@@ -1,6 +1,8 @@
 # Party Command Games
 
-A single-file party games web app — no install, no server, no framework. Open `party-games.html` in any browser and play.
+**Play now: https://tokkathedj.github.io/party-command-games/**
+
+A single-file party games web app — no install, no server, no framework. Open in any browser and play.
 
 ## Games
 
