@@ -1,0 +1,1956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Party Command Games</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --lava1: #ff2200;
+    --lava2: #ff6600;
+    --lava3: #ffaa00;
+    --safe: #1a5c2a;
+    --green: #00c44f;
+    --red: #cc0000;
+  }
+
+  body {
+    font-family: 'Arial Black', Impact, sans-serif;
+    background: #111;
+    color: #fff;
+    min-height: 100vh;
+    overflow-x: hidden;
+    user-select: none;
+  }
+
+  /* ── SOUND TOGGLE ── */
+  #sound-toggle {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 500;
+    background: rgba(0,0,0,0.55);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: #fff;
+    font-size: 1.3rem;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  #sound-toggle:hover { background: rgba(255,255,255,0.2); }
+  #sound-toggle.muted { opacity: 0.55; }
+
+  /* ── SPLASH OVERLAY ── */
+  #splash-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    cursor: pointer;
+  }
+  #splash-overlay.show { display: flex; }
+
+  #splash-icon {
+    font-size: clamp(5rem, 22vw, 10rem);
+    line-height: 1;
+    animation: splashBounce 0.55s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+  }
+  #splash-title {
+    font-size: clamp(2rem, 9vw, 5rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-align: center;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    padding: 0 20px;
+    animation: splashSlideUp 0.4s ease-out 0.1s both;
+  }
+  #splash-sub {
+    font-size: clamp(1rem, 4vw, 1.6rem);
+    font-family: Arial, sans-serif;
+    font-weight: normal;
+    opacity: 0.85;
+    animation: splashSlideUp 0.4s ease-out 0.2s both;
+  }
+  #splash-tap {
+    font-size: clamp(0.75rem, 2.5vw, 1rem);
+    font-family: Arial, sans-serif;
+    font-weight: normal;
+    opacity: 0.45;
+    margin-top: 8px;
+    animation: splashSlideUp 0.4s ease-out 0.35s both;
+  }
+
+  @keyframes splashBounce {
+    0%   { transform: scale(0.2) rotate(-10deg); opacity: 0; }
+    60%  { transform: scale(1.2) rotate(4deg); opacity: 1; }
+    80%  { transform: scale(0.93) rotate(-2deg); }
+    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  }
+  @keyframes splashSlideUp {
+    0%   { transform: translateY(18px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  /* ── MAIN MENU ── */
+  #menu {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 24px;
+    padding: 32px;
+    background: radial-gradient(ellipse at center, #1a1a2e 0%, #111 80%);
+  }
+
+  #menu h1 {
+    font-size: clamp(2rem, 8vw, 4rem);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #fff;
+    text-shadow: 0 0 30px rgba(255,100,0,0.6);
+    text-align: center;
+  }
+
+  #menu p {
+    color: #aaa;
+    font-family: Arial, sans-serif;
+    font-size: 1rem;
+    font-weight: normal;
+    text-align: center;
+  }
+
+  .game-card {
+    width: 100%;
+    max-width: 420px;
+    border: none;
+    border-radius: 12px;
+    padding: 28px 24px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: clamp(1.4rem, 5vw, 2rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: transform 0.15s, box-shadow 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .game-card:active { transform: scale(0.97); }
+  .game-card:hover  { transform: scale(1.03); }
+
+  .card-lava  { background: linear-gradient(135deg, #b22000, #ff5500); color: #fff; box-shadow: 0 6px 30px rgba(255,60,0,0.5); }
+  .card-simon { background: linear-gradient(135deg, #0055cc, #33aaff); color: #fff; box-shadow: 0 6px 30px rgba(30,120,255,0.5); }
+  .card-rglg  { background: linear-gradient(135deg, #007a22, #00dd55); color: #fff; box-shadow: 0 6px 30px rgba(0,200,70,0.5); }
+  .card-hp    { background: linear-gradient(135deg, #7a2800, #ff6600); color: #fff; box-shadow: 0 6px 30px rgba(255,100,0,0.5); }
+  .card-mc    { background: linear-gradient(135deg, #440088, #aa44ff); color: #fff; box-shadow: 0 6px 30px rgba(150,50,255,0.5); }
+
+  .card-icon { font-size: 2.4rem; }
+
+  /* ── SCREENS ── */
+  .screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 70px 24px 40px;
+    text-align: center;
+    position: relative;
+    transition: background 0.4s;
+  }
+  .screen.active { display: flex; }
+
+  /* BACK BUTTON */
+  .back-btn {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: #fff;
+    font-family: inherit;
+    font-size: 1rem;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    z-index: 10;
+  }
+  .back-btn:hover { background: rgba(255,255,255,0.25); }
+
+  /* GENERIC BUTTONS */
+  .btn {
+    border: none;
+    border-radius: 10px;
+    padding: 18px 36px;
+    font-family: inherit;
+    font-size: clamp(1.1rem, 4vw, 1.5rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 0.12s, opacity 0.12s;
+    letter-spacing: 1px;
+  }
+  .btn:active { transform: scale(0.95); }
+  .btn-green  { background: #00cc55; color: #fff; }
+  .btn-red    { background: #cc2200; color: #fff; }
+  .btn-gray   { background: #444; color: #fff; }
+  .btn-blue   { background: #1177ee; color: #fff; }
+  .btn-orange { background: #ff5500; color: #fff; }
+  .btn-purple { background: #7722cc; color: #fff; }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* ══════════════════════════════
+     FLOOR IS LAVA
+  ══════════════════════════════ */
+  #lava-screen { background: #1a5c2a; }
+  #lava-screen.lava-mode    { animation: lavaPulse 0.6s ease-in-out infinite alternate; }
+  #lava-screen.lava-warning { animation: warningPulse 0.9s ease-in-out infinite alternate; }
+
+  @keyframes lavaPulse {
+    0%   { background: #cc1100; }
+    50%  { background: #ff4400; }
+    100% { background: #ff8800; }
+  }
+  @keyframes warningPulse {
+    0%   { background: #1a5c2a; }
+    100% { background: #5a3a00; }
+  }
+
+  #lava-status {
+    font-size: clamp(2.8rem, 13vw, 7rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    margin-bottom: 16px;
+    line-height: 1.1;
+  }
+
+  #lava-sub {
+    font-size: clamp(1.1rem, 4.5vw, 1.8rem);
+    font-family: Arial, sans-serif;
+    font-weight: normal;
+    opacity: 0.85;
+    margin-bottom: 32px;
+  }
+
+  #lava-countdown {
+    font-size: clamp(3.5rem, 18vw, 9rem);
+    font-weight: 900;
+    text-shadow: 0 0 40px rgba(255,255,255,0.3);
+    margin-bottom: 32px;
+    min-height: 1.2em;
+  }
+
+  .lava-controls { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+
+  /* LAVA SETTINGS */
+  #lava-settings-toggle {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.65);
+    font-family: Arial, sans-serif;
+    font-size: 0.85rem;
+    padding: 8px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 18px;
+    transition: background 0.15s;
+    letter-spacing: 0.5px;
+  }
+  #lava-settings-toggle:hover { background: rgba(255,255,255,0.18); }
+
+  #lava-settings {
+    display: none;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 20px 22px;
+    margin-top: 12px;
+    width: 100%;
+    max-width: 380px;
+    text-align: left;
+  }
+  #lava-settings.open { display: block; }
+
+  .setting-row { margin-bottom: 16px; }
+  .setting-row:last-child { margin-bottom: 0; }
+
+  .setting-label {
+    font-family: Arial, sans-serif;
+    font-size: 0.78rem;
+    opacity: 0.65;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-transform: uppercase;
+  }
+  .setting-label strong { color: #ffcc44; font-size: 0.9rem; }
+
+  .setting-row input[type=range] {
+    width: 100%;
+    accent-color: #ff5500;
+    cursor: pointer;
+    height: 5px;
+  }
+
+  #flames {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 120px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  #flames.show { opacity: 1; }
+  .flame {
+    position: absolute;
+    bottom: 0;
+    border-radius: 50% 50% 20% 20%;
+    animation: flameAnim 0.8s ease-in-out infinite alternate;
+  }
+  @keyframes flameAnim {
+    0%   { transform: scaleY(0.8) scaleX(1.1); }
+    100% { transform: scaleY(1.2) scaleX(0.9); }
+  }
+
+  /* ══════════════════════════════
+     SIMON SAYS
+  ══════════════════════════════ */
+  #simon-screen { background: #0a1628; justify-content: flex-start; padding-top: 80px; }
+
+  #simon-command-box {
+    background: rgba(255,255,255,0.07);
+    border: 3px solid rgba(255,255,255,0.15);
+    border-radius: 16px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 560px;
+    margin-bottom: 24px;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  #simon-label {
+    font-size: clamp(0.85rem, 3vw, 1.1rem);
+    color: #88aaff;
+    letter-spacing: 2px;
+    font-family: Arial, sans-serif;
+  }
+
+  #simon-command {
+    font-size: clamp(1.6rem, 6vw, 2.8rem);
+    font-weight: 900;
+    line-height: 1.2;
+    color: #fff;
+  }
+  #simon-command.multi-step {
+    font-size: clamp(1.2rem, 4.5vw, 2.1rem);
+  }
+  #simon-command.trick { color: #ff4444; animation: shakeTrick 0.4s; }
+  @keyframes shakeTrick {
+    0%,100% { transform: translateX(0); }
+    20%     { transform: translateX(-8px); }
+    40%     { transform: translateX(8px); }
+    60%     { transform: translateX(-6px); }
+    80%     { transform: translateX(6px); }
+  }
+  #simon-command.legit { color: #44ff88; }
+
+  .simon-score-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .simon-score-card {
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 10px 16px;
+    text-align: center;
+    min-width: 80px;
+  }
+  .simon-score-card .label { font-size: 0.7rem; font-family: Arial, sans-serif; opacity: 0.6; letter-spacing: 1px; }
+  .simon-score-card .value { font-size: 1.8rem; font-weight: 900; }
+  .score-correct .value { color: #44ff88; }
+  .score-tricked .value { color: #ff4444; }
+  .score-round   .value { color: #ffcc44; }
+
+  .simon-action-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; }
+
+  .simon-speed-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-family: Arial, sans-serif;
+    font-size: 0.9rem;
+    opacity: 0.7;
+  }
+  .speed-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    font-family: inherit;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.15s;
+  }
+  .speed-btn.active { background: #1177ee; border-color: #1177ee; }
+
+  .mode-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-family: Arial, sans-serif;
+    font-size: 0.9rem;
+    opacity: 0.75;
+    justify-content: center;
+  }
+
+  #simon-next-bar {
+    width: 100%;
+    max-width: 300px;
+    height: 8px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 12px;
+  }
+  #simon-next-fill {
+    height: 100%;
+    background: #1177ee;
+    border-radius: 4px;
+    transition: width 0.1s linear;
+    width: 0%;
+  }
+
+  /* ══════════════════════════════
+     RED LIGHT GREEN LIGHT
+  ══════════════════════════════ */
+  #rglg-screen { background: #005522; }
+  #rglg-screen.red-light   { background: #880000; animation: redPulse 0.5s ease-in-out infinite alternate; }
+  #rglg-screen.green-light { background: #004d1a; animation: greenPulse 1s ease-in-out infinite alternate; }
+
+  @keyframes redPulse {
+    0%   { background: #990000; }
+    100% { background: #ff1100; }
+  }
+  @keyframes greenPulse {
+    0%   { background: #004d1a; }
+    100% { background: #007a2a; }
+  }
+
+  #rglg-light-icon {
+    font-size: clamp(5rem, 20vw, 10rem);
+    margin-bottom: 16px;
+    filter: drop-shadow(0 0 30px currentColor);
+    transition: filter 0.3s;
+  }
+
+  #rglg-status {
+    font-size: clamp(2.8rem, 13vw, 7rem);
+    font-weight: 900;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    margin-bottom: 8px;
+  }
+
+  #rglg-sub {
+    font-size: clamp(1rem, 4vw, 1.6rem);
+    font-family: Arial, sans-serif;
+    font-weight: normal;
+    opacity: 0.75;
+    margin-bottom: 28px;
+  }
+
+  .rglg-elim-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 14px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 12px;
+    padding: 12px 22px;
+  }
+  .rglg-elim-row span {
+    font-size: 1rem;
+    font-family: Arial, sans-serif;
+    opacity: 0.8;
+  }
+  #elim-count { font-size: 2rem; font-weight: 900; }
+  .elim-btn {
+    background: rgba(255,255,255,0.15);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: #fff;
+    font-size: 1.4rem;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 900;
+    transition: background 0.1s;
+  }
+  .elim-btn:hover { background: rgba(255,255,255,0.25); }
+
+  /* SUDDEN DEATH TOGGLE */
+  #sudden-death-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    font-family: Arial, sans-serif;
+    font-size: 0.95rem;
+    opacity: 0.85;
+  }
+  #sudden-death-btn {
+    background: rgba(255,255,255,0.1);
+    border: 2px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.7);
+    font-family: inherit;
+    font-size: 0.9rem;
+    padding: 7px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
+  }
+  #sudden-death-btn.on {
+    background: #bb0000;
+    border-color: #ff2200;
+    color: #fff;
+    animation: sdGlow 1s ease-in-out infinite alternate;
+  }
+  @keyframes sdGlow {
+    0%   { box-shadow: 0 0 6px rgba(255,0,0,0.4); }
+    100% { box-shadow: 0 0 22px rgba(255,0,0,0.85); }
+  }
+
+  .rglg-controls { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+
+  /* ══════════════════════════════
+     HOT POTATO
+  ══════════════════════════════ */
+  #hp-screen { background: #3a1500; }
+  #hp-screen.hp-burned { animation: hpBurnPulse 0.35s ease-in-out infinite alternate; }
+
+  @keyframes hpBurnPulse {
+    0%   { background: #cc0000; }
+    100% { background: #ff4400; }
+  }
+
+  #hp-icon {
+    font-size: clamp(5rem, 20vw, 10rem);
+    margin-bottom: 16px;
+    line-height: 1;
+    animation: hpBounce 0.55s ease-in-out infinite alternate;
+  }
+  #hp-screen.hp-burned #hp-icon { animation: hpShake 0.1s linear infinite; }
+
+  @keyframes hpBounce {
+    0%   { transform: rotate(-8deg) scale(0.95); }
+    100% { transform: rotate(8deg) scale(1.05); }
+  }
+  @keyframes hpShake {
+    0%   { transform: translate(-4px, 0) rotate(-5deg); }
+    50%  { transform: translate(4px, 0) rotate(5deg); }
+    100% { transform: translate(-4px, 0) rotate(-5deg); }
+  }
+
+  #hp-status {
+    font-size: clamp(2.8rem, 13vw, 7rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    margin-bottom: 8px;
+  }
+  #hp-sub {
+    font-size: clamp(1.1rem, 4.5vw, 1.8rem);
+    font-family: Arial, sans-serif;
+    font-weight: normal;
+    opacity: 0.85;
+    margin-bottom: 8px;
+  }
+  #hp-countdown {
+    font-size: clamp(3.5rem, 18vw, 9rem);
+    font-weight: 900;
+    text-shadow: 0 0 40px rgba(255,255,255,0.3);
+    min-height: 1.2em;
+    margin-bottom: 20px;
+  }
+
+  .hp-elim-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 16px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 12px;
+    padding: 12px 22px;
+  }
+  .hp-elim-row > span { font-size: 1rem; font-family: Arial, sans-serif; opacity: 0.8; }
+  #hp-elim-count { font-size: 2rem; font-weight: 900; }
+
+  #hp-settings-toggle {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.65);
+    font-family: Arial, sans-serif;
+    font-size: 0.85rem;
+    padding: 8px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 18px;
+    transition: background 0.15s;
+  }
+  #hp-settings-toggle:hover { background: rgba(255,255,255,0.18); }
+  #hp-settings {
+    display: none;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 20px 22px;
+    margin-top: 12px;
+    width: 100%;
+    max-width: 380px;
+    text-align: left;
+  }
+  #hp-settings.open { display: block; }
+
+  /* ══════════════════════════════
+     MUSICAL CHAIRS
+  ══════════════════════════════ */
+  #mc-screen { background: #110022; }
+  #mc-screen.mc-playing { animation: mcPlayPulse 0.9s ease-in-out infinite alternate; }
+  #mc-screen.mc-stopped { animation: mcStopPulse 0.4s ease-in-out infinite alternate; }
+  #mc-screen.mc-winner  { animation: mcWinPulse 1s ease-in-out infinite alternate; }
+
+  @keyframes mcPlayPulse {
+    0%   { background: #110022; }
+    100% { background: #3300aa; }
+  }
+  @keyframes mcStopPulse {
+    0%   { background: #550000; }
+    100% { background: #cc0000; }
+  }
+  @keyframes mcWinPulse {
+    0%   { background: #221100; }
+    100% { background: #886600; }
+  }
+
+  #mc-icon {
+    font-size: clamp(5rem, 20vw, 10rem);
+    margin-bottom: 16px;
+    line-height: 1;
+  }
+  #mc-screen.mc-playing #mc-icon { animation: mcBounce 0.4s ease-in-out infinite alternate; }
+  @keyframes mcBounce {
+    0%   { transform: scale(0.93) rotate(-3deg); }
+    100% { transform: scale(1.07) rotate(3deg); }
+  }
+
+  #mc-status {
+    font-size: clamp(2rem, 10vw, 5rem);
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    margin-bottom: 8px;
+  }
+  #mc-sub {
+    font-size: clamp(1rem, 4vw, 1.6rem);
+    font-family: Arial, sans-serif;
+    font-weight: normal;
+    opacity: 0.85;
+    margin-bottom: 8px;
+  }
+  #mc-countdown {
+    font-size: clamp(3.5rem, 18vw, 9rem);
+    font-weight: 900;
+    text-shadow: 0 0 40px rgba(255,255,255,0.3);
+    min-height: 1.2em;
+    margin-bottom: 16px;
+  }
+
+  .mc-info-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .mc-info-card {
+    background: rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 14px 22px;
+    text-align: center;
+    min-width: 110px;
+  }
+  .mc-info-card .label {
+    font-size: 0.72rem;
+    font-family: Arial, sans-serif;
+    opacity: 0.6;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .mc-counter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: center;
+  }
+  .mc-counter span, #mc-chairs-val {
+    font-size: 2.2rem;
+    font-weight: 900;
+    min-width: 1.5ch;
+    text-align: center;
+  }
+  #mc-chairs-val { color: #bb88ff; }
+
+  /* DRAMATIC PAUSE */
+  #dramatic-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: #111;
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+  }
+  #dramatic-overlay.show { display: flex; }
+  #dramatic-dots {
+    font-size: 4rem;
+    letter-spacing: 12px;
+    animation: dotsAnim 1s steps(3, end) infinite;
+  }
+  @keyframes dotsAnim {
+    0%   { opacity: 0.3; }
+    33%  { opacity: 0.6; }
+    66%  { opacity: 0.9; }
+    100% { opacity: 1; }
+  }
+  #dramatic-text {
+    font-size: clamp(1.2rem, 5vw, 2rem);
+    color: #888;
+    font-family: Arial, sans-serif;
+    font-weight: normal;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ SOUND TOGGLE ═══ -->
+<button id="sound-toggle" onclick="toggleSound()" title="Toggle sound">🔊</button>
+
+<!-- ═══ SPLASH OVERLAY ═══ -->
+<div id="splash-overlay" onclick="dismissSplash()">
+  <div id="splash-icon">🎉</div>
+  <div id="splash-title">GET READY</div>
+  <div id="splash-sub">Let's play!</div>
+  <div id="splash-tap">tap to skip</div>
+</div>
+
+<!-- ═══ MAIN MENU ═══ -->
+<div id="menu">
+  <h1>🎉 Party Command Games</h1>
+  <p>Pick a game to play with friends!</p>
+
+  <button class="game-card card-lava" onclick="showScreen('lava-screen')">
+    <span class="card-icon">🔥</span>
+    <span>Floor is Lava</span>
+  </button>
+  <button class="game-card card-simon" onclick="showScreen('simon-screen')">
+    <span class="card-icon">👆</span>
+    <span>Simon Says</span>
+  </button>
+  <button class="game-card card-rglg" onclick="showScreen('rglg-screen')">
+    <span class="card-icon">🚦</span>
+    <span>Red / Green Light</span>
+  </button>
+  <button class="game-card card-hp" onclick="showScreen('hp-screen')">
+    <span class="card-icon">🥔</span>
+    <span>Hot Potato</span>
+  </button>
+  <button class="game-card card-mc" onclick="showScreen('mc-screen')">
+    <span class="card-icon">🪑</span>
+    <span>Musical Chairs</span>
+  </button>
+</div>
+
+<!-- ═══ FLOOR IS LAVA ═══ -->
+<div id="lava-screen" class="screen">
+  <button class="back-btn" onclick="backToMenu('lava')">← Menu</button>
+
+  <div id="lava-status">🎉 YOU'RE SAFE!</div>
+  <div id="lava-sub">😈 Get ready… lava strikes at any moment!</div>
+  <div id="lava-countdown"></div>
+
+  <div class="lava-controls">
+    <button id="lava-start-btn" class="btn btn-orange" onclick="lavaStart()">▶ START</button>
+    <button id="lava-stop-btn"  class="btn btn-gray"   onclick="lavaStop()" disabled>■ STOP</button>
+  </div>
+
+  <button id="lava-settings-toggle" onclick="toggleLavaSettings()">⚙ Settings</button>
+
+  <div id="lava-settings">
+    <div class="setting-row">
+      <div class="setting-label">
+        <span>MIN WAIT</span>
+        <strong><span id="lava-min-wait-val">30</span>s</strong>
+      </div>
+      <input type="range" id="lava-min-wait" min="5" max="120" value="30"
+             oninput="lavaSettingUpdate('lava-min-wait','lava-min-wait-val')">
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        <span>MAX WAIT</span>
+        <strong><span id="lava-max-wait-val">120</span>s</strong>
+      </div>
+      <input type="range" id="lava-max-wait" min="10" max="180" value="120"
+             oninput="lavaSettingUpdate('lava-max-wait','lava-max-wait-val')">
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        <span>LAVA DURATION MIN</span>
+        <strong><span id="lava-dur-min-val">10</span>s</strong>
+      </div>
+      <input type="range" id="lava-dur-min" min="3" max="60" value="10"
+             oninput="lavaSettingUpdate('lava-dur-min','lava-dur-min-val')">
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        <span>LAVA DURATION MAX</span>
+        <strong><span id="lava-dur-max-val">18</span>s</strong>
+      </div>
+      <input type="range" id="lava-dur-max" min="3" max="60" value="18"
+             oninput="lavaSettingUpdate('lava-dur-max','lava-dur-max-val')">
+    </div>
+  </div>
+</div>
+
+<!-- flame decoration -->
+<div id="flames"></div>
+
+<!-- ═══ SIMON SAYS ═══ -->
+<div id="simon-screen" class="screen">
+  <button class="back-btn" onclick="backToMenu('simon')">← Menu</button>
+
+  <div class="simon-score-row">
+    <div class="simon-score-card score-round">
+      <div class="label">ROUND</div>
+      <div class="value" id="simon-round">0</div>
+    </div>
+    <div class="simon-score-card score-correct">
+      <div class="label">CORRECT</div>
+      <div class="value" id="simon-correct">0</div>
+    </div>
+    <div class="simon-score-card score-tricked">
+      <div class="label">TRICKED</div>
+      <div class="value" id="simon-tricked">0</div>
+    </div>
+  </div>
+
+  <div id="simon-command-box">
+    <div id="simon-label">WAITING…</div>
+    <div id="simon-command">Press Start!</div>
+    <div id="simon-next-bar"><div id="simon-next-fill"></div></div>
+  </div>
+
+  <div class="simon-action-row">
+    <button class="btn btn-green" id="simon-did-btn"   onclick="simonScore(true)"  disabled>✔ I Did It!</button>
+    <button class="btn btn-red"   id="simon-trick-btn" onclick="simonScore(false)" disabled>✘ Got Tricked</button>
+  </div>
+
+  <div class="simon-speed-row">
+    <span>Speed:</span>
+    <button class="speed-btn active" id="speed-slow"   onclick="setSimonSpeed(1)">Slow</button>
+    <button class="speed-btn"        id="speed-medium" onclick="setSimonSpeed(2)">Medium</button>
+    <button class="speed-btn"        id="speed-fast"   onclick="setSimonSpeed(3)">Fast</button>
+  </div>
+
+  <div style="display:flex;gap:14px;margin-top:20px;flex-wrap:wrap;justify-content:center;">
+    <button id="simon-start-btn" class="btn btn-blue" onclick="simonStart()">▶ START</button>
+    <button id="simon-stop-btn"  class="btn btn-gray" onclick="simonStop()" disabled>■ STOP</button>
+    <button class="btn btn-gray" onclick="simonResetScore()">↺ Reset</button>
+  </div>
+</div>
+
+<!-- ═══ RED LIGHT GREEN LIGHT ═══ -->
+<div id="rglg-screen" class="screen">
+  <button class="back-btn" onclick="backToMenu('rglg')">← Menu</button>
+
+  <div id="rglg-light-icon">🟢</div>
+  <div id="rglg-status">READY?</div>
+  <div id="rglg-sub">Press Start to begin</div>
+
+  <div class="rglg-elim-row">
+    <span>Eliminations:</span>
+    <button class="elim-btn" onclick="rglgElim(-1)">−</button>
+    <span id="elim-count">0</span>
+    <button class="elim-btn" onclick="rglgElim(1)">+</button>
+    <button class="elim-btn" onclick="rglgElim(-elimCount)" style="font-size:0.9rem;width:auto;padding:0 10px;">↺</button>
+  </div>
+
+  <div id="sudden-death-row">
+    <span>⚡ Sudden Death:</span>
+    <button id="sudden-death-btn" onclick="toggleSuddenDeath()">OFF</button>
+  </div>
+
+  <div class="rglg-controls">
+    <button id="rglg-start-btn" class="btn btn-green" onclick="rglgStart()">▶ START</button>
+    <button id="rglg-stop-btn"  class="btn btn-gray"  onclick="rglgStop()" disabled>■ STOP</button>
+  </div>
+</div>
+
+<!-- ═══ HOT POTATO ═══ -->
+<div id="hp-screen" class="screen">
+  <button class="back-btn" onclick="backToMenu('hp')">← Menu</button>
+
+  <div id="hp-icon">🥔</div>
+  <div id="hp-status">🥔 HOT POTATO</div>
+  <div id="hp-sub">😈 Pass it fast… before it explodes!</div>
+  <div id="hp-countdown"></div>
+
+  <div class="hp-elim-row">
+    <span>Eliminations:</span>
+    <button class="elim-btn" onclick="hpElim(-1)">−</button>
+    <span id="hp-elim-count">0</span>
+    <button class="elim-btn" onclick="hpElim(1)">+</button>
+    <button class="elim-btn" onclick="hpElim(-hotPotatoElimCount)" style="font-size:0.9rem;width:auto;padding:0 10px;">↺</button>
+  </div>
+
+  <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;">
+    <button id="hp-start-btn" class="btn btn-orange" onclick="hotPotatoStart()">▶ START</button>
+    <button id="hp-stop-btn"  class="btn btn-gray"   onclick="hotPotatoStop()" disabled>■ STOP</button>
+  </div>
+
+  <div class="mode-row">
+    <span>Mode:</span>
+    <button class="speed-btn active" id="hp-auto-btn"   onclick="setHpMode('auto')">Auto</button>
+    <button class="speed-btn"        id="hp-manual-btn" onclick="setHpMode('manual')">Manual</button>
+  </div>
+  <div id="hp-explode-wrap" style="display:none;justify-content:center;margin-top:6px;">
+    <button class="btn btn-red" style="font-size:1.3rem;padding:14px 36px;" onclick="hotPotatoBurn()">💥 EXPLODE!</button>
+  </div>
+
+  <button id="hp-settings-toggle" onclick="toggleHpSettings()">⚙ Settings</button>
+  <div id="hp-settings">
+    <div class="setting-row">
+      <div class="setting-label">
+        <span>MIN TIME</span>
+        <strong><span id="hp-min-time-val">15</span>s</strong>
+      </div>
+      <input type="range" id="hp-min-time" min="5" max="90" value="15"
+             oninput="hpSettingUpdate('hp-min-time','hp-min-time-val')">
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        <span>MAX TIME</span>
+        <strong><span id="hp-max-time-val">60</span>s</strong>
+      </div>
+      <input type="range" id="hp-max-time" min="10" max="120" value="60"
+             oninput="hpSettingUpdate('hp-max-time','hp-max-time-val')">
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MUSICAL CHAIRS ═══ -->
+<div id="mc-screen" class="screen">
+  <button class="back-btn" onclick="backToMenu('mc')">← Menu</button>
+
+  <div id="mc-icon">🪑</div>
+  <div id="mc-status">🪑 MUSICAL CHAIRS</div>
+  <div id="mc-sub">Set players and press Start!</div>
+  <div id="mc-countdown"></div>
+
+  <div class="mc-info-row">
+    <div class="mc-info-card">
+      <div class="label">PLAYERS</div>
+      <div class="mc-counter">
+        <button class="elim-btn" onclick="mcAdjustPlayers(-1)">−</button>
+        <span id="mc-players">4</span>
+        <button class="elim-btn" onclick="mcAdjustPlayers(1)">+</button>
+      </div>
+    </div>
+    <div class="mc-info-card">
+      <div class="label">CHAIRS</div>
+      <div id="mc-chairs-val">3</div>
+    </div>
+  </div>
+
+  <div class="mode-row">
+    <span>Mode:</span>
+    <button class="speed-btn active" id="mc-auto-btn"   onclick="setMcMode('auto')">Auto</button>
+    <button class="speed-btn"        id="mc-manual-btn" onclick="setMcMode('manual')">Manual</button>
+  </div>
+  <div id="mc-stop-music-wrap" style="display:none;justify-content:center;margin-top:6px;">
+    <button class="btn btn-red" style="font-size:1.3rem;padding:14px 36px;" id="mc-stop-music-btn" onclick="mcStopMusic()">⏹ STOP MUSIC</button>
+  </div>
+
+  <div style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center;">
+    <button id="mc-start-btn" class="btn btn-purple" onclick="musicalChairsStart()">▶ START</button>
+    <button id="mc-stop-btn"  class="btn btn-gray"   onclick="musicalChairsStop()" disabled>■ STOP</button>
+    <button class="btn btn-gray"                      onclick="musicalChairsReset()">↺ Reset</button>
+  </div>
+</div>
+
+<!-- Dramatic pause overlay -->
+<div id="dramatic-overlay">
+  <div id="dramatic-text">CHANGING LIGHT</div>
+  <div id="dramatic-dots">• • •</div>
+</div>
+
+<script>
+// ── Sound Toggle ──────────────────────────────────────────
+let soundEnabled = true;
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  if (!soundEnabled) synth.cancel();
+  const btn = document.getElementById('sound-toggle');
+  btn.textContent = soundEnabled ? '🔊' : '🔇';
+  btn.classList.toggle('muted', !soundEnabled);
+}
+
+// ── Speech & Audio Utilities ──────────────────────────────
+const synth = window.speechSynthesis;
+let audioCtx = null;
+let cartoonyVoice = null;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+// Pick the most expressive/natural English voice available.
+// Prefer named voices known to sound lively; fall back to any English voice.
+function pickVoice() {
+  const voices = synth.getVoices();
+  if (!voices.length) return;
+  const want = [
+    'Google UK English Female',
+    'Google US English',
+    'Microsoft Zira Desktop',
+    'Microsoft Zira - English (United States)',
+    'Samantha',
+    'Karen',
+    'Victoria',
+    'Moira',
+    'Tessa',
+  ];
+  for (const name of want) {
+    const v = voices.find(v => v.name === name);
+    if (v) { cartoonyVoice = v; return; }
+  }
+  // Any English voice is better than the default robotic fallback
+  cartoonyVoice = voices.find(v => v.lang.startsWith('en')) || null;
+}
+pickVoice();
+synth.addEventListener('voiceschanged', pickVoice);
+
+function speak(text, opts = {}) {
+  if (!soundEnabled) return;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  // Only apply the cartoony voice when not using the ominous low-pitch warning
+  if (cartoonyVoice && !opts.keepDefault) u.voice = cartoonyVoice;
+  u.rate   = opts.rate   ?? 1.05;
+  u.pitch  = opts.pitch  ?? 1.65;   // high pitch = cartoony character voice
+  u.volume = opts.volume ?? 1;
+  synth.speak(u);
+}
+
+function playAlarmBeep(freq = 880, duration = 0.15) {
+  if (!soundEnabled) return;
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = 'sawtooth';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.4, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + duration);
+}
+
+function playAlarmSequence(count = 6, freq = 880) {
+  if (!soundEnabled) return;
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => playAlarmBeep(freq + (i % 2) * 200), i * 220);
+  }
+}
+
+function playChime(freqs = [523, 659, 784]) {
+  if (!soundEnabled) return;
+  const ctx = getAudioCtx();
+  freqs.forEach((f, i) => {
+    setTimeout(() => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.6);
+    }, i * 150);
+  });
+}
+
+// ── Splash Overlay ────────────────────────────────────────
+const SPLASH_CONFIG = {
+  'lava-screen': {
+    bg: 'linear-gradient(135deg, #8b1200, #ff4400)',
+    icon: '🔥',
+    title: 'FLOOR IS LAVA',
+    sub: 'Jump! Get off the floor!',
+  },
+  'simon-screen': {
+    bg: 'linear-gradient(135deg, #001a66, #0055cc)',
+    icon: '👆',
+    title: 'SIMON SAYS',
+    sub: 'Listen carefully!',
+  },
+  'rglg-screen': {
+    bg: 'linear-gradient(135deg, #003d14, #00aa33)',
+    icon: '🚦',
+    title: 'RED LIGHT GREEN LIGHT',
+    sub: 'Move or freeze!',
+  },
+  'hp-screen': {
+    bg: 'linear-gradient(135deg, #4a1500, #cc4400)',
+    icon: '🥔',
+    title: 'HOT POTATO',
+    sub: 'Pass it before it blows!',
+  },
+  'mc-screen': {
+    bg: 'linear-gradient(135deg, #1a0044, #6600cc)',
+    icon: '🪑',
+    title: 'MUSICAL CHAIRS',
+    sub: 'Find a seat or you\'re out!',
+  },
+};
+
+let splashTimeout = null;
+
+function showSplash(screenId) {
+  const cfg = SPLASH_CONFIG[screenId];
+  if (!cfg) return;
+  const overlay = document.getElementById('splash-overlay');
+  overlay.style.background = cfg.bg;
+  overlay.style.opacity    = '1';
+  overlay.style.transition = 'none';
+  document.getElementById('splash-icon').textContent  = cfg.icon;
+  document.getElementById('splash-title').textContent = cfg.title;
+  document.getElementById('splash-sub').textContent   = cfg.sub;
+  overlay.classList.add('show');
+  clearTimeout(splashTimeout);
+  splashTimeout = setTimeout(dismissSplash, 1700);
+}
+
+function dismissSplash() {
+  clearTimeout(splashTimeout);
+  const overlay = document.getElementById('splash-overlay');
+  overlay.style.transition = 'opacity 0.35s';
+  overlay.style.opacity    = '0';
+  setTimeout(() => {
+    overlay.classList.remove('show');
+    overlay.style.opacity    = '';
+    overlay.style.transition = '';
+  }, 360);
+}
+
+// ── Screen Navigation ─────────────────────────────────────
+function showScreen(id) {
+  document.getElementById('menu').style.display = 'none';
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  showSplash(id);
+}
+
+function backToMenu(game) {
+  if (game === 'lava')  lavaStop();
+  if (game === 'simon') simonStop();
+  if (game === 'rglg')  rglgStop();
+  if (game === 'hp')    hotPotatoStop();
+  if (game === 'mc')    musicalChairsStop();
+  synth.cancel();
+  dismissSplash();
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('menu').style.display = 'flex';
+}
+
+// ══════════════════════════════════════════════════════════
+// FLOOR IS LAVA
+// ══════════════════════════════════════════════════════════
+let lavaRunning = false;
+let lavaTimeout = null;
+let lavaWarningTimeout = null;
+let lavaCountdownInterval = null;
+let lavaIsActive = false;
+
+function lavaSettingUpdate(inputId, valId) {
+  document.getElementById(valId).textContent = document.getElementById(inputId).value;
+}
+
+function toggleLavaSettings() {
+  const panel  = document.getElementById('lava-settings');
+  const toggle = document.getElementById('lava-settings-toggle');
+  const open   = panel.classList.toggle('open');
+  toggle.textContent = open ? '▲ Hide Settings' : '⚙ Settings';
+}
+
+function getLavaSetting(id) {
+  return parseInt(document.getElementById(id).value) * 1000;
+}
+
+function lavaStart() {
+  lavaRunning = true;
+  getAudioCtx().resume();
+  document.getElementById('lava-start-btn').disabled = true;
+  document.getElementById('lava-stop-btn').disabled  = false;
+  buildFlames();
+  lavaSetSafe();
+  lavaScheduleNext();
+}
+
+function lavaStop() {
+  lavaRunning = false;
+  lavaIsActive = false;
+  clearTimeout(lavaTimeout);
+  clearTimeout(lavaWarningTimeout);
+  clearInterval(lavaCountdownInterval);
+  synth.cancel();
+  document.getElementById('lava-start-btn').disabled = false;
+  document.getElementById('lava-stop-btn').disabled  = true;
+  const screen = document.getElementById('lava-screen');
+  screen.classList.remove('lava-mode', 'lava-warning');
+  document.getElementById('lava-status').textContent    = '🌿 YOU\'RE SAFE';
+  document.getElementById('lava-sub').textContent       = 'Game stopped. Press Start to play again!';
+  document.getElementById('lava-countdown').textContent = '';
+  document.getElementById('flames').classList.remove('show');
+}
+
+function lavaSetSafe() {
+  lavaIsActive = false;
+  const screen = document.getElementById('lava-screen');
+  screen.classList.remove('lava-mode', 'lava-warning');
+  document.getElementById('lava-status').textContent    = '🌿 YOU\'RE SAFE';
+  document.getElementById('lava-sub').textContent       = '😅 Relax… for now.';
+  document.getElementById('lava-countdown').textContent = '';
+  document.getElementById('flames').classList.remove('show');
+}
+
+function lavaScheduleNext() {
+  if (!lavaRunning) return;
+  const minWait = getLavaSetting('lava-min-wait');
+  const maxWait = Math.max(getLavaSetting('lava-max-wait'), minWait + 2000);
+  const delay   = rand(minWait, maxWait);
+
+  // Warning whisper ~5 seconds before lava (note: Web Speech can't truly whisper;
+  // low pitch + low volume is the best approximation available in browsers)
+  if (delay > 7000) {
+    lavaWarningTimeout = setTimeout(() => {
+      if (!lavaRunning || lavaIsActive) return;
+      document.getElementById('lava-screen').classList.add('lava-warning');
+      document.getElementById('lava-sub').textContent = '💀 It is coming…';
+      speak('It is coming...', { rate: 0.6, pitch: 0.35, volume: 0.55, keepDefault: true });
+    }, delay - 5000);
+  }
+
+  lavaTimeout = setTimeout(() => {
+    document.getElementById('lava-screen').classList.remove('lava-warning');
+    lavaTrigger();
+  }, delay);
+}
+
+function lavaTrigger() {
+  if (!lavaRunning) return;
+  lavaIsActive = true;
+
+  document.getElementById('lava-screen').classList.add('lava-mode');
+  document.getElementById('lava-status').textContent = '💀 THE FLOOR IS LAVA!';
+  document.getElementById('flames').classList.add('show');
+  document.getElementById('lava-sub').textContent    = '💀 JUMP! GET OFF THE FLOOR!';
+
+  speak('THE FLOOR... IS LAVA!', { rate: 0.72, pitch: 0.4, keepDefault: true });
+  playAlarmSequence(8, 800);
+
+  const durMin = getLavaSetting('lava-dur-min');
+  const durMax = Math.max(getLavaSetting('lava-dur-max'), durMin + 2000);
+  const lavaDuration = rand(durMin, durMax);
+  let remaining = Math.round(lavaDuration / 1000);
+  document.getElementById('lava-countdown').textContent = remaining;
+
+  clearInterval(lavaCountdownInterval);
+  lavaCountdownInterval = setInterval(() => {
+    remaining--;
+    document.getElementById('lava-countdown').textContent = remaining > 0 ? remaining : '';
+    if (remaining <= 3 && remaining > 0) playAlarmBeep(660, 0.1);
+    if (remaining <= 0) {
+      clearInterval(lavaCountdownInterval);
+      if (lavaRunning) {
+        playChime([784, 659, 523]);
+        speak('Safe! You made it!', { rate: 1.3, pitch: 1.95 });
+        document.getElementById('lava-sub').textContent = '🎉 Woohoo! You survived!';
+        lavaSetSafe();
+        setTimeout(() => { if (lavaRunning) lavaScheduleNext(); }, 3000);
+      }
+    }
+  }, 1000);
+}
+
+function buildFlames() {
+  const container = document.getElementById('flames');
+  container.innerHTML = '';
+  const colors = ['#ff2200','#ff5500','#ff8800','#ffaa00','#ffcc00'];
+  for (let i = 0; i < 12; i++) {
+    const f = document.createElement('div');
+    f.className = 'flame';
+    const h = rand(50, 110);
+    f.style.cssText = `left:${i*8.5}%;width:${rand(40,70)}px;height:${h}px;background:${colors[rand(0,4)]};opacity:${rand(6,10)/10};animation-delay:${rand(0,8)*0.1}s;animation-duration:${0.5+rand(0,5)*0.1}s`;
+    container.appendChild(f);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// SIMON SAYS
+// ══════════════════════════════════════════════════════════
+const SIMON_COMMANDS = [
+  // Classic body
+  "touch your nose",
+  "jump up and down",
+  "spin around",
+  "clap your hands",
+  "touch your toes",
+  "pat your head",
+  "wave your arms",
+  "stomp your feet",
+  "touch your ears",
+  "hop on one foot",
+  "sit down",
+  "stand up",
+  "touch the ground",
+  "put your hands up",
+  "turn around",
+  "do a jumping jack",
+  "touch your knees",
+  "wiggle your fingers",
+  "shake your booty",
+  // Extended body movements
+  "wiggle your hips",
+  "shake your head no",
+  "nod your head yes",
+  "stretch your arms wide",
+  "flap your arms like a chicken",
+  "do the robot",
+  "touch your right ear with your left hand",
+  "balance on one foot for 3 seconds",
+  "march in place",
+  "do a big stretch",
+  "roll your shoulders",
+  "tap your knees twice",
+  "cross your arms",
+  "snap your fingers",
+  "do a squat",
+  "touch your left knee with your right hand",
+  // Silly / funny
+  "make your silliest face",
+  "roar like a lion",
+  "pretend you are a zombie",
+  "bark like a dog",
+  "moo like a cow",
+  "waddle like a penguin",
+  "act like a superhero landing",
+  "pretend to swim",
+  "do your best moonwalk",
+  "act like you just ate something disgusting",
+  "move in slow motion",
+  "pretend to play air guitar",
+  "do a silly walk in place",
+  "pretend you are on a tightrope",
+  "act like a melting ice cream",
+  "pretend to be a crab",
+  // Multi-step
+  "touch your nose AND hop on one foot",
+  "clap three times AND spin around",
+  "pat your head AND rub your belly",
+  "stomp your feet AND wave your arms",
+  "touch your toes AND stand back up fast",
+  "do a jumping jack AND then freeze",
+  "spin around AND touch the ground",
+  "jump twice AND then sit down",
+  "clap your hands AND stomp your feet",
+  "roar like a lion AND wave your arms",
+  "hop twice AND clap once",
+  "touch your right knee AND your left ear",
+  "do the robot AND then moonwalk",
+  "bark like a dog AND wag your tail",
+];
+
+function isMultiStep(cmd) { return cmd.includes(' AND '); }
+
+let simonRunning = false;
+let simonCorrect = 0;
+let simonTricked = 0;
+let simonRound   = 0;
+let simonSpeed   = 1;
+let simonCurrentIsTrick   = false;
+let simonWaitingForInput  = false;
+let simonFillInterval     = null;
+let simonFillStart        = 0;
+let simonFillDuration     = 0;
+
+const SIMON_SPEEDS = { 1: [5000, 8000], 2: [3000, 5000], 3: [1500, 3000] };
+
+function simonStart() {
+  simonRunning = true;
+  getAudioCtx().resume();
+  document.getElementById('simon-start-btn').disabled = true;
+  document.getElementById('simon-stop-btn').disabled  = false;
+  simonFireCommand();
+}
+
+function simonStop() {
+  simonRunning = false;
+  clearInterval(simonFillInterval);
+  synth.cancel();
+  document.getElementById('simon-start-btn').disabled = false;
+  document.getElementById('simon-stop-btn').disabled  = true;
+  document.getElementById('simon-did-btn').disabled   = true;
+  document.getElementById('simon-trick-btn').disabled = true;
+  document.getElementById('simon-label').textContent   = 'STOPPED';
+  document.getElementById('simon-command').textContent = 'Press Start to play!';
+  document.getElementById('simon-command').className   = '';
+  document.getElementById('simon-next-fill').style.width = '0%';
+}
+
+function simonResetScore() {
+  simonCorrect = simonTricked = simonRound = 0;
+  document.getElementById('simon-correct').textContent = 0;
+  document.getElementById('simon-tricked').textContent = 0;
+  document.getElementById('simon-round').textContent   = 0;
+}
+
+function setSimonSpeed(s) {
+  simonSpeed = s;
+  ['slow','medium','fast'].forEach((n, i) => {
+    document.getElementById(`speed-${n}`).classList.toggle('active', i + 1 === s);
+  });
+}
+
+function simonFireCommand() {
+  if (!simonRunning) return;
+
+  simonRound++;
+  document.getElementById('simon-round').textContent = simonRound;
+
+  const isTrick = Math.random() < 0.3;
+  simonCurrentIsTrick = isTrick;
+  const cmd     = SIMON_COMMANDS[rand(0, SIMON_COMMANDS.length - 1)];
+  const fullCmd = isTrick ? cmd : `Simon says ${cmd}`;
+  const multi   = isMultiStep(cmd);
+
+  const cmdEl   = document.getElementById('simon-command');
+  const labelEl = document.getElementById('simon-label');
+
+  cmdEl.className   = (isTrick ? 'trick' : 'legit') + (multi ? ' multi-step' : '');
+  cmdEl.textContent = fullCmd;
+  labelEl.textContent = isTrick ? '⚠️ TRICK!' : '✅ SIMON SAYS';
+
+  speak(fullCmd, { rate: simonSpeed === 3 ? 1.2 : 1.0, pitch: 1.9 });
+
+  simonWaitingForInput = true;
+  document.getElementById('simon-did-btn').disabled   = false;
+  document.getElementById('simon-trick-btn').disabled = false;
+
+  const [minT, maxT] = SIMON_SPEEDS[simonSpeed];
+  simonFillDuration = rand(minT, maxT);
+  simonFillStart    = Date.now();
+  clearInterval(simonFillInterval);
+  document.getElementById('simon-next-fill').style.width = '0%';
+
+  simonFillInterval = setInterval(() => {
+    const pct = Math.min(100, (Date.now() - simonFillStart) / simonFillDuration * 100);
+    document.getElementById('simon-next-fill').style.width = pct + '%';
+    if (pct >= 100) {
+      clearInterval(simonFillInterval);
+      if (simonRunning) simonFireCommand();
+    }
+  }, 50);
+}
+
+function simonScore(didIt) {
+  if (!simonWaitingForInput) return;
+  simonWaitingForInput = false;
+  // For trick: "I Did It" = got tricked; "Got Tricked" = correct dodge
+  const correct = simonCurrentIsTrick ? !didIt : didIt;
+  if (correct) {
+    simonCorrect++;
+    document.getElementById('simon-correct').textContent = simonCorrect;
+    playChime([523, 659, 784]);
+  } else {
+    simonTricked++;
+    document.getElementById('simon-tricked').textContent = simonTricked;
+    playAlarmBeep(220, 0.4);
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// RED LIGHT GREEN LIGHT
+// ══════════════════════════════════════════════════════════
+let rglgRunning    = false;
+let rglgIsGreen    = false;
+let rglgTimeout    = null;
+let rglgSuddenDeath = false;
+let elimCount      = 0;
+
+function toggleSuddenDeath() {
+  rglgSuddenDeath = !rglgSuddenDeath;
+  const btn = document.getElementById('sudden-death-btn');
+  btn.textContent = rglgSuddenDeath ? 'ON ⚡' : 'OFF';
+  btn.classList.toggle('on', rglgSuddenDeath);
+}
+
+function rglgStart() {
+  rglgRunning = true;
+  getAudioCtx().resume();
+  document.getElementById('rglg-start-btn').disabled = true;
+  document.getElementById('rglg-stop-btn').disabled  = false;
+  rglgGreen();
+}
+
+function rglgStop() {
+  rglgRunning = false;
+  clearTimeout(rglgTimeout);
+  synth.cancel();
+  document.getElementById('rglg-start-btn').disabled = false;
+  document.getElementById('rglg-stop-btn').disabled  = true;
+  const screen = document.getElementById('rglg-screen');
+  screen.className = 'screen active';
+  document.getElementById('rglg-light-icon').textContent = '🟢';
+  document.getElementById('rglg-status').textContent = 'READY?';
+  document.getElementById('rglg-sub').textContent    = 'Press Start to begin';
+  document.getElementById('dramatic-overlay').classList.remove('show');
+}
+
+function rglgGreen() {
+  if (!rglgRunning) return;
+  rglgIsGreen = true;
+
+  const screen = document.getElementById('rglg-screen');
+  screen.className = 'screen active green-light';
+  document.getElementById('rglg-light-icon').textContent = '🟢';
+  document.getElementById('rglg-status').textContent     = '🎉 GREEN LIGHT!';
+  document.getElementById('rglg-sub').textContent        = rglgSuddenDeath
+    ? '⚡ SUDDEN DEATH — move fast!'
+    : '🎉 Go go go! MOVE!';
+
+  speak('GREEN LIGHT!', { rate: 1.3, pitch: 1.95 });
+  playChime([659, 784, 1047]);
+
+  if (rglgSuddenDeath) {
+    // Very short green phase (300ms–1.2s), skip dramatic pause
+    const dur = rand(300, 1200);
+    rglgTimeout = setTimeout(() => { if (rglgRunning) rglgRed(); }, dur);
+  } else {
+    const dur = rand(4000, 10000);
+    rglgTimeout = setTimeout(() => rglgDramatic(), dur);
+  }
+}
+
+function rglgDramatic() {
+  if (!rglgRunning) return;
+  synth.cancel();
+  const overlay = document.getElementById('dramatic-overlay');
+  overlay.classList.add('show');
+  const pauseDur = rand(1500, 3500);
+  setTimeout(() => {
+    overlay.classList.remove('show');
+    if (rglgRunning) rglgRed();
+  }, pauseDur);
+}
+
+function rglgRed() {
+  if (!rglgRunning) return;
+  rglgIsGreen = false;
+
+  const screen = document.getElementById('rglg-screen');
+  screen.className = 'screen active red-light';
+  document.getElementById('rglg-light-icon').textContent = '🔴';
+  document.getElementById('rglg-status').textContent     = '💀 RED LIGHT!';
+  document.getElementById('rglg-sub').textContent        = '💀 FREEZE! Don\'t even breathe!';
+
+  speak('RED LIGHT!', { rate: 0.75, pitch: 0.45, keepDefault: true });
+  playAlarmSequence(4, 440);
+
+  const dur = rand(3000, 7000);
+  rglgTimeout = setTimeout(() => { if (rglgRunning) rglgGreen(); }, dur);
+}
+
+function rglgElim(delta) {
+  elimCount = Math.max(0, elimCount + delta);
+  document.getElementById('elim-count').textContent = elimCount;
+}
+
+// ══════════════════════════════════════════════════════════
+// HOT POTATO
+// ══════════════════════════════════════════════════════════
+let hotPotatoRunning         = false;
+let hotPotatoBurned          = false;
+let hotPotatoBurnTimeout     = null;
+let hotPotatoBeepTimer       = null;
+let hotPotatoCountdownTimer  = null;
+let hotPotatoBeepDelay       = 900;
+let hotPotatoElimCount       = 0;
+let hotPotatoManual          = false;
+
+function setHpMode(mode) {
+  hotPotatoManual = (mode === 'manual');
+  document.getElementById('hp-auto-btn').classList.toggle('active', !hotPotatoManual);
+  document.getElementById('hp-manual-btn').classList.toggle('active', hotPotatoManual);
+  if (hotPotatoRunning && !hotPotatoBurned) {
+    if (hotPotatoManual) {
+      clearTimeout(hotPotatoBurnTimeout);
+      document.getElementById('hp-explode-wrap').style.display = 'flex';
+    } else {
+      document.getElementById('hp-explode-wrap').style.display = 'none';
+      hotPotatoScheduleBurn();
+    }
+  } else {
+    document.getElementById('hp-explode-wrap').style.display = 'none';
+  }
+}
+
+function hpSettingUpdate(inputId, valId) {
+  document.getElementById(valId).textContent = document.getElementById(inputId).value;
+}
+function toggleHpSettings() {
+  const panel  = document.getElementById('hp-settings');
+  const toggle = document.getElementById('hp-settings-toggle');
+  const open   = panel.classList.toggle('open');
+  toggle.textContent = open ? '▲ Hide Settings' : '⚙ Settings';
+}
+function hpElim(delta) {
+  hotPotatoElimCount = Math.max(0, hotPotatoElimCount + delta);
+  document.getElementById('hp-elim-count').textContent = hotPotatoElimCount;
+}
+
+function hotPotatoStart() {
+  hotPotatoRunning = true;
+  hotPotatoBurned  = false;
+  getAudioCtx().resume();
+  document.getElementById('hp-start-btn').disabled = true;
+  document.getElementById('hp-stop-btn').disabled  = false;
+  hotPotatoBeepDelay = 900;
+  hotPotatoSetPassing();
+  if (hotPotatoManual) {
+    document.getElementById('hp-explode-wrap').style.display = 'flex';
+  } else {
+    hotPotatoScheduleBurn();
+  }
+  hotPotatoBeep();
+}
+
+function hotPotatoStop() {
+  hotPotatoRunning = false;
+  hotPotatoBurned  = false;
+  clearTimeout(hotPotatoBurnTimeout);
+  clearTimeout(hotPotatoBeepTimer);
+  clearInterval(hotPotatoCountdownTimer);
+  synth.cancel();
+  document.getElementById('hp-start-btn').disabled = false;
+  document.getElementById('hp-stop-btn').disabled  = true;
+  document.getElementById('hp-countdown').textContent = '';
+  document.getElementById('hp-explode-wrap').style.display = 'none';
+  const screen = document.getElementById('hp-screen');
+  screen.classList.remove('hp-burned');
+  screen.style.background = '';
+  document.getElementById('hp-icon').textContent   = '🥔';
+  document.getElementById('hp-status').textContent = '🥔 HOT POTATO';
+  document.getElementById('hp-sub').textContent    = '😈 Pass it fast… before it explodes!';
+}
+
+function hotPotatoSetPassing() {
+  const screen = document.getElementById('hp-screen');
+  screen.classList.remove('hp-burned');
+  document.getElementById('hp-icon').textContent   = '🥔';
+  document.getElementById('hp-status').textContent = '🥔 PASS IT!';
+  document.getElementById('hp-sub').textContent    = '🔥 The potato is BURNING HOT!';
+}
+
+function hotPotatoScheduleBurn() {
+  const minMs = parseInt(document.getElementById('hp-min-time').value) * 1000;
+  const maxMs = Math.max(parseInt(document.getElementById('hp-max-time').value) * 1000, minMs + 2000);
+  hotPotatoBurnTimeout = setTimeout(() => hotPotatoBurn(), rand(minMs, maxMs));
+}
+
+function hotPotatoBeep() {
+  if (!hotPotatoRunning || hotPotatoBurned) return;
+  // Rising pitch as beep speeds up — gives a sense of escalating heat
+  const heat = 1 - Math.max(0, hotPotatoBeepDelay - 100) / 800;
+  const freq  = 380 + heat * 500;
+  if (soundEnabled) {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.28, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.07);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.07);
+  }
+  // Gradually warm the screen background
+  const r = Math.round(58  + heat * 170);
+  const g = Math.round(21  - heat * 21);
+  document.getElementById('hp-screen').style.background = `rgb(${r},${g},0)`;
+
+  hotPotatoBeepDelay = Math.max(100, hotPotatoBeepDelay - 8);
+  hotPotatoBeepTimer = setTimeout(hotPotatoBeep, hotPotatoBeepDelay);
+}
+
+function hotPotatoBurn() {
+  if (!hotPotatoRunning || hotPotatoBurned) return;
+  hotPotatoBurned = true;
+  clearTimeout(hotPotatoBeepTimer);
+  document.getElementById('hp-explode-wrap').style.display = 'none';
+
+  const screen = document.getElementById('hp-screen');
+  screen.style.background = '';
+  screen.classList.add('hp-burned');
+  document.getElementById('hp-icon').textContent   = '💥';
+  document.getElementById('hp-status').textContent = '💥 DROPPED IT!';
+  document.getElementById('hp-sub').textContent    = '😂 Someone\'s OUT!';
+
+  speak('Dropped it!', { rate: 1.2, pitch: 1.95 });
+  playAlarmSequence(10, 200);
+
+  hotPotatoElimCount++;
+  document.getElementById('hp-elim-count').textContent = hotPotatoElimCount;
+
+  let remaining = 4;
+  document.getElementById('hp-countdown').textContent = remaining;
+
+  clearInterval(hotPotatoCountdownTimer);
+  hotPotatoCountdownTimer = setInterval(() => {
+    if (!hotPotatoRunning) { clearInterval(hotPotatoCountdownTimer); return; }
+    remaining--;
+    document.getElementById('hp-countdown').textContent = remaining > 0 ? remaining : '';
+    if (remaining <= 0) {
+      clearInterval(hotPotatoCountdownTimer);
+      hotPotatoBurned    = false;
+      hotPotatoBeepDelay = 900;
+      const s = document.getElementById('hp-screen');
+      s.classList.remove('hp-burned');
+      s.style.background = '';
+      hotPotatoSetPassing();
+      if (hotPotatoManual) {
+        document.getElementById('hp-explode-wrap').style.display = 'flex';
+      } else {
+        hotPotatoScheduleBurn();
+      }
+      hotPotatoBeep();
+    }
+  }, 1000);
+}
+
+// ══════════════════════════════════════════════════════════
+// MUSICAL CHAIRS
+// ══════════════════════════════════════════════════════════
+const MC_MELODY = [523,659,784,880,784,659,523,392,523,659,784,659,523,392,523,659];
+let musicalChairsRunning        = false;
+let musicalChairsMusicPlaying   = false;
+let musicalChairsMusicTimer     = null;
+let musicalChairsNoteTimer      = null;
+let musicalChairsCountdownTimer = null;
+let musicalChairsNoteIdx        = 0;
+let musicalChairsPlayers        = 4;
+let musicalChairsManual         = false;
+
+function setMcMode(mode) {
+  musicalChairsManual = (mode === 'manual');
+  document.getElementById('mc-auto-btn').classList.toggle('active', !musicalChairsManual);
+  document.getElementById('mc-manual-btn').classList.toggle('active', musicalChairsManual);
+  if (musicalChairsMusicPlaying) {
+    if (musicalChairsManual) {
+      clearTimeout(musicalChairsMusicTimer);
+      document.getElementById('mc-stop-music-wrap').style.display = 'flex';
+    } else {
+      document.getElementById('mc-stop-music-wrap').style.display = 'none';
+      musicalChairsMusicTimer = setTimeout(mcStopMusic, rand(5000, 18000));
+    }
+  } else {
+    document.getElementById('mc-stop-music-wrap').style.display = 'none';
+  }
+}
+
+function mcAdjustPlayers(delta) {
+  if (musicalChairsRunning) return;
+  musicalChairsPlayers = Math.max(2, Math.min(20, musicalChairsPlayers + delta));
+  document.getElementById('mc-players').textContent  = musicalChairsPlayers;
+  document.getElementById('mc-chairs-val').textContent = musicalChairsPlayers - 1;
+}
+
+function musicalChairsStart() {
+  musicalChairsRunning = true;
+  getAudioCtx().resume();
+  document.getElementById('mc-start-btn').disabled = true;
+  document.getElementById('mc-stop-btn').disabled  = false;
+  mcPlayRound();
+}
+
+function musicalChairsStop() {
+  musicalChairsRunning      = false;
+  musicalChairsMusicPlaying = false;
+  clearTimeout(musicalChairsMusicTimer);
+  clearTimeout(musicalChairsNoteTimer);
+  clearInterval(musicalChairsCountdownTimer);
+  synth.cancel();
+  document.getElementById('mc-countdown').textContent = '';
+  document.getElementById('mc-start-btn').disabled = false;
+  document.getElementById('mc-stop-btn').disabled  = true;
+  document.getElementById('mc-stop-music-wrap').style.display = 'none';
+  const screen = document.getElementById('mc-screen');
+  screen.className = 'screen active';
+  document.getElementById('mc-icon').textContent   = '🪑';
+  document.getElementById('mc-status').textContent = '🪑 MUSICAL CHAIRS';
+  document.getElementById('mc-sub').textContent    = 'Set players and press Start!';
+}
+
+function musicalChairsReset() {
+  musicalChairsStop();
+  musicalChairsPlayers = 4;
+  document.getElementById('mc-players').textContent    = 4;
+  document.getElementById('mc-chairs-val').textContent = 3;
+}
+
+function mcPlayRound() {
+  if (!musicalChairsRunning) return;
+  musicalChairsMusicPlaying = true;
+  musicalChairsNoteIdx      = 0;
+
+  const screen = document.getElementById('mc-screen');
+  screen.className = 'screen active mc-playing';
+  document.getElementById('mc-icon').textContent   = '🎵';
+  document.getElementById('mc-status').textContent = '🎵 MUSIC PLAYING';
+  document.getElementById('mc-sub').textContent    = '🎉 Walk around the chairs!';
+
+  speak('Music time! Walk around the chairs!', { rate: 1.1, pitch: 1.9 });
+  mcPlayNote();
+
+  if (musicalChairsManual) {
+    document.getElementById('mc-stop-music-wrap').style.display = 'flex';
+  } else {
+    musicalChairsMusicTimer = setTimeout(mcStopMusic, rand(5000, 18000));
+  }
+}
+
+function mcPlayNote() {
+  if (!musicalChairsMusicPlaying || !musicalChairsRunning) return;
+  if (soundEnabled) {
+    const ctx  = getAudioCtx();
+    const freq = MC_MELODY[musicalChairsNoteIdx % MC_MELODY.length];
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.22);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.22);
+  }
+  musicalChairsNoteIdx++;
+  musicalChairsNoteTimer = setTimeout(mcPlayNote, 270);
+}
+
+function mcStopMusic() {
+  if (!musicalChairsRunning || !musicalChairsMusicPlaying) return;
+  musicalChairsMusicPlaying = false;
+  clearTimeout(musicalChairsNoteTimer);
+  document.getElementById('mc-stop-music-wrap').style.display = 'none';
+
+  const screen = document.getElementById('mc-screen');
+  screen.className = 'screen active mc-stopped';
+  document.getElementById('mc-icon').textContent   = '🪑';
+  document.getElementById('mc-status').textContent = '💀 FIND A CHAIR!';
+  document.getElementById('mc-sub').textContent    = '💀 FREEZE! Someone is OUT!';
+
+  speak('Find a chair!', { rate: 0.85, pitch: 0.45, keepDefault: true });
+  playAlarmSequence(5, 300);
+
+  let remaining = 5;
+  document.getElementById('mc-countdown').textContent = remaining;
+
+  clearInterval(musicalChairsCountdownTimer);
+  musicalChairsCountdownTimer = setInterval(() => {
+    if (!musicalChairsRunning) { clearInterval(musicalChairsCountdownTimer); return; }
+    remaining--;
+    document.getElementById('mc-countdown').textContent = remaining > 0 ? remaining : '';
+    if (remaining <= 3 && remaining > 0) playAlarmBeep(500, 0.1);
+    if (remaining <= 0) {
+      clearInterval(musicalChairsCountdownTimer);
+      document.getElementById('mc-countdown').textContent = '';
+      musicalChairsPlayers--;
+      document.getElementById('mc-players').textContent    = musicalChairsPlayers;
+      document.getElementById('mc-chairs-val').textContent = musicalChairsPlayers - 1;
+
+      if (musicalChairsPlayers <= 1) {
+        screen.className = 'screen active mc-winner';
+        document.getElementById('mc-icon').textContent   = '🏆';
+        document.getElementById('mc-status').textContent = '🏆 WINNER!';
+        document.getElementById('mc-sub').textContent    = '🎉 Last one standing!';
+        speak('We have a winner!', { rate: 1.2, pitch: 1.95 });
+        playChime([523, 659, 784, 1047, 1319]);
+        musicalChairsRunning = false;
+        document.getElementById('mc-start-btn').disabled = false;
+        document.getElementById('mc-stop-btn').disabled  = true;
+      } else {
+        document.getElementById('mc-sub').textContent =
+          `🎉 ${musicalChairsPlayers} players left — next round!`;
+        setTimeout(() => { if (musicalChairsRunning) mcPlayRound(); }, 3000);
+      }
+    }
+  }, 1000);
+}
+
+// ── Helpers ───────────────────────────────────────────────
+function rand(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+</script>
+</body>
+</html>
