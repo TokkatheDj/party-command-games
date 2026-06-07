@@ -26,7 +26,7 @@ Simulated music plays while players walk around chairs. When the music stops, a 
 ## Features
 
 - **👥 Player names** — add everyone's names before the game; eliminations show the player's name on screen and remove them from future rounds
-- **🏆 Scoreboard** — tracks wins across all games; ranked leaderboard (🥇🥈🥉) updates live after each game, with a win toast announcement and a Reset Wins button
+- **🏆 Scoreboard** — tracks wins across all games; ranked leaderboard (🥇🥈🥉) updates live after each game, with a win toast announcement and a Reset Wins button; player names and scores are saved to `localStorage` and restored automatically on next visit
 
 <img src="scoreboard-mobile.png" alt="Scoreboard on mobile" width="260" />
 - **Auto / Manual mode** on Hot Potato and Musical Chairs — hosts can let events fire randomly, or control exactly when the potato explodes or the music stops
