@@ -2,6 +2,8 @@
 
 **Play now: https://tokkathedj.github.io/party-command-games/**
 
+<img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://tokkathedj.github.io/party-command-games/" alt="QR code" />
+
 A single-file party games web app — no install, no server, no framework. Open in any browser and play.
 
 ## Games
