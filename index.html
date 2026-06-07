@@ -134,7 +134,7 @@
   }
 
   .menu-footer-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-  #qr-btn, #players-btn {
+  #qr-btn, #players-btn, #scoreboard-btn {
     background: none;
     border: 1px solid rgba(255,255,255,0.25);
     color: rgba(255,255,255,0.55);
@@ -145,7 +145,7 @@
     cursor: pointer;
     transition: color 0.15s, border-color 0.15s;
   }
-  #qr-btn:hover, #players-btn:hover { color: #fff; border-color: rgba(255,255,255,0.6); }
+  #qr-btn:hover, #players-btn:hover, #scoreboard-btn:hover { color: #fff; border-color: rgba(255,255,255,0.6); }
 
   /* Players modal */
   #players-modal {
@@ -199,6 +199,67 @@
     border-radius: 8px; padding: 6px 14px; font-family: Arial, sans-serif; font-size: 0.8rem; cursor: pointer;
   }
   #players-clear-btn:hover { color: #ff4444; border-color: rgba(255,0,0,0.4); }
+
+  /* Scoreboard modal */
+  #scoreboard-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  #scoreboard-box {
+    background: #1a1a2e;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 20px;
+    padding: 28px 22px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    position: relative;
+    max-width: 360px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  #scoreboard-box .modal-title { font-size: 1.3rem; font-weight: 900; text-transform: uppercase; color: #fff; letter-spacing: 1px; }
+  #scoreboard-list { width: 100%; display: flex; flex-direction: column; gap: 8px; min-height: 32px; }
+  .sb-row {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;
+  }
+  .sb-row.sb-leader { background: rgba(255,204,68,0.12); border: 1px solid rgba(255,204,68,0.3); }
+  .sb-rank { font-size: 1.2rem; width: 28px; text-align: center; flex-shrink: 0; }
+  .sb-name { flex: 1; font-size: 1rem; color: #fff; font-family: Arial, sans-serif; font-weight: 600; }
+  .sb-score { text-align: right; }
+  .sb-wins { font-size: 1.3rem; font-weight: 900; color: #ffcc44; line-height: 1.1; }
+  .sb-wins-label { font-size: 0.65rem; color: rgba(255,204,68,0.55); text-transform: uppercase; letter-spacing: 0.5px; }
+  #scoreboard-reset-btn {
+    background: none; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.45);
+    border-radius: 8px; padding: 6px 14px; font-family: Arial, sans-serif; font-size: 0.8rem; cursor: pointer;
+  }
+  #scoreboard-reset-btn:hover { color: #ff4444; border-color: rgba(255,0,0,0.4); }
+
+  /* Win toast */
+  #win-toast {
+    position: fixed;
+    bottom: -120px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #1a1a2e, #2d2d4e);
+    border: 2px solid #ffcc44;
+    border-radius: 16px;
+    padding: 14px 28px;
+    z-index: 400;
+    transition: bottom 0.4s ease;
+    text-align: center;
+    pointer-events: none;
+  }
+  #win-toast.show { bottom: 32px; }
+  #win-toast-text { font-size: 1.3rem; font-weight: 900; color: #ffcc44; white-space: nowrap; }
 
   /* Who's Out overlay */
   #whos-out-overlay {
@@ -977,6 +1038,7 @@
 
   <div class="menu-footer-btns">
     <button id="players-btn" onclick="document.getElementById('players-modal').style.display='flex'">👥 Players</button>
+    <button id="scoreboard-btn" onclick="openScoreboard()">🏆 Scoreboard</button>
     <button id="qr-btn" onclick="document.getElementById('qr-modal').style.display='flex'">📲 Share Game</button>
   </div>
 </div>
@@ -1002,6 +1064,19 @@
   <div id="whos-out-players"></div>
   <button id="whos-out-skip" onclick="skipElimination()">Skip</button>
 </div>
+
+<!-- Scoreboard Modal -->
+<div id="scoreboard-modal" onclick="this.style.display='none'">
+  <div id="scoreboard-box" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="document.getElementById('scoreboard-modal').style.display='none'">✕</button>
+    <div class="modal-title">🏆 Scoreboard</div>
+    <div id="scoreboard-list"><div class="no-players">Add players to track wins</div></div>
+    <button id="scoreboard-reset-btn" onclick="resetWins()">Reset Wins</button>
+  </div>
+</div>
+
+<!-- Win Toast -->
+<div id="win-toast"><div id="win-toast-text"></div></div>
 
 <!-- QR Modal -->
 <div id="qr-modal" onclick="this.style.display='none'">
@@ -1246,35 +1321,43 @@
 
 <script>
 // ── Player Names ──────────────────────────────────────────
-let playerNames = [];
+let allPlayerNames = []; // roster: managed via Players modal, persists across games
+let playerWins = {};     // {name: winCount}
+let playerNames = [];    // active game list: reset at each game start
 let elimCallback = null;
 
 function addPlayer() {
   const input = document.getElementById('player-name-input');
   const name  = input.value.trim();
-  if (!name || playerNames.includes(name)) return;
-  playerNames.push(name);
+  if (!name || allPlayerNames.includes(name)) return;
+  allPlayerNames.push(name);
+  playerWins[name] = 0;
   input.value = '';
   renderPlayerList();
+  renderScoreboard();
 }
 
 function removePlayer(idx) {
-  playerNames.splice(idx, 1);
+  const name = allPlayerNames.splice(idx, 1)[0];
+  delete playerWins[name];
   renderPlayerList();
+  renderScoreboard();
 }
 
 function clearPlayers() {
-  playerNames = [];
+  allPlayerNames = [];
+  playerWins = {};
   renderPlayerList();
+  renderScoreboard();
 }
 
 function renderPlayerList() {
   const list = document.getElementById('players-list');
-  if (!playerNames.length) {
+  if (!allPlayerNames.length) {
     list.innerHTML = '<div class="no-players">No players added yet</div>';
     return;
   }
-  list.innerHTML = playerNames.map((name, i) =>
+  list.innerHTML = allPlayerNames.map((name, i) =>
     `<div class="player-item"><span>${name}</span><button onclick="removePlayer(${i})">✕</button></div>`
   ).join('');
 }
@@ -1296,11 +1379,60 @@ function selectEliminated(idx) {
   const name = playerNames.splice(idx, 1)[0];
   document.getElementById('whos-out-overlay').style.display = 'none';
   if (elimCallback) { elimCallback(name); elimCallback = null; }
+  // Record win when last player stands — but let MC handle its own winner detection
+  const mcMidGame = musicalChairsRunning && musicalChairsPlayers > 1;
+  if (playerNames.length === 1 && allPlayerNames.length > 1 && !mcMidGame) {
+    setTimeout(() => recordWin(playerNames[0]), 400);
+  }
 }
 
 function skipElimination() {
   document.getElementById('whos-out-overlay').style.display = 'none';
   if (elimCallback) { elimCallback(null); elimCallback = null; }
+}
+
+function openScoreboard() {
+  renderScoreboard();
+  document.getElementById('scoreboard-modal').style.display = 'flex';
+}
+
+function renderScoreboard() {
+  const list = document.getElementById('scoreboard-list');
+  if (!list) return;
+  if (!allPlayerNames.length) {
+    list.innerHTML = '<div class="no-players">Add players to track wins</div>';
+    return;
+  }
+  const ranked = [...allPlayerNames].sort((a, b) => (playerWins[b] || 0) - (playerWins[a] || 0));
+  const medals = ['🥇', '🥈', '🥉'];
+  list.innerHTML = ranked.map((name, i) => {
+    const wins = playerWins[name] || 0;
+    const isLeader = i === 0 && wins > 0;
+    return `<div class="sb-row${isLeader ? ' sb-leader' : ''}">
+      <span class="sb-rank">${medals[i] || String(i + 1)}</span>
+      <span class="sb-name">${name}</span>
+      <div class="sb-score"><div class="sb-wins">${wins}</div><div class="sb-wins-label">WIN${wins !== 1 ? 'S' : ''}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function recordWin(name) {
+  if (!name || !(name in playerWins)) return;
+  playerWins[name]++;
+  renderScoreboard();
+  showWinToast(name);
+}
+
+function showWinToast(name) {
+  const toast = document.getElementById('win-toast');
+  document.getElementById('win-toast-text').textContent = `🏆 ${name} WINS!`;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+function resetWins() {
+  Object.keys(playerWins).forEach(k => { playerWins[k] = 0; });
+  renderScoreboard();
 }
 
 // ── Sound Toggle ──────────────────────────────────────────
@@ -1509,6 +1641,7 @@ function getLavaSetting(id) {
 }
 
 function lavaStart() {
+  playerNames = [...allPlayerNames];
   lavaRunning = true;
   getAudioCtx().resume();
   document.getElementById('lava-start-btn').disabled = true;
@@ -1820,6 +1953,7 @@ function toggleSuddenDeath() {
 }
 
 function rglgStart() {
+  playerNames = [...allPlayerNames];
   rglgRunning = true;
   getAudioCtx().resume();
   document.getElementById('rglg-start-btn').disabled = true;
@@ -1947,6 +2081,7 @@ function hpElim(delta) {
 }
 
 function hotPotatoStart() {
+  playerNames = [...allPlayerNames];
   hotPotatoRunning = true;
   hotPotatoBurned  = false;
   getAudioCtx().resume();
@@ -2110,6 +2245,7 @@ function mcAdjustPlayers(delta) {
 }
 
 function musicalChairsStart() {
+  playerNames = [...allPlayerNames];
   musicalChairsRunning = true;
   getAudioCtx().resume();
   document.getElementById('mc-start-btn').disabled = true;
@@ -2225,6 +2361,7 @@ function mcStopMusic() {
           document.getElementById('mc-status').textContent = '🏆 WINNER!';
           document.getElementById('mc-sub').textContent    = playerNames.length
             ? `🎉 ${playerNames[0]} wins!` : '🎉 Last one standing!';
+          if (playerNames.length) recordWin(playerNames[0]);
           speak('We have a winner!', { rate: 1.2, pitch: 1.95 });
           playChime([523, 659, 784, 1047, 1319]);
           musicalChairsRunning = false;
