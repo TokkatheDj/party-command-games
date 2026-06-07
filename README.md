@@ -36,7 +36,7 @@ Simulated music plays while players walk around chairs. When the music stops, a 
 - **Escalating beeps** and **chiptune melody** via Web Audio API — no audio files needed
 - **Sound mute toggle** in the top corner
 - **Animated splash screen** on each game entry
-- Fully responsive — works on phones, tablets, and desktop
+- **Fully responsive** — all 5 games and menus fit on screen without scrolling on phones, tablets, and desktop; optimized for fast touch response (no tap delay)
 
 ## Usage
 
