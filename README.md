@@ -26,6 +26,7 @@ Simulated music plays while players walk around chairs. When the music stops, a 
 ## Features
 
 - **👥 Player names** — add everyone's names before the game; eliminations show the player's name on screen and remove them from future rounds
+- **🏆 Scoreboard** — tracks wins across all games; ranked leaderboard (🥇🥈🥉) updates live after each game, with a win toast announcement and a Reset Wins button
 - **Auto / Manual mode** on Hot Potato and Musical Chairs — hosts can let events fire randomly, or control exactly when the potato explodes or the music stops
 - **☠️ Eliminate Player button** on Floor is Lava (during lava) and Red/Green Light (during red light) so the host can tag who got caught
 - **📲 Share button** on the menu — tap to show a QR code anyone can scan to open the game
