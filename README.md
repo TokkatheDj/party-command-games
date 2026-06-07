@@ -18,15 +18,18 @@ Simon gives commands — some legit, some tricks. Players tap **I Did It!** or *
 Green light means go, red light means freeze. Players who move on red are out. Includes **Sudden Death** mode where green phases are under 1 second.
 
 ### 🥔 Hot Potato
-A beeping potato with escalating speed — whoever holds it when it explodes is eliminated. Tracks elimination count across rounds.
+A beeping potato with escalating speed — whoever holds it when it explodes is eliminated. After each explosion a **Who's Out?** overlay shows all remaining players so the host can tap who was holding it. Tracks elimination count across rounds.
 
 ### 🪑 Musical Chairs
-Simulated music plays while players walk around chairs. When the music stops, someone is out. Tracks players and chairs automatically, round by round.
+Simulated music plays while players walk around chairs. When the music stops, a 5-second scramble countdown starts, then the **Who's Out?** picker appears. Tracks players and chairs automatically, round by round, down to the last winner.
 
 ## Features
 
-- **Auto / Manual mode** on Hot Potato and Musical Chairs — hosts can let the game trigger events randomly, or press a button to control exactly when the potato explodes or the music stops
-- **Cartoony voices** for safe/happy moments; **scary deep voices** for danger moments (uses Web Speech API)
+- **👥 Player names** — add everyone's names before the game; eliminations show the player's name on screen and remove them from future rounds
+- **Auto / Manual mode** on Hot Potato and Musical Chairs — hosts can let events fire randomly, or control exactly when the potato explodes or the music stops
+- **☠️ Eliminate Player button** on Floor is Lava (during lava) and Red/Green Light (during red light) so the host can tag who got caught
+- **📲 Share button** on the menu — tap to show a QR code anyone can scan to open the game
+- **Cartoony voices** for safe/happy moments; **scary deep voices** for danger moments (Web Speech API)
 - **Escalating beeps** and **chiptune melody** via Web Audio API — no audio files needed
 - **Sound mute toggle** in the top corner
 - **Animated splash screen** on each game entry
@@ -34,6 +37,6 @@ Simulated music plays while players walk around chairs. When the music stops, so
 
 ## Usage
 
-Just open `party-games.html` in a browser. No build step, no dependencies, no internet required after the first load.
+Open the link or scan the QR code. No install, no build step, no dependencies.
 
 For best results on mobile, add to your home screen so it runs full-screen.
