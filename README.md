@@ -25,7 +25,7 @@ Simulated music plays while players walk around chairs. When the music stops, a 
 
 ## Features
 
-- **👥 Player names** — add everyone's names before the game; eliminations show the player's name on screen and remove them from future rounds
+- **👥 Player names** — add everyone's names before the game; the Players button shows a live count (e.g. "👥 Players (3)"); eliminations show the player's name on screen and remove them from future rounds
 - **🏆 Scoreboard** — tracks wins across all games; ranked leaderboard (🥇🥈🥉) updates live after each game, with a win toast announcement and a Reset Wins button; player names and scores are saved to `localStorage` and restored automatically on next visit
 
 <img src="scoreboard-mobile.png" alt="Scoreboard on mobile" width="260" />
@@ -35,7 +35,7 @@ Simulated music plays while players walk around chairs. When the music stops, a 
 - **Cartoony voices** for safe/happy moments; **scary deep voices** for danger moments (Web Speech API)
 - **Escalating beeps** and **chiptune melody** via Web Audio API — no audio files needed
 - **Sound mute toggle** in the top corner
-- **Animated splash screen** on each game entry
+- **Animated splash screen** on each game entry; Floor is Lava icon shakes frantically during a lava strike and pulses faster during the warning phase
 - **Fully responsive** — all 5 games and menus fit on screen without scrolling on phones, tablets, and desktop; optimized for fast touch response (no tap delay)
 
 ## Usage
