@@ -851,37 +851,14 @@
   .elim-btn:hover { background: rgba(255,255,255,0.25); }
 
   /* SUDDEN DEATH TOGGLE */
-  #sudden-death-row {
+  #rglg-speed-row {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     margin-bottom: 20px;
     font-family: Arial, sans-serif;
-    font-size: 0.95rem;
-    opacity: 0.85;
-  }
-  #sudden-death-btn {
-    background: rgba(255,255,255,0.1);
-    border: 2px solid rgba(255,255,255,0.25);
-    color: rgba(255,255,255,0.7);
-    font-family: inherit;
     font-size: 0.9rem;
-    padding: 7px 18px;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 700;
-    letter-spacing: 0.5px;
-    transition: all 0.15s;
-  }
-  #sudden-death-btn.on {
-    background: #bb0000;
-    border-color: #ff2200;
-    color: #fff;
-    animation: sdGlow 1s ease-in-out infinite alternate;
-  }
-  @keyframes sdGlow {
-    0%   { box-shadow: 0 0 6px rgba(255,0,0,0.4); }
-    100% { box-shadow: 0 0 22px rgba(255,0,0,0.85); }
+    opacity: 0.7;
   }
 
   .rglg-controls { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
@@ -1405,9 +1382,11 @@
     <button class="elim-btn" onclick="rglgElim(-elimCount)" style="font-size:0.9rem;width:auto;padding:0 10px;">↺</button>
   </div>
 
-  <div id="sudden-death-row">
-    <span>⚡ Sudden Death:</span>
-    <button id="sudden-death-btn" onclick="toggleSuddenDeath()">OFF</button>
+  <div id="rglg-speed-row">
+    <span>Speed:</span>
+    <button class="speed-btn" id="rglg-slow"   onclick="setRglgSpeed(1)">Slow</button>
+    <button class="speed-btn active" id="rglg-medium" onclick="setRglgSpeed(2)">Medium</button>
+    <button class="speed-btn" id="rglg-fast"   onclick="setRglgSpeed(3)">Fast</button>
   </div>
 
   <div class="elim-player-wrap" id="rglg-elim-wrap">
@@ -2304,17 +2283,23 @@ function simonScore(didIt) {
 // ══════════════════════════════════════════════════════════
 // RED LIGHT GREEN LIGHT
 // ══════════════════════════════════════════════════════════
-let rglgRunning    = false;
-let rglgIsGreen    = false;
-let rglgTimeout    = null;
-let rglgSuddenDeath = false;
-let elimCount      = 0;
+let rglgRunning = false;
+let rglgIsGreen = false;
+let rglgTimeout = null;
+let rglgSpeed   = 2;
+let elimCount   = 0;
 
-function toggleSuddenDeath() {
-  rglgSuddenDeath = !rglgSuddenDeath;
-  const btn = document.getElementById('sudden-death-btn');
-  btn.textContent = rglgSuddenDeath ? 'ON ⚡' : 'OFF';
-  btn.classList.toggle('on', rglgSuddenDeath);
+const RGLG_SPEEDS = {
+  1: { green: [6000, 12000], pause: [2000, 4000], red: [4000, 8000] },
+  2: { green: [4000, 10000], pause: [1500, 3500], red: [3000, 7000] },
+  3: { green: [1200,  3500], pause: [500,  1500], red: [1500, 3500] },
+};
+
+function setRglgSpeed(s) {
+  rglgSpeed = s;
+  ['slow','medium','fast'].forEach((n, i) => {
+    document.getElementById(`rglg-${n}`).classList.toggle('active', i + 1 === s);
+  });
 }
 
 function rglgStart() {
@@ -2350,21 +2335,15 @@ function rglgGreen() {
   screen.className = 'screen active green-light';
   document.getElementById('rglg-light-icon').textContent = '🟢';
   document.getElementById('rglg-status').textContent     = '🎉 GREEN LIGHT!';
-  document.getElementById('rglg-sub').textContent        = rglgSuddenDeath
-    ? '⚡ SUDDEN DEATH — move fast!'
+  document.getElementById('rglg-sub').textContent = rglgSpeed === 3
+    ? '⚡ Fast — move NOW!'
     : '🎉 Go go go! MOVE!';
 
   speak('GREEN LIGHT!', { rate: 1.3, pitch: 1.95 });
   playChime([659, 784, 1047]);
 
-  if (rglgSuddenDeath) {
-    // Very short green phase (300ms–1.2s), skip dramatic pause
-    const dur = rand(300, 1200);
-    rglgTimeout = setTimeout(() => { if (rglgRunning) rglgRed(); }, dur);
-  } else {
-    const dur = rand(4000, 10000);
-    rglgTimeout = setTimeout(() => rglgDramatic(), dur);
-  }
+  const [minG, maxG] = RGLG_SPEEDS[rglgSpeed].green;
+  rglgTimeout = setTimeout(() => { if (rglgRunning) rglgDramatic(); }, rand(minG, maxG));
 }
 
 function rglgDramatic() {
@@ -2372,11 +2351,11 @@ function rglgDramatic() {
   synth.cancel();
   const overlay = document.getElementById('dramatic-overlay');
   overlay.classList.add('show');
-  const pauseDur = rand(1500, 3500);
+  const [minP, maxP] = RGLG_SPEEDS[rglgSpeed].pause;
   setTimeout(() => {
     overlay.classList.remove('show');
     if (rglgRunning) rglgRed();
-  }, pauseDur);
+  }, rand(minP, maxP));
 }
 
 function rglgRed() {
@@ -2393,8 +2372,8 @@ function rglgRed() {
   speak('RED LIGHT!', { rate: 0.75, pitch: 0.45, keepDefault: true });
   playAlarmSequence(4, 440);
 
-  const dur = rand(3000, 7000);
-  rglgTimeout = setTimeout(() => { if (rglgRunning) rglgGreen(); }, dur);
+  const [minR, maxR] = RGLG_SPEEDS[rglgSpeed].red;
+  rglgTimeout = setTimeout(() => { if (rglgRunning) rglgGreen(); }, rand(minR, maxR));
 }
 
 function rglgElim(delta) {
