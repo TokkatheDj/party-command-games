@@ -1389,6 +1389,16 @@
     <button class="speed-btn" id="rglg-fast"   onclick="setRglgSpeed(3)">Fast</button>
   </div>
 
+  <div class="mode-row" id="rglg-mode-row">
+    <span>Mode:</span>
+    <button class="speed-btn active" id="rglg-auto-btn"   onclick="setRglgMode('auto')">Auto</button>
+    <button class="speed-btn"        id="rglg-manual-btn" onclick="setRglgMode('manual')">Manual</button>
+  </div>
+
+  <div id="rglg-trigger-wrap" style="display:none;justify-content:center;margin-top:6px;">
+    <button class="btn btn-red" id="rglg-trigger-btn" style="font-size:1.3rem;padding:14px 36px;" onclick="rglgManualTrigger()">🔴 RED LIGHT!</button>
+  </div>
+
   <div class="elim-player-wrap" id="rglg-elim-wrap">
     <button class="elim-player-btn" onclick="showWhosOut(null)">☠️ Eliminate Player</button>
   </div>
@@ -2287,6 +2297,7 @@ let rglgRunning = false;
 let rglgIsGreen = false;
 let rglgTimeout = null;
 let rglgSpeed   = 2;
+let rglgManual  = false;
 let elimCount   = 0;
 
 const RGLG_SPEEDS = {
@@ -2302,6 +2313,51 @@ function setRglgSpeed(s) {
   });
 }
 
+function setRglgMode(mode) {
+  rglgManual = (mode === 'manual');
+  document.getElementById('rglg-auto-btn').classList.toggle('active', !rglgManual);
+  document.getElementById('rglg-manual-btn').classList.toggle('active', rglgManual);
+  if (rglgRunning) {
+    if (rglgManual) {
+      clearTimeout(rglgTimeout);
+      document.getElementById('dramatic-overlay').classList.remove('show');
+      document.getElementById('rglg-trigger-wrap').style.display = 'flex';
+      rglgUpdateTriggerBtn();
+    } else {
+      document.getElementById('rglg-trigger-wrap').style.display = 'none';
+      if (rglgIsGreen) {
+        const [minG, maxG] = RGLG_SPEEDS[rglgSpeed].green;
+        rglgTimeout = setTimeout(() => { if (rglgRunning) rglgDramatic(); }, rand(minG, maxG));
+      } else {
+        const [minR, maxR] = RGLG_SPEEDS[rglgSpeed].red;
+        rglgTimeout = setTimeout(() => { if (rglgRunning) rglgGreen(); }, rand(minR, maxR));
+      }
+    }
+  }
+}
+
+function rglgUpdateTriggerBtn() {
+  const btn = document.getElementById('rglg-trigger-btn');
+  if (rglgIsGreen) {
+    btn.textContent = '🔴 RED LIGHT!';
+    btn.className   = 'btn btn-red';
+  } else {
+    btn.textContent = '🟢 GREEN LIGHT!';
+    btn.className   = 'btn btn-green';
+  }
+  btn.style.cssText = 'font-size:1.3rem;padding:14px 36px;';
+}
+
+function rglgManualTrigger() {
+  if (!rglgRunning || !rglgManual) return;
+  if (rglgIsGreen) {
+    rglgRed();
+  } else {
+    rglgGreen();
+  }
+  rglgUpdateTriggerBtn();
+}
+
 function rglgStart() {
   playerNames = [...allPlayerNames];
   rglgRunning = true;
@@ -2309,6 +2365,10 @@ function rglgStart() {
   document.getElementById('rglg-start-btn').disabled = true;
   document.getElementById('rglg-stop-btn').disabled  = false;
   rglgGreen();
+  if (rglgManual) {
+    document.getElementById('rglg-trigger-wrap').style.display = 'flex';
+    rglgUpdateTriggerBtn();
+  }
 }
 
 function rglgStop() {
@@ -2317,7 +2377,8 @@ function rglgStop() {
   synth.cancel();
   document.getElementById('rglg-start-btn').disabled = false;
   document.getElementById('rglg-stop-btn').disabled  = true;
-  document.getElementById('rglg-elim-wrap').style.display = 'none';
+  document.getElementById('rglg-elim-wrap').style.display   = 'none';
+  document.getElementById('rglg-trigger-wrap').style.display = 'none';
   const screen = document.getElementById('rglg-screen');
   screen.className = 'screen active';
   document.getElementById('rglg-light-icon').textContent = '🟢';
@@ -2342,8 +2403,10 @@ function rglgGreen() {
   speak('GREEN LIGHT!', { rate: 1.3, pitch: 1.95 });
   playChime([659, 784, 1047]);
 
-  const [minG, maxG] = RGLG_SPEEDS[rglgSpeed].green;
-  rglgTimeout = setTimeout(() => { if (rglgRunning) rglgDramatic(); }, rand(minG, maxG));
+  if (!rglgManual) {
+    const [minG, maxG] = RGLG_SPEEDS[rglgSpeed].green;
+    rglgTimeout = setTimeout(() => { if (rglgRunning) rglgDramatic(); }, rand(minG, maxG));
+  }
 }
 
 function rglgDramatic() {
@@ -2372,8 +2435,10 @@ function rglgRed() {
   speak('RED LIGHT!', { rate: 0.75, pitch: 0.45, keepDefault: true });
   playAlarmSequence(4, 440);
 
-  const [minR, maxR] = RGLG_SPEEDS[rglgSpeed].red;
-  rglgTimeout = setTimeout(() => { if (rglgRunning) rglgGreen(); }, rand(minR, maxR));
+  if (!rglgManual) {
+    const [minR, maxR] = RGLG_SPEEDS[rglgSpeed].red;
+    rglgTimeout = setTimeout(() => { if (rglgRunning) rglgGreen(); }, rand(minR, maxR));
+  }
 }
 
 function rglgElim(delta) {
