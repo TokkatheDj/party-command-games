@@ -715,6 +715,19 @@
   .score-tricked .value { color: #ff4444; }
   .score-round   .value { color: #ffcc44; }
 
+  #simon-team-score-row {
+    display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; width: 100%;
+  }
+  .simon-team-card {
+    border-radius: 10px; padding: 10px 16px; text-align: center;
+    min-width: 72px; cursor: pointer; user-select: none;
+    touch-action: manipulation; transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .simon-team-card:active { transform: scale(0.93); }
+  .simon-team-card .label { font-size: 0.7rem; font-family: Arial,sans-serif; opacity: 0.85; letter-spacing: 1px; }
+  .simon-team-card .value { font-size: 1.8rem; font-weight: 900; }
+  .simon-team-card.team-scored { transform: scale(1.12); box-shadow: 0 0 14px rgba(255,255,255,0.5); }
+
   .simon-action-row { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; }
 
   .simon-speed-row {
@@ -1330,7 +1343,7 @@
 <div id="simon-screen" class="screen">
   <button class="back-btn" onclick="backToMenu('simon')">← Menu</button>
 
-  <div class="simon-score-row">
+  <div class="simon-score-row" id="simon-score-row">
     <div class="simon-score-card score-round">
       <div class="label">ROUND</div>
       <div class="value" id="simon-round">0</div>
@@ -1344,6 +1357,7 @@
       <div class="value" id="simon-tricked">0</div>
     </div>
   </div>
+  <div id="simon-team-score-row" style="display:none;"></div>
 
   <div id="simon-command-box">
     <div id="simon-label">WAITING…</div>
@@ -1351,7 +1365,7 @@
     <div id="simon-next-bar"><div id="simon-next-fill"></div></div>
   </div>
 
-  <div class="simon-action-row">
+  <div class="simon-action-row" id="simon-action-row">
     <button class="btn btn-green" id="simon-did-btn"   onclick="simonScore(true)"  disabled>✔ I Did It!</button>
     <button class="btn btn-red"   id="simon-trick-btn" onclick="simonScore(false)" disabled>✘ Got Tricked</button>
   </div>
@@ -1361,6 +1375,11 @@
     <button class="speed-btn active" id="speed-slow"   onclick="setSimonSpeed(1)">Slow</button>
     <button class="speed-btn"        id="speed-medium" onclick="setSimonSpeed(2)">Medium</button>
     <button class="speed-btn"        id="speed-fast"   onclick="setSimonSpeed(3)">Fast</button>
+  </div>
+
+  <div class="simon-speed-row" id="simon-team-row" style="margin-top:8px;">
+    <span>Team Battle:</span>
+    <button class="speed-btn" id="simon-team-btn" onclick="toggleSimonTeamMode()">Off</button>
   </div>
 
   <div class="game-controls" style="margin-top:20px;">
@@ -2119,8 +2138,62 @@ let simonWaitingForInput  = false;
 let simonFillInterval     = null;
 let simonFillStart        = 0;
 let simonFillDuration     = 0;
+let simonTeamMode   = false;
+let simonTeamScores = {};
 
 const SIMON_SPEEDS = { 1: [5000, 8000], 2: [3000, 5000], 3: [1500, 3000] };
+
+function simonActiveTeams() {
+  if (!teamsEnabled) return [];
+  return TEAM_COLORS.filter(c => allPlayerNames.some(n => playerTeams[n] === c.id));
+}
+
+function toggleSimonTeamMode() {
+  const active = simonActiveTeams();
+  if (!simonTeamMode && active.length < 2) {
+    const labelEl = document.getElementById('simon-label');
+    const orig = labelEl.textContent;
+    labelEl.textContent = '⚠️ Assign players to 2+ teams first!';
+    setTimeout(() => { labelEl.textContent = orig; }, 2500);
+    return;
+  }
+  simonTeamMode = !simonTeamMode;
+  const btn = document.getElementById('simon-team-btn');
+  if (btn) { btn.textContent = simonTeamMode ? 'On' : 'Off'; btn.classList.toggle('active', simonTeamMode); }
+  document.getElementById('simon-score-row').style.display   = simonTeamMode ? 'none' : '';
+  document.getElementById('simon-team-score-row').style.display = simonTeamMode ? 'flex' : 'none';
+  document.getElementById('simon-action-row').style.display  = simonTeamMode ? 'none' : '';
+  if (simonTeamMode) {
+    simonTeamScores = {};
+    simonActiveTeams().forEach(c => { simonTeamScores[c.id] = 0; });
+    renderSimonTeamScores();
+  }
+  if (simonRunning) simonStop();
+}
+
+function renderSimonTeamScores() {
+  const row = document.getElementById('simon-team-score-row');
+  if (!row) return;
+  row.innerHTML = simonActiveTeams().map(c =>
+    `<div class="simon-team-card" id="simon-tcard-${c.id}" style="background:${c.hex};color:#fff;" onclick="simonTeamPoint('${c.id}')">
+      <div class="label">${c.label.toUpperCase()}</div>
+      <div class="value" id="simon-tval-${c.id}">${simonTeamScores[c.id] || 0}</div>
+    </div>`
+  ).join('');
+}
+
+function simonTeamPoint(teamId) {
+  if (!simonWaitingForInput) return;
+  simonTeamScores[teamId] = (simonTeamScores[teamId] || 0) + 1;
+  const el = document.getElementById(`simon-tval-${teamId}`);
+  if (el) el.textContent = simonTeamScores[teamId];
+  const card = document.getElementById(`simon-tcard-${teamId}`);
+  if (card) {
+    card.classList.add('team-scored');
+    setTimeout(() => card.classList.remove('team-scored'), 400);
+  }
+  playChime([523, 659, 784]);
+}
 
 function simonStart() {
   simonRunning = true;
@@ -2132,12 +2205,15 @@ function simonStart() {
 
 function simonStop() {
   simonRunning = false;
+  simonWaitingForInput = false;
   clearInterval(simonFillInterval);
   synth.cancel();
   document.getElementById('simon-start-btn').disabled = false;
   document.getElementById('simon-stop-btn').disabled  = true;
-  document.getElementById('simon-did-btn').disabled   = true;
-  document.getElementById('simon-trick-btn').disabled = true;
+  if (!simonTeamMode) {
+    document.getElementById('simon-did-btn').disabled   = true;
+    document.getElementById('simon-trick-btn').disabled = true;
+  }
   document.getElementById('simon-label').textContent   = 'STOPPED';
   document.getElementById('simon-command').textContent = 'Press Start to play!';
   document.getElementById('simon-command').className   = '';
@@ -2149,6 +2225,10 @@ function simonResetScore() {
   document.getElementById('simon-correct').textContent = 0;
   document.getElementById('simon-tricked').textContent = 0;
   document.getElementById('simon-round').textContent   = 0;
+  if (simonTeamMode) {
+    simonActiveTeams().forEach(c => { simonTeamScores[c.id] = 0; });
+    renderSimonTeamScores();
+  }
 }
 
 function setSimonSpeed(s) {
@@ -2184,8 +2264,10 @@ function simonFireCommand() {
   speak(fullCmd, { rate: simonSpeed === 3 ? 1.2 : 1.0, pitch: 1.9 });
 
   simonWaitingForInput = true;
-  document.getElementById('simon-did-btn').disabled   = false;
-  document.getElementById('simon-trick-btn').disabled = false;
+  if (!simonTeamMode) {
+    document.getElementById('simon-did-btn').disabled   = false;
+    document.getElementById('simon-trick-btn').disabled = false;
+  }
 
   const [minT, maxT] = SIMON_SPEEDS[simonSpeed];
   simonFillDuration = rand(minT, maxT);
