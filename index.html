@@ -294,6 +294,7 @@
   }
   #whos-out-players { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; max-width: 520px; }
   .whos-out-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
     background: rgba(255,255,255,0.1);
     border: 2px solid rgba(255,255,255,0.25);
     color: #fff;
@@ -315,6 +316,39 @@
 
   /* Manual-mode action wraps (display toggled by JS) */
   #hp-explode-wrap, #mc-stop-music-wrap { justify-content: center; margin-top: 6px; }
+
+  /* Teams */
+  #teams-toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; font-family: Arial, sans-serif; font-size: 0.9rem;
+    color: rgba(255,255,255,0.7);
+  }
+  .player-item-teams { flex-direction: column; align-items: stretch; gap: 6px; justify-content: flex-start; }
+  .player-item-top { display: flex; align-items: center; width: 100%; }
+  .player-name-wrap { display: flex; align-items: center; gap: 6px; flex: 1; }
+  .player-badge {
+    width: 12px; height: 12px; border-radius: 50%;
+    display: inline-block; flex-shrink: 0;
+  }
+  .player-badge-empty {
+    width: 12px; height: 12px; border-radius: 50%;
+    display: inline-block; flex-shrink: 0;
+    background: rgba(255,255,255,0.15);
+  }
+  .player-team-pick { display: flex; gap: 5px; flex-wrap: wrap; }
+  .team-dot {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 2.5px solid transparent;
+    cursor: pointer; padding: 0; transition: transform 0.1s, border-color 0.1s;
+    flex-shrink: 0; touch-action: manipulation;
+  }
+  .team-dot:hover { transform: scale(1.15); }
+  .team-dot.selected { border-color: #fff; transform: scale(1.2); box-shadow: 0 0 6px rgba(255,255,255,0.4); }
+  .team-dot-clear {
+    background: rgba(255,255,255,0.15) !important; color: rgba(255,255,255,0.55);
+    font-size: 0.7rem; display: flex; align-items: center; justify-content: center;
+  }
+  .sb-name { display: flex; align-items: center; gap: 6px; }
 
   /* In-game eliminate button */
   .elim-player-wrap { display: none; justify-content: center; margin-top: 6px; }
@@ -1179,6 +1213,10 @@
   <div id="players-modal-box" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="document.getElementById('players-modal').style.display='none'">✕</button>
     <div class="modal-title">👥 Players</div>
+    <div id="teams-toggle-row">
+      <span>Teams</span>
+      <button class="speed-btn" id="teams-btn" onclick="toggleTeams()">Off</button>
+    </div>
     <div id="players-list"><div class="no-players">No players added yet</div></div>
     <div id="players-add-row">
       <input type="text" id="player-name-input" placeholder="Player name…" maxlength="20"
@@ -1232,6 +1270,15 @@
   <div class="lava-controls">
     <button id="lava-start-btn" class="btn btn-orange" onclick="lavaStart()">▶ START</button>
     <button id="lava-stop-btn"  class="btn btn-gray"   onclick="lavaStop()" disabled>■ STOP</button>
+  </div>
+
+  <div class="mode-row" id="lava-mode-row">
+    <span>Mode:</span>
+    <button class="speed-btn active" id="lava-auto-btn"   onclick="setLavaMode('auto')">Auto</button>
+    <button class="speed-btn"        id="lava-manual-btn" onclick="setLavaMode('manual')">Manual</button>
+  </div>
+  <div id="lava-trigger-wrap" style="display:none;justify-content:center;margin-top:6px;">
+    <button class="btn btn-red" style="font-size:1.3rem;padding:14px 36px;" onclick="lavaTrigger()">🌋 TRIGGER LAVA!</button>
   </div>
 
   <div class="elim-player-wrap" id="lava-elim-wrap">
@@ -1454,8 +1501,19 @@
 
 <script>
 // ── Player Names ──────────────────────────────────────────
+const TEAM_COLORS = [
+  { id: 'red',    hex: '#e74c3c', label: 'Red'    },
+  { id: 'blue',   hex: '#3498db', label: 'Blue'   },
+  { id: 'green',  hex: '#2ecc71', label: 'Green'  },
+  { id: 'yellow', hex: '#f1c40f', label: 'Yellow' },
+  { id: 'purple', hex: '#9b59b6', label: 'Purple' },
+  { id: 'orange', hex: '#e67e22', label: 'Orange' },
+];
+
 let allPlayerNames = []; // roster: managed via Players modal, persists across games
 let playerWins = {};     // {name: winCount}
+let playerTeams = {};    // {name: teamId | null}
+let teamsEnabled = false;
 let playerNames = [];    // active game list: reset at each game start
 let elimCallback = null;
 
@@ -1465,6 +1523,7 @@ function addPlayer() {
   if (!name || allPlayerNames.includes(name)) return;
   allPlayerNames.push(name);
   playerWins[name] = 0;
+  playerTeams[name] = null;
   input.value = '';
   renderPlayerList();
   renderScoreboard();
@@ -1474,6 +1533,7 @@ function addPlayer() {
 function removePlayer(idx) {
   const name = allPlayerNames.splice(idx, 1)[0];
   delete playerWins[name];
+  delete playerTeams[name];
   renderPlayerList();
   renderScoreboard();
   saveState();
@@ -1482,6 +1542,33 @@ function removePlayer(idx) {
 function clearPlayers() {
   allPlayerNames = [];
   playerWins = {};
+  playerTeams = {};
+  renderPlayerList();
+  renderScoreboard();
+  saveState();
+}
+
+function getBadgeHtml(name) {
+  if (!teamsEnabled) return '';
+  const t = playerTeams[name];
+  if (!t) return '';
+  const color = TEAM_COLORS.find(c => c.id === t)?.hex;
+  return color ? `<span class="player-badge" style="background:${color}"></span>` : '';
+}
+
+function toggleTeams() {
+  teamsEnabled = !teamsEnabled;
+  const btn = document.getElementById('teams-btn');
+  if (btn) { btn.textContent = teamsEnabled ? 'On' : 'Off'; btn.classList.toggle('active', teamsEnabled); }
+  renderPlayerList();
+  renderScoreboard();
+  saveState();
+}
+
+function setPlayerTeam(idx, teamId) {
+  const name = allPlayerNames[idx];
+  if (!name) return;
+  playerTeams[name] = playerTeams[name] === teamId ? null : teamId;
   renderPlayerList();
   renderScoreboard();
   saveState();
@@ -1492,13 +1579,29 @@ function renderPlayerList() {
   const btn  = document.getElementById('players-btn');
   const n    = allPlayerNames.length;
   if (btn) btn.textContent = n ? `👥 Players (${n})` : '👥 Players';
+  const teamsBtn = document.getElementById('teams-btn');
+  if (teamsBtn) { teamsBtn.textContent = teamsEnabled ? 'On' : 'Off'; teamsBtn.classList.toggle('active', teamsEnabled); }
   if (!n) {
     list.innerHTML = '<div class="no-players">No players added yet</div>';
     return;
   }
-  list.innerHTML = allPlayerNames.map((name, i) =>
-    `<div class="player-item"><span>${name}</span><button onclick="removePlayer(${i})">✕</button></div>`
-  ).join('');
+  list.innerHTML = allPlayerNames.map((name, i) => {
+    if (!teamsEnabled) {
+      return `<div class="player-item"><span>${name}</span><button onclick="removePlayer(${i})">✕</button></div>`;
+    }
+    const teamId = playerTeams[name];
+    const teamColor = teamId ? TEAM_COLORS.find(c => c.id === teamId)?.hex : null;
+    const badge = teamColor
+      ? `<span class="player-badge" style="background:${teamColor}"></span>`
+      : `<span class="player-badge-empty"></span>`;
+    const dots = TEAM_COLORS.map(c =>
+      `<button class="team-dot${teamId === c.id ? ' selected' : ''}" style="background:${c.hex}" onclick="setPlayerTeam(${i},'${c.id}')" title="${c.label}"></button>`
+    ).join('') + (teamId ? `<button class="team-dot team-dot-clear" onclick="setPlayerTeam(${i},null)" title="No team">✕</button>` : '');
+    return `<div class="player-item player-item-teams">
+      <div class="player-item-top"><div class="player-name-wrap">${badge}<span>${name}</span></div><button onclick="removePlayer(${i})">✕</button></div>
+      <div class="player-team-pick">${dots}</div>
+    </div>`;
+  }).join('');
 }
 
 function showWhosOut(callback) {
@@ -1509,7 +1612,7 @@ function showWhosOut(callback) {
   elimCallback = callback;
   const container = document.getElementById('whos-out-players');
   container.innerHTML = playerNames.map((name, i) =>
-    `<button class="whos-out-btn" onclick="selectEliminated(${i})">${name}</button>`
+    `<button class="whos-out-btn" onclick="selectEliminated(${i})">${getBadgeHtml(name)}${name}</button>`
   ).join('');
   document.getElementById('whos-out-overlay').style.display = 'flex';
 }
@@ -1549,7 +1652,7 @@ function renderScoreboard() {
     const isLeader = i === 0 && wins > 0;
     return `<div class="sb-row${isLeader ? ' sb-leader' : ''}">
       <span class="sb-rank">${medals[i] || String(i + 1)}</span>
-      <span class="sb-name">${name}</span>
+      <span class="sb-name">${getBadgeHtml(name)}${name}</span>
       <div class="sb-score"><div class="sb-wins">${wins}</div><div class="sb-wins-label">WIN${wins !== 1 ? 'S' : ''}</div></div>
     </div>`;
   }).join('');
@@ -1761,6 +1864,7 @@ function backToMenu(game) {
 // FLOOR IS LAVA
 // ══════════════════════════════════════════════════════════
 let lavaRunning = false;
+let lavaManual = false;
 let lavaTimeout = null;
 let lavaWarningTimeout = null;
 let lavaCountdownInterval = null;
@@ -1781,6 +1885,23 @@ function getLavaSetting(id) {
   return parseInt(document.getElementById(id).value) * 1000;
 }
 
+function setLavaMode(mode) {
+  lavaManual = (mode === 'manual');
+  document.getElementById('lava-auto-btn').classList.toggle('active', !lavaManual);
+  document.getElementById('lava-manual-btn').classList.toggle('active', lavaManual);
+  if (lavaRunning && !lavaIsActive) {
+    if (lavaManual) {
+      clearTimeout(lavaTimeout);
+      clearTimeout(lavaWarningTimeout);
+      document.getElementById('lava-screen').classList.remove('lava-warning');
+      document.getElementById('lava-trigger-wrap').style.display = 'flex';
+    } else {
+      document.getElementById('lava-trigger-wrap').style.display = 'none';
+      lavaScheduleNext();
+    }
+  }
+}
+
 function lavaStart() {
   playerNames = [...allPlayerNames];
   lavaRunning = true;
@@ -1789,7 +1910,11 @@ function lavaStart() {
   document.getElementById('lava-stop-btn').disabled  = false;
   buildFlames();
   lavaSetSafe();
-  lavaScheduleNext();
+  if (lavaManual) {
+    document.getElementById('lava-trigger-wrap').style.display = 'flex';
+  } else {
+    lavaScheduleNext();
+  }
 }
 
 function lavaStop() {
@@ -1802,6 +1927,7 @@ function lavaStop() {
   document.getElementById('lava-start-btn').disabled = false;
   document.getElementById('lava-stop-btn').disabled  = true;
   document.getElementById('lava-elim-wrap').style.display = 'none';
+  document.getElementById('lava-trigger-wrap').style.display = 'none';
   const screen = document.getElementById('lava-screen');
   screen.classList.remove('lava-mode', 'lava-warning');
   document.getElementById('lava-status').textContent    = '🌿 YOU\'RE SAFE';
@@ -1816,9 +1942,12 @@ function lavaSetSafe() {
   const screen = document.getElementById('lava-screen');
   screen.classList.remove('lava-mode', 'lava-warning');
   document.getElementById('lava-status').textContent    = '🌿 YOU\'RE SAFE';
-  document.getElementById('lava-sub').textContent       = '😅 Relax… for now.';
+  document.getElementById('lava-sub').textContent       = lavaManual ? '👆 Host: tap Trigger when ready!' : '😅 Relax… for now.';
   document.getElementById('lava-countdown').textContent = '';
   document.getElementById('flames').classList.remove('show');
+  if (lavaRunning && lavaManual) {
+    document.getElementById('lava-trigger-wrap').style.display = 'flex';
+  }
 }
 
 function lavaScheduleNext() {
@@ -1847,6 +1976,8 @@ function lavaScheduleNext() {
 function lavaTrigger() {
   if (!lavaRunning) return;
   lavaIsActive = true;
+  document.getElementById('lava-trigger-wrap').style.display = 'none';
+  document.getElementById('lava-screen').classList.remove('lava-warning');
   document.getElementById('lava-elim-wrap').style.display = 'flex';
 
   document.getElementById('lava-screen').classList.add('lava-mode');
@@ -1882,7 +2013,7 @@ function lavaTrigger() {
         speak('Safe! You made it!', { rate: 1.3, pitch: 1.95 });
         document.getElementById('lava-sub').textContent = '🎉 Woohoo! You survived!';
         lavaSetSafe();
-        setTimeout(() => { if (lavaRunning) lavaScheduleNext(); }, 3000);
+        if (!lavaManual) setTimeout(() => { if (lavaRunning) lavaScheduleNext(); }, 3000);
       }
     }
   }, 1000);
@@ -2541,17 +2672,23 @@ function rand(min, max) {
 // ── Persistence ───────────────────────────────────────────
 function saveState() {
   try {
-    localStorage.setItem('pcg_players', JSON.stringify(allPlayerNames));
-    localStorage.setItem('pcg_wins',    JSON.stringify(playerWins));
+    localStorage.setItem('pcg_players',      JSON.stringify(allPlayerNames));
+    localStorage.setItem('pcg_wins',         JSON.stringify(playerWins));
+    localStorage.setItem('pcg_teams',        JSON.stringify(playerTeams));
+    localStorage.setItem('pcg_teams_enabled', teamsEnabled ? '1' : '0');
   } catch(e) {}
 }
 
 function loadState() {
   try {
-    const p = localStorage.getItem('pcg_players');
-    const w = localStorage.getItem('pcg_wins');
-    if (p) allPlayerNames = JSON.parse(p);
-    if (w) playerWins     = JSON.parse(w);
+    const p  = localStorage.getItem('pcg_players');
+    const w  = localStorage.getItem('pcg_wins');
+    const t  = localStorage.getItem('pcg_teams');
+    const te = localStorage.getItem('pcg_teams_enabled');
+    if (p)  allPlayerNames = JSON.parse(p);
+    if (w)  playerWins     = JSON.parse(w);
+    if (t)  playerTeams    = JSON.parse(t);
+    if (te) teamsEnabled   = te === '1';
   } catch(e) {}
   renderPlayerList();
   renderScoreboard();
