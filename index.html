@@ -1168,7 +1168,9 @@
   .mem-score-card.active-turn { outline: 2px solid #fff; }
   .mem-score-card .label { font-size: 0.65rem; font-family: Arial,sans-serif; opacity: 0.8; letter-spacing: 1px; }
   .mem-score-card .value { font-size: 1.5rem; font-weight: 900; }
-  #mem-diff-row { display: flex; gap: 10px; justify-content: center; margin-bottom: 10px; }
+  #mem-settings { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; width: 100%; }
+  .mem-set-row { display: flex; align-items: center; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .mem-set-lbl { font-size: 0.7rem; font-family: Arial,sans-serif; letter-spacing: 2px; opacity: 0.7; min-width: 52px; text-align: right; }
 
   /* QUICK MATCH */
   #qmatch-screen { background: linear-gradient(160deg, #100020, #2a0055); }
@@ -1759,10 +1761,22 @@
   <button class="back-btn" onclick="backToMenu('mem')">← Menu</button>
   <div id="mem-header">🃏 MEMORY MATCH</div>
 
-  <div id="mem-diff-row">
-    <button class="speed-btn active" id="mem-easy"   onclick="setMemDiff('easy')">Easy</button>
-    <button class="speed-btn"        id="mem-medium" onclick="setMemDiff('medium')">Medium</button>
-    <button class="speed-btn"        id="mem-hard"   onclick="setMemDiff('hard')">Hard</button>
+  <div id="mem-settings">
+    <div class="mem-set-row">
+      <span class="mem-set-lbl">SYMBOLS</span>
+      <button class="speed-btn"        id="mem-sym-4"  onclick="setMemSym(4)">4</button>
+      <button class="speed-btn active" id="mem-sym-6"  onclick="setMemSym(6)">6</button>
+      <button class="speed-btn"        id="mem-sym-8"  onclick="setMemSym(8)">8</button>
+      <button class="speed-btn"        id="mem-sym-10" onclick="setMemSym(10)">10</button>
+      <button class="speed-btn"        id="mem-sym-12" onclick="setMemSym(12)">12</button>
+    </div>
+    <div class="mem-set-row">
+      <span class="mem-set-lbl">MATCH</span>
+      <button class="speed-btn active" id="mem-match-2" onclick="setMemMatch(2)">2</button>
+      <button class="speed-btn"        id="mem-match-3" onclick="setMemMatch(3)">3</button>
+      <button class="speed-btn"        id="mem-match-4" onclick="setMemMatch(4)">4</button>
+      <button class="speed-btn"        id="mem-match-5" onclick="setMemMatch(5)">5</button>
+    </div>
   </div>
 
   <div id="mem-scores"></div>
@@ -3968,9 +3982,9 @@ function huntAddPoint(name) {
 // MEMORY MATCH
 // ══════════════════════════════════════════════════════════
 const MEM_EMOJIS = ['🐱','🐶','🐭','🐰','🦊','🐻','🐼','🐸','🐧','🦆','🦁','🐯','🦋','🌸','⭐','🍕','🍦','🎸','🚀','🎈'];
-const MEM_SIZES  = { easy: {rows:3,cols:4,pairs:6}, medium: {rows:4,cols:4,pairs:8}, hard: {rows:4,cols:5,pairs:10} };
 
-let memDiff     = 'easy';
+let memSymbols  = 6;
+let memMatchN   = 2;
 let memCards    = [];
 let memFlipped  = [];
 let memLocked   = false;
@@ -3984,9 +3998,26 @@ function arrShuffle(arr) {
   return a;
 }
 
-function setMemDiff(d) {
-  memDiff = d;
-  ['easy','medium','hard'].forEach(n => document.getElementById(`mem-${n}`).classList.toggle('active', n === d));
+function setMemSym(n) {
+  memSymbols = n;
+  [4,6,8,10,12].forEach(v => document.getElementById(`mem-sym-${v}`).classList.toggle('active', v === n));
+}
+
+function setMemMatch(n) {
+  memMatchN = n;
+  [2,3,4,5].forEach(v => document.getElementById(`mem-match-${v}`).classList.toggle('active', v === n));
+}
+
+function memBestCols(total) {
+  // Find smallest factor >= sqrt(total), capped at 6 for phone readability
+  const sq = Math.ceil(Math.sqrt(total));
+  for (let c = sq; c <= Math.min(total, 6); c++) {
+    if (total % c === 0) return c;
+  }
+  for (let c = sq - 1; c >= 2; c--) {
+    if (total % c === 0) return c;
+  }
+  return Math.min(sq, 6);
 }
 
 function memScreenInit() {
@@ -4018,9 +4049,12 @@ function memUpdateTurn() {
 }
 
 function memStart() {
-  const { pairs, cols } = MEM_SIZES[memDiff];
-  const emojis = arrShuffle(MEM_EMOJIS).slice(0, pairs);
-  memCards  = arrShuffle([...emojis, ...emojis]).map((e, i) => ({ emoji: e, id: i, state: 'hidden' }));
+  const total  = memSymbols * memMatchN;
+  const cols   = memBestCols(total);
+  const emojis = arrShuffle(MEM_EMOJIS).slice(0, memSymbols);
+  const deck   = [];
+  emojis.forEach(e => { for (let k = 0; k < memMatchN; k++) deck.push(e); });
+  memCards   = arrShuffle(deck).map((e, i) => ({ emoji: e, id: i, state: 'hidden' }));
   memFlipped = [];
   memLocked  = false;
   memRunning = true;
@@ -4047,21 +4081,22 @@ function memFlipCard(i) {
   if (memLocked || !memRunning) return;
   const card = memCards[i];
   if (card.state !== 'hidden') return;
-  if (memFlipped.length >= 2) return;
+  if (memFlipped.length >= memMatchN) return;
 
   card.state = 'revealed';
   memFlipped.push(i);
   document.getElementById(`mw${i}`).classList.add('flipped');
   playChime([523]);
 
-  if (memFlipped.length === 2) {
-    const [a, b] = memFlipped;
+  if (memFlipped.length === memMatchN) {
     memLocked = true;
-    if (memCards[a].emoji === memCards[b].emoji) {
+    const allSame = memFlipped.every(idx => memCards[idx].emoji === memCards[memFlipped[0]].emoji);
+    if (allSame) {
       setTimeout(() => {
-        memCards[a].state = memCards[b].state = 'matched';
-        document.getElementById(`mw${a}`).classList.replace('flipped','matched');
-        document.getElementById(`mw${b}`).classList.replace('flipped','matched');
+        memFlipped.forEach(idx => {
+          memCards[idx].state = 'matched';
+          document.getElementById(`mw${idx}`).classList.replace('flipped', 'matched');
+        });
         memFlipped = [];
         memLocked  = false;
         const player = allPlayerNames[memTurnIdx % allPlayerNames.length];
@@ -4074,12 +4109,13 @@ function memFlipCard(i) {
         if (memCards.every(c => c.state === 'matched')) memWin();
       }, 350);
     } else {
-      document.getElementById(`mw${a}`).classList.add('mismatch');
-      document.getElementById(`mw${b}`).classList.add('mismatch');
+      memFlipped.forEach(idx => document.getElementById(`mw${idx}`).classList.add('mismatch'));
       setTimeout(() => {
-        memCards[a].state = memCards[b].state = 'hidden';
-        const wa = document.getElementById(`mw${a}`); wa.classList.remove('flipped','mismatch');
-        const wb = document.getElementById(`mw${b}`); wb.classList.remove('flipped','mismatch');
+        memFlipped.forEach(idx => {
+          memCards[idx].state = 'hidden';
+          const w = document.getElementById(`mw${idx}`);
+          w.classList.remove('flipped', 'mismatch');
+        });
         memFlipped = [];
         memLocked  = false;
         if (allPlayerNames.length > 1) { memTurnIdx = (memTurnIdx + 1) % allPlayerNames.length; memUpdateTurn(); }
