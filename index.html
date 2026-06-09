@@ -2777,6 +2777,34 @@ function simonScore(didIt) {
 // ══════════════════════════════════════════════════════════
 // RED LIGHT GREEN LIGHT
 // ══════════════════════════════════════════════════════════
+const RGLG_COMMANDS = [
+  { show: '🐰 Hop like a bunny!',          say: 'Hop like a bunny!' },
+  { show: '🦁 Roar like a lion!',           say: 'Roar like a lion!' },
+  { show: '🐘 Stomp like an elephant!',     say: 'Stomp like an elephant!' },
+  { show: '🐸 Jump like a frog!',           say: 'Jump like a frog!' },
+  { show: '🐶 Bark like a dog!',            say: 'Bark like a dog!' },
+  { show: '🐧 Waddle like a penguin!',      say: 'Waddle like a penguin!' },
+  { show: '🐻 Growl like a bear!',          say: 'Growl like a bear!' },
+  { show: '🐒 Scratch like a monkey!',      say: 'Scratch like a monkey!' },
+  { show: '🐴 Gallop like a horse!',        say: 'Gallop like a horse!' },
+  { show: '🐔 Cluck like a chicken!',       say: 'Cluck like a chicken!' },
+  { show: '🐮 Moo like a cow!',             say: 'Moo like a cow!' },
+  { show: '🦊 Sneak like a fox!',           say: 'Sneak like a fox!' },
+  { show: '🦋 Flap like a butterfly!',      say: 'Flap like a butterfly!' },
+  { show: '🐠 Swim like a fish!',           say: 'Swim like a fish!' },
+  { show: '🐍 Slither like a snake!',       say: 'Slither like a snake!' },
+  { show: '🦀 Snap like a crab!',           say: 'Snap like a crab!' },
+  { show: '👏 Clap your hands!',            say: 'Clap your hands!' },
+  { show: '👣 Stomp your feet!',            say: 'Stomp your feet!' },
+  { show: '🙌 Wave your arms!',             say: 'Wave your arms!' },
+  { show: '⬆️ Jump up and down!',           say: 'Jump up and down!' },
+  { show: '💃 Wiggle your whole body!',     say: 'Wiggle your whole body!' },
+  { show: '🥁 March in place!',             say: 'March in place!' },
+  { show: '🌀 Spin in a circle!',           say: 'Spin in a circle!' },
+  { show: '🤸 Do a jumping jack!',          say: 'Do a jumping jack!' },
+  { show: '🦩 Stand on one foot!',          say: 'Stand on one foot!' },
+];
+
 let rglgRunning = false;
 let rglgIsGreen = false;
 let rglgTimeout = null;
@@ -2876,15 +2904,40 @@ function rglgGreen() {
   rglgIsGreen = true;
   document.getElementById('rglg-elim-wrap').style.display = 'none';
 
+  const cmd    = RGLG_COMMANDS[rand(0, RGLG_COMMANDS.length - 1)];
   const screen = document.getElementById('rglg-screen');
   screen.className = 'screen active green-light';
   document.getElementById('rglg-light-icon').textContent = '🟢';
   document.getElementById('rglg-status').textContent     = '🎉 GREEN LIGHT!';
-  document.getElementById('rglg-sub').textContent = rglgSpeed === 3
-    ? '⚡ Fast — move NOW!'
-    : '🎉 Go go go! MOVE!';
+  document.getElementById('rglg-sub').textContent        = cmd.show;
 
-  speak('GREEN LIGHT!', { rate: 1.2, pitch: 1.1 });
+  // Speak the command and only start the countdown after speech finishes,
+  // so Fast mode doesn't cut off the command mid-sentence.
+  if (!rglgManual) {
+    const [minG, maxG] = RGLG_SPEEDS[rglgSpeed].green;
+    let scheduled = false;
+    const scheduleNext = () => {
+      if (scheduled || !rglgRunning || !rglgIsGreen) return;
+      scheduled = true;
+      clearTimeout(safetyTimer);
+      rglgTimeout = setTimeout(() => { if (rglgRunning) rglgDramatic(); }, rand(minG, maxG));
+    };
+    const u = new SpeechSynthesisUtterance(`Green light! ${cmd.say}`);
+    if (cartoonyVoice) u.voice = cartoonyVoice;
+    u.rate = 1.2; u.pitch = 1.1; u.volume = 1;
+    u.onend = scheduleNext;
+    let safetyTimer = setTimeout(scheduleNext, 4000); // fallback if onend never fires
+    synth.cancel();
+    synth.speak(u);
+    return;
+  }
+
+  // Manual mode — just speak, host controls the light
+  const u = new SpeechSynthesisUtterance(`Green light! ${cmd.say}`);
+  if (cartoonyVoice) u.voice = cartoonyVoice;
+  u.rate = 1.2; u.pitch = 1.1; u.volume = 1;
+  synth.cancel();
+  synth.speak(u);
   playChime([659, 784, 1047]);
 
   if (!rglgManual) {
