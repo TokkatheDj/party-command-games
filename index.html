@@ -619,6 +619,83 @@
   }
   #lava-settings.open { display: block; }
 
+  /* VOICE BOX */
+  .vbox-section {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+  .vbox-title {
+    font-family: Arial, sans-serif;
+    font-size: 0.78rem;
+    opacity: 0.65;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .vbox-fx-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .vbox-fx-lbl {
+    font-family: Arial, sans-serif;
+    font-size: 0.72rem;
+    opacity: 0.55;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    min-width: 46px;
+  }
+  .vbox-phrase-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .vbox-phrase-row:last-child { margin-bottom: 0; }
+  .vbox-phrase-lbl {
+    font-family: Arial, sans-serif;
+    font-size: 0.85rem;
+    flex: 1;
+  }
+  .vbox-rec-btn {
+    background: rgba(255,80,80,0.2);
+    border: 1px solid rgba(255,80,80,0.5);
+    color: #fff;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-family: Arial, sans-serif;
+    font-size: 0.75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+  }
+  .vbox-rec-btn:hover { background: rgba(255,80,80,0.4); }
+  .vbox-rec-btn.recording {
+    background: rgba(255,40,40,0.6);
+    border-color: #ff4444;
+    animation: recPulse 0.8s ease-in-out infinite;
+  }
+  @keyframes recPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .vbox-play-btn, .vbox-clear-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .vbox-play-btn:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
+  .vbox-clear-btn:hover:not(:disabled) { background: rgba(255,60,60,0.3); border-color: rgba(255,60,60,0.5); }
+  .vbox-play-btn:disabled, .vbox-clear-btn:disabled { opacity: 0.3; cursor: default; }
+
   .setting-row { margin-bottom: 16px; }
   .setting-row:last-child { margin-bottom: 0; }
 
@@ -1502,6 +1579,36 @@
       </div>
       <input type="range" id="lava-dur-max" min="3" max="60" value="18"
              oninput="lavaSettingUpdate('lava-dur-max','lava-dur-max-val')">
+    </div>
+
+    <!-- Voice Box -->
+    <div class="vbox-section">
+      <div class="vbox-title">🎙 Voice Box</div>
+      <div class="vbox-fx-row">
+        <span class="vbox-fx-lbl">Effect</span>
+        <button class="speed-btn active" id="vbox-fx-normal" onclick="setVboxFx('normal')">Normal</button>
+        <button class="speed-btn" id="vbox-fx-deep" onclick="setVboxFx('deep')">Deep</button>
+        <button class="speed-btn" id="vbox-fx-chipmunk" onclick="setVboxFx('chipmunk')">Chipmunk</button>
+        <button class="speed-btn" id="vbox-fx-robot" onclick="setVboxFx('robot')">Robot</button>
+      </div>
+      <div class="vbox-phrase-row">
+        <span class="vbox-phrase-lbl">⚠️ Warning</span>
+        <button class="vbox-rec-btn" id="vbox-rec-warn" onclick="vboxToggleRec('warn')">🎙 Record</button>
+        <button class="vbox-play-btn" id="vbox-play-warn" onclick="vboxPlay('warn')" disabled>▶</button>
+        <button class="vbox-clear-btn" id="vbox-clear-warn" onclick="vboxClear('warn')" disabled>✕</button>
+      </div>
+      <div class="vbox-phrase-row">
+        <span class="vbox-phrase-lbl">🔥 Lava!</span>
+        <button class="vbox-rec-btn" id="vbox-rec-lava" onclick="vboxToggleRec('lava')">🎙 Record</button>
+        <button class="vbox-play-btn" id="vbox-play-lava" onclick="vboxPlay('lava')" disabled>▶</button>
+        <button class="vbox-clear-btn" id="vbox-clear-lava" onclick="vboxClear('lava')" disabled>✕</button>
+      </div>
+      <div class="vbox-phrase-row">
+        <span class="vbox-phrase-lbl">🌿 Safe!</span>
+        <button class="vbox-rec-btn" id="vbox-rec-safe" onclick="vboxToggleRec('safe')">🎙 Record</button>
+        <button class="vbox-play-btn" id="vbox-play-safe" onclick="vboxPlay('safe')" disabled>▶</button>
+        <button class="vbox-clear-btn" id="vbox-clear-safe" onclick="vboxClear('safe')" disabled>✕</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2396,6 +2503,121 @@ function backToMenu(game) {
 }
 
 // ══════════════════════════════════════════════════════════
+// VOICE BOX
+// ══════════════════════════════════════════════════════════
+let vboxFx = localStorage.getItem('vboxFx') || 'normal';
+let vboxRecording = null;
+let vboxData = (() => { try { return JSON.parse(localStorage.getItem('vbox') || '{}'); } catch(e) { return {}; } })();
+
+function vboxSaveData() { localStorage.setItem('vbox', JSON.stringify(vboxData)); }
+
+function vboxInitUI() {
+  ['warn','lava','safe'].forEach(k => vboxUpdateUI(k));
+  document.querySelectorAll('[id^="vbox-fx-"]').forEach(b => b.classList.remove('active'));
+  const fxBtn = document.getElementById('vbox-fx-' + vboxFx);
+  if (fxBtn) fxBtn.classList.add('active');
+}
+
+function setVboxFx(fx) {
+  vboxFx = fx;
+  localStorage.setItem('vboxFx', fx);
+  document.querySelectorAll('[id^="vbox-fx-"]').forEach(b => b.classList.remove('active'));
+  document.getElementById('vbox-fx-' + fx).classList.add('active');
+}
+
+function vboxUpdateUI(key) {
+  const has = !!vboxData[key];
+  const playBtn  = document.getElementById('vbox-play-' + key);
+  const clearBtn = document.getElementById('vbox-clear-' + key);
+  const recBtn   = document.getElementById('vbox-rec-' + key);
+  if (playBtn)  playBtn.disabled  = !has;
+  if (clearBtn) clearBtn.disabled = !has;
+  if (recBtn)   recBtn.textContent = has ? '🔄 Re-record' : '🎙 Record';
+}
+
+async function vboxToggleRec(key) {
+  if (vboxRecording) { vboxRecording.mediaRecorder.stop(); return; }
+  const recBtn = document.getElementById('vbox-rec-' + key);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mr = new MediaRecorder(stream);
+    const chunks = [];
+    vboxRecording = { key, mediaRecorder: mr, chunks };
+    recBtn.textContent = '⏹ Stop';
+    recBtn.classList.add('recording');
+    mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    mr.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(chunks, { type: mr.mimeType || 'audio/webm' });
+      const reader = new FileReader();
+      reader.onload = () => { vboxData[key] = reader.result; vboxSaveData(); vboxUpdateUI(key); };
+      reader.readAsDataURL(blob);
+      vboxRecording = null;
+      recBtn.classList.remove('recording');
+    };
+    mr.start();
+  } catch(e) {
+    alert('Microphone access denied. Please allow mic access and try again.');
+    vboxRecording = null;
+  }
+}
+
+function dataUrlToArrayBuffer(dataUrl) {
+  const base64 = dataUrl.split(',')[1];
+  const binary = atob(base64);
+  const buf = new ArrayBuffer(binary.length);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < binary.length; i++) view[i] = binary.charCodeAt(i);
+  return buf;
+}
+
+function makeDistortionCurve(amount) {
+  const n = 256, curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = (Math.PI + amount) * x / (Math.PI + amount * Math.abs(x));
+  }
+  return curve;
+}
+
+async function vboxPlay(key, onended) {
+  if (!vboxData[key]) return false;
+  const ctx = getAudioCtx();
+  let audioBuf;
+  try {
+    audioBuf = await ctx.decodeAudioData(dataUrlToArrayBuffer(vboxData[key]));
+  } catch(e) { return false; }
+  const src = ctx.createBufferSource();
+  src.buffer = audioBuf;
+  if (onended) src.onended = onended;
+  if (vboxFx === 'deep') {
+    src.playbackRate.value = 0.65;
+    src.connect(ctx.destination);
+  } else if (vboxFx === 'chipmunk') {
+    src.playbackRate.value = 1.7;
+    src.connect(ctx.destination);
+  } else if (vboxFx === 'robot') {
+    src.playbackRate.value = 0.88;
+    const wave = ctx.createWaveShaper();
+    wave.curve = makeDistortionCurve(150);
+    wave.oversample = '2x';
+    src.connect(wave);
+    wave.connect(ctx.destination);
+  } else {
+    src.connect(ctx.destination);
+  }
+  src.start();
+  return true;
+}
+
+function vboxClear(key) { delete vboxData[key]; vboxSaveData(); vboxUpdateUI(key); }
+
+async function lavaVoice(key, fallbackText, fallbackOpts) {
+  const played = await vboxPlay(key);
+  if (!played) speak(fallbackText, fallbackOpts);
+}
+
+// ══════════════════════════════════════════════════════════
 // FLOOR IS LAVA
 // ══════════════════════════════════════════════════════════
 let lavaRunning = false;
@@ -2415,6 +2637,7 @@ function toggleLavaSettings() {
   const toggle = document.getElementById('lava-settings-toggle');
   const open   = panel.classList.toggle('open');
   toggle.textContent = open ? '▲ Hide Settings' : '⚙ Settings';
+  if (open) vboxInitUI();
 }
 
 function getLavaSetting(id) {
@@ -2517,7 +2740,7 @@ function lavaWarn() {
   screen.classList.add('lava-warning');
   document.getElementById('lava-status').textContent = '⚠️ WARNING!';
   document.getElementById('lava-sub').textContent    = '💀 Get ready…';
-  speak('Warning!', { rate: 0.75, pitch: 0.5, keepDefault: true });
+  lavaVoice('warn', 'Warning!', { rate: 0.75, pitch: 0.5, keepDefault: true });
 
   let count = 3;
   const tick = () => {
@@ -2557,7 +2780,7 @@ function lavaTrigger() {
   document.getElementById('lava-sub').textContent    = '💀 JUMP! GET OFF THE FLOOR!';
   document.getElementById('lava-countdown').textContent = '';
 
-  speak('THE FLOOR... IS LAVA!', { rate: 0.72, pitch: 0.4, keepDefault: true });
+  lavaVoice('lava', 'THE FLOOR... IS LAVA!', { rate: 0.72, pitch: 0.4, keepDefault: true });
   // Siren bursts on lava trigger
   for (let i = 0; i < 3; i++) setTimeout(() => playSiren(1.3), i * 1100);
 
@@ -2583,7 +2806,7 @@ function lavaTrigger() {
       clearInterval(lavaCountdownInterval);
       if (lavaRunning) {
         playChime([784, 659, 523]);
-        speak('Safe! You made it!', { rate: 1.2, pitch: 1.1 });
+        lavaVoice('safe', 'Safe! You made it!', { rate: 1.2, pitch: 1.1 });
         document.getElementById('lava-sub').textContent = '🎉 Woohoo! You survived!';
         lavaSetSafe();
         if (!lavaManual) setTimeout(() => { if (lavaRunning) lavaScheduleNext(); }, 3000);
