@@ -525,7 +525,21 @@
   }
   .vbox-fx-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
   .vbox-fx-btn.active { background: rgba(160,80,255,0.3); border-color: #bb66ff; color: #fff; }
-  .vbox-action-row { display: flex; gap: 12px; align-items: center; }
+  .vbox-action-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  #vbox-live-btn {
+    background: rgba(0,200,80,0.12); border: 1px solid rgba(0,200,80,0.45);
+    color: rgba(255,255,255,0.75); border-radius: 50px; padding: 14px 28px;
+    font-family: Arial, sans-serif; font-size: 1rem; cursor: pointer; transition: all 0.2s;
+  }
+  #vbox-live-btn:hover { background: rgba(0,200,80,0.25); color: #fff; }
+  #vbox-live-btn.live-active {
+    background: rgba(0,200,80,0.35); border-color: #00cc55; color: #fff;
+    animation: livePulse 1.2s ease-in-out infinite;
+  }
+  @keyframes livePulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(0,200,80,0.5); }
+    50%      { box-shadow: 0 0 0 12px rgba(0,200,80,0); }
+  }
   #vbox-main-play-btn {
     background: linear-gradient(135deg, #6600cc, #aa44ff); border: none; color: #fff;
     border-radius: 50px; padding: 14px 32px; font-family: inherit; font-size: 1.05rem;
@@ -4876,10 +4890,61 @@ function vboxMainClear() {
   document.getElementById('vbox-main-hint').textContent = 'Tap 🎙 to record up to 30 seconds';
 }
 
+let vboxLiveStream = null;
+let vboxLiveNodes  = [];
+
+async function vboxToggleLive() {
+  if (vboxLiveStream) { vboxStopLive(); return; }
+  const btn = document.getElementById('vbox-live-btn');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    vboxLiveStream = stream;
+    const ctx = getAudioCtx();
+    const src = ctx.createMediaStreamSource(stream);
+    btn.textContent = '⏹ Stop Live';
+    btn.classList.add('live-active');
+    document.getElementById('vbox-main-hint').textContent = 'Live mode — speak into your mic!';
+
+    if (vboxMainFx === 'robot') {
+      const wave = ctx.createWaveShaper();
+      wave.curve = makeDistortionCurve(150); wave.oversample = '2x';
+      src.connect(wave); wave.connect(ctx.destination);
+      vboxLiveNodes = [src, wave];
+    } else if (vboxMainFx === 'echo') {
+      const delay = ctx.createDelay(1.0); delay.delayTime.value = 0.28;
+      const fb = ctx.createGain(); fb.gain.value = 0.45;
+      const wet = ctx.createGain(); wet.gain.value = 0.6;
+      src.connect(ctx.destination);
+      src.connect(delay); delay.connect(fb); fb.connect(delay);
+      delay.connect(wet); wet.connect(ctx.destination);
+      vboxLiveNodes = [src, delay, fb, wet];
+    } else {
+      if (vboxMainFx === 'deep' || vboxMainFx === 'chipmunk') {
+        document.getElementById('vbox-main-hint').textContent = 'Live Deep/Chipmunk not supported — try recording instead.';
+      }
+      src.connect(ctx.destination);
+      vboxLiveNodes = [src];
+    }
+  } catch(e) {
+    alert('Microphone access denied. Please allow mic access and try again.');
+  }
+}
+
+function vboxStopLive() {
+  if (vboxLiveStream) { vboxLiveStream.getTracks().forEach(t => t.stop()); vboxLiveStream = null; }
+  vboxLiveNodes.forEach(n => { try { n.disconnect(); } catch(e) {} });
+  vboxLiveNodes = [];
+  const btn = document.getElementById('vbox-live-btn');
+  if (btn) { btn.textContent = '🎤 Live'; btn.classList.remove('live-active'); }
+  const hint = document.getElementById('vbox-main-hint');
+  if (hint) hint.textContent = vboxMainData ? 'Ready! Pick an effect and tap Play.' : 'Tap 🎙 to record up to 30 seconds';
+}
+
 function vboxMainStop() {
   clearInterval(vboxMainTimerInterval);
   if (vboxMainRecording) { try { vboxMainRecording.mediaRecorder.stop(); } catch(e) {} vboxMainRecording = null; }
   if (vboxMainSource)    { try { vboxMainSource.stop(); } catch(e) {} vboxMainSource = null; }
+  vboxStopLive();
 }
 </script>
 
@@ -4897,12 +4962,13 @@ function vboxMainStop() {
     <div class="vbox-fx-btns">
       <button class="vbox-fx-btn active" id="vbox-main-fx-normal"   onclick="vboxMainSetFx('normal')">Normal</button>
       <button class="vbox-fx-btn"        id="vbox-main-fx-deep"     onclick="vboxMainSetFx('deep')">🐻 Deep</button>
-      <button class="vbox-fx-btn"        id="vbox-main-fx-chipmunk" onclick="vboxMainSetFx('chipmunk')">🐿 Chipmunk</button>
+      <button class="vbox-fx-btn"        id="vbox-main-fx-chipmunk" onclick="vboxMainSetFx('chipmunk')">🐭 Chipmunk</button>
       <button class="vbox-fx-btn"        id="vbox-main-fx-robot"    onclick="vboxMainSetFx('robot')">🤖 Robot</button>
       <button class="vbox-fx-btn"        id="vbox-main-fx-echo"     onclick="vboxMainSetFx('echo')">🔊 Echo</button>
     </div>
   </div>
   <div class="vbox-action-row">
+    <button id="vbox-live-btn"       onclick="vboxToggleLive()">🎤 Live</button>
     <button id="vbox-main-play-btn"  onclick="vboxMainPlay()"  disabled>▶ Play</button>
     <button id="vbox-main-clear-btn" onclick="vboxMainClear()" disabled>✕ Clear</button>
   </div>
