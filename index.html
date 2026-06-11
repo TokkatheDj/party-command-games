@@ -1430,6 +1430,25 @@
   #shell-diff-row { display:flex; gap:10px; margin-bottom:14px; }
   #shell-diff-row .speed-btn { min-width:72px; }
 
+  /* FOLLOW THE PATTERN */
+  .card-fp { background:linear-gradient(145deg,#880066,#cc0099); color:#fff; box-shadow:0 8px 32px rgba(180,0,130,0.55); }
+  #fp-screen { background:radial-gradient(ellipse at center,#1a0022 0%,#0d0011 80%); justify-content:flex-start; overflow-y:auto; padding-bottom:40px; }
+  #fp-title { font-size:clamp(1rem,5vw,1.6rem); font-weight:900; letter-spacing:2px; margin:12px 0 8px; }
+  #fp-hud { display:flex; gap:20px; align-items:center; justify-content:center; margin-bottom:14px; flex-wrap:wrap; }
+  #fp-lives { font-size:1.35rem; letter-spacing:3px; min-width:80px; text-align:center; }
+  #fp-round { font-size:1rem; font-weight:800; opacity:0.85; }
+  #fp-best  { font-size:0.85rem; font-weight:700; opacity:0.5; }
+  #fp-status { font-size:1.05rem; font-weight:800; letter-spacing:0.5px; margin-bottom:16px; min-height:1.5em; text-align:center; padding:0 20px; }
+  #fp-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; width:min(300px,90vw); margin:0 auto 20px; }
+  .fp-tile {
+    aspect-ratio:1; border-radius:14px;
+    background:rgba(255,255,255,0.07); border:2px solid rgba(255,255,255,0.1);
+    cursor:pointer; transition:background 0.12s, box-shadow 0.12s, transform 0.1s;
+  }
+  .fp-tile:active { transform:scale(0.9) !important; }
+  @keyframes fpWrong { 0%,100%{transform:scale(1);} 30%{transform:scale(0.87) rotate(-4deg);} 70%{transform:scale(0.87) rotate(4deg);} }
+  .fp-tile.fp-wrong-anim { animation:fpWrong 0.35s ease; }
+
   /* WHEEL SPINNER */
   .card-wheel { background:linear-gradient(145deg,#004d99,#0088ff); color:#fff; box-shadow:0 8px 32px rgba(0,120,255,0.55); }
   #wheel-screen { background:radial-gradient(ellipse at center,#001a3a 0%,#000d1f 80%); justify-content:flex-start; overflow-y:auto; padding-bottom:40px; }
@@ -1792,6 +1811,10 @@
       <span class="card-icon">🎩</span>
       <span>Shell Game</span>
     </button>
+    <button class="game-card card-fp" onclick="showScreen('fp-screen')">
+      <span class="card-icon">🧠</span>
+      <span>Follow the Pattern</span>
+    </button>
   </div>
 
   <div class="menu-footer-btns">
@@ -1799,6 +1822,34 @@
     <button id="scoreboard-btn" onclick="openScoreboard()">🏆 Scoreboard</button>
     <button id="qr-btn" onclick="document.getElementById('qr-modal').style.display='flex'">📲 Share Game</button>
   </div>
+</div>
+
+<!-- ═══ FOLLOW THE PATTERN ═══ -->
+<div id="fp-screen" class="screen">
+  <button class="back-btn" onclick="backToMenu('fp')">← Menu</button>
+  <div id="fp-title">🧠 FOLLOW THE PATTERN</div>
+
+  <div id="fp-hud">
+    <div id="fp-lives">❤️❤️❤️</div>
+    <div id="fp-round">Round 1</div>
+    <div id="fp-best">Best: 0</div>
+  </div>
+
+  <div id="fp-status">Press START to play!</div>
+
+  <div id="fp-grid">
+    <div class="fp-tile" id="fp-t0" onclick="fpTap(0)"></div>
+    <div class="fp-tile" id="fp-t1" onclick="fpTap(1)"></div>
+    <div class="fp-tile" id="fp-t2" onclick="fpTap(2)"></div>
+    <div class="fp-tile" id="fp-t3" onclick="fpTap(3)"></div>
+    <div class="fp-tile" id="fp-t4" onclick="fpTap(4)"></div>
+    <div class="fp-tile" id="fp-t5" onclick="fpTap(5)"></div>
+    <div class="fp-tile" id="fp-t6" onclick="fpTap(6)"></div>
+    <div class="fp-tile" id="fp-t7" onclick="fpTap(7)"></div>
+    <div class="fp-tile" id="fp-t8" onclick="fpTap(8)"></div>
+  </div>
+
+  <button class="btn btn-blue" id="fp-btn" onclick="fpStart()" style="font-size:1.2rem;padding:12px 40px;margin-top:4px;">🧠 START!</button>
 </div>
 
 <!-- ═══ SHELL GAME ═══ -->
@@ -2940,6 +2991,7 @@ function showScreen(id) {
   if (id === 'wheel-screen')    setTimeout(wheelLoad, 30);
   if (id === 'tp-screen')       setTimeout(tpLoad, 30);
   if (id === 'shell-screen')    setTimeout(shellLoad, 30);
+  if (id === 'fp-screen')       setTimeout(fpLoad, 30);
 }
 
 function backToMenu(game) {
@@ -2955,6 +3007,7 @@ function backToMenu(game) {
   if (game === 'vbox')     vboxMainStop();
   if (game === 'wheel')    wheelStop();
   if (game === 'shell')    shellStop();
+  if (game === 'fp')       fpStop();
   synth.cancel();
   dismissSplash();
   exitFullscreen();
@@ -4450,6 +4503,153 @@ function diceRoll() {
     diceRolling = false;
   }, 950);
 }
+
+// ══════════════════════════════════════════════════════════
+// FOLLOW THE PATTERN
+// ══════════════════════════════════════════════════════════
+const FP_TILE_COLORS = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff922b','#cc5de8','#20c997','#f06595','#a9e34b'];
+const FP_FREQS       = [261,294,330,349,392,440,494,523,587];
+
+let fpState     = 'idle';
+let fpSequence  = [];
+let fpPlayerIdx = 0;
+let fpLives     = 3;
+let fpRound     = 0;
+let fpBest      = 0;
+let fpBusy      = false;
+
+function fpGetTiming(round) {
+  if (round <= 3)  return { flash:480, gap:220 };
+  if (round <= 7)  return { flash:370, gap:180 };
+  if (round <= 12) return { flash:290, gap:140 };
+  return { flash:220, gap:110 };
+}
+
+const fpSleep = ms => new Promise(r => setTimeout(r, ms));
+
+function fpSetStatus(txt) { const e = document.getElementById('fp-status'); if (e) e.textContent = txt; }
+
+function fpLitTile(idx, on) {
+  const el = document.getElementById(`fp-t${idx}`);
+  if (!el) return;
+  if (on) {
+    el.style.background = FP_TILE_COLORS[idx];
+    el.style.boxShadow  = `0 0 24px ${FP_TILE_COLORS[idx]}`;
+    el.style.transform  = 'scale(1.08)';
+  } else {
+    el.style.background = '';
+    el.style.boxShadow  = '';
+    el.style.transform  = '';
+  }
+}
+
+function fpRenderLives() {
+  const e = document.getElementById('fp-lives');
+  if (e) e.textContent = '❤️'.repeat(Math.max(0,fpLives)) + '🖤'.repeat(Math.max(0,3-fpLives));
+}
+
+function fpLoad() {
+  fpState = 'idle'; fpBusy = false;
+  fpRound = 1; fpLives = 3; fpSequence = []; fpPlayerIdx = 0;
+  fpRenderLives();
+  const r = document.getElementById('fp-round'); if (r) r.textContent = 'Round 1';
+  fpSetStatus('Press START to play!');
+  for (let i=0;i<9;i++) fpLitTile(i,false);
+  const btn = document.getElementById('fp-btn');
+  if (btn) { btn.disabled=false; btn.textContent='🧠 START!'; }
+}
+
+async function fpStart() {
+  if (fpBusy) return;
+  fpBusy = true; fpState = 'playing';
+  fpRound = 1; fpLives = 3; fpSequence = []; fpPlayerIdx = 0;
+  fpRenderLives();
+  const btn = document.getElementById('fp-btn');
+  if (btn) btn.disabled = true;
+  fpAddStep();
+  await fpShowSequence();
+  fpBusy = false;
+}
+
+function fpAddStep() {
+  let next;
+  do { next = Math.floor(Math.random() * 9); }
+  while (fpSequence.length > 0 && next === fpSequence[fpSequence.length-1]);
+  fpSequence.push(next);
+}
+
+async function fpShowSequence() {
+  fpState = 'showing';
+  const r = document.getElementById('fp-round'); if (r) r.textContent = `Round ${fpRound}`;
+  fpSetStatus(`👀 Round ${fpRound} — watch!`);
+  const { flash, gap } = fpGetTiming(fpRound);
+  await fpSleep(350);
+  for (const idx of fpSequence) {
+    fpLitTile(idx, true);
+    playChime([FP_FREQS[idx]]);
+    await fpSleep(flash);
+    fpLitTile(idx, false);
+    await fpSleep(gap);
+  }
+  fpState = 'input'; fpPlayerIdx = 0;
+  fpSetStatus('🎯 Your turn!');
+}
+
+async function fpTap(idx) {
+  if (fpState !== 'input' || fpBusy) return;
+  fpBusy = true;
+
+  fpLitTile(idx, true);
+  playChime([FP_FREQS[idx]]);
+  await fpSleep(130);
+  fpLitTile(idx, false);
+
+  if (idx === fpSequence[fpPlayerIdx]) {
+    fpPlayerIdx++;
+    if (fpPlayerIdx === fpSequence.length) {
+      // Round complete
+      if (fpRound > fpBest) {
+        fpBest = fpRound;
+        const b = document.getElementById('fp-best'); if (b) b.textContent = `Best: ${fpBest}`;
+      }
+      fpSetStatus('✅ Nice one!');
+      playChime([523,659,784]);
+      await fpSleep(700);
+      fpRound++;
+      fpAddStep();
+      await fpShowSequence();
+    }
+    fpBusy = false;
+  } else {
+    // Wrong
+    fpLives--;
+    fpRenderLives();
+    const el = document.getElementById(`fp-t${idx}`);
+    if (el) {
+      el.style.background='#ff2222'; el.style.boxShadow='0 0 20px #ff2222';
+      el.classList.add('fp-wrong-anim');
+    }
+    playChime([220,180]);
+    await fpSleep(380);
+    if (el) { el.style.background=''; el.style.boxShadow=''; el.classList.remove('fp-wrong-anim'); }
+
+    if (fpLives <= 0) {
+      fpState = 'gameover';
+      if (fpRound > fpBest) { fpBest = fpRound; const b=document.getElementById('fp-best'); if(b) b.textContent=`Best: ${fpBest}`; }
+      fpSetStatus(`💀 Game Over — Round ${fpRound}`);
+      await fpSleep(1200);
+      const btn = document.getElementById('fp-btn');
+      if (btn) { btn.disabled=false; btn.textContent='🔄 PLAY AGAIN!'; }
+    } else {
+      fpSetStatus(`❌ Wrong! ${fpLives} ${fpLives===1?'life':'lives'} left — replaying…`);
+      await fpSleep(900);
+      await fpShowSequence();
+    }
+    fpBusy = false;
+  }
+}
+
+function fpStop() { fpState='idle'; fpBusy=false; }
 
 // ══════════════════════════════════════════════════════════
 // SHELL GAME
