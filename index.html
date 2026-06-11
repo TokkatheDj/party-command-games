@@ -1357,6 +1357,27 @@
   @keyframes numRolling { 0%,100%{transform:scale(1);opacity:1;} 50%{transform:scale(1.15);opacity:0.6;} }
   #dice-big-num.rolling { animation:numRolling 0.1s ease-in-out infinite; }
 
+  /* TEAM PICKER */
+  .card-tp { background:linear-gradient(145deg,#005522,#00aa44); color:#fff; box-shadow:0 8px 32px rgba(0,170,60,0.55); }
+  #tp-screen { background:radial-gradient(ellipse at center,#001a0a 0%,#000d05 80%); justify-content:flex-start; overflow-y:auto; padding-bottom:40px; }
+  .tp-title { font-size:clamp(1.1rem,5vw,1.8rem); font-weight:900; letter-spacing:2px; margin:12px 0 16px; }
+  .tp-section { width:100%; max-width:400px; margin-bottom:16px; padding:0 12px; }
+  .tp-label { font-size:0.68rem; letter-spacing:2px; opacity:0.55; margin-bottom:8px; font-family:Arial,sans-serif; }
+  .tp-add-row { display:flex; gap:8px; margin-bottom:10px; }
+  .tp-add-row input { flex:1; padding:10px 16px; border-radius:50px; border:2px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08); color:#fff; font-size:0.95rem; font-family:Nunito,Arial,sans-serif; outline:none; }
+  .tp-add-row input::placeholder { color:rgba(255,255,255,0.4); }
+  .tp-add-row button { padding:10px 18px; border-radius:50px; border:none; background:linear-gradient(135deg,#00aa44,#00dd66); color:#fff; font-size:1.4rem; font-weight:900; cursor:pointer; box-shadow:0 4px 12px rgba(0,180,60,0.4); }
+  .tp-chips { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .tp-teams-row { display:flex; gap:10px; justify-content:center; }
+  #tp-result { width:100%; max-width:520px; display:flex; flex-wrap:wrap; gap:14px; justify-content:center; margin-top:8px; padding:0 12px; }
+  .tp-team-card { border:3px solid; border-radius:18px; overflow:hidden; min-width:140px; flex:1; background:rgba(255,255,255,0.05); }
+  .tp-team-name { padding:9px 16px; font-weight:900; font-size:1rem; letter-spacing:1px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,0.35); }
+  .tp-team-players { padding:10px 16px; display:flex; flex-direction:column; gap:7px; }
+  .tp-player { font-size:1rem; font-weight:700; color:rgba(255,255,255,0.92); }
+  .tp-hint { opacity:0.45; font-size:0.88rem; text-align:center; padding:10px 0; }
+  @keyframes tpReveal { 0%{transform:scale(0.9);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+  .tp-team-card { animation:tpReveal 0.3s ease-out both; }
+
   /* WHEEL SPINNER */
   .card-wheel { background:linear-gradient(145deg,#004d99,#0088ff); color:#fff; box-shadow:0 8px 32px rgba(0,120,255,0.55); }
   #wheel-screen { background:radial-gradient(ellipse at center,#001a3a 0%,#000d1f 80%); justify-content:flex-start; overflow-y:auto; padding-bottom:40px; }
@@ -1711,6 +1732,10 @@
       <span class="card-icon">🎡</span>
       <span>Spin the Wheel</span>
     </button>
+    <button class="game-card card-tp" onclick="showScreen('tp-screen')">
+      <span class="card-icon">👥</span>
+      <span>Team Picker</span>
+    </button>
   </div>
 
   <div class="menu-footer-btns">
@@ -1718,6 +1743,35 @@
     <button id="scoreboard-btn" onclick="openScoreboard()">🏆 Scoreboard</button>
     <button id="qr-btn" onclick="document.getElementById('qr-modal').style.display='flex'">📲 Share Game</button>
   </div>
+</div>
+
+<!-- ═══ TEAM PICKER ═══ -->
+<div id="tp-screen" class="screen">
+  <button class="back-btn" onclick="backToMenu('tp')">← Menu</button>
+  <div class="tp-title">👥 TEAM PICKER</div>
+
+  <div class="tp-section">
+    <div class="tp-label">PLAYERS</div>
+    <div class="tp-add-row">
+      <input id="tp-input" type="text" placeholder="Add player…" maxlength="20"
+             onkeydown="if(event.key==='Enter')tpAddPlayer()">
+      <button onclick="tpAddPlayer()">＋</button>
+    </div>
+    <div id="tp-chips" class="tp-chips"></div>
+  </div>
+
+  <div class="tp-section">
+    <div class="tp-label">NUMBER OF TEAMS</div>
+    <div class="tp-teams-row">
+      <button class="speed-btn active" id="tp-n2" onclick="tpSetCount(2)">2 Teams</button>
+      <button class="speed-btn"        id="tp-n3" onclick="tpSetCount(3)">3 Teams</button>
+      <button class="speed-btn"        id="tp-n4" onclick="tpSetCount(4)">4 Teams</button>
+    </div>
+  </div>
+
+  <button class="btn btn-blue" onclick="tpPick()" style="font-size:1.3rem;padding:14px 44px;margin:12px 0 20px;">🎲 PICK TEAMS!</button>
+
+  <div id="tp-result"></div>
 </div>
 
 <!-- ═══ WHEEL SPINNER ═══ -->
@@ -2803,6 +2857,7 @@ function showScreen(id) {
   if (id === 'hunt-screen')     huntRenderScores();
   if (id === 'tod-screen')      todNext();
   if (id === 'wheel-screen')    setTimeout(wheelLoad, 30);
+  if (id === 'tp-screen')       setTimeout(tpLoad, 30);
 }
 
 function backToMenu(game) {
@@ -4311,6 +4366,82 @@ function diceRoll() {
     playChime([523, 659, 784]);
     diceRolling = false;
   }, 950);
+}
+
+// ══════════════════════════════════════════════════════════
+// TEAM PICKER
+// ══════════════════════════════════════════════════════════
+const TP_TEAM_COLORS = ['#ff6b6b','#4d96ff','#6bcb77','#ffd93d','#ff922b','#cc5de8'];
+const TP_TEAM_NAMES  = ['Team 1','Team 2','Team 3','Team 4','Team 5','Team 6'];
+let tpPlayers = [];
+let tpCount   = 2;
+
+function tpLoad() {
+  tpPlayers = allPlayerNames.length >= 2 ? [...allPlayerNames] : [];
+  if (!tpPlayers.length) {
+    const saved = localStorage.getItem('tpPlayers');
+    if (saved) { try { tpPlayers = JSON.parse(saved); } catch(e) {} }
+  }
+  document.getElementById('tp-result').innerHTML = '';
+  tpRenderChips();
+}
+
+function tpSave() { localStorage.setItem('tpPlayers', JSON.stringify(tpPlayers)); }
+
+function tpAddPlayer() {
+  const input = document.getElementById('tp-input');
+  const val = input.value.trim();
+  if (!val || tpPlayers.length >= 16) return;
+  tpPlayers.push(val);
+  input.value = '';
+  tpSave(); tpRenderChips();
+}
+
+function tpRemovePlayer(i) {
+  tpPlayers.splice(i, 1);
+  tpSave(); tpRenderChips();
+}
+
+function tpSetCount(n) {
+  tpCount = n;
+  [2,3,4].forEach(d => document.getElementById(`tp-n${d}`).classList.toggle('active', d === n));
+}
+
+function tpRenderChips() {
+  const el = document.getElementById('tp-chips');
+  if (!el) return;
+  if (!tpPlayers.length) {
+    el.innerHTML = '<div class="tp-hint">Add players above</div>';
+    return;
+  }
+  el.innerHTML = tpPlayers.map((p, i) => {
+    const bg = WHEEL_COLORS[i % WHEEL_COLORS.length];
+    return `<div class="wheel-chip" style="background:${bg}">
+      <span>${p}</span>
+      <button onclick="tpRemovePlayer(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function tpPick() {
+  if (tpPlayers.length < tpCount) {
+    document.getElementById('tp-result').innerHTML =
+      `<div class="tp-hint">Need at least ${tpCount} players for ${tpCount} teams</div>`;
+    return;
+  }
+  const shuffled = [...tpPlayers].sort(() => Math.random() - 0.5);
+  const teams = Array.from({length: tpCount}, () => []);
+  shuffled.forEach((p, i) => teams[i % tpCount].push(p));
+
+  document.getElementById('tp-result').innerHTML = teams.map((team, i) => `
+    <div class="tp-team-card" style="border-color:${TP_TEAM_COLORS[i]};animation-delay:${i*0.08}s">
+      <div class="tp-team-name" style="background:${TP_TEAM_COLORS[i]}">${TP_TEAM_NAMES[i]}</div>
+      <div class="tp-team-players">
+        ${team.map(p => `<div class="tp-player">${p}</div>`).join('')}
+      </div>
+    </div>
+  `).join('');
+  playChime([523, 659, 784]);
 }
 
 // ══════════════════════════════════════════════════════════
