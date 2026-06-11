@@ -1357,6 +1357,58 @@
   @keyframes numRolling { 0%,100%{transform:scale(1);opacity:1;} 50%{transform:scale(1.15);opacity:0.6;} }
   #dice-big-num.rolling { animation:numRolling 0.1s ease-in-out infinite; }
 
+  /* WHEEL SPINNER */
+  .card-wheel { background:linear-gradient(145deg,#004d99,#0088ff); color:#fff; box-shadow:0 8px 32px rgba(0,120,255,0.55); }
+  #wheel-screen { background:radial-gradient(ellipse at center,#001a3a 0%,#000d1f 80%); justify-content:flex-start; overflow-y:auto; padding-bottom:40px; }
+  #wheel-title { font-size:clamp(1.1rem,5vw,1.8rem); font-weight:900; letter-spacing:2px; margin:12px 0 6px; opacity:0.9; }
+  #wheel-area { position:relative; display:flex; flex-direction:column; align-items:center; margin-bottom:8px; }
+  #wheel-pointer {
+    font-size:2.2rem; line-height:1; z-index:2; margin-bottom:-4px;
+    filter:drop-shadow(0 2px 6px rgba(0,0,0,0.7));
+    color:#fff;
+  }
+  #wheel-canvas {
+    width:min(300px,82vw); height:min(300px,82vw);
+    border-radius:50%;
+    box-shadow:0 8px 40px rgba(0,0,0,0.7), 0 0 0 4px rgba(255,255,255,0.08);
+    display:block;
+  }
+  #wheel-winner {
+    font-size:clamp(1.8rem,8vw,3rem); font-weight:900; text-align:center;
+    min-height:1.5em; color:#ffd93d;
+    text-shadow:0 0 24px rgba(255,217,61,0.7);
+    padding:4px 0;
+  }
+  #wheel-items-wrap { width:100%; max-width:380px; padding:0 12px; }
+  #wheel-add-row { display:flex; gap:8px; margin-bottom:10px; }
+  #wheel-add-row input {
+    flex:1; padding:10px 16px; border-radius:50px;
+    border:2px solid rgba(255,255,255,0.2);
+    background:rgba(255,255,255,0.08); color:#fff;
+    font-size:0.95rem; font-family:Nunito,Arial,sans-serif; outline:none;
+  }
+  #wheel-add-row input::placeholder { color:rgba(255,255,255,0.4); }
+  #wheel-add-btn {
+    padding:10px 18px; border-radius:50px; border:none;
+    background:linear-gradient(135deg,#0077ff,#00aaff);
+    color:#fff; font-size:1.4rem; font-weight:900; cursor:pointer;
+    box-shadow:0 4px 12px rgba(0,120,255,0.4);
+  }
+  #wheel-items-list { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+  .wheel-chip {
+    display:flex; align-items:center; gap:5px;
+    padding:5px 10px 5px 12px; border-radius:50px;
+    font-size:0.82rem; font-weight:700; color:rgba(0,0,0,0.8);
+    cursor:default;
+  }
+  .wheel-chip button {
+    width:17px; height:17px; border-radius:50%; border:none;
+    background:rgba(0,0,0,0.18); color:rgba(0,0,0,0.65);
+    font-size:0.7rem; font-weight:900; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; padding:0; line-height:1;
+  }
+  .wheel-chip button:disabled { opacity:0.3; cursor:default; }
+
   /* CHARADES */
   #charades-screen { background: linear-gradient(160deg, #003322, #006644); justify-content: flex-start; }
   #charades-header { font-size: clamp(1.1rem,5vw,1.8rem); font-weight: 900; letter-spacing: 1px; margin-bottom: 12px; opacity: 0.9; }
@@ -1655,12 +1707,40 @@
       <span class="card-icon">🎙</span>
       <span>Voice Box</span>
     </button>
+    <button class="game-card card-wheel" onclick="showScreen('wheel-screen')">
+      <span class="card-icon">🎡</span>
+      <span>Spin the Wheel</span>
+    </button>
   </div>
 
   <div class="menu-footer-btns">
     <button id="players-btn" onclick="document.getElementById('players-modal').style.display='flex'">👥 Players</button>
     <button id="scoreboard-btn" onclick="openScoreboard()">🏆 Scoreboard</button>
     <button id="qr-btn" onclick="document.getElementById('qr-modal').style.display='flex'">📲 Share Game</button>
+  </div>
+</div>
+
+<!-- ═══ WHEEL SPINNER ═══ -->
+<div id="wheel-screen" class="screen">
+  <button class="back-btn" onclick="backToMenu('wheel')">← Menu</button>
+  <div id="wheel-title">🎡 SPIN THE WHEEL</div>
+
+  <div id="wheel-area">
+    <div id="wheel-pointer">▼</div>
+    <canvas id="wheel-canvas" width="300" height="300"></canvas>
+  </div>
+
+  <div id="wheel-winner"></div>
+
+  <button class="btn btn-blue" id="wheel-spin-btn" onclick="spinWheel()" style="font-size:1.3rem;padding:14px 44px;margin-bottom:18px;">🎡 SPIN!</button>
+
+  <div id="wheel-items-wrap">
+    <div id="wheel-add-row">
+      <input id="wheel-input" type="text" placeholder="Add item…" maxlength="24"
+             onkeydown="if(event.key==='Enter')wheelAddItem()">
+      <button id="wheel-add-btn" onclick="wheelAddItem()">＋</button>
+    </div>
+    <div id="wheel-items-list"></div>
   </div>
 </div>
 
@@ -2722,6 +2802,7 @@ function showScreen(id) {
   if (id === 'charades-screen') charadeScreenInit();
   if (id === 'hunt-screen')     huntRenderScores();
   if (id === 'tod-screen')      todNext();
+  if (id === 'wheel-screen')    setTimeout(wheelLoad, 30);
 }
 
 function backToMenu(game) {
@@ -2735,6 +2816,7 @@ function backToMenu(game) {
   if (game === 'qmatch')   qmStop();
   if (game === 'hunt')     huntStop();
   if (game === 'vbox')     vboxMainStop();
+  if (game === 'wheel')    wheelStop();
   synth.cancel();
   dismissSplash();
   exitFullscreen();
@@ -4229,6 +4311,179 @@ function diceRoll() {
     playChime([523, 659, 784]);
     diceRolling = false;
   }, 950);
+}
+
+// ══════════════════════════════════════════════════════════
+// WHEEL SPINNER
+// ══════════════════════════════════════════════════════════
+const WHEEL_COLORS = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff922b','#cc5de8','#20c997','#f06595'];
+let wheelItems    = [];
+let wheelAngle    = 0;
+let wheelSpinning = false;
+let wheelAnimId   = null;
+
+function wheelLoad() {
+  const saved = localStorage.getItem('wheelItems');
+  if (saved) { try { wheelItems = JSON.parse(saved); } catch(e) {} }
+  if (!wheelItems.length) {
+    wheelItems = allPlayerNames.length >= 2
+      ? [...allPlayerNames]
+      : ['Option 1','Option 2','Option 3','Option 4','Option 5','Option 6'];
+  }
+  document.getElementById('wheel-winner').textContent = '';
+  wheelRenderList();
+  drawWheel();
+}
+
+function wheelSave() { localStorage.setItem('wheelItems', JSON.stringify(wheelItems)); }
+
+function wheelAddItem() {
+  const input = document.getElementById('wheel-input');
+  const val = input.value.trim();
+  if (!val || wheelItems.length >= 12) return;
+  wheelItems.push(val);
+  input.value = '';
+  wheelSave(); wheelRenderList(); drawWheel();
+}
+
+function wheelRemoveItem(i) {
+  if (wheelSpinning || wheelItems.length <= 2) return;
+  wheelItems.splice(i, 1);
+  wheelSave(); wheelRenderList(); drawWheel();
+}
+
+function wheelRenderList() {
+  const list = document.getElementById('wheel-items-list');
+  if (!list) return;
+  list.innerHTML = wheelItems.map((item, i) => {
+    const bg = WHEEL_COLORS[i % WHEEL_COLORS.length];
+    return `<div class="wheel-chip" style="background:${bg}">
+      <span>${item}</span>
+      <button onclick="wheelRemoveItem(${i})" ${wheelItems.length <= 2 ? 'disabled' : ''}>✕</button>
+    </div>`;
+  }).join('');
+}
+
+function drawWheel() {
+  const canvas = document.getElementById('wheel-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2, r = W / 2 - 6;
+  const n = wheelItems.length;
+  const sliceAngle = (2 * Math.PI) / n;
+
+  ctx.clearRect(0, 0, W, H);
+
+  for (let i = 0; i < n; i++) {
+    const start = wheelAngle + i * sliceAngle - Math.PI / 2;
+    const end   = start + sliceAngle;
+
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, start, end);
+    ctx.closePath();
+    ctx.fillStyle = WHEEL_COLORS[i % WHEEL_COLORS.length];
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(start + sliceAngle / 2);
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(0,0,0,0.72)';
+    const fs = Math.max(10, Math.min(16, 110 / n));
+    ctx.font = `bold ${fs}px Nunito, Arial, sans-serif`;
+    ctx.fillText(wheelItems[i].length > 14 ? wheelItems[i].slice(0, 13) + '…' : wheelItems[i], r - 10, fs * 0.38);
+    ctx.restore();
+  }
+
+  // Outer ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // Center cap
+  ctx.beginPath();
+  ctx.arc(cx, cy, 20, 0, 2 * Math.PI);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, cy, 8, 0, 2 * Math.PI);
+  ctx.fillStyle = '#333';
+  ctx.fill();
+}
+
+function wheelTick() {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const g   = ctx.createGain();
+    osc.connect(g); g.connect(ctx.destination);
+    osc.frequency.value = 700 + Math.random() * 200;
+    g.gain.setValueAtTime(0.1, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.035);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.035);
+  } catch(e) {}
+}
+
+function spinWheel() {
+  if (wheelSpinning || wheelItems.length < 2) return;
+  wheelSpinning = true;
+  document.getElementById('wheel-winner').textContent = '';
+  document.getElementById('wheel-spin-btn').disabled = true;
+
+  const n = wheelItems.length;
+  const sliceAngle = (2 * Math.PI) / n;
+  const winnerIndex = Math.floor(Math.random() * n);
+
+  // Target angle: winner slice center at top (pointer position)
+  const targetMod = (( -(winnerIndex + 0.5) * sliceAngle ) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+  const curMod    = (( wheelAngle ) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+  let delta = targetMod - curMod;
+  if (delta <= 0) delta += 2 * Math.PI;
+  const totalDelta = delta + (8 + Math.floor(Math.random() * 6)) * 2 * Math.PI;
+
+  const startAngle = wheelAngle;
+  const duration   = 4200 + Math.random() * 1400;
+  const startTime  = performance.now();
+  let lastTickSlice = 0;
+
+  function animate(now) {
+    const t = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    wheelAngle = startAngle + totalDelta * eased;
+    drawWheel();
+
+    const slicesTraveled = Math.floor((wheelAngle - startAngle) / sliceAngle);
+    if (slicesTraveled > lastTickSlice) {
+      wheelTick();
+      lastTickSlice = slicesTraveled;
+    }
+
+    if (t < 1) {
+      wheelAnimId = requestAnimationFrame(animate);
+    } else {
+      wheelAngle = startAngle + totalDelta;
+      drawWheel();
+      wheelSpinning = false;
+      document.getElementById('wheel-spin-btn').disabled = false;
+      document.getElementById('wheel-winner').textContent = wheelItems[winnerIndex];
+      playChime([523, 659, 784, 1047]);
+    }
+  }
+  wheelAnimId = requestAnimationFrame(animate);
+}
+
+function wheelStop() {
+  if (wheelAnimId) { cancelAnimationFrame(wheelAnimId); wheelAnimId = null; }
+  wheelSpinning = false;
+  const btn = document.getElementById('wheel-spin-btn');
+  if (btn) btn.disabled = false;
 }
 
 // ══════════════════════════════════════════════════════════
