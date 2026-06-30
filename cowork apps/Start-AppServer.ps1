@@ -1,0 +1,40 @@
+# Start-AppServer.ps1 — Launch the local app server for phones/tablets
+
+$AppsDir = $PSScriptRoot
+$Port = 8080
+
+# Find the real local IP (not WSL/Hyper-V virtual)
+$LocalIP = (Get-NetIPAddress -AddressFamily IPv4 |
+    Where-Object { $_.PrefixOrigin -ne "WellKnown" -and $_.IPAddress -notlike "172.*" } |
+    Select-Object -First 1).IPAddress
+
+if (-not $LocalIP) {
+    $LocalIP = "127.0.0.1"
+}
+
+# Check if port is already in use
+$existing = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+if ($existing) {
+    Write-Host "`n  Port $Port is already in use. Server may already be running." -ForegroundColor Yellow
+    Write-Host "  Try: http://$LocalIP`:$Port`n" -ForegroundColor Cyan
+    exit
+}
+
+Write-Host ""
+Write-Host "  ╔══════════════════════════════════════════╗" -ForegroundColor DarkCyan
+Write-Host "  ║       Cowork Apps — Local Server         ║" -ForegroundColor Cyan
+Write-Host "  ╠══════════════════════════════════════════╣" -ForegroundColor DarkCyan
+Write-Host "  ║                                          ║" -ForegroundColor DarkCyan
+Write-Host "  ║  Open on phone/tablet (same WiFi):       ║" -ForegroundColor DarkCyan
+Write-Host "  ║  http://$LocalIP`:$Port       ║" -ForegroundColor White
+Write-Host "  ║                                          ║" -ForegroundColor DarkCyan
+Write-Host "  ╚══════════════════════════════════════════╝" -ForegroundColor DarkCyan
+Write-Host ""
+Write-Host "  Starting server..." -ForegroundColor Gray
+
+# Open the local browser
+Start-Process "http://localhost:$Port"
+
+# Start Python server
+Set-Location $AppsDir
+python "$AppsDir\serve_apps.py"
