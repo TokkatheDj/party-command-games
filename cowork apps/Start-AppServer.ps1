@@ -35,6 +35,15 @@ Write-Host "  Starting server..." -ForegroundColor Gray
 # Open the local browser
 Start-Process "http://localhost:$Port"
 
-# Start Python server
+# Start Python server — auto-restart on crash, stop on Ctrl+C
 Set-Location $AppsDir
-python "$AppsDir\serve_apps.py"
+while ($true) {
+    python "$AppsDir\serve_apps.py"
+    $exit = $LASTEXITCODE
+    if ($exit -eq 0) {
+        Write-Host "`n  Server stopped cleanly." -ForegroundColor Gray
+        break
+    }
+    Write-Host "`n  Server exited (code $exit) — restarting in 3s... (Ctrl+C to stop)" -ForegroundColor Yellow
+    Start-Sleep -Seconds 3
+}
