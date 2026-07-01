@@ -655,14 +655,6 @@ def generate_index(apps, reviews, base_url):
 <header>
   <h1>Cowork Apps</h1>
   <p class="subtitle">{app_count} apps &middot; {review_count} {review_label}</p>
-  <div class="qr-section">
-    <img src="{qr_url}" width="80" height="80" alt="QR" onerror="this.style.display='none'">
-    <div class="qr-text">
-      <p>Scan or visit on your device:</p>
-      <div class="qr-url">{base_url}</div>
-      <p class="qr-hint">Requires Tailscale on your device</p>
-    </div>
-  </div>
   <div class="tabs-nav">
     <button class="tab-btn active" data-tab="apps">&#128241; Apps ({app_count})</button>
     <button class="tab-btn" data-tab="reviews">&#11088; Reviews ({review_count})</button>
@@ -1287,7 +1279,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         path = unquote(self.path.split("?")[0])
         if path in ("/", "/index.html", ""):
             ip = get_local_ip()
-            base_url = f"http://{ip}:{PORT}"
+            base_url = os.environ.get("PUBLIC_URL") or f"http://{ip}:{PORT}"
             apps = discover_apps()
             reviews = discover_reviews()
             html = generate_index(apps, reviews, base_url)
@@ -1343,7 +1335,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             self._json({"html": html})
         elif path == "/manifest.json":
             ip = get_local_ip()
-            data = make_manifest(f"http://{ip}:{PORT}").encode("utf-8")
+            data = make_manifest(os.environ.get("PUBLIC_URL") or f"http://{ip}:{PORT}").encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/manifest+json")
             self.send_header("Content-Length", str(len(data)))

@@ -20,13 +20,18 @@ if ($existing) {
     exit
 }
 
+$env:PUBLIC_URL = "https://desktop-lance.tail476695.ts.net"
+
 Write-Host ""
 Write-Host "  ╔══════════════════════════════════════════╗" -ForegroundColor DarkCyan
 Write-Host "  ║       Cowork Apps — Local Server         ║" -ForegroundColor Cyan
 Write-Host "  ╠══════════════════════════════════════════╣" -ForegroundColor DarkCyan
 Write-Host "  ║                                          ║" -ForegroundColor DarkCyan
-Write-Host "  ║  Open on phone/tablet (same WiFi):       ║" -ForegroundColor DarkCyan
-Write-Host "  ║  http://$LocalIP`:$Port       ║" -ForegroundColor White
+Write-Host "  ║  Public URL (anywhere):                  ║" -ForegroundColor DarkCyan
+Write-Host "  ║  $($env:PUBLIC_URL)  ║" -ForegroundColor White
+Write-Host "  ║                                          ║" -ForegroundColor DarkCyan
+Write-Host "  ║  Local (same WiFi):                      ║" -ForegroundColor DarkCyan
+Write-Host "  ║  http://$LocalIP`:$Port       ║" -ForegroundColor DarkCyan
 Write-Host "  ║                                          ║" -ForegroundColor DarkCyan
 Write-Host "  ╚══════════════════════════════════════════╝" -ForegroundColor DarkCyan
 Write-Host ""
