@@ -408,10 +408,6 @@ def generate_index(apps, reviews, base_url):
     else:
         reviews_html = '<p class="no-reviews">No review files found in the Reviews folder.</p>'
 
-    qr_url = (
-        f"https://api.qrserver.com/v1/create-qr-code/"
-        f"?size=180x180&data={base_url}&margin=10"
-    )
     review_label = "Reviews" if review_count != 1 else "Review"
 
     removed_section = ""
@@ -453,12 +449,6 @@ def generate_index(apps, reviews, base_url):
   header {{ background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 2rem 1.5rem 0; border-bottom: 1px solid var(--border); text-align: center; }}
   header h1 {{ font-size: 1.8rem; font-weight: 700; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 0.3rem; }}
   .subtitle {{ color: var(--muted); font-size: 0.9rem; margin-bottom: 1.2rem; }}
-  .qr-section {{ display: flex; align-items: center; justify-content: center; gap: 1.2rem; background: rgba(124,110,230,0.08); border: 1px solid rgba(124,110,230,0.3); border-radius: 12px; padding: 1rem 1.5rem; max-width: 480px; margin: 0 auto 1.5rem; }}
-  .qr-section img {{ border-radius: 8px; background: white; padding: 4px; }}
-  .qr-text {{ text-align: left; }}
-  .qr-text p {{ font-size: 0.78rem; color: var(--muted); margin-bottom: 0.3rem; }}
-  .qr-url {{ font-family: monospace; font-size: 1rem; color: var(--accent); font-weight: 600; word-break: break-all; }}
-  .qr-hint {{ font-size: 0.72rem; color: var(--muted); margin-top: 0.4rem; }}
   .tabs-nav {{ display: flex; border-top: 1px solid var(--border); }}
   .tab-btn {{ flex: 1; padding: 0.8rem; background: transparent; border: none; border-bottom: 3px solid transparent; color: var(--muted); font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: color 0.15s, border-color 0.15s; }}
   .tab-btn.active {{ color: var(--accent); border-bottom-color: var(--accent); }}
@@ -1255,7 +1245,7 @@ def get_icon(size):
     return _ICON_512
 
 
-def make_manifest(base_url):
+def make_manifest():
     return json.dumps({
         "name": "Cowork Apps",
         "short_name": "CoworkApps",
@@ -1334,8 +1324,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             ) if cards else ""
             self._json({"html": html})
         elif path == "/manifest.json":
-            ip = get_local_ip()
-            data = make_manifest(os.environ.get("PUBLIC_URL") or f"http://{ip}:{PORT}").encode("utf-8")
+            data = make_manifest().encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/manifest+json")
             self.send_header("Content-Length", str(len(data)))
