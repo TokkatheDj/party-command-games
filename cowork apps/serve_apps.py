@@ -204,6 +204,12 @@ def save_data(data):
     os.replace(tmp, DATA_FILE)
 
 
+def now_iso():
+    """UTC timestamp in the same format used for every created/started/finished
+    field across notes, playlists, and app_requests."""
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+
+
 def slugify_idea(text):
     slug = re.sub(r'[^a-z0-9]+', '-', (text or "").lower()).strip('-')
     return slug[:40].strip('-') or "my-app"
@@ -328,7 +334,7 @@ def generate_app_worker(request_id):
     requester_name = req.get("requester_name", "")
 
     with GENERATION_SEMAPHORE:
-        started = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+        started = now_iso()
         update_app_request(request_id, status="generating", started=started)
         print(f"[builder] {request_id} ({kind}) starting -> {target_filename}", flush=True)
 
@@ -355,7 +361,7 @@ def generate_app_worker(request_id):
                 encoding="utf-8", errors="replace", cwd=str(APPS_DIR),
             )
             log_tail = ((result.stdout or "") + (result.stderr or ""))[-2000:]
-            finished = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+            finished = now_iso()
 
             if kind == "fix":
                 # A fix edits an already-existing file, so "exists and non-empty" is
@@ -399,14 +405,21 @@ def generate_app_worker(request_id):
                 update_app_request(request_id, status="error", finished=finished, error_message=err, log_tail=log_tail)
 
         except subprocess.TimeoutExpired:
-            finished = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+            finished = now_iso()
             print(f"[builder] {request_id} error: timed out after {GENERATION_TIMEOUT_SEC}s", flush=True)
             update_app_request(
                 request_id, status="error", finished=finished,
                 error_message=f"Timed out after {GENERATION_TIMEOUT_SEC} seconds.", log_tail=log_tail,
             )
+        except FileNotFoundError:
+            # Matches daily_check.py's ask_claude() -- same subprocess.run(["claude", ...])
+            # shape, same failure mode if the CLI isn't resolvable on PATH.
+            finished = now_iso()
+            err = "claude CLI not found -- ensure Claude Code is installed and on PATH."
+            print(f"[builder] {request_id} error: {err}", flush=True)
+            update_app_request(request_id, status="error", finished=finished, error_message=err, log_tail=log_tail)
         except Exception as e:
-            finished = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+            finished = now_iso()
             print(f"[builder] {request_id} error: {e}", flush=True)
             update_app_request(request_id, status="error", finished=finished, error_message=str(e), log_tail=log_tail)
 
@@ -2002,7 +2015,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 note = {
                     "id": uuid.uuid4().hex[:8],
                     "text": text,
-                    "created": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+                    "created": now_iso(),
                     "reviewed": False,
                     "ai_response": None,
                     "reviewed_at": None
@@ -2028,7 +2041,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 "name": name,
                 "emoji": emoji,
                 "apps": [],
-                "created": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+                "created": now_iso(),
             }
             save_data(data)
             self._json({"ok": True, "id": pid})
@@ -2118,7 +2131,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 "target_path": f"custom_apps/{target_filename}",
                 "status": "queued",
                 "error_message": None,
-                "created": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+                "created": now_iso(),
                 "started": None,
                 "finished": None,
                 "log_tail": "",
@@ -2154,7 +2167,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 "target_path": original["target_path"],
                 "status": "queued",
                 "error_message": None,
-                "created": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+                "created": now_iso(),
                 "started": None,
                 "finished": None,
                 "log_tail": "",
@@ -2214,7 +2227,7 @@ def main():
         if req.get("status") == "generating":
             req["status"] = "error"
             req["error_message"] = "Interrupted by server restart -- please resubmit."
-            req["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+            req["finished"] = now_iso()
             interrupted += 1
     if interrupted:
         save_data(data)
