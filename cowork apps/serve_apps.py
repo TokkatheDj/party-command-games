@@ -27,6 +27,11 @@ CUSTOM_APPS_DIR = APPS_DIR / "custom_apps"
 MAX_CONCURRENT_GENERATIONS = 2
 GENERATION_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT_GENERATIONS)
 GENERATION_TIMEOUT_SEC = 360
+# Guards every read-modify-write cycle against .app_data.json: do_POST holds this
+# for its whole request (load -> mutate -> save), and update_app_request() holds it
+# too, so a background generation thread's status write can never be silently
+# clobbered by (or clobber) a concurrent HTTP request's stale data snapshot.
+DATA_LOCK = threading.Lock()
 
 CATEGORY_ICONS = {
     # Original 8 categories
@@ -220,13 +225,16 @@ def compute_target_filename(criteria, data):
 
 def update_app_request(request_id, **fields):
     """Re-read data fresh before writing, mirroring daily_check.py's update_note()
-    idiom, so a slow generation doesn't clobber concurrent HTTP-server writes."""
-    data = load_data()
-    for req in data.get("app_requests", []):
-        if req.get("id") == request_id:
-            req.update(fields)
-            break
-    save_data(data)
+    idiom, so a slow generation doesn't clobber concurrent HTTP-server writes.
+    Holds DATA_LOCK for the whole read-modify-write cycle -- see DATA_LOCK's
+    definition for why a re-read alone isn't a strong enough guarantee."""
+    with DATA_LOCK:
+        data = load_data()
+        for req in data.get("app_requests", []):
+            if req.get("id") == request_id:
+                req.update(fields)
+                break
+        save_data(data)
 
 
 def build_prompt(criteria, mode, target_filename, requester_name):
@@ -1917,7 +1925,15 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             payload = json.loads(body.decode("utf-8")) if body else {}
         except Exception:
             payload = {}
+        # Whole request handled under DATA_LOCK: load, decide, mutate, save, and
+        # respond all happen atomically w.r.t. every other POST and every
+        # background generation thread's update_app_request() calls -- see
+        # DATA_LOCK's definition for why a load-once-at-the-top snapshot alone
+        # isn't safe once background threads can write concurrently.
+        with DATA_LOCK:
+            self._handle_post(path, payload)
 
+    def _handle_post(self, path, payload):
         app_path = payload.get("path", "")
         data = load_data()
 
@@ -2138,10 +2154,6 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         print(f"  {self.address_string()} -- {fmt % args}")
 
 
-class ReusableThreadingTCPServer(socketserver.ThreadingTCPServer):
-    allow_reuse_address = True
-
-
 def main():
     import sys
     if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
@@ -2151,13 +2163,18 @@ def main():
     apps = discover_apps()
     count = sum(len(v) for v in apps.values())
 
-    # Bind the port FIRST. If another instance already holds it (e.g. a stale
-    # auto-restart wrapper racing this one), exit immediately without touching
-    # .app_data.json -- a losing contender must never run the crash-recovery
-    # sweep below, or it will flip a request that the winning process is
-    # actively working on to "error" out from under it.
+    # Bind the port FIRST, with allow_reuse_address left at its default False.
+    # Deliberately NOT setting allow_reuse_address = True here: on Windows,
+    # SO_REUSEADDR lets a second process silently bind the same port while the
+    # first is still live (routing between them becomes "indeterminate" per
+    # Microsoft's own Winsock docs) instead of raising an error -- exactly the
+    # wrong behavior for the "only one true server" invariant the crash-recovery
+    # sweep below depends on. Plain socketserver.ThreadingTCPServer's default
+    # (exclusive bind) is what makes a losing contender fail cleanly with
+    # OSError instead of silently sharing the port with two servers racing to
+    # handle the same requests.
     try:
-        httpd = ReusableThreadingTCPServer(("0.0.0.0", PORT), AppHandler)
+        httpd = socketserver.ThreadingTCPServer(("0.0.0.0", PORT), AppHandler)
     except OSError as e:
         print(f"Could not bind port {PORT}: {e}")
         print("Another server instance is likely already running. Exiting without changes.")
