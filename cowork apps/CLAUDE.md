@@ -19,8 +19,28 @@ Apps live in category subfolders. Drop each new app in the right one — the ser
 | `data_visualization_apps/` | Simulations, physics demos, stats visualizations |
 | `educational_apps/` | Learning apps for students; interactive, instructional |
 | `health_productivity_apps/` | Wellness trackers, focus tools, productivity aids |
-| `music_apps/` | Audio synthesis, rhythm games, music tools (Web Audio API) |
+| `music_apps/` | Audio synthesis, generative/experimental instruments, music tools (Web Audio API) |
 | `custom_apps/` | Kid-generated apps from the "Build Your Own App" wizard; wide variety of types/themes; produced autonomously by a headless `claude -p` invocation, not a human session |
+| `action_games/` | Fast-paced arcade action: platformers, combat, dodge/reflex challenges; neon/high-energy visuals |
+| `card_games_apps/` | Classic and original card games (solitaire, rummy, trick-taking) |
+| `dj_music_apps/` | DJ mixing/scratching tools: turntables, beat chopping, live performance |
+| `fashion_apps/` | Fashion design and styling: outfit builders, pattern/color design, runway challenges |
+| `music_game_apps/` | Music-*learning* games: ear training, rhythm tapping, instrument simulators — distinct from `music_apps/` (synthesis tools) and `Music Production/` (DAW-style production) |
+| `party_apps/` | Group/party games for multiple players: word games, voting, prompt-based social games |
+| `shooting_games_apps/` | Arcade shooters: gallery shooters, twin-stick, cannon/projectile games |
+| `sports_games_apps/` | Sports simulations: archery, bowling, baseball, ski jump, curling |
+| `table_games_apps/` | Tabletop/board game simulations: dice, mancala, area-control strategy |
+| `therapy_apps/` | Mental-health and therapeutic tools: CBT, EMDR, guided relaxation, mood check-ins — distinct from `health_productivity_apps/` (general wellness/focus) |
+| `Content Creation Apps/` | Writing/content-creation tools, split into age-tier subfolders: `kid_apps/`, `teen_apps/`, `adult_apps/` |
+| `Cooking Games/` | Restaurant/kitchen simulation and cooking games |
+| `Crafts/` | Craft-making tools: drawing, bead/textile design, pottery, nature crafts |
+| `Inspirational/` | Motivational content: gratitude, affirmations, quotes, growth-mindset tools |
+| `Music Production/` | DAW-style production tools: drum machines, synths, chord/melody editors — distinct from `music_apps/` (see above) |
+
+> ⚠️ **Known folder-structure issues — do not silently "fix" by moving files without confirming with Lance first:**
+> - `Educational Apps/` and `Shooting Games/` (Title Case, no underscore) are stray duplicate folders, each holding one file that belongs in `educational_apps/` or `shooting_games_apps/` respectively. They are not real categories.
+> - `action_games/`, `card_games_apps/`, `dj_music_apps/`, `fashion_apps/`, and `sports_games_apps/` each have one extra, unnecessary subfolder level (e.g. `action_games/Action Games Generator/*.html` instead of `action_games/*.html`). The server still discovers these fine since it recurses, but it's inconsistent with every other category.
+> - Five categories (`Content Creation Apps`, `Cooking Games`, `Crafts`, `Inspirational`, `Music Production`) use "Title Case With Spaces" folder names instead of the `snake_case` convention every other category follows.
 
 Infrastructure files in root — never modify them:
 - `serve_apps.py` + `Start-AppServer.ps1` — HTTP server on port 8080
