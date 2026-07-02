@@ -209,6 +209,16 @@ def slugify_idea(text):
     return slug[:40].strip('-') or "my-app"
 
 
+def slug_from_filename(target_filename):
+    """Derive the localStorage-namespace slug from the actual computed target
+    filename (stripping the YYYY-MM-DD- prefix and .html suffix) instead of
+    recomputing it independently from criteria -- that way the namespace
+    always matches the real filename, including any -2/-3 disambiguator
+    compute_target_filename() appended on a same-day slug collision."""
+    stem = target_filename[:-5] if target_filename.endswith(".html") else target_filename
+    return re.sub(r'^\d{4}-\d{2}-\d{2}-', '', stem)
+
+
 def compute_target_filename(criteria, data):
     slug = slugify_idea(criteria.get("idea") or criteria.get("theme") or criteria.get("app_type"))
     today = time.strftime("%Y-%m-%d")
@@ -243,7 +253,7 @@ def build_prompt(criteria, mode, target_filename, requester_name):
     age_line = f"Target age range: {criteria.get('age_range')}\n" if criteria.get("age_range") else ""
     tech_line = f"Specific technical requests: {criteria.get('tech_requests')}\n" if criteria.get("tech_requests") else ""
     inspired_line = f"Should feel similar in spirit to: {criteria.get('inspired_by')}\n" if criteria.get("inspired_by") else ""
-    slug = slugify_idea(criteria.get("idea") or criteria.get("theme"))
+    slug = slug_from_filename(target_filename)
 
     return (
         "You are generating exactly ONE new self-contained HTML app for a local family app "
@@ -267,6 +277,10 @@ def build_prompt(criteria, mode, target_filename, requester_name):
         'maximum-scale=1.0, user-scalable=no">\n'
         "- Single self-contained HTML file: all CSS and JS inline, no external dependencies, "
         "no CDN links, no external fonts or images.\n"
+        "- Always include this universal reset: "
+        "* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }\n"
+        "- Always include this on html, body: margin: 0; padding: 0; "
+        "touch-action: manipulation; user-select: none; -webkit-user-select: none;\n"
         "- Use CSS custom properties (:root { --var: value; }) for theme colors.\n"
         "- Vanilla JS only, in one <script> tag at the end of <body>.\n"
         "- Mobile-first: works at 375px wide with no horizontal scroll, all tap targets >= 44px, "
