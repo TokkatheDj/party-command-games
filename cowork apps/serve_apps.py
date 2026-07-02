@@ -29,7 +29,7 @@ CUSTOM_APPS_DIR = APPS_DIR / "custom_apps"
 EMAIL_CONFIG_FILE = APPS_DIR / "email_config.json"
 MAX_CONCURRENT_GENERATIONS = 2
 GENERATION_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT_GENERATIONS)
-GENERATION_TIMEOUT_SEC = 360
+GENERATION_TIMEOUT_SEC = 600
 # Guards every read-modify-write cycle against .app_data.json: do_POST holds this
 # for its whole request (load -> mutate -> save), and update_app_request() holds it
 # too, so a background generation thread's status write can never be silently
@@ -484,8 +484,12 @@ def generate_app_worker(request_id):
                 print(f"[builder] {request_id} error: {err}", flush=True)
                 update_app_request(request_id, status="error", finished=finished, error_message=err, log_tail=log_tail)
 
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as e:
+            # subprocess.run() populates e.stdout/e.stderr with whatever the child
+            # had produced before it was killed -- capture it so a repeat timeout
+            # is diagnosable instead of leaving log_tail blank.
             finished = now_iso()
+            log_tail = ((e.stdout or "") + (e.stderr or ""))[-2000:]
             print(f"[builder] {request_id} error: timed out after {GENERATION_TIMEOUT_SEC}s", flush=True)
             update_app_request(
                 request_id, status="error", finished=finished,
@@ -1855,7 +1859,7 @@ function pollRequest(id) {{
   // client-observed one) so elapsed time isn't skewed by the 4s poll cadence.
   let generatingStartedAt = null;
   builderPolls[id] = setInterval(async () => {{
-    if (generatingStartedAt && Date.now() - generatingStartedAt > 420000) {{
+    if (generatingStartedAt && Date.now() - generatingStartedAt > 660000) {{
       clearInterval(builderPolls[id]);
       delete builderPolls[id];
       const idx = APP_REQUESTS.findIndex(r => r.id === id);
