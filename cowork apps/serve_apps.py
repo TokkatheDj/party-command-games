@@ -1001,6 +1001,8 @@ def generate_index(apps, reviews, base_url):
   .builder-card-error {{ margin-top: 0.4rem; font-size: 0.82rem; color: var(--accent2); }}
   .report-btn {{ display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: var(--muted); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; }}
   .report-btn:hover {{ color: var(--accent2); border-color: var(--accent2); }}
+  .dismiss-btn {{ display: inline-block; margin-top: 0.4rem; margin-right: 0.4rem; font-size: 0.78rem; color: var(--accent2); background: none; border: 1px solid var(--accent2); border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; transition: opacity 0.15s; }}
+  .dismiss-btn:hover {{ opacity: 0.8; }}
   .report-form {{ margin-top: 0.5rem; }}
   .report-ta {{ width: 100%; min-height: 50px; padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; resize: vertical; outline: none; font-family: inherit; line-height: 1.4; transition: border-color 0.2s; }}
   .report-ta:focus {{ border-color: var(--accent2); }}
@@ -1787,6 +1789,8 @@ function builderCardHtml(r) {{
   const idea = escHtml((r.criteria && r.criteria.idea) || '');
   const errorHtml = (r.status === 'error' && r.error_message)
     ? '<div class="builder-card-error" id="builder-error-' + r.id + '">' + escHtml(r.error_message) + '</div>' : '';
+  const dismissHtml = (r.status === 'error')
+    ? '<button class="dismiss-btn" data-id="' + r.id + '">&#10005; Remove</button>' : '';
   const openHtml = (r.status === 'done')
     ? '<a class="builder-card-open" id="builder-open-' + r.id + '" href="/' + r.target_path + '" target="_blank">Open App &rarr;</a>' : '';
   const appType = escHtml((r.criteria && r.criteria.app_type) || 'App');
@@ -1824,7 +1828,7 @@ function builderCardHtml(r) {{
     + '<span class="builder-badge ' + r.status + '" id="builder-badge-' + r.id + '">' + badgeLabel + '</span>'
     + '</div>'
     + '<div class="builder-card-meta">' + idea + '</div>'
-    + errorHtml + openHtml + reportHtml
+    + errorHtml + dismissHtml + openHtml + reportHtml
     + '</div>';
 }}
 
@@ -1883,6 +1887,21 @@ function pollRequest(id) {{
 }}
 
 document.querySelector('.builder-lists')?.addEventListener('click', async (e) => {{
+  const dismissBtn = e.target.closest('.dismiss-btn');
+  if (dismissBtn) {{
+    if (!confirm('Remove this failed build from the list?')) return;
+    const id = dismissBtn.dataset.id;
+    dismissBtn.disabled = true;
+    const r = await apiPost('/api/app_requests/dismiss', {{id}});
+    if (r?.ok) {{
+      APP_REQUESTS = APP_REQUESTS.filter(x => x.id !== id);
+      renderBuilderLists();
+    }} else {{
+      dismissBtn.disabled = false;
+      alert(r?.error || 'Could not remove — please try again.');
+    }}
+    return;
+  }}
   const reportBtn = e.target.closest('.report-btn');
   if (reportBtn) {{
     const form = document.getElementById('report-form-' + reportBtn.dataset.id);
@@ -2316,6 +2335,22 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             save_data(data)
             threading.Thread(target=generate_app_worker, args=(request_id,), daemon=True).start()
             self._json({"ok": True, "id": request_id})
+
+        elif path == "/api/app_requests/dismiss":
+            request_id = (payload.get("id") or "").strip()
+            req = next((r for r in data.get("app_requests", []) if r.get("id") == request_id), None)
+            if req is None:
+                self._json({"ok": False, "error": "not found"}, status=404)
+                return
+            if req.get("status") != "error":
+                # Only failed builds can be cleared this way -- removing a "done"
+                # record would orphan its generated file and any fix history
+                # pointing at it, so that's not exposed here.
+                self._json({"ok": False, "error": "can only remove failed builds"}, status=400)
+                return
+            data["app_requests"] = [r for r in data.get("app_requests", []) if r.get("id") != request_id]
+            save_data(data)
+            self._json({"ok": True})
 
         else:
             self._json({"ok": False, "error": "unknown endpoint"}, status=404)
