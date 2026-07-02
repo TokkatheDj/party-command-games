@@ -552,7 +552,8 @@ def generate_index(apps, reviews, base_url):
     playlist_count = len(playlists)
 
     app_requests = data.get("app_requests", [])
-    app_requests_json = json.dumps(app_requests).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+    app_requests_public = [{k: v for k, v in r.items() if k != "log_tail"} for r in app_requests]
+    app_requests_json = json.dumps(app_requests_public).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     app_request_count = len(app_requests)
 
     notes_items_html = ""
