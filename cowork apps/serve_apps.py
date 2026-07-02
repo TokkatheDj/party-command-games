@@ -26,7 +26,7 @@ DATA_FILE = APPS_DIR / ".app_data.json"
 CUSTOM_APPS_DIR = APPS_DIR / "custom_apps"
 MAX_CONCURRENT_GENERATIONS = 2
 GENERATION_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT_GENERATIONS)
-GENERATION_TIMEOUT_SEC = 240
+GENERATION_TIMEOUT_SEC = 360
 
 CATEGORY_ICONS = {
     # Original 8 categories
@@ -1606,7 +1606,7 @@ function pollRequest(id) {{
   if (builderPolls[id]) return;
   const startedPoll = Date.now();
   builderPolls[id] = setInterval(async () => {{
-    if (Date.now() - startedPoll > 300000) {{
+    if (Date.now() - startedPoll > 420000) {{
       clearInterval(builderPolls[id]);
       delete builderPolls[id];
       const badge = document.getElementById('builder-badge-' + id);
@@ -1979,6 +1979,10 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         print(f"  {self.address_string()} -- {fmt % args}")
 
 
+class ReusableThreadingTCPServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+
+
 def main():
     import sys
     if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
@@ -1988,8 +1992,21 @@ def main():
     apps = discover_apps()
     count = sum(len(v) for v in apps.values())
 
+    # Bind the port FIRST. If another instance already holds it (e.g. a stale
+    # auto-restart wrapper racing this one), exit immediately without touching
+    # .app_data.json -- a losing contender must never run the crash-recovery
+    # sweep below, or it will flip a request that the winning process is
+    # actively working on to "error" out from under it.
+    try:
+        httpd = ReusableThreadingTCPServer(("0.0.0.0", PORT), AppHandler)
+    except OSError as e:
+        print(f"Could not bind port {PORT}: {e}")
+        print("Another server instance is likely already running. Exiting without changes.")
+        sys.exit(1)
+
     # Crash recovery: a killed subprocess can't be resumed, so any app_request
-    # still "generating" from a previous run is stuck forever -- surface it as an error.
+    # still "generating" from a previous run is stuck forever -- surface it as an
+    # error. Safe to run now: we hold the port, so we are the one true server.
     data = load_data()
     interrupted = 0
     for req in data.get("app_requests", []):
@@ -2016,8 +2033,7 @@ def main():
   >> Press Ctrl+C to stop
 """)
 
-    with socketserver.ThreadingTCPServer(("0.0.0.0", PORT), AppHandler) as httpd:
-        httpd.allow_reuse_address = True
+    with httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
