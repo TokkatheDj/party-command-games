@@ -20,6 +20,7 @@ Apps live in category subfolders. Drop each new app in the right one — the ser
 | `educational_apps/` | Learning apps for students; interactive, instructional |
 | `health_productivity_apps/` | Wellness trackers, focus tools, productivity aids |
 | `music_apps/` | Audio synthesis, rhythm games, music tools (Web Audio API) |
+| `custom_apps/` | Kid-generated apps from the "Build Your Own App" wizard; wide variety of types/themes; produced autonomously by a headless `claude -p` invocation, not a human session |
 
 Infrastructure files in root — never modify them:
 - `serve_apps.py` + `Start-AppServer.ps1` — HTTP server on port 8080

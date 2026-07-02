@@ -12,6 +12,8 @@ import zlib
 import re
 import socket
 import socketserver
+import subprocess
+import threading
 import time
 import uuid
 import os
@@ -21,6 +23,10 @@ from urllib.parse import unquote
 APPS_DIR = Path(__file__).parent
 PORT = 8080
 DATA_FILE = APPS_DIR / ".app_data.json"
+CUSTOM_APPS_DIR = APPS_DIR / "custom_apps"
+MAX_CONCURRENT_GENERATIONS = 2
+GENERATION_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT_GENERATIONS)
+GENERATION_TIMEOUT_SEC = 240
 
 CATEGORY_ICONS = {
     # Original 8 categories
@@ -37,6 +43,7 @@ CATEGORY_ICONS = {
     "Action Games": "\U0001f94a",
     "Card Games Apps": "\U0001f0cf",
     "Content Creation Apps": "✍️",
+    "Custom Apps": "\U0001f6e0️",
     "Dj Music Apps": "\U0001f3a7",
     "Fashion Apps": "\U0001f457",
     "Music Game Apps": "\U0001f3b6",
@@ -174,7 +181,7 @@ def discover_reviews():
 
 
 def load_data():
-    defaults = {"favorites": [], "ratings": {}, "removed": [], "opened": [], "notes": [], "playlists": {}}
+    defaults = {"favorites": [], "ratings": {}, "removed": [], "opened": [], "notes": [], "playlists": {}, "app_requests": []}
     if DATA_FILE.exists():
         try:
             data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
@@ -190,6 +197,151 @@ def save_data(data):
     tmp = DATA_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
     os.replace(tmp, DATA_FILE)
+
+
+def slugify_idea(text):
+    slug = re.sub(r'[^a-z0-9]+', '-', (text or "").lower()).strip('-')
+    return slug[:40].strip('-') or "my-app"
+
+
+def compute_target_filename(criteria, data):
+    slug = slugify_idea(criteria.get("idea") or criteria.get("theme") or criteria.get("app_type"))
+    today = time.strftime("%Y-%m-%d")
+    existing = {p.name for p in CUSTOM_APPS_DIR.glob("*.html")} if CUSTOM_APPS_DIR.exists() else set()
+    existing |= {req.get("target_filename") for req in data.get("app_requests", []) if req.get("target_filename")}
+    base = f"{today}-{slug}"
+    candidate = f"{base}.html"
+    n = 2
+    while candidate in existing:
+        candidate = f"{base}-{n}.html"
+        n += 1
+    return candidate
+
+
+def update_app_request(request_id, **fields):
+    """Re-read data fresh before writing, mirroring daily_check.py's update_note()
+    idiom, so a slow generation doesn't clobber concurrent HTTP-server writes."""
+    data = load_data()
+    for req in data.get("app_requests", []):
+        if req.get("id") == request_id:
+            req.update(fields)
+            break
+    save_data(data)
+
+
+def build_prompt(criteria, mode, target_filename, requester_name):
+    target_full = CUSTOM_APPS_DIR / target_filename
+    mechanics_line = f"Requested mechanics: {', '.join(criteria.get('mechanics', []))}\n" if criteria.get("mechanics") else ""
+    age_line = f"Target age range: {criteria.get('age_range')}\n" if criteria.get("age_range") else ""
+    tech_line = f"Specific technical requests: {criteria.get('tech_requests')}\n" if criteria.get("tech_requests") else ""
+    inspired_line = f"Should feel similar in spirit to: {criteria.get('inspired_by')}\n" if criteria.get("inspired_by") else ""
+    slug = slugify_idea(criteria.get("idea") or criteria.get("theme"))
+
+    return (
+        "You are generating exactly ONE new self-contained HTML app for a local family app "
+        "library called 'Cowork Apps', built by a kid using a 'Build Your Own App' wizard.\n\n"
+        f"App type: {criteria.get('app_type')}\n"
+        f"Theme: {criteria.get('theme')}\n"
+        f"Difficulty: {criteria.get('difficulty')}\n"
+        f"Visual color vibe: {criteria.get('color_vibe')}\n"
+        f"One-line idea: {criteria.get('idea')}\n"
+        f"{mechanics_line}{age_line}{tech_line}{inspired_line}"
+        f"Requested by: {requester_name}\n\n"
+        "MANDATORY OUTPUT LOCATION -- this is the single most important rule:\n"
+        f"Create exactly one file at this exact absolute path: {target_full}\n"
+        "Do NOT create, edit, move, or delete any other file. Do not touch serve_apps.py, "
+        "Start-AppServer.ps1, .app_data.json, package.json, or anything outside the "
+        "custom_apps folder. Do not create README files, asset files, or a second HTML file.\n\n"
+        "MANDATORY HTML APP CONVENTIONS (from this project's CLAUDE.md -- follow exactly):\n"
+        "- First line of the file must be: <!-- CONCEPT: one-sentence description -->\n"
+        "- Must include this exact viewport meta tag verbatim: "
+        '<meta name="viewport" content="width=device-width, initial-scale=1.0, '
+        'maximum-scale=1.0, user-scalable=no">\n'
+        "- Single self-contained HTML file: all CSS and JS inline, no external dependencies, "
+        "no CDN links, no external fonts or images.\n"
+        "- Use CSS custom properties (:root { --var: value; }) for theme colors.\n"
+        "- Vanilla JS only, in one <script> tag at the end of <body>.\n"
+        "- Mobile-first: works at 375px wide with no horizontal scroll, all tap targets >= 44px, "
+        "no hover-only interactions.\n"
+        "- If you persist any state, use localStorage with keys namespaced as "
+        f"'cowork-{slug}-{{key}}'.\n"
+        "- Give the app a clear on-screen title and, if it's a game or puzzle, a way to restart/reset.\n"
+        "- Match the visual vibe requested above (bright/playful, dark/muted, neon, pastel, etc.) "
+        "using colors, not just a label in a comment.\n\n"
+        "Build the complete, working app in one pass -- do not ask clarifying questions, do not "
+        "produce placeholder or skeleton code."
+    )
+
+
+def generate_app_worker(request_id):
+    data = load_data()
+    req = next((r for r in data.get("app_requests", []) if r.get("id") == request_id), None)
+    if req is None:
+        return
+    criteria = req.get("criteria", {})
+    mode = req.get("mode", "basic")
+    target_filename = req.get("target_filename")
+    requester_name = req.get("requester_name", "")
+
+    with GENERATION_SEMAPHORE:
+        started = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+        update_app_request(request_id, status="generating", started=started)
+        print(f"[builder] {request_id} starting -> {target_filename}", flush=True)
+
+        prompt = build_prompt(criteria, mode, target_filename, requester_name)
+        target_full_path = CUSTOM_APPS_DIR / target_filename
+        CUSTOM_APPS_DIR.mkdir(exist_ok=True)
+
+        log_tail = ""
+        try:
+            result = subprocess.run(
+                ["claude", "--permission-mode", "dontAsk", "-p", prompt,
+                 "--allowedTools", f"Write({CUSTOM_APPS_DIR}\\**),Edit({CUSTOM_APPS_DIR}\\**),Read,Glob,Grep",
+                 "--max-turns", "30"],
+                capture_output=True, text=True, timeout=GENERATION_TIMEOUT_SEC,
+                encoding="utf-8", errors="replace", cwd=str(APPS_DIR),
+            )
+            log_tail = ((result.stdout or "") + (result.stderr or ""))[-2000:]
+            finished = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+
+            actual_filename = target_filename
+            if not (target_full_path.exists() and target_full_path.stat().st_size > 0):
+                # Defensive fallback: look for the newest html file created since we started
+                started_ts = time.mktime(time.strptime(started, "%Y-%m-%dT%H:%M:%S"))
+                candidates = [
+                    p for p in CUSTOM_APPS_DIR.glob("*.html")
+                    if p.stat().st_mtime >= started_ts
+                ]
+                if candidates:
+                    newest = max(candidates, key=lambda p: p.stat().st_mtime)
+                    actual_filename = newest.name
+                    target_full_path = newest
+                else:
+                    target_full_path = None
+
+            if target_full_path and target_full_path.exists() and target_full_path.stat().st_size > 0:
+                print(f"[builder] {request_id} done -> {actual_filename}", flush=True)
+                update_app_request(
+                    request_id, status="done", finished=finished, log_tail=log_tail,
+                    target_filename=actual_filename,
+                    target_path=f"custom_apps/{actual_filename}",
+                )
+            else:
+                err = f"No file was created (exit code {result.returncode})."
+                print(f"[builder] {request_id} error: {err}", flush=True)
+                update_app_request(request_id, status="error", finished=finished, error_message=err, log_tail=log_tail)
+
+        except subprocess.TimeoutExpired:
+            finished = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+            print(f"[builder] {request_id} error: timed out after {GENERATION_TIMEOUT_SEC}s", flush=True)
+            update_app_request(
+                request_id, status="error", finished=finished,
+                error_message=f"Timed out after {GENERATION_TIMEOUT_SEC} seconds.", log_tail=log_tail,
+            )
+        except Exception as e:
+            finished = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+            print(f"[builder] {request_id} error: {e}", flush=True)
+            update_app_request(request_id, status="error", finished=finished, error_message=str(e), log_tail=log_tail)
 
 
 def _star_html(path, current_rating):
@@ -345,6 +497,10 @@ def generate_index(apps, reviews, base_url):
     playlists = data.get("playlists", {})
     playlists_json = json.dumps(playlists).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     playlist_count = len(playlists)
+
+    app_requests = data.get("app_requests", [])
+    app_requests_json = json.dumps(app_requests).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+    app_request_count = len(app_requests)
 
     notes_items_html = ""
     for note in notes:
@@ -639,6 +795,41 @@ def generate_index(apps, reviews, base_url):
   .pin-picker-new {{ font-size: 0.82rem; color: var(--accent); padding: 0.45rem 0.5rem; cursor: pointer; border-top: 1px solid var(--border); margin-top: 0.3rem; border-radius: 0 0 6px 6px; transition: background 0.12s; }}
   .pin-picker-new:hover {{ background: rgba(124,110,230,0.12); }}
   .pl-empty {{ color: var(--muted); font-style: italic; font-size: 0.9rem; padding: 1rem 0; }}
+  /* ---- App Builder ---- */
+  #tab-builder {{ display: none; padding: 1.5rem; max-width: 700px; margin: 0 auto; }}
+  .builder-form {{ background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 1rem; margin-bottom: 1.2rem; }}
+  .builder-form label {{ font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin: 0.75rem 0 0.4rem; }}
+  .builder-form label:first-child {{ margin-top: 0; }}
+  #builder-name-input, #builder-theme-input, #builder-inspired-input {{ width: 100%; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; transition: border-color 0.2s; }}
+  #builder-name-input:focus, #builder-theme-input:focus, #builder-inspired-input:focus {{ border-color: var(--accent); }}
+  #builder-idea-input, #builder-tech-input {{ width: 100%; min-height: 60px; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; resize: vertical; transition: border-color 0.2s; }}
+  #builder-idea-input:focus, #builder-tech-input:focus {{ border-color: var(--accent); }}
+  .mode-toggle {{ display: flex; gap: 0.4rem; margin-bottom: 0.5rem; }}
+  .mode-toggle-btn {{ flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.85rem; font-weight: 600; padding: 0.5rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; }}
+  .mode-toggle-btn.active {{ color: var(--accent); border-color: var(--accent); background: rgba(124,110,230,0.1); }}
+  .choice-group {{ display: flex; gap: 0.4rem; flex-wrap: wrap; }}
+  .choice-opt {{ font-size: 0.85rem; color: var(--text); cursor: pointer; border-radius: 7px; padding: 0.4rem 0.75rem; border: 2px solid var(--border); transition: border-color 0.12s, background 0.12s; }}
+  .choice-opt.selected {{ border-color: var(--accent); background: rgba(124,110,230,0.12); color: var(--accent); }}
+  .choice-checkboxes {{ display: flex; gap: 0.5rem; flex-wrap: wrap; }}
+  .choice-checkbox {{ display: flex; align-items: center; gap: 0.35rem; font-size: 0.83rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 0.35rem 0.6rem; cursor: pointer; }}
+  .choice-checkbox input {{ accent-color: var(--accent); }}
+  #builder-advanced-fields.hidden {{ display: none; }}
+  .builder-lists {{ margin-top: 1.5rem; }}
+  .builder-list-heading {{ font-size: 0.85rem; font-weight: 600; color: var(--text); margin: 1.2rem 0 0.6rem; }}
+  .builder-card-list {{ display: flex; flex-direction: column; gap: 0.6rem; }}
+  .builder-empty {{ color: var(--muted); font-style: italic; font-size: 0.88rem; }}
+  .builder-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 0.9rem; }}
+  .builder-card-header {{ display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.3rem; }}
+  .builder-card-title {{ font-size: 0.9rem; color: var(--text); font-weight: 600; }}
+  .builder-card-meta {{ font-size: 0.75rem; color: var(--muted); }}
+  .builder-badge {{ font-size: 0.68rem; font-weight: 700; padding: 0.15em 0.55em; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0; }}
+  .builder-badge.queued {{ background: rgba(136,136,153,0.15); color: var(--muted); }}
+  .builder-badge.generating {{ background: rgba(124,110,230,0.15); color: var(--accent); }}
+  .builder-badge.done {{ background: rgba(68,238,102,0.12); color: #44ee66; }}
+  .builder-badge.error {{ background: rgba(230,110,124,0.15); color: var(--accent2); }}
+  .builder-card-open {{ display: inline-block; margin-top: 0.4rem; font-size: 0.83rem; color: var(--accent); text-decoration: none; font-weight: 600; }}
+  .builder-card-open:hover {{ text-decoration: underline; }}
+  .builder-card-error {{ margin-top: 0.4rem; font-size: 0.82rem; color: var(--accent2); }}
 </style>
 </head>
 <body>
@@ -650,6 +841,7 @@ def generate_index(apps, reviews, base_url):
     <button class="tab-btn" data-tab="reviews">&#11088; Reviews ({review_count})</button>
     <button class="tab-btn" data-tab="notes">&#128203; Notes {notes_tab_label}</button>
     <button class="tab-btn" data-tab="playlists">&#128204; Lists ({playlist_count})</button>
+    <button class="tab-btn" data-tab="builder">&#128736; Build ({app_request_count})</button>
   </div>
 </header>
 
@@ -713,6 +905,96 @@ def generate_index(apps, reviews, base_url):
 
 <div id="playlist-view-container" class="hidden"></div>
 
+<div id="tab-builder">
+  <div class="pl-header">
+    <h2>&#128736; Build Your Own App</h2>
+  </div>
+  <div class="builder-form">
+    <label>Your name</label>
+    <input id="builder-name-input" type="text" placeholder="e.g. Emma" autocomplete="off" maxlength="30">
+
+    <div class="mode-toggle">
+      <button class="mode-toggle-btn active" id="mode-basic-btn" data-mode="basic">Basic</button>
+      <button class="mode-toggle-btn" id="mode-advanced-btn" data-mode="advanced">Advanced</button>
+    </div>
+
+    <label>App type</label>
+    <div class="choice-group" id="builder-app-type" data-field="app_type">
+      <span class="choice-opt selected" data-value="Game">&#127918; Game</span>
+      <span class="choice-opt" data-value="Puzzle">&#129513; Puzzle</span>
+      <span class="choice-opt" data-value="Quiz">&#10067; Quiz</span>
+      <span class="choice-opt" data-value="Story">&#128214; Story</span>
+      <span class="choice-opt" data-value="Tool">&#128295; Tool</span>
+      <span class="choice-opt" data-value="Art">&#127912; Art</span>
+      <span class="choice-opt" data-value="Music">&#127925; Music</span>
+    </div>
+
+    <label>Theme / subject</label>
+    <input id="builder-theme-input" type="text" placeholder="e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
+
+    <label>Difficulty</label>
+    <div class="choice-group" id="builder-difficulty" data-field="difficulty">
+      <span class="choice-opt selected" data-value="Easy">Easy</span>
+      <span class="choice-opt" data-value="Medium">Medium</span>
+      <span class="choice-opt" data-value="Hard">Hard</span>
+    </div>
+
+    <label>Color vibe</label>
+    <div class="choice-group" id="builder-color-vibe" data-field="color_vibe">
+      <span class="choice-opt selected" data-value="Bright &amp; Playful">Bright &amp; Playful</span>
+      <span class="choice-opt" data-value="Cool &amp; Calm">Cool &amp; Calm</span>
+      <span class="choice-opt" data-value="Dark &amp; Mysterious">Dark &amp; Mysterious</span>
+      <span class="choice-opt" data-value="Neon &amp; Energetic">Neon &amp; Energetic</span>
+      <span class="choice-opt" data-value="Pastel &amp; Soft">Pastel &amp; Soft</span>
+    </div>
+
+    <label>Your idea (one line)</label>
+    <textarea id="builder-idea-input" placeholder="e.g. A maze game where you're a dragon collecting gems" maxlength="200"></textarea>
+
+    <div id="builder-advanced-fields" class="hidden">
+      <label>Mechanics (pick any)</label>
+      <div class="choice-checkboxes" id="builder-mechanics">
+        <label class="choice-checkbox"><input type="checkbox" value="Timer/Countdown"> Timer/Countdown</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Score/Points"> Score/Points</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Levels"> Levels</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Local multiplayer"> Local multiplayer</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Sound effects"> Sound effects</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Drag &amp; drop"> Drag &amp; drop</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Keyboard controls"> Keyboard controls</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Touch/swipe"> Touch/swipe</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Randomized"> Randomized</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Save progress"> Save progress</label>
+      </div>
+
+      <label>Age range</label>
+      <div class="choice-group" id="builder-age-range" data-field="age_range">
+        <span class="choice-opt" data-value="4-6">4-6</span>
+        <span class="choice-opt" data-value="7-9">7-9</span>
+        <span class="choice-opt" data-value="10-12">10-12</span>
+        <span class="choice-opt" data-value="13-16">13-16</span>
+        <span class="choice-opt selected" data-value="All ages">All ages</span>
+      </div>
+
+      <label>Anything specific? (optional)</label>
+      <textarea id="builder-tech-input" placeholder="e.g. a leaderboard of best times" maxlength="300"></textarea>
+
+      <label>Make it feel like&hellip; (optional)</label>
+      <input id="builder-inspired-input" type="text" placeholder="e.g. Flappy Bird" autocomplete="off" maxlength="100">
+    </div>
+
+    <div class="pl-form-actions">
+      <button class="pl-create-btn" id="builder-submit-btn">Build My App!</button>
+    </div>
+  </div>
+
+  <div class="builder-lists">
+    <h2 class="builder-list-heading">Your Creations</h2>
+    <div id="builder-mine-list" class="builder-card-list"></div>
+    <h2 class="builder-list-heading">Family Creations</h2>
+    <div id="builder-family-list" class="builder-card-list"></div>
+  </div>
+</div>
+
 <footer>Auto-refreshes on each visit &middot; {APPS_DIR}</footer>
 
 <script>
@@ -733,6 +1015,9 @@ function switchTab(name) {{
   plView.classList.add('hidden');
   if (name === 'playlists') {{
     renderPlaylistGrid();
+  }}
+  if (name === 'builder') {{
+    loadAppRequests();
   }}
   location.hash = name === 'apps' ? '' : name;
 }}
@@ -1203,6 +1488,145 @@ document.querySelectorAll('.note-delete').forEach(btn => {{
     if (r && r.ok) location.reload();
   }});
 }});
+
+// ---- App Builder ----
+let APP_REQUESTS = {app_requests_json};
+const builderPolls = {{}};
+
+const builderNameInput = document.getElementById('builder-name-input');
+if (builderNameInput) {{
+  builderNameInput.value = localStorage.getItem('cowork-builder-name') || '';
+  builderNameInput.addEventListener('input', () => {{
+    localStorage.setItem('cowork-builder-name', builderNameInput.value.trim());
+  }});
+}}
+
+document.getElementById('mode-basic-btn')?.addEventListener('click', () => setBuilderMode('basic'));
+document.getElementById('mode-advanced-btn')?.addEventListener('click', () => setBuilderMode('advanced'));
+function setBuilderMode(mode) {{
+  document.getElementById('mode-basic-btn').classList.toggle('active', mode === 'basic');
+  document.getElementById('mode-advanced-btn').classList.toggle('active', mode === 'advanced');
+  document.getElementById('builder-advanced-fields').classList.toggle('hidden', mode !== 'advanced');
+}}
+
+document.querySelectorAll('.choice-group').forEach(group => {{
+  group.addEventListener('click', e => {{
+    const opt = e.target.closest('.choice-opt');
+    if (!opt || !group.contains(opt)) return;
+    group.querySelectorAll('.choice-opt').forEach(o => o.classList.remove('selected'));
+    opt.classList.add('selected');
+  }});
+}});
+
+function builderChoice(fieldId) {{
+  return document.querySelector('#' + fieldId + ' .choice-opt.selected')?.dataset.value || '';
+}}
+
+document.getElementById('builder-submit-btn')?.addEventListener('click', async () => {{
+  const requester_name = builderNameInput?.value.trim() || '';
+  if (!requester_name) {{ builderNameInput?.focus(); return; }}
+  const mode = document.getElementById('mode-advanced-btn').classList.contains('active') ? 'advanced' : 'basic';
+
+  const criteria = {{
+    app_type: builderChoice('builder-app-type'),
+    theme: document.getElementById('builder-theme-input').value.trim(),
+    difficulty: builderChoice('builder-difficulty'),
+    color_vibe: builderChoice('builder-color-vibe'),
+    idea: document.getElementById('builder-idea-input').value.trim(),
+  }};
+  if (!criteria.theme) {{ document.getElementById('builder-theme-input').focus(); return; }}
+  if (!criteria.idea) {{ document.getElementById('builder-idea-input').focus(); return; }}
+  if (mode === 'advanced') {{
+    criteria.mechanics = Array.from(document.querySelectorAll('#builder-mechanics input:checked')).map(cb => cb.value);
+    criteria.age_range = builderChoice('builder-age-range');
+    const tech = document.getElementById('builder-tech-input').value.trim();
+    const inspired = document.getElementById('builder-inspired-input').value.trim();
+    if (tech) criteria.tech_requests = tech;
+    if (inspired) criteria.inspired_by = inspired;
+  }}
+
+  const btn = document.getElementById('builder-submit-btn');
+  btn.disabled = true; btn.textContent = 'Building…';
+  const r = await apiPost('/api/app_requests/create', {{requester_name, mode, criteria}});
+  btn.disabled = false; btn.textContent = 'Build My App!';
+  if (r?.ok) {{
+    APP_REQUESTS.unshift({{
+      id: r.id, requester_name, mode, criteria,
+      target_filename: r.target_filename, target_path: 'custom_apps/' + r.target_filename,
+      status: 'queued', error_message: null, created: new Date().toISOString(),
+      started: null, finished: null,
+    }});
+    document.getElementById('builder-idea-input').value = '';
+    renderBuilderLists();
+    pollRequest(r.id);
+  }} else {{
+    alert(r?.error || 'Could not submit — please try again.');
+  }}
+}});
+
+function builderCardHtml(r) {{
+  const labels = {{queued: 'Queued', generating: 'Building…', done: 'Ready ✅', error: 'Error'}};
+  const badgeLabel = labels[r.status] || r.status;
+  const idea = escHtml((r.criteria && r.criteria.idea) || '');
+  const errorHtml = (r.status === 'error' && r.error_message)
+    ? '<div class="builder-card-error" id="builder-error-' + r.id + '">' + escHtml(r.error_message) + '</div>' : '';
+  const openHtml = (r.status === 'done')
+    ? '<a class="builder-card-open" id="builder-open-' + r.id + '" href="/' + r.target_path + '" target="_blank">Open App &rarr;</a>' : '';
+  const appType = escHtml((r.criteria && r.criteria.app_type) || 'App');
+  return '<div class="builder-card" id="builder-card-' + r.id + '">'
+    + '<div class="builder-card-header">'
+    + '<span class="builder-card-title">' + appType + ' — ' + escHtml(r.requester_name || '') + '</span>'
+    + '<span class="builder-badge ' + r.status + '" id="builder-badge-' + r.id + '">' + badgeLabel + '</span>'
+    + '</div>'
+    + '<div class="builder-card-meta">' + idea + '</div>'
+    + errorHtml + openHtml
+    + '</div>';
+}}
+
+function renderBuilderLists() {{
+  const myName = (builderNameInput?.value || '').trim().toLowerCase();
+  const mineList = document.getElementById('builder-mine-list');
+  const familyList = document.getElementById('builder-family-list');
+  if (!mineList || !familyList) return;
+  const mine = myName ? APP_REQUESTS.filter(r => (r.requester_name || '').trim().toLowerCase() === myName) : [];
+  mineList.innerHTML = mine.length ? mine.map(builderCardHtml).join('') : '<p class="builder-empty">Nothing yet — build your first app above!</p>';
+  familyList.innerHTML = APP_REQUESTS.length ? APP_REQUESTS.map(builderCardHtml).join('') : '<p class="builder-empty">No apps built yet.</p>';
+  APP_REQUESTS.forEach(r => {{
+    if (r.status === 'queued' || r.status === 'generating') pollRequest(r.id);
+  }});
+}}
+
+async function loadAppRequests() {{
+  const r = await fetch('/api/app_requests').then(res => res.json()).catch(() => null);
+  if (r && r.requests) APP_REQUESTS = r.requests;
+  renderBuilderLists();
+}}
+
+function pollRequest(id) {{
+  if (builderPolls[id]) return;
+  const startedPoll = Date.now();
+  builderPolls[id] = setInterval(async () => {{
+    if (Date.now() - startedPoll > 300000) {{
+      clearInterval(builderPolls[id]);
+      delete builderPolls[id];
+      const badge = document.getElementById('builder-badge-' + id);
+      if (badge) {{ badge.textContent = 'Taking longer than expected'; badge.className = 'builder-badge error'; }}
+      return;
+    }}
+    const status = await fetch('/api/app_requests/status/' + id).then(res => res.ok ? res.json() : null).catch(() => null);
+    if (!status) return;
+    const idx = APP_REQUESTS.findIndex(r => r.id === id);
+    if (idx >= 0) APP_REQUESTS[idx] = Object.assign({{}}, APP_REQUESTS[idx], status);
+    if (status.status === 'done' || status.status === 'error') {{
+      clearInterval(builderPolls[id]);
+      delete builderPolls[id];
+      renderBuilderLists();
+    }} else {{
+      const badge = document.getElementById('builder-badge-' + id);
+      if (badge) {{ badge.textContent = 'Building…'; badge.className = 'builder-badge generating'; }}
+    }}
+  }}, 4000);
+}}
 </script>
 </body>
 </html>"""
@@ -1323,6 +1747,18 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 f'<div class="app-list">{cards}</div></div>'
             ) if cards else ""
             self._json({"html": html})
+        elif path == "/api/app_requests":
+            data = load_data()
+            requests_list = sorted(data.get("app_requests", []), key=lambda r: r.get("created", ""), reverse=True)
+            self._json({"requests": [{k: v for k, v in r.items() if k != "log_tail"} for r in requests_list]})
+        elif path.startswith("/api/app_requests/status/"):
+            request_id = path[len("/api/app_requests/status/"):]
+            data = load_data()
+            req = next((r for r in data.get("app_requests", []) if r.get("id") == request_id), None)
+            if req is None:
+                self._json({"error": "not found"}, status=404)
+                return
+            self._json({k: v for k, v in req.items() if k != "log_tail"})
         elif path == "/manifest.json":
             data = make_manifest().encode("utf-8")
             self.send_response(200)
@@ -1474,6 +1910,60 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             save_data(data)
             self._json({"ok": True})
 
+        elif path == "/api/app_requests/create":
+            requester_name = (payload.get("requester_name") or "").strip()[:30]
+            mode = payload.get("mode") or "basic"
+            criteria = payload.get("criteria") or {}
+            if mode not in ("basic", "advanced"):
+                self._json({"ok": False, "error": "invalid mode"}, status=400)
+                return
+            if not requester_name:
+                self._json({"ok": False, "error": "missing required field: requester_name"}, status=400)
+                return
+            for field in ("app_type", "theme", "difficulty", "color_vibe", "idea"):
+                if not str(criteria.get(field, "")).strip():
+                    self._json({"ok": False, "error": f"missing required field: {field}"}, status=400)
+                    return
+
+            clean_criteria = {
+                "app_type": str(criteria["app_type"]).strip()[:40],
+                "theme": str(criteria["theme"]).strip()[:60],
+                "difficulty": str(criteria["difficulty"]).strip()[:20],
+                "color_vibe": str(criteria["color_vibe"]).strip()[:40],
+                "idea": str(criteria["idea"]).strip()[:200],
+            }
+            if mode == "advanced":
+                mechanics = criteria.get("mechanics") or []
+                if isinstance(mechanics, list):
+                    clean_criteria["mechanics"] = [str(m).strip()[:40] for m in mechanics][:10]
+                if criteria.get("age_range"):
+                    clean_criteria["age_range"] = str(criteria["age_range"]).strip()[:20]
+                if criteria.get("tech_requests"):
+                    clean_criteria["tech_requests"] = str(criteria["tech_requests"]).strip()[:300]
+                if criteria.get("inspired_by"):
+                    clean_criteria["inspired_by"] = str(criteria["inspired_by"]).strip()[:100]
+
+            request_id = uuid.uuid4().hex[:8]
+            target_filename = compute_target_filename(clean_criteria, data)
+            record = {
+                "id": request_id,
+                "requester_name": requester_name,
+                "mode": mode,
+                "criteria": clean_criteria,
+                "target_filename": target_filename,
+                "target_path": f"custom_apps/{target_filename}",
+                "status": "queued",
+                "error_message": None,
+                "created": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+                "started": None,
+                "finished": None,
+                "log_tail": "",
+            }
+            data.setdefault("app_requests", []).append(record)
+            save_data(data)
+            threading.Thread(target=generate_app_worker, args=(request_id,), daemon=True).start()
+            self._json({"ok": True, "id": request_id, "target_filename": target_filename})
+
         else:
             self._json({"ok": False, "error": "unknown endpoint"}, status=404)
 
@@ -1497,6 +1987,20 @@ def main():
     ip = get_local_ip()
     apps = discover_apps()
     count = sum(len(v) for v in apps.values())
+
+    # Crash recovery: a killed subprocess can't be resumed, so any app_request
+    # still "generating" from a previous run is stuck forever -- surface it as an error.
+    data = load_data()
+    interrupted = 0
+    for req in data.get("app_requests", []):
+        if req.get("status") == "generating":
+            req["status"] = "error"
+            req["error_message"] = "Interrupted by server restart -- please resubmit."
+            req["finished"] = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+            interrupted += 1
+    if interrupted:
+        save_data(data)
+        print(f"[builder] marked {interrupted} interrupted app_request(s) as error on startup")
 
     print(f"""
 +----------------------------------------------+
