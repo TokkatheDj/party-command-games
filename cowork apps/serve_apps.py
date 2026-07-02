@@ -13,10 +13,12 @@ import re
 import socket
 import socketserver
 import subprocess
+import smtplib
 import threading
 import time
 import uuid
 import os
+from email.message import EmailMessage
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -24,6 +26,7 @@ APPS_DIR = Path(__file__).parent
 PORT = 8080
 DATA_FILE = APPS_DIR / ".app_data.json"
 CUSTOM_APPS_DIR = APPS_DIR / "custom_apps"
+EMAIL_CONFIG_FILE = APPS_DIR / "email_config.json"
 MAX_CONCURRENT_GENERATIONS = 2
 GENERATION_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT_GENERATIONS)
 GENERATION_TIMEOUT_SEC = 360
@@ -186,7 +189,7 @@ def discover_reviews():
 
 
 def load_data():
-    defaults = {"favorites": [], "ratings": {}, "removed": [], "opened": [], "notes": [], "playlists": {}, "app_requests": []}
+    defaults = {"favorites": [], "ratings": {}, "removed": [], "opened": [], "notes": [], "playlists": {}, "app_requests": [], "builders": {}}
     if DATA_FILE.exists():
         try:
             data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
@@ -237,6 +240,82 @@ def compute_target_filename(criteria, data):
         candidate = f"{base}-{n}.html"
         n += 1
     return candidate
+
+
+EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+def strip_private_fields(request_record):
+    """Drop fields from an app_request record that shouldn't leave the server:
+    log_tail (debug-only subprocess output) and requester_email (only needed
+    server-side to send the build-finished notification, not for card display)."""
+    return {k: v for k, v in request_record.items() if k not in ("log_tail", "requester_email")}
+
+
+def remember_builder(data, name, email):
+    """Track name -> most-recently-provided email so the name dropdown can
+    offer returning guests their name (and re-use their email for build
+    notifications) without asking them to retype it every time."""
+    builders = data.setdefault("builders", {})
+    if email:
+        builders[name] = email
+    elif name not in builders:
+        builders[name] = ""
+
+
+def list_builders(data):
+    return sorted(
+        ({"name": name, "email": email} for name, email in data.get("builders", {}).items() if name),
+        key=lambda b: b["name"].lower(),
+    )
+
+
+def load_email_config():
+    """Reads email_config.json (gitignored, not part of .app_data.json since it
+    holds an SMTP credential, not app state). Returns None -- and callers must
+    silently skip sending -- until the file exists with all three fields filled in."""
+    if not EMAIL_CONFIG_FILE.exists():
+        return None
+    try:
+        cfg = json.loads(EMAIL_CONFIG_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not (cfg.get("smtp_host") and cfg.get("smtp_user") and cfg.get("smtp_app_password")):
+        return None
+    return cfg
+
+
+def get_base_url():
+    return os.environ.get("PUBLIC_URL") or f"http://{get_local_ip()}:{PORT}"
+
+
+def send_build_notification(requester_name, requester_email, target_path):
+    """Best-effort 'your app is ready' email. Must never raise into the caller --
+    a missing/unconfigured email_config.json or an SMTP hiccup should not affect
+    the build itself, so every failure path here just logs and returns."""
+    if not requester_email:
+        return
+    cfg = load_email_config()
+    if not cfg:
+        return
+    link = f"{get_base_url()}/{target_path}"
+    msg = EmailMessage()
+    msg["Subject"] = f"Your app is ready, {requester_name}!"
+    msg["From"] = f'{cfg.get("from_name", "Cowork Apps")} <{cfg["smtp_user"]}>'
+    msg["To"] = requester_email
+    msg.set_content(
+        f"Hi {requester_name},\n\n"
+        f"Your app is built and ready to play:\n{link}\n\n"
+        "Have fun!\n"
+    )
+    try:
+        with smtplib.SMTP(cfg["smtp_host"], cfg.get("smtp_port", 587), timeout=15) as smtp:
+            smtp.starttls()
+            smtp.login(cfg["smtp_user"], cfg["smtp_app_password"])
+            smtp.send_message(msg)
+        print(f"[builder] notification email sent to {requester_email}", flush=True)
+    except Exception as e:
+        print(f"[builder] notification email failed: {e}", flush=True)
 
 
 def update_app_request(request_id, **fields):
@@ -399,6 +478,7 @@ def generate_app_worker(request_id):
                     target_filename=actual_filename,
                     target_path=f"custom_apps/{actual_filename}",
                 )
+                send_build_notification(requester_name, req.get("requester_email", ""), f"custom_apps/{actual_filename}")
             else:
                 err = f"No file was created (exit code {result.returncode})."
                 print(f"[builder] {request_id} error: {err}", flush=True)
@@ -579,9 +659,11 @@ def generate_index(apps, reviews, base_url):
     playlist_count = len(playlists)
 
     app_requests = data.get("app_requests", [])
-    app_requests_public = [{k: v for k, v in r.items() if k != "log_tail"} for r in app_requests]
+    app_requests_public = [strip_private_fields(r) for r in app_requests]
     app_requests_json = json.dumps(app_requests_public).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     app_request_count = len(app_requests)
+
+    builders_json = json.dumps(list_builders(data)).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
 
     notes_items_html = ""
     for note in notes:
@@ -881,8 +963,10 @@ def generate_index(apps, reviews, base_url):
   .builder-form {{ background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 1rem; margin-bottom: 1.2rem; }}
   .builder-form label {{ font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin: 0.75rem 0 0.4rem; }}
   .builder-form label:first-child {{ margin-top: 0; }}
-  #builder-name-input, #builder-theme-input, #builder-inspired-input {{ width: 100%; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; transition: border-color 0.2s; }}
-  #builder-name-input:focus, #builder-theme-input:focus, #builder-inspired-input:focus {{ border-color: var(--accent); }}
+  #builder-name-input, #builder-theme-input, #builder-inspired-input, #builder-name-select, #builder-email-input {{ width: 100%; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; transition: border-color 0.2s; }}
+  #builder-name-input:focus, #builder-theme-input:focus, #builder-inspired-input:focus, #builder-name-select:focus, #builder-email-input:focus {{ border-color: var(--accent); }}
+  #builder-name-select {{ margin-bottom: 0.5rem; }}
+  .builder-optional {{ text-transform: none; letter-spacing: normal; font-weight: 400; opacity: 0.75; }}
   #builder-idea-input, #builder-tech-input {{ width: 100%; min-height: 60px; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; resize: vertical; transition: border-color 0.2s; }}
   #builder-idea-input:focus, #builder-tech-input:focus {{ border-color: var(--accent); }}
   .mode-toggle {{ display: flex; gap: 0.4rem; margin-bottom: 0.5rem; }}
@@ -1000,7 +1084,13 @@ def generate_index(apps, reviews, base_url):
   </div>
   <div class="builder-form">
     <label>Your name</label>
+    <select id="builder-name-select">
+      <option value="">&#10133; New name&hellip;</option>
+    </select>
     <input id="builder-name-input" type="text" placeholder="e.g. Emma" autocomplete="off" maxlength="30">
+
+    <label>Email <span class="builder-optional">(optional &mdash; get notified when it's built)</span></label>
+    <input id="builder-email-input" type="email" placeholder="you@example.com" autocomplete="off" maxlength="100">
 
     <div class="mode-toggle">
       <button class="mode-toggle-btn active" id="mode-basic-btn" data-mode="basic">Basic</button>
@@ -1580,13 +1670,46 @@ document.querySelectorAll('.note-delete').forEach(btn => {{
 
 // ---- App Builder ----
 let APP_REQUESTS = {app_requests_json};
+const BUILDERS = {builders_json};
 const builderPolls = {{}};
 
+const builderNameSelect = document.getElementById('builder-name-select');
 const builderNameInput = document.getElementById('builder-name-input');
+const builderEmailInput = document.getElementById('builder-email-input');
+
+function builderEmailFor(name) {{
+  return (BUILDERS.find(b => b.name === name) || {{}}).email || '';
+}}
+
+if (builderNameSelect) {{
+  for (const b of BUILDERS) {{
+    const opt = document.createElement('option');
+    opt.value = b.name;
+    opt.textContent = b.name;
+    builderNameSelect.appendChild(opt);
+  }}
+  builderNameSelect.addEventListener('change', () => {{
+    if (!builderNameSelect.value) return;
+    builderNameInput.value = builderNameSelect.value;
+    builderEmailInput.value = builderEmailFor(builderNameSelect.value);
+    localStorage.setItem('cowork-builder-name', builderNameInput.value);
+    localStorage.setItem('cowork-builder-email', builderEmailInput.value);
+  }});
+}}
 if (builderNameInput) {{
   builderNameInput.value = localStorage.getItem('cowork-builder-name') || '';
+  if (builderNameSelect && BUILDERS.some(b => b.name === builderNameInput.value)) {{
+    builderNameSelect.value = builderNameInput.value;
+  }}
   builderNameInput.addEventListener('input', () => {{
     localStorage.setItem('cowork-builder-name', builderNameInput.value.trim());
+    if (builderNameSelect) builderNameSelect.value = builderNameSelect.value === builderNameInput.value.trim() ? builderNameSelect.value : '';
+  }});
+}}
+if (builderEmailInput) {{
+  builderEmailInput.value = localStorage.getItem('cowork-builder-email') || builderEmailFor(builderNameInput?.value || '');
+  builderEmailInput.addEventListener('input', () => {{
+    localStorage.setItem('cowork-builder-email', builderEmailInput.value.trim());
   }});
 }}
 
@@ -1614,6 +1737,7 @@ function builderChoice(fieldId) {{
 document.getElementById('builder-submit-btn')?.addEventListener('click', async () => {{
   const requester_name = builderNameInput?.value.trim() || '';
   if (!requester_name) {{ builderNameInput?.focus(); return; }}
+  const requester_email = builderEmailInput?.value.trim() || '';
   const mode = document.getElementById('mode-advanced-btn').classList.contains('active') ? 'advanced' : 'basic';
 
   const criteria = {{
@@ -1636,7 +1760,7 @@ document.getElementById('builder-submit-btn')?.addEventListener('click', async (
 
   const btn = document.getElementById('builder-submit-btn');
   btn.disabled = true; btn.textContent = 'Building…';
-  const r = await apiPost('/api/app_requests/create', {{requester_name, mode, criteria}});
+  const r = await apiPost('/api/app_requests/create', {{requester_name, requester_email, mode, criteria}});
   btn.disabled = false; btn.textContent = 'Build My App!';
   if (r?.ok) {{
     APP_REQUESTS.unshift({{
@@ -1779,8 +1903,9 @@ document.querySelector('.builder-lists')?.addEventListener('click', async (e) =>
     if (!issue_description) {{ ta?.focus(); return; }}
     const requester_name = builderNameInput?.value.trim() || '';
     if (!requester_name) {{ builderNameInput?.focus(); return; }}
+    const requester_email = builderEmailInput?.value.trim() || '';
     submitBtn.disabled = true; submitBtn.textContent = 'Submitting…';
-    const r = await apiPost('/api/app_requests/fix', {{requester_name, fix_of: id, issue_description}});
+    const r = await apiPost('/api/app_requests/fix', {{requester_name, requester_email, fix_of: id, issue_description}});
     submitBtn.disabled = false; submitBtn.textContent = 'Submit';
     if (r?.ok) {{
       APP_REQUESTS.unshift({{
@@ -1860,8 +1985,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         path = unquote(self.path.split("?")[0])
         if path in ("/", "/index.html", ""):
-            ip = get_local_ip()
-            base_url = os.environ.get("PUBLIC_URL") or f"http://{ip}:{PORT}"
+            base_url = get_base_url()
             apps = discover_apps()
             reviews = discover_reviews()
             html = generate_index(apps, reviews, base_url)
@@ -1918,7 +2042,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         elif path == "/api/app_requests":
             data = load_data()
             requests_list = sorted(data.get("app_requests", []), key=lambda r: r.get("created", ""), reverse=True)
-            self._json({"requests": [{k: v for k, v in r.items() if k != "log_tail"} for r in requests_list]})
+            self._json({"requests": [strip_private_fields(r) for r in requests_list]})
         elif path.startswith("/api/app_requests/status/"):
             request_id = path[len("/api/app_requests/status/"):]
             data = load_data()
@@ -1926,7 +2050,10 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             if req is None:
                 self._json({"error": "not found"}, status=404)
                 return
-            self._json({k: v for k, v in req.items() if k != "log_tail"})
+            self._json(strip_private_fields(req))
+        elif path == "/api/builders":
+            data = load_data()
+            self._json({"builders": list_builders(data)})
         elif path == "/manifest.json":
             data = make_manifest().encode("utf-8")
             self.send_response(200)
@@ -2088,6 +2215,9 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/app_requests/create":
             requester_name = (payload.get("requester_name") or "").strip()[:30]
+            requester_email = (payload.get("requester_email") or "").strip()[:100]
+            if requester_email and not EMAIL_RE.match(requester_email):
+                requester_email = ""
             mode = payload.get("mode") or "basic"
             criteria = payload.get("criteria") or {}
             if mode not in ("basic", "advanced"):
@@ -2121,10 +2251,12 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
             request_id = uuid.uuid4().hex[:8]
             target_filename = compute_target_filename(clean_criteria, data)
+            remember_builder(data, requester_name, requester_email)
             record = {
                 "id": request_id,
                 "kind": "build",
                 "requester_name": requester_name,
+                "requester_email": requester_email,
                 "mode": mode,
                 "criteria": clean_criteria,
                 "target_filename": target_filename,
@@ -2143,6 +2275,9 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/app_requests/fix":
             requester_name = (payload.get("requester_name") or "").strip()[:30]
+            requester_email = (payload.get("requester_email") or "").strip()[:100]
+            if requester_email and not EMAIL_RE.match(requester_email):
+                requester_email = ""
             fix_of = (payload.get("fix_of") or "").strip()
             issue_description = (payload.get("issue_description") or "").strip()[:500]
             if not requester_name:
@@ -2157,6 +2292,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             request_id = uuid.uuid4().hex[:8]
+            remember_builder(data, requester_name, requester_email)
             record = {
                 "id": request_id,
                 "kind": "fix",
