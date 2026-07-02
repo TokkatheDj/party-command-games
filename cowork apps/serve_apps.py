@@ -253,14 +253,24 @@ def strip_private_fields(request_record):
 
 
 def remember_builder(data, name, email):
-    """Track name -> most-recently-provided email so the name dropdown can
-    offer returning guests their name (and re-use their email for build
-    notifications) without asking them to retype it every time."""
+    """Track name -> email so the name dropdown can offer returning guests
+    their name (and re-use their email for build notifications) without
+    asking them to retype it every time.
+
+    A blank email always clears whatever was stored (an explicit opt-out --
+    otherwise there'd be no way to stop being auto-filled/notified). A
+    non-blank email is only stored the *first* time it's seen for a given
+    name; it does not silently overwrite an existing different email.
+    Display names aren't unique identities here (no auth), so without this,
+    two different people who happen to submit under the same name (or a
+    generic name like "Dad") would clobber each other's stored email and
+    the dropdown would start auto-filling -- and notifying -- the wrong
+    person."""
     builders = data.setdefault("builders", {})
-    if email:
-        builders[name] = email
-    elif name not in builders:
+    if not email:
         builders[name] = ""
+    elif not builders.get(name):
+        builders[name] = email
 
 
 def list_builders(data):
@@ -287,6 +297,18 @@ def load_email_config():
 
 def get_base_url():
     return os.environ.get("PUBLIC_URL") or f"http://{get_local_ip()}:{PORT}"
+
+
+def notify_async(requester_name, requester_email, target_path):
+    """Fires send_build_notification() on its own daemon thread instead of
+    calling it inline. generate_app_worker calls this from inside
+    `with GENERATION_SEMAPHORE:` -- a blocking SMTP call there would hold a
+    generation slot open (delaying the next queued build) for however long a
+    slow or unreachable mail server takes to respond, for a reason that has
+    nothing to do with app generation."""
+    threading.Thread(
+        target=send_build_notification, args=(requester_name, requester_email, target_path), daemon=True,
+    ).start()
 
 
 def send_build_notification(requester_name, requester_email, target_path):
@@ -463,6 +485,7 @@ def generate_app_worker(request_id):
                 if touched:
                     print(f"[builder] {request_id} done (fix applied) -> {target_filename}", flush=True)
                     update_app_request(request_id, status="done", finished=finished, log_tail=log_tail)
+                    notify_async(requester_name, req.get("requester_email", ""), req.get("target_path", f"custom_apps/{target_filename}"))
                 else:
                     err = f"Fix did not modify the file (exit code {result.returncode})."
                     print(f"[builder] {request_id} error: {err}", flush=True)
@@ -491,7 +514,7 @@ def generate_app_worker(request_id):
                     target_filename=actual_filename,
                     target_path=f"custom_apps/{actual_filename}",
                 )
-                send_build_notification(requester_name, req.get("requester_email", ""), f"custom_apps/{actual_filename}")
+                notify_async(requester_name, req.get("requester_email", ""), f"custom_apps/{actual_filename}")
             else:
                 err = f"No file was created (exit code {result.returncode})."
                 print(f"[builder] {request_id} error: {err}", flush=True)
@@ -1721,8 +1744,17 @@ if (builderNameInput) {{
     builderNameSelect.value = builderNameInput.value;
   }}
   builderNameInput.addEventListener('input', () => {{
-    localStorage.setItem('cowork-builder-name', builderNameInput.value.trim());
-    if (builderNameSelect) builderNameSelect.value = builderNameSelect.value === builderNameInput.value.trim() ? builderNameSelect.value : '';
+    const typed = builderNameInput.value.trim();
+    localStorage.setItem('cowork-builder-name', typed);
+    // If a dropdown selection is currently in effect and the typed name no longer
+    // matches it, the auto-filled email belongs to whoever was selected before --
+    // clear it along with the selection instead of silently carrying a stranger's
+    // email forward onto a new name.
+    if (builderNameSelect && builderNameSelect.value && builderNameSelect.value !== typed) {{
+      builderNameSelect.value = '';
+      if (builderEmailInput) builderEmailInput.value = '';
+      localStorage.removeItem('cowork-builder-email');
+    }}
   }});
 }}
 if (builderEmailInput) {{
@@ -2334,6 +2366,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 "kind": "fix",
                 "fix_of": fix_of,
                 "requester_name": requester_name,
+                "requester_email": requester_email,
                 "issue_description": issue_description,
                 "target_filename": original["target_filename"],
                 "target_path": original["target_path"],
