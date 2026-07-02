@@ -1709,9 +1709,16 @@ async function loadAppRequests() {{
 
 function pollRequest(id) {{
   if (builderPolls[id]) return;
-  const startedPoll = Date.now();
+  // The giveup clock only starts once a job actually begins generating -- not
+  // from when polling starts. A job can legitimately sit "queued" behind the
+  // 2-concurrent-generation cap for longer than the giveup window (each slot
+  // can run up to GENERATION_TIMEOUT_SEC), and that queue wait must never by
+  // itself trigger a false "taking longer than expected" error for a job that
+  // hasn't even started yet. Uses the server's own `started` timestamp (not a
+  // client-observed one) so elapsed time isn't skewed by the 4s poll cadence.
+  let generatingStartedAt = null;
   builderPolls[id] = setInterval(async () => {{
-    if (Date.now() - startedPoll > 420000) {{
+    if (generatingStartedAt && Date.now() - generatingStartedAt > 420000) {{
       clearInterval(builderPolls[id]);
       delete builderPolls[id];
       const idx = APP_REQUESTS.findIndex(r => r.id === id);
@@ -1721,6 +1728,9 @@ function pollRequest(id) {{
     }}
     const status = await fetch('/api/app_requests/status/' + id).then(res => res.ok ? res.json() : null).catch(() => null);
     if (!status) return;
+    if (status.status === 'generating' && !generatingStartedAt && status.started) {{
+      generatingStartedAt = Date.parse(status.started + 'Z');
+    }}
     const idx = APP_REQUESTS.findIndex(r => r.id === id);
     if (idx >= 0) APP_REQUESTS[idx] = Object.assign({{}}, APP_REQUESTS[idx], status);
     if (status.status === 'done' || status.status === 'error') {{
