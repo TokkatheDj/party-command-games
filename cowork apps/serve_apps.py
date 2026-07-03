@@ -396,13 +396,7 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
     </div>
 
     <label>Your idea (one line)</label>
-    <div class="idea-chips" id="builder-idea-chips">
-      <span class="choice-opt idea-chip" data-value="A maze game where you escape before time runs out">&#127984; Escape the maze</span>
-      <span class="choice-opt idea-chip" data-value="Race against the clock to beat your best score">&#127919; Beat the clock</span>
-      <span class="choice-opt idea-chip" data-value="Collect gems while avoiding obstacles">&#128009; Collect the treasure</span>
-      <span class="choice-opt idea-chip" data-value="Flip cards and match the pairs before you run out of tries">&#129504; Match the pairs</span>
-      <span class="choice-opt idea-chip" data-value="A drawing canvas where you can pick colors and shapes">&#127912; Design your own</span>
-    </div>
+    <div class="idea-chips" id="builder-idea-chips"></div>
     <textarea id="builder-idea-input" placeholder="e.g. A maze game where you're a dragon collecting gems" maxlength="200"></textarea>
 
     <div id="builder-advanced-fields" class="hidden">
@@ -558,12 +552,76 @@ document.querySelectorAll('.choice-group').forEach(group => {{
     if (!opt || !group.contains(opt)) return;
     group.querySelectorAll('.choice-opt').forEach(o => o.classList.remove('selected'));
     opt.classList.add('selected');
+    if (group.id === 'builder-app-type') renderIdeaChips(opt.dataset.value);
   }});
 }});
 
 function builderChoice(fieldId) {{
   return document.querySelector('#' + fieldId + ' .choice-opt.selected')?.dataset.value || '';
 }}
+
+const IDEA_SUGGESTIONS = {{
+  Game: [
+    ['🏰', 'Escape the maze', 'A maze game where you escape before time runs out'],
+    ['🎯', 'Beat the clock', 'Race against the clock to beat your best score'],
+    ['🐉', 'Collect the treasure', 'Collect gems while avoiding obstacles'],
+    ['🕹️', 'Dodge and survive', 'Dodge falling obstacles and survive as long as you can'],
+    ['🏆', 'Beat the boss', 'Defeat a boss by solving three challenges in a row'],
+  ],
+  Puzzle: [
+    ['🧩', 'Match the pairs', 'Flip cards and match the pairs before you run out of tries'],
+    ['🔢', 'Slide the tiles', 'Slide numbered tiles into order to solve the puzzle'],
+    ['🔗', 'Connect the dots', 'Connect matching colors without crossing lines'],
+    ['🧱', 'Stack and clear', 'Stack falling blocks and clear full rows'],
+    ['🗝️', 'Unlock the door', 'Solve a chain of riddles to unlock the door'],
+  ],
+  Quiz: [
+    ['❓', 'Guess the answer', 'Multiple choice trivia with a timer for each question'],
+    ['🧠', 'Test your knowledge', 'A quiz that gets harder each round'],
+    ['🔤', 'Word guess', 'Guess the hidden word letter by letter'],
+    ['🌍', 'True or false', 'Rapid-fire true or false questions on a topic'],
+    ['🏅', 'Beat your score', 'Answer as many questions as you can before time runs out'],
+  ],
+  Story: [
+    ['📖', 'Choose your path', 'A choose-your-own-adventure story with branching endings'],
+    ['🐲', 'Tell a tale', 'An illustrated story that turns the page as you read'],
+    ['🕵️', 'Solve the mystery', 'A mystery story where you pick clues to solve the case'],
+    ['🌌', 'Explore a world', 'An interactive story exploring a fantasy world'],
+    ['🎭', 'Pick the ending', 'A story where your choices change how it ends'],
+  ],
+  Tool: [
+    ['⏱️', 'Track the time', 'A timer/stopwatch with lap tracking'],
+    ['✅', 'Make a list', 'A simple checklist or to-do tracker'],
+    ['🎲', 'Pick for me', 'A random picker/spinner for choosing between options'],
+    ['🧮', 'Do the math', 'A calculator for a specific everyday task'],
+    ['📆', 'Plan it out', 'A simple planner or countdown to an event'],
+  ],
+  Art: [
+    ['🎨', 'Design your own', 'A drawing canvas where you can pick colors and shapes'],
+    ['🖌️', 'Paint by numbers', 'A paint-by-numbers picture to color in'],
+    ['🌈', 'Mix the colors', 'An interactive canvas for mixing and blending colors'],
+    ['✂️', 'Build a collage', 'Drag and arrange shapes and stickers to build a scene'],
+    ['🖼️', 'Color the picture', 'An outline picture to fill in with color'],
+  ],
+  Music: [
+    ['🎹', 'Play a tune', 'A simple piano/keyboard you can play with taps'],
+    ['🥁', 'Make a beat', 'A drum pad for making your own beat'],
+    ['🎼', 'Follow the notes', 'A rhythm game where you match falling notes'],
+    ['🎤', 'Sing along', 'A karaoke-style app that shows lyrics as music plays'],
+    ['🔊', 'Mix the sounds', 'An app for layering and mixing different sound effects'],
+  ],
+}};
+
+function renderIdeaChips(appType) {{
+  const container = document.getElementById('builder-idea-chips');
+  if (!container) return;
+  const suggestions = IDEA_SUGGESTIONS[appType] || IDEA_SUGGESTIONS.Game;
+  container.innerHTML = suggestions.map(([emoji, label, value]) =>
+    '<span class="choice-opt idea-chip" data-value="' + escHtml(value) + '">' + emoji + ' ' + escHtml(label) + '</span>'
+  ).join('');
+}}
+
+renderIdeaChips(builderChoice('builder-app-type') || 'Game');
 
 document.getElementById('builder-idea-chips')?.addEventListener('click', (e) => {{
   const chip = e.target.closest('.idea-chip');
