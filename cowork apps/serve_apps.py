@@ -280,6 +280,528 @@ def list_builders(data):
     )
 
 
+# Builder widget: shared CSS/HTML/JS used by both the "Build" tab inside the
+# main SPA (generate_index) and the standalone /build page (generate_builder_page),
+# so there's exactly one copy of the form/list markup and card-rendering logic
+# to maintain instead of two that can drift.
+BUILDER_STYLES = """
+/* ---- App Builder ---- */
+#tab-builder { display: none; padding: 1.5rem; max-width: 700px; margin: 0 auto; }
+.builder-form { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 1rem; margin-bottom: 1.2rem; }
+.builder-form label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin: 0.75rem 0 0.4rem; }
+.builder-form label:first-child { margin-top: 0; }
+#builder-name-input, #builder-theme-input, #builder-inspired-input, #builder-name-select, #builder-email-input { width: 100%; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; transition: border-color 0.2s; }
+#builder-name-input:focus, #builder-theme-input:focus, #builder-inspired-input:focus, #builder-name-select:focus, #builder-email-input:focus { border-color: var(--accent); }
+#builder-name-select { margin-bottom: 0.5rem; }
+.builder-optional { text-transform: none; letter-spacing: normal; font-weight: 400; opacity: 0.75; }
+#builder-idea-input, #builder-tech-input { width: 100%; min-height: 60px; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; resize: vertical; transition: border-color 0.2s; }
+#builder-idea-input:focus, #builder-tech-input:focus { border-color: var(--accent); }
+.mode-toggle { display: flex; gap: 0.4rem; margin-bottom: 0.5rem; }
+.mode-toggle-btn { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.85rem; font-weight: 600; padding: 0.5rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
+.mode-toggle-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(124,110,230,0.1); }
+.choice-group { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.choice-opt { font-size: 0.85rem; color: var(--text); cursor: pointer; border-radius: 7px; padding: 0.4rem 0.75rem; border: 2px solid var(--border); transition: border-color 0.12s, background 0.12s; }
+.choice-opt.selected { border-color: var(--accent); background: rgba(124,110,230,0.12); color: var(--accent); }
+.choice-checkboxes { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.choice-checkbox { display: flex; align-items: center; gap: 0.35rem; font-size: 0.83rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 0.35rem 0.6rem; cursor: pointer; }
+.choice-checkbox input { accent-color: var(--accent); }
+#builder-advanced-fields.hidden { display: none; }
+.idea-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.idea-chip { font-size: 0.8rem; }
+.builder-share { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; margin-bottom: 1.2rem; }
+.builder-share label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.5rem; }
+.builder-share-row { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+#builder-share-link { flex: 1; min-width: 140px; padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.82rem; outline: none; font-family: inherit; }
+.builder-copy-btn, .builder-share-btn { background: var(--accent); border: none; border-radius: 8px; color: #fff; font-size: 0.82rem; font-weight: 600; padding: 0.5rem 0.85rem; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
+.builder-copy-btn:hover, .builder-share-btn:hover { opacity: 0.85; }
+.builder-share-copied { display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: #44ee66; }
+.builder-lists { margin-top: 1.5rem; }
+.builder-list-heading { font-size: 0.85rem; font-weight: 600; color: var(--text); margin: 1.2rem 0 0.6rem; }
+.builder-card-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.builder-empty { color: var(--muted); font-style: italic; font-size: 0.88rem; }
+.builder-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 0.9rem; }
+.builder-card-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.3rem; }
+.builder-card-title { font-size: 0.9rem; color: var(--text); font-weight: 600; }
+.builder-card-meta { font-size: 0.75rem; color: var(--muted); }
+.builder-badge { font-size: 0.68rem; font-weight: 700; padding: 0.15em 0.55em; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0; }
+.builder-badge.queued { background: rgba(136,136,153,0.15); color: var(--muted); }
+.builder-badge.generating { background: rgba(124,110,230,0.15); color: var(--accent); }
+.builder-badge.done { background: rgba(68,238,102,0.12); color: #44ee66; }
+.builder-badge.error { background: rgba(230,110,124,0.15); color: var(--accent2); }
+.builder-card-open { display: inline-block; margin-top: 0.4rem; margin-right: 0.6rem; font-size: 0.83rem; color: var(--accent); text-decoration: none; font-weight: 600; }
+.builder-card-open:hover { text-decoration: underline; }
+.builder-card-error { margin-top: 0.4rem; font-size: 0.82rem; color: var(--accent2); }
+.report-btn { display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: var(--muted); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
+.report-btn:hover { color: var(--accent2); border-color: var(--accent2); }
+.dismiss-btn { display: inline-block; margin-top: 0.4rem; margin-right: 0.4rem; font-size: 0.78rem; color: var(--accent2); background: none; border: 1px solid var(--accent2); border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; transition: opacity 0.15s; }
+.dismiss-btn:hover { opacity: 0.8; }
+.report-form { margin-top: 0.5rem; }
+.report-ta { width: 100%; min-height: 50px; padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; resize: vertical; outline: none; font-family: inherit; line-height: 1.4; transition: border-color 0.2s; }
+.report-ta:focus { border-color: var(--accent2); }
+.fix-status { margin-top: 0.4rem; font-size: 0.8rem; color: var(--muted); font-style: italic; }
+.fix-status-done { color: #44ee66; font-style: normal; }
+.fix-status-error { color: var(--accent2); font-style: normal; }
+.standalone-wrap { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
+.standalone-header { text-align: center; margin-bottom: 1.2rem; }
+.standalone-header h1 { font-size: 1.4rem; font-weight: 700; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 0.3rem; }
+.standalone-header p { color: var(--muted); font-size: 0.85rem; }
+.standalone-footer { text-align: center; margin-top: 1.5rem; }
+.standalone-footer a { color: var(--accent); font-size: 0.85rem; text-decoration: none; }
+.standalone-footer a:hover { text-decoration: underline; }
+"""
+
+BUILDER_FORM_HTML = """  <div class="builder-form">
+    <label>Your name</label>
+    <select id="builder-name-select">
+      <option value="">&#10133; New name&hellip;</option>
+    </select>
+    <input id="builder-name-input" type="text" placeholder="e.g. Emma" autocomplete="off" maxlength="30">
+
+    <label>Email <span class="builder-optional">(optional &mdash; get notified when it's built)</span></label>
+    <input id="builder-email-input" type="email" placeholder="you@example.com" autocomplete="off" maxlength="100">
+
+    <div class="mode-toggle">
+      <button class="mode-toggle-btn active" id="mode-basic-btn" data-mode="basic">Basic</button>
+      <button class="mode-toggle-btn" id="mode-advanced-btn" data-mode="advanced">Advanced</button>
+    </div>
+
+    <label>App type</label>
+    <div class="choice-group" id="builder-app-type" data-field="app_type">
+      <span class="choice-opt selected" data-value="Game">&#127918; Game</span>
+      <span class="choice-opt" data-value="Puzzle">&#129513; Puzzle</span>
+      <span class="choice-opt" data-value="Quiz">&#10067; Quiz</span>
+      <span class="choice-opt" data-value="Story">&#128214; Story</span>
+      <span class="choice-opt" data-value="Tool">&#128295; Tool</span>
+      <span class="choice-opt" data-value="Art">&#127912; Art</span>
+      <span class="choice-opt" data-value="Music">&#127925; Music</span>
+    </div>
+
+    <label>Theme / subject</label>
+    <input id="builder-theme-input" type="text" placeholder="e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
+
+    <label>Difficulty</label>
+    <div class="choice-group" id="builder-difficulty" data-field="difficulty">
+      <span class="choice-opt selected" data-value="Easy">Easy</span>
+      <span class="choice-opt" data-value="Medium">Medium</span>
+      <span class="choice-opt" data-value="Hard">Hard</span>
+    </div>
+
+    <label>Color vibe</label>
+    <div class="choice-group" id="builder-color-vibe" data-field="color_vibe">
+      <span class="choice-opt selected" data-value="Bright &amp; Playful">Bright &amp; Playful</span>
+      <span class="choice-opt" data-value="Cool &amp; Calm">Cool &amp; Calm</span>
+      <span class="choice-opt" data-value="Dark &amp; Mysterious">Dark &amp; Mysterious</span>
+      <span class="choice-opt" data-value="Neon &amp; Energetic">Neon &amp; Energetic</span>
+      <span class="choice-opt" data-value="Pastel &amp; Soft">Pastel &amp; Soft</span>
+    </div>
+
+    <label>Your idea (one line)</label>
+    <div class="idea-chips" id="builder-idea-chips">
+      <span class="choice-opt idea-chip" data-value="A maze game where you escape before time runs out">&#127984; Escape the maze</span>
+      <span class="choice-opt idea-chip" data-value="Race against the clock to beat your best score">&#127919; Beat the clock</span>
+      <span class="choice-opt idea-chip" data-value="Collect gems while avoiding obstacles">&#128009; Collect the treasure</span>
+      <span class="choice-opt idea-chip" data-value="Flip cards and match the pairs before you run out of tries">&#129504; Match the pairs</span>
+      <span class="choice-opt idea-chip" data-value="A drawing canvas where you can pick colors and shapes">&#127912; Design your own</span>
+    </div>
+    <textarea id="builder-idea-input" placeholder="e.g. A maze game where you're a dragon collecting gems" maxlength="200"></textarea>
+
+    <div id="builder-advanced-fields" class="hidden">
+      <label>Mechanics (pick any)</label>
+      <div class="choice-checkboxes" id="builder-mechanics">
+        <label class="choice-checkbox"><input type="checkbox" value="Timer/Countdown"> Timer/Countdown</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Score/Points"> Score/Points</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Levels"> Levels</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Local multiplayer"> Local multiplayer</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Sound effects"> Sound effects</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Drag &amp; drop"> Drag &amp; drop</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Keyboard controls"> Keyboard controls</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Touch/swipe"> Touch/swipe</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Randomized"> Randomized</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Save progress"> Save progress</label>
+      </div>
+
+      <label>Age range</label>
+      <div class="choice-group" id="builder-age-range" data-field="age_range">
+        <span class="choice-opt" data-value="4-6">4-6</span>
+        <span class="choice-opt" data-value="7-9">7-9</span>
+        <span class="choice-opt" data-value="10-12">10-12</span>
+        <span class="choice-opt" data-value="13-16">13-16</span>
+        <span class="choice-opt selected" data-value="All ages">All ages</span>
+      </div>
+
+      <label>Anything specific? (optional)</label>
+      <textarea id="builder-tech-input" placeholder="e.g. a leaderboard of best times" maxlength="300"></textarea>
+
+      <label>Make it feel like&hellip; (optional)</label>
+      <input id="builder-inspired-input" type="text" placeholder="e.g. Flappy Bird" autocomplete="off" maxlength="100">
+    </div>
+
+    <div class="pl-form-actions">
+      <button class="pl-create-btn" id="builder-submit-btn">Build My App!</button>
+    </div>
+  </div>"""
+
+BUILDER_LISTS_HTML = """  <div class="builder-lists">
+    <h2 class="builder-list-heading">Your Creations</h2>
+    <div id="builder-mine-list" class="builder-card-list"></div>
+    <h2 class="builder-list-heading">Family Creations</h2>
+    <div id="builder-family-list" class="builder-card-list"></div>
+  </div>"""
+
+SHARED_JS_HELPERS = """
+async function apiPost(endpoint, body) {
+  try {
+    const r = await fetch(endpoint, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body)
+    });
+    return await r.json();
+  } catch(e) {
+    console.error(endpoint, e);
+    return null;
+  }
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+"""
+
+
+def builder_share_row_html(share_url):
+    return f"""  <div class="builder-share">
+    <label>Share this form</label>
+    <div class="builder-share-row">
+      <input id="builder-share-link" type="text" readonly value="{share_url}">
+      <button class="builder-copy-btn" id="builder-copy-btn" type="button">&#128203; Copy Link</button>
+      <button class="builder-share-btn hidden" id="builder-native-share-btn" type="button">&#128228; Share&hellip;</button>
+    </div>
+    <span class="builder-share-copied hidden" id="builder-share-copied">Copied!</span>
+  </div>"""
+
+
+def builder_logic_js(app_requests_json, builders_json, share_url):
+    """Data seed + all interaction logic for the builder widget (name/email sync,
+    mode toggle, choice-groups, submit, card rendering, polling, dismiss/report,
+    idea-starter chips, and the share-link widget). Called from both generate_index()
+    (embedded in the Build tab's own <script>, which already defines apiPost/escHtml)
+    and generate_builder_page() (the standalone page, which includes SHARED_JS_HELPERS
+    first) -- identical behavior either way since it drives the same DOM element IDs."""
+    share_url_json = json.dumps(share_url)
+    return f"""
+// ---- App Builder ----
+let APP_REQUESTS = {app_requests_json};
+const BUILDERS = {builders_json};
+const builderPolls = {{}};
+
+const builderNameSelect = document.getElementById('builder-name-select');
+const builderNameInput = document.getElementById('builder-name-input');
+const builderEmailInput = document.getElementById('builder-email-input');
+
+function builderEmailFor(name) {{
+  return (BUILDERS.find(b => b.name === name) || {{}}).email || '';
+}}
+
+if (builderNameSelect) {{
+  for (const b of BUILDERS) {{
+    const opt = document.createElement('option');
+    opt.value = b.name;
+    opt.textContent = b.name;
+    builderNameSelect.appendChild(opt);
+  }}
+  builderNameSelect.addEventListener('change', () => {{
+    if (!builderNameSelect.value) return;
+    builderNameInput.value = builderNameSelect.value;
+    builderEmailInput.value = builderEmailFor(builderNameSelect.value);
+    localStorage.setItem('cowork-builder-name', builderNameInput.value);
+    localStorage.setItem('cowork-builder-email', builderEmailInput.value);
+  }});
+}}
+if (builderNameInput) {{
+  builderNameInput.value = localStorage.getItem('cowork-builder-name') || '';
+  if (builderNameSelect && BUILDERS.some(b => b.name === builderNameInput.value)) {{
+    builderNameSelect.value = builderNameInput.value;
+  }}
+  builderNameInput.addEventListener('input', () => {{
+    const typed = builderNameInput.value.trim();
+    localStorage.setItem('cowork-builder-name', typed);
+    // If a dropdown selection is currently in effect and the typed name no longer
+    // matches it, the auto-filled email belongs to whoever was selected before --
+    // clear it along with the selection instead of silently carrying a stranger's
+    // email forward onto a new name.
+    if (builderNameSelect && builderNameSelect.value && builderNameSelect.value !== typed) {{
+      builderNameSelect.value = '';
+      if (builderEmailInput) builderEmailInput.value = '';
+      localStorage.removeItem('cowork-builder-email');
+    }}
+  }});
+}}
+if (builderEmailInput) {{
+  builderEmailInput.value = localStorage.getItem('cowork-builder-email') || builderEmailFor(builderNameInput?.value || '');
+  builderEmailInput.addEventListener('input', () => {{
+    localStorage.setItem('cowork-builder-email', builderEmailInput.value.trim());
+  }});
+}}
+
+document.getElementById('mode-basic-btn')?.addEventListener('click', () => setBuilderMode('basic'));
+document.getElementById('mode-advanced-btn')?.addEventListener('click', () => setBuilderMode('advanced'));
+function setBuilderMode(mode) {{
+  document.getElementById('mode-basic-btn').classList.toggle('active', mode === 'basic');
+  document.getElementById('mode-advanced-btn').classList.toggle('active', mode === 'advanced');
+  document.getElementById('builder-advanced-fields').classList.toggle('hidden', mode !== 'advanced');
+}}
+
+document.querySelectorAll('.choice-group').forEach(group => {{
+  group.addEventListener('click', e => {{
+    const opt = e.target.closest('.choice-opt');
+    if (!opt || !group.contains(opt)) return;
+    group.querySelectorAll('.choice-opt').forEach(o => o.classList.remove('selected'));
+    opt.classList.add('selected');
+  }});
+}});
+
+function builderChoice(fieldId) {{
+  return document.querySelector('#' + fieldId + ' .choice-opt.selected')?.dataset.value || '';
+}}
+
+document.getElementById('builder-idea-chips')?.addEventListener('click', (e) => {{
+  const chip = e.target.closest('.idea-chip');
+  if (!chip) return;
+  const ta = document.getElementById('builder-idea-input');
+  if (ta) {{ ta.value = chip.dataset.value; ta.focus(); }}
+}});
+
+document.getElementById('builder-submit-btn')?.addEventListener('click', async () => {{
+  const requester_name = builderNameInput?.value.trim() || '';
+  if (!requester_name) {{ builderNameInput?.focus(); return; }}
+  const requester_email = builderEmailInput?.value.trim() || '';
+  const mode = document.getElementById('mode-advanced-btn').classList.contains('active') ? 'advanced' : 'basic';
+
+  const criteria = {{
+    app_type: builderChoice('builder-app-type'),
+    theme: document.getElementById('builder-theme-input').value.trim(),
+    difficulty: builderChoice('builder-difficulty'),
+    color_vibe: builderChoice('builder-color-vibe'),
+    idea: document.getElementById('builder-idea-input').value.trim(),
+  }};
+  if (!criteria.theme) {{ document.getElementById('builder-theme-input').focus(); return; }}
+  if (!criteria.idea) {{ document.getElementById('builder-idea-input').focus(); return; }}
+  if (mode === 'advanced') {{
+    criteria.mechanics = Array.from(document.querySelectorAll('#builder-mechanics input:checked')).map(cb => cb.value);
+    criteria.age_range = builderChoice('builder-age-range');
+    const tech = document.getElementById('builder-tech-input').value.trim();
+    const inspired = document.getElementById('builder-inspired-input').value.trim();
+    if (tech) criteria.tech_requests = tech;
+    if (inspired) criteria.inspired_by = inspired;
+  }}
+
+  const btn = document.getElementById('builder-submit-btn');
+  btn.disabled = true; btn.textContent = 'Building…';
+  const r = await apiPost('/api/app_requests/create', {{requester_name, requester_email, mode, criteria}});
+  btn.disabled = false; btn.textContent = 'Build My App!';
+  if (r?.ok) {{
+    APP_REQUESTS.unshift({{
+      id: r.id, requester_name, mode, criteria,
+      target_filename: r.target_filename, target_path: 'custom_apps/' + r.target_filename,
+      status: 'queued', error_message: null, created: new Date().toISOString(),
+      started: null, finished: null,
+    }});
+    document.getElementById('builder-idea-input').value = '';
+    renderBuilderLists();
+    pollRequest(r.id);
+  }} else {{
+    alert(r?.error || 'Could not submit — please try again.');
+  }}
+}});
+
+function builderCardHtml(r) {{
+  const labels = {{queued: 'Queued', generating: 'Building…', done: 'Ready ✅', error: 'Error'}};
+  const badgeLabel = labels[r.status] || r.status;
+  const idea = escHtml((r.criteria && r.criteria.idea) || '');
+  const errorHtml = (r.status === 'error' && r.error_message)
+    ? '<div class="builder-card-error" id="builder-error-' + r.id + '">' + escHtml(r.error_message) + '</div>' : '';
+  const dismissHtml = (r.status === 'error')
+    ? '<button class="dismiss-btn" data-id="' + r.id + '">&#10005; Remove</button>' : '';
+  const openHtml = (r.status === 'done')
+    ? '<a class="builder-card-open" id="builder-open-' + r.id + '" href="/' + r.target_path + '" target="_blank">Open App &rarr;</a>' : '';
+  const appType = escHtml((r.criteria && r.criteria.app_type) || 'App');
+
+  let reportHtml = '';
+  if (r.status === 'done') {{
+    const fixes = APP_REQUESTS.filter(f => f.kind === 'fix' && f.fix_of === r.id);
+    const active = fixes.find(f => f.status === 'queued' || f.status === 'generating');
+    const finishedFixes = fixes.filter(f => f.status === 'done' || f.status === 'error')
+      .sort((a, b) => (a.finished || '').localeCompare(b.finished || ''));
+    const last = finishedFixes[finishedFixes.length - 1];
+
+    let fixStatusHtml = '';
+    if (active) {{
+      fixStatusHtml = '<div class="fix-status">Fix in progress…</div>';
+    }} else if (last && last.status === 'done') {{
+      fixStatusHtml = '<div class="fix-status fix-status-done">Fix applied ✅ — try it again</div>';
+    }} else if (last && last.status === 'error') {{
+      fixStatusHtml = '<div class="fix-status fix-status-error">Fix attempt failed: ' + escHtml(last.error_message || '') + '</div>';
+    }}
+
+    reportHtml = '<button class="report-btn" data-id="' + r.id + '">&#128027; Report a problem</button>'
+      + '<div class="report-form hidden" id="report-form-' + r.id + '">'
+      + '<textarea class="report-ta" placeholder="What went wrong? e.g. arrow keys don&#39;t move the character" maxlength="500"></textarea>'
+      + '<div class="quick-note-actions">'
+      + '<button class="quick-note-cancel report-cancel-btn" data-id="' + r.id + '">Cancel</button>'
+      + '<button class="quick-note-submit report-submit-btn" data-id="' + r.id + '">Submit</button>'
+      + '</div></div>'
+      + fixStatusHtml;
+  }}
+
+  return '<div class="builder-card" id="builder-card-' + r.id + '">'
+    + '<div class="builder-card-header">'
+    + '<span class="builder-card-title">' + appType + ' — ' + escHtml(r.requester_name || '') + '</span>'
+    + '<span class="builder-badge ' + r.status + '" id="builder-badge-' + r.id + '">' + badgeLabel + '</span>'
+    + '</div>'
+    + '<div class="builder-card-meta">' + idea + '</div>'
+    + errorHtml + dismissHtml + openHtml + reportHtml
+    + '</div>';
+}}
+
+function renderBuilderLists() {{
+  const myName = (builderNameInput?.value || '').trim().toLowerCase();
+  const mineList = document.getElementById('builder-mine-list');
+  const familyList = document.getElementById('builder-family-list');
+  if (!mineList || !familyList) return;
+  const builds = APP_REQUESTS.filter(r => (r.kind || 'build') === 'build');
+  const mine = myName ? builds.filter(r => (r.requester_name || '').trim().toLowerCase() === myName) : [];
+  mineList.innerHTML = mine.length ? mine.map(builderCardHtml).join('') : '<p class="builder-empty">Nothing yet — build your first app above!</p>';
+  familyList.innerHTML = builds.length ? builds.map(builderCardHtml).join('') : '<p class="builder-empty">No apps built yet.</p>';
+  APP_REQUESTS.forEach(r => {{
+    if (r.status === 'queued' || r.status === 'generating') pollRequest(r.id);
+  }});
+}}
+
+async function loadAppRequests() {{
+  const r = await fetch('/api/app_requests').then(res => res.json()).catch(() => null);
+  if (r && r.requests) APP_REQUESTS = r.requests;
+  renderBuilderLists();
+}}
+
+function pollRequest(id) {{
+  if (builderPolls[id]) return;
+  // The giveup clock only starts once a job actually begins generating -- not
+  // from when polling starts. A job can legitimately sit "queued" behind the
+  // 2-concurrent-generation cap for longer than the giveup window (each slot
+  // can run up to GENERATION_TIMEOUT_SEC), and that queue wait must never by
+  // itself trigger a false "taking longer than expected" error for a job that
+  // hasn't even started yet. Uses the server's own `started` timestamp (not a
+  // client-observed one) so elapsed time isn't skewed by the 4s poll cadence.
+  let generatingStartedAt = null;
+  builderPolls[id] = setInterval(async () => {{
+    if (generatingStartedAt && Date.now() - generatingStartedAt > 660000) {{
+      clearInterval(builderPolls[id]);
+      delete builderPolls[id];
+      const idx = APP_REQUESTS.findIndex(r => r.id === id);
+      if (idx >= 0) APP_REQUESTS[idx] = Object.assign({{}}, APP_REQUESTS[idx], {{status: 'error', error_message: 'Taking longer than expected — refresh to check.'}});
+      renderBuilderLists();
+      return;
+    }}
+    const status = await fetch('/api/app_requests/status/' + id).then(res => res.ok ? res.json() : null).catch(() => null);
+    if (!status) return;
+    if (status.status === 'generating' && !generatingStartedAt && status.started) {{
+      generatingStartedAt = Date.parse(status.started + 'Z');
+    }}
+    const idx = APP_REQUESTS.findIndex(r => r.id === id);
+    if (idx >= 0) APP_REQUESTS[idx] = Object.assign({{}}, APP_REQUESTS[idx], status);
+    if (status.status === 'done' || status.status === 'error') {{
+      clearInterval(builderPolls[id]);
+      delete builderPolls[id];
+    }}
+    renderBuilderLists();
+  }}, 4000);
+}}
+
+document.querySelector('.builder-lists')?.addEventListener('click', async (e) => {{
+  const dismissBtn = e.target.closest('.dismiss-btn');
+  if (dismissBtn) {{
+    if (!confirm('Remove this failed build from the list?')) return;
+    const id = dismissBtn.dataset.id;
+    dismissBtn.disabled = true;
+    const r = await apiPost('/api/app_requests/dismiss', {{id}});
+    if (r?.ok) {{
+      APP_REQUESTS = APP_REQUESTS.filter(x => x.id !== id);
+      renderBuilderLists();
+    }} else {{
+      dismissBtn.disabled = false;
+      alert(r?.error || 'Could not remove — please try again.');
+    }}
+    return;
+  }}
+  const reportBtn = e.target.closest('.report-btn');
+  if (reportBtn) {{
+    const form = document.getElementById('report-form-' + reportBtn.dataset.id);
+    if (form) {{
+      form.classList.toggle('hidden');
+      if (!form.classList.contains('hidden')) form.querySelector('.report-ta').focus();
+    }}
+    return;
+  }}
+  const cancelBtn = e.target.closest('.report-cancel-btn');
+  if (cancelBtn) {{
+    const form = document.getElementById('report-form-' + cancelBtn.dataset.id);
+    if (form) {{ form.classList.add('hidden'); form.querySelector('.report-ta').value = ''; }}
+    return;
+  }}
+  const submitBtn = e.target.closest('.report-submit-btn');
+  if (submitBtn) {{
+    const id = submitBtn.dataset.id;
+    const form = document.getElementById('report-form-' + id);
+    const ta = form?.querySelector('.report-ta');
+    const issue_description = ta?.value.trim() || '';
+    if (!issue_description) {{ ta?.focus(); return; }}
+    const requester_name = builderNameInput?.value.trim() || '';
+    if (!requester_name) {{ builderNameInput?.focus(); return; }}
+    const requester_email = builderEmailInput?.value.trim() || '';
+    submitBtn.disabled = true; submitBtn.textContent = 'Submitting…';
+    const r = await apiPost('/api/app_requests/fix', {{requester_name, requester_email, fix_of: id, issue_description}});
+    submitBtn.disabled = false; submitBtn.textContent = 'Submit';
+    if (r?.ok) {{
+      APP_REQUESTS.unshift({{
+        id: r.id, kind: 'fix', fix_of: id, requester_name, issue_description,
+        status: 'queued', error_message: null, created: new Date().toISOString(),
+        started: null, finished: null,
+      }});
+      renderBuilderLists();
+      pollRequest(r.id);
+    }} else {{
+      alert(r?.error || 'Could not submit — please try again.');
+    }}
+  }}
+}});
+
+const builderShareBtn = document.getElementById('builder-native-share-btn');
+const builderCopyBtn = document.getElementById('builder-copy-btn');
+const builderShareLink = document.getElementById('builder-share-link');
+const builderShareCopied = document.getElementById('builder-share-copied');
+const BUILDER_SHARE_URL = {share_url_json};
+if (builderShareBtn && navigator.share) {{
+  builderShareBtn.classList.remove('hidden');
+  builderShareBtn.addEventListener('click', () => {{
+    navigator.share({{title: 'Build Your Own App', url: BUILDER_SHARE_URL}}).catch(() => {{}});
+  }});
+}}
+builderCopyBtn?.addEventListener('click', async () => {{
+  try {{
+    await navigator.clipboard.writeText(BUILDER_SHARE_URL);
+  }} catch(e) {{
+    builderShareLink?.select();
+    document.execCommand('copy');
+  }}
+  if (builderShareCopied) {{
+    builderShareCopied.classList.remove('hidden');
+    setTimeout(() => builderShareCopied.classList.add('hidden'), 1800);
+  }}
+}});
+"""
+
+
 def load_email_config():
     """Reads email_config.json (gitignored, not part of .app_data.json since it
     holds an SMTP credential, not app state). Returns None -- and callers must
@@ -705,6 +1227,8 @@ def generate_index(apps, reviews, base_url):
 
     builders_json = json.dumps(list_builders(data)).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
 
+    share_url = f"{base_url}/build"
+
     notes_items_html = ""
     for note in notes:
         created = note.get("created", "")[:16].replace("T", " ")
@@ -998,53 +1522,7 @@ def generate_index(apps, reviews, base_url):
   .pin-picker-new {{ font-size: 0.82rem; color: var(--accent); padding: 0.45rem 0.5rem; cursor: pointer; border-top: 1px solid var(--border); margin-top: 0.3rem; border-radius: 0 0 6px 6px; transition: background 0.12s; }}
   .pin-picker-new:hover {{ background: rgba(124,110,230,0.12); }}
   .pl-empty {{ color: var(--muted); font-style: italic; font-size: 0.9rem; padding: 1rem 0; }}
-  /* ---- App Builder ---- */
-  #tab-builder {{ display: none; padding: 1.5rem; max-width: 700px; margin: 0 auto; }}
-  .builder-form {{ background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 1rem; margin-bottom: 1.2rem; }}
-  .builder-form label {{ font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin: 0.75rem 0 0.4rem; }}
-  .builder-form label:first-child {{ margin-top: 0; }}
-  #builder-name-input, #builder-theme-input, #builder-inspired-input, #builder-name-select, #builder-email-input {{ width: 100%; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; transition: border-color 0.2s; }}
-  #builder-name-input:focus, #builder-theme-input:focus, #builder-inspired-input:focus, #builder-name-select:focus, #builder-email-input:focus {{ border-color: var(--accent); }}
-  #builder-name-select {{ margin-bottom: 0.5rem; }}
-  .builder-optional {{ text-transform: none; letter-spacing: normal; font-weight: 400; opacity: 0.75; }}
-  #builder-idea-input, #builder-tech-input {{ width: 100%; min-height: 60px; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; resize: vertical; transition: border-color 0.2s; }}
-  #builder-idea-input:focus, #builder-tech-input:focus {{ border-color: var(--accent); }}
-  .mode-toggle {{ display: flex; gap: 0.4rem; margin-bottom: 0.5rem; }}
-  .mode-toggle-btn {{ flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.85rem; font-weight: 600; padding: 0.5rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; }}
-  .mode-toggle-btn.active {{ color: var(--accent); border-color: var(--accent); background: rgba(124,110,230,0.1); }}
-  .choice-group {{ display: flex; gap: 0.4rem; flex-wrap: wrap; }}
-  .choice-opt {{ font-size: 0.85rem; color: var(--text); cursor: pointer; border-radius: 7px; padding: 0.4rem 0.75rem; border: 2px solid var(--border); transition: border-color 0.12s, background 0.12s; }}
-  .choice-opt.selected {{ border-color: var(--accent); background: rgba(124,110,230,0.12); color: var(--accent); }}
-  .choice-checkboxes {{ display: flex; gap: 0.5rem; flex-wrap: wrap; }}
-  .choice-checkbox {{ display: flex; align-items: center; gap: 0.35rem; font-size: 0.83rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 0.35rem 0.6rem; cursor: pointer; }}
-  .choice-checkbox input {{ accent-color: var(--accent); }}
-  #builder-advanced-fields.hidden {{ display: none; }}
-  .builder-lists {{ margin-top: 1.5rem; }}
-  .builder-list-heading {{ font-size: 0.85rem; font-weight: 600; color: var(--text); margin: 1.2rem 0 0.6rem; }}
-  .builder-card-list {{ display: flex; flex-direction: column; gap: 0.6rem; }}
-  .builder-empty {{ color: var(--muted); font-style: italic; font-size: 0.88rem; }}
-  .builder-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 0.9rem; }}
-  .builder-card-header {{ display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.3rem; }}
-  .builder-card-title {{ font-size: 0.9rem; color: var(--text); font-weight: 600; }}
-  .builder-card-meta {{ font-size: 0.75rem; color: var(--muted); }}
-  .builder-badge {{ font-size: 0.68rem; font-weight: 700; padding: 0.15em 0.55em; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0; }}
-  .builder-badge.queued {{ background: rgba(136,136,153,0.15); color: var(--muted); }}
-  .builder-badge.generating {{ background: rgba(124,110,230,0.15); color: var(--accent); }}
-  .builder-badge.done {{ background: rgba(68,238,102,0.12); color: #44ee66; }}
-  .builder-badge.error {{ background: rgba(230,110,124,0.15); color: var(--accent2); }}
-  .builder-card-open {{ display: inline-block; margin-top: 0.4rem; margin-right: 0.6rem; font-size: 0.83rem; color: var(--accent); text-decoration: none; font-weight: 600; }}
-  .builder-card-open:hover {{ text-decoration: underline; }}
-  .builder-card-error {{ margin-top: 0.4rem; font-size: 0.82rem; color: var(--accent2); }}
-  .report-btn {{ display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: var(--muted); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; }}
-  .report-btn:hover {{ color: var(--accent2); border-color: var(--accent2); }}
-  .dismiss-btn {{ display: inline-block; margin-top: 0.4rem; margin-right: 0.4rem; font-size: 0.78rem; color: var(--accent2); background: none; border: 1px solid var(--accent2); border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; transition: opacity 0.15s; }}
-  .dismiss-btn:hover {{ opacity: 0.8; }}
-  .report-form {{ margin-top: 0.5rem; }}
-  .report-ta {{ width: 100%; min-height: 50px; padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; resize: vertical; outline: none; font-family: inherit; line-height: 1.4; transition: border-color 0.2s; }}
-  .report-ta:focus {{ border-color: var(--accent2); }}
-  .fix-status {{ margin-top: 0.4rem; font-size: 0.8rem; color: var(--muted); font-style: italic; }}
-  .fix-status-done {{ color: #44ee66; font-style: normal; }}
-  .fix-status-error {{ color: var(--accent2); font-style: normal; }}
+{BUILDER_STYLES}
 </style>
 </head>
 <body>
@@ -1124,96 +1602,9 @@ def generate_index(apps, reviews, base_url):
   <div class="pl-header">
     <h2>&#128736; Build Your Own App</h2>
   </div>
-  <div class="builder-form">
-    <label>Your name</label>
-    <select id="builder-name-select">
-      <option value="">&#10133; New name&hellip;</option>
-    </select>
-    <input id="builder-name-input" type="text" placeholder="e.g. Emma" autocomplete="off" maxlength="30">
-
-    <label>Email <span class="builder-optional">(optional &mdash; get notified when it's built)</span></label>
-    <input id="builder-email-input" type="email" placeholder="you@example.com" autocomplete="off" maxlength="100">
-
-    <div class="mode-toggle">
-      <button class="mode-toggle-btn active" id="mode-basic-btn" data-mode="basic">Basic</button>
-      <button class="mode-toggle-btn" id="mode-advanced-btn" data-mode="advanced">Advanced</button>
-    </div>
-
-    <label>App type</label>
-    <div class="choice-group" id="builder-app-type" data-field="app_type">
-      <span class="choice-opt selected" data-value="Game">&#127918; Game</span>
-      <span class="choice-opt" data-value="Puzzle">&#129513; Puzzle</span>
-      <span class="choice-opt" data-value="Quiz">&#10067; Quiz</span>
-      <span class="choice-opt" data-value="Story">&#128214; Story</span>
-      <span class="choice-opt" data-value="Tool">&#128295; Tool</span>
-      <span class="choice-opt" data-value="Art">&#127912; Art</span>
-      <span class="choice-opt" data-value="Music">&#127925; Music</span>
-    </div>
-
-    <label>Theme / subject</label>
-    <input id="builder-theme-input" type="text" placeholder="e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
-
-    <label>Difficulty</label>
-    <div class="choice-group" id="builder-difficulty" data-field="difficulty">
-      <span class="choice-opt selected" data-value="Easy">Easy</span>
-      <span class="choice-opt" data-value="Medium">Medium</span>
-      <span class="choice-opt" data-value="Hard">Hard</span>
-    </div>
-
-    <label>Color vibe</label>
-    <div class="choice-group" id="builder-color-vibe" data-field="color_vibe">
-      <span class="choice-opt selected" data-value="Bright &amp; Playful">Bright &amp; Playful</span>
-      <span class="choice-opt" data-value="Cool &amp; Calm">Cool &amp; Calm</span>
-      <span class="choice-opt" data-value="Dark &amp; Mysterious">Dark &amp; Mysterious</span>
-      <span class="choice-opt" data-value="Neon &amp; Energetic">Neon &amp; Energetic</span>
-      <span class="choice-opt" data-value="Pastel &amp; Soft">Pastel &amp; Soft</span>
-    </div>
-
-    <label>Your idea (one line)</label>
-    <textarea id="builder-idea-input" placeholder="e.g. A maze game where you're a dragon collecting gems" maxlength="200"></textarea>
-
-    <div id="builder-advanced-fields" class="hidden">
-      <label>Mechanics (pick any)</label>
-      <div class="choice-checkboxes" id="builder-mechanics">
-        <label class="choice-checkbox"><input type="checkbox" value="Timer/Countdown"> Timer/Countdown</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Score/Points"> Score/Points</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Levels"> Levels</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Local multiplayer"> Local multiplayer</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Sound effects"> Sound effects</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Drag &amp; drop"> Drag &amp; drop</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Keyboard controls"> Keyboard controls</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Touch/swipe"> Touch/swipe</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Randomized"> Randomized</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Save progress"> Save progress</label>
-      </div>
-
-      <label>Age range</label>
-      <div class="choice-group" id="builder-age-range" data-field="age_range">
-        <span class="choice-opt" data-value="4-6">4-6</span>
-        <span class="choice-opt" data-value="7-9">7-9</span>
-        <span class="choice-opt" data-value="10-12">10-12</span>
-        <span class="choice-opt" data-value="13-16">13-16</span>
-        <span class="choice-opt selected" data-value="All ages">All ages</span>
-      </div>
-
-      <label>Anything specific? (optional)</label>
-      <textarea id="builder-tech-input" placeholder="e.g. a leaderboard of best times" maxlength="300"></textarea>
-
-      <label>Make it feel like&hellip; (optional)</label>
-      <input id="builder-inspired-input" type="text" placeholder="e.g. Flappy Bird" autocomplete="off" maxlength="100">
-    </div>
-
-    <div class="pl-form-actions">
-      <button class="pl-create-btn" id="builder-submit-btn">Build My App!</button>
-    </div>
-  </div>
-
-  <div class="builder-lists">
-    <h2 class="builder-list-heading">Your Creations</h2>
-    <div id="builder-mine-list" class="builder-card-list"></div>
-    <h2 class="builder-list-heading">Family Creations</h2>
-    <div id="builder-family-list" class="builder-card-list"></div>
-  </div>
+{builder_share_row_html(share_url)}
+{BUILDER_FORM_HTML}
+{BUILDER_LISTS_HTML}
 </div>
 
 <footer>Auto-refreshes on each visit &middot; {APPS_DIR}</footer>
@@ -1710,288 +2101,68 @@ document.querySelectorAll('.note-delete').forEach(btn => {{
   }});
 }});
 
-// ---- App Builder ----
-let APP_REQUESTS = {app_requests_json};
-const BUILDERS = {builders_json};
-const builderPolls = {{}};
-
-const builderNameSelect = document.getElementById('builder-name-select');
-const builderNameInput = document.getElementById('builder-name-input');
-const builderEmailInput = document.getElementById('builder-email-input');
-
-function builderEmailFor(name) {{
-  return (BUILDERS.find(b => b.name === name) || {{}}).email || '';
-}}
-
-if (builderNameSelect) {{
-  for (const b of BUILDERS) {{
-    const opt = document.createElement('option');
-    opt.value = b.name;
-    opt.textContent = b.name;
-    builderNameSelect.appendChild(opt);
-  }}
-  builderNameSelect.addEventListener('change', () => {{
-    if (!builderNameSelect.value) return;
-    builderNameInput.value = builderNameSelect.value;
-    builderEmailInput.value = builderEmailFor(builderNameSelect.value);
-    localStorage.setItem('cowork-builder-name', builderNameInput.value);
-    localStorage.setItem('cowork-builder-email', builderEmailInput.value);
-  }});
-}}
-if (builderNameInput) {{
-  builderNameInput.value = localStorage.getItem('cowork-builder-name') || '';
-  if (builderNameSelect && BUILDERS.some(b => b.name === builderNameInput.value)) {{
-    builderNameSelect.value = builderNameInput.value;
-  }}
-  builderNameInput.addEventListener('input', () => {{
-    const typed = builderNameInput.value.trim();
-    localStorage.setItem('cowork-builder-name', typed);
-    // If a dropdown selection is currently in effect and the typed name no longer
-    // matches it, the auto-filled email belongs to whoever was selected before --
-    // clear it along with the selection instead of silently carrying a stranger's
-    // email forward onto a new name.
-    if (builderNameSelect && builderNameSelect.value && builderNameSelect.value !== typed) {{
-      builderNameSelect.value = '';
-      if (builderEmailInput) builderEmailInput.value = '';
-      localStorage.removeItem('cowork-builder-email');
-    }}
-  }});
-}}
-if (builderEmailInput) {{
-  builderEmailInput.value = localStorage.getItem('cowork-builder-email') || builderEmailFor(builderNameInput?.value || '');
-  builderEmailInput.addEventListener('input', () => {{
-    localStorage.setItem('cowork-builder-email', builderEmailInput.value.trim());
-  }});
-}}
-
-document.getElementById('mode-basic-btn')?.addEventListener('click', () => setBuilderMode('basic'));
-document.getElementById('mode-advanced-btn')?.addEventListener('click', () => setBuilderMode('advanced'));
-function setBuilderMode(mode) {{
-  document.getElementById('mode-basic-btn').classList.toggle('active', mode === 'basic');
-  document.getElementById('mode-advanced-btn').classList.toggle('active', mode === 'advanced');
-  document.getElementById('builder-advanced-fields').classList.toggle('hidden', mode !== 'advanced');
-}}
-
-document.querySelectorAll('.choice-group').forEach(group => {{
-  group.addEventListener('click', e => {{
-    const opt = e.target.closest('.choice-opt');
-    if (!opt || !group.contains(opt)) return;
-    group.querySelectorAll('.choice-opt').forEach(o => o.classList.remove('selected'));
-    opt.classList.add('selected');
-  }});
-}});
-
-function builderChoice(fieldId) {{
-  return document.querySelector('#' + fieldId + ' .choice-opt.selected')?.dataset.value || '';
-}}
-
-document.getElementById('builder-submit-btn')?.addEventListener('click', async () => {{
-  const requester_name = builderNameInput?.value.trim() || '';
-  if (!requester_name) {{ builderNameInput?.focus(); return; }}
-  const requester_email = builderEmailInput?.value.trim() || '';
-  const mode = document.getElementById('mode-advanced-btn').classList.contains('active') ? 'advanced' : 'basic';
-
-  const criteria = {{
-    app_type: builderChoice('builder-app-type'),
-    theme: document.getElementById('builder-theme-input').value.trim(),
-    difficulty: builderChoice('builder-difficulty'),
-    color_vibe: builderChoice('builder-color-vibe'),
-    idea: document.getElementById('builder-idea-input').value.trim(),
-  }};
-  if (!criteria.theme) {{ document.getElementById('builder-theme-input').focus(); return; }}
-  if (!criteria.idea) {{ document.getElementById('builder-idea-input').focus(); return; }}
-  if (mode === 'advanced') {{
-    criteria.mechanics = Array.from(document.querySelectorAll('#builder-mechanics input:checked')).map(cb => cb.value);
-    criteria.age_range = builderChoice('builder-age-range');
-    const tech = document.getElementById('builder-tech-input').value.trim();
-    const inspired = document.getElementById('builder-inspired-input').value.trim();
-    if (tech) criteria.tech_requests = tech;
-    if (inspired) criteria.inspired_by = inspired;
-  }}
-
-  const btn = document.getElementById('builder-submit-btn');
-  btn.disabled = true; btn.textContent = 'Building…';
-  const r = await apiPost('/api/app_requests/create', {{requester_name, requester_email, mode, criteria}});
-  btn.disabled = false; btn.textContent = 'Build My App!';
-  if (r?.ok) {{
-    APP_REQUESTS.unshift({{
-      id: r.id, requester_name, mode, criteria,
-      target_filename: r.target_filename, target_path: 'custom_apps/' + r.target_filename,
-      status: 'queued', error_message: null, created: new Date().toISOString(),
-      started: null, finished: null,
-    }});
-    document.getElementById('builder-idea-input').value = '';
-    renderBuilderLists();
-    pollRequest(r.id);
-  }} else {{
-    alert(r?.error || 'Could not submit — please try again.');
-  }}
-}});
-
-function builderCardHtml(r) {{
-  const labels = {{queued: 'Queued', generating: 'Building…', done: 'Ready ✅', error: 'Error'}};
-  const badgeLabel = labels[r.status] || r.status;
-  const idea = escHtml((r.criteria && r.criteria.idea) || '');
-  const errorHtml = (r.status === 'error' && r.error_message)
-    ? '<div class="builder-card-error" id="builder-error-' + r.id + '">' + escHtml(r.error_message) + '</div>' : '';
-  const dismissHtml = (r.status === 'error')
-    ? '<button class="dismiss-btn" data-id="' + r.id + '">&#10005; Remove</button>' : '';
-  const openHtml = (r.status === 'done')
-    ? '<a class="builder-card-open" id="builder-open-' + r.id + '" href="/' + r.target_path + '" target="_blank">Open App &rarr;</a>' : '';
-  const appType = escHtml((r.criteria && r.criteria.app_type) || 'App');
-
-  let reportHtml = '';
-  if (r.status === 'done') {{
-    const fixes = APP_REQUESTS.filter(f => f.kind === 'fix' && f.fix_of === r.id);
-    const active = fixes.find(f => f.status === 'queued' || f.status === 'generating');
-    const finishedFixes = fixes.filter(f => f.status === 'done' || f.status === 'error')
-      .sort((a, b) => (a.finished || '').localeCompare(b.finished || ''));
-    const last = finishedFixes[finishedFixes.length - 1];
-
-    let fixStatusHtml = '';
-    if (active) {{
-      fixStatusHtml = '<div class="fix-status">Fix in progress…</div>';
-    }} else if (last && last.status === 'done') {{
-      fixStatusHtml = '<div class="fix-status fix-status-done">Fix applied ✅ — try it again</div>';
-    }} else if (last && last.status === 'error') {{
-      fixStatusHtml = '<div class="fix-status fix-status-error">Fix attempt failed: ' + escHtml(last.error_message || '') + '</div>';
-    }}
-
-    reportHtml = '<button class="report-btn" data-id="' + r.id + '">&#128027; Report a problem</button>'
-      + '<div class="report-form hidden" id="report-form-' + r.id + '">'
-      + '<textarea class="report-ta" placeholder="What went wrong? e.g. arrow keys don&#39;t move the character" maxlength="500"></textarea>'
-      + '<div class="quick-note-actions">'
-      + '<button class="quick-note-cancel report-cancel-btn" data-id="' + r.id + '">Cancel</button>'
-      + '<button class="quick-note-submit report-submit-btn" data-id="' + r.id + '">Submit</button>'
-      + '</div></div>'
-      + fixStatusHtml;
-  }}
-
-  return '<div class="builder-card" id="builder-card-' + r.id + '">'
-    + '<div class="builder-card-header">'
-    + '<span class="builder-card-title">' + appType + ' — ' + escHtml(r.requester_name || '') + '</span>'
-    + '<span class="builder-badge ' + r.status + '" id="builder-badge-' + r.id + '">' + badgeLabel + '</span>'
-    + '</div>'
-    + '<div class="builder-card-meta">' + idea + '</div>'
-    + errorHtml + dismissHtml + openHtml + reportHtml
-    + '</div>';
-}}
-
-function renderBuilderLists() {{
-  const myName = (builderNameInput?.value || '').trim().toLowerCase();
-  const mineList = document.getElementById('builder-mine-list');
-  const familyList = document.getElementById('builder-family-list');
-  if (!mineList || !familyList) return;
-  const builds = APP_REQUESTS.filter(r => (r.kind || 'build') === 'build');
-  const mine = myName ? builds.filter(r => (r.requester_name || '').trim().toLowerCase() === myName) : [];
-  mineList.innerHTML = mine.length ? mine.map(builderCardHtml).join('') : '<p class="builder-empty">Nothing yet — build your first app above!</p>';
-  familyList.innerHTML = builds.length ? builds.map(builderCardHtml).join('') : '<p class="builder-empty">No apps built yet.</p>';
-  APP_REQUESTS.forEach(r => {{
-    if (r.status === 'queued' || r.status === 'generating') pollRequest(r.id);
-  }});
-}}
-
-async function loadAppRequests() {{
-  const r = await fetch('/api/app_requests').then(res => res.json()).catch(() => null);
-  if (r && r.requests) APP_REQUESTS = r.requests;
-  renderBuilderLists();
-}}
-
-function pollRequest(id) {{
-  if (builderPolls[id]) return;
-  // The giveup clock only starts once a job actually begins generating -- not
-  // from when polling starts. A job can legitimately sit "queued" behind the
-  // 2-concurrent-generation cap for longer than the giveup window (each slot
-  // can run up to GENERATION_TIMEOUT_SEC), and that queue wait must never by
-  // itself trigger a false "taking longer than expected" error for a job that
-  // hasn't even started yet. Uses the server's own `started` timestamp (not a
-  // client-observed one) so elapsed time isn't skewed by the 4s poll cadence.
-  let generatingStartedAt = null;
-  builderPolls[id] = setInterval(async () => {{
-    if (generatingStartedAt && Date.now() - generatingStartedAt > 660000) {{
-      clearInterval(builderPolls[id]);
-      delete builderPolls[id];
-      const idx = APP_REQUESTS.findIndex(r => r.id === id);
-      if (idx >= 0) APP_REQUESTS[idx] = Object.assign({{}}, APP_REQUESTS[idx], {{status: 'error', error_message: 'Taking longer than expected — refresh to check.'}});
-      renderBuilderLists();
-      return;
-    }}
-    const status = await fetch('/api/app_requests/status/' + id).then(res => res.ok ? res.json() : null).catch(() => null);
-    if (!status) return;
-    if (status.status === 'generating' && !generatingStartedAt && status.started) {{
-      generatingStartedAt = Date.parse(status.started + 'Z');
-    }}
-    const idx = APP_REQUESTS.findIndex(r => r.id === id);
-    if (idx >= 0) APP_REQUESTS[idx] = Object.assign({{}}, APP_REQUESTS[idx], status);
-    if (status.status === 'done' || status.status === 'error') {{
-      clearInterval(builderPolls[id]);
-      delete builderPolls[id];
-    }}
-    renderBuilderLists();
-  }}, 4000);
-}}
-
-document.querySelector('.builder-lists')?.addEventListener('click', async (e) => {{
-  const dismissBtn = e.target.closest('.dismiss-btn');
-  if (dismissBtn) {{
-    if (!confirm('Remove this failed build from the list?')) return;
-    const id = dismissBtn.dataset.id;
-    dismissBtn.disabled = true;
-    const r = await apiPost('/api/app_requests/dismiss', {{id}});
-    if (r?.ok) {{
-      APP_REQUESTS = APP_REQUESTS.filter(x => x.id !== id);
-      renderBuilderLists();
-    }} else {{
-      dismissBtn.disabled = false;
-      alert(r?.error || 'Could not remove — please try again.');
-    }}
-    return;
-  }}
-  const reportBtn = e.target.closest('.report-btn');
-  if (reportBtn) {{
-    const form = document.getElementById('report-form-' + reportBtn.dataset.id);
-    if (form) {{
-      form.classList.toggle('hidden');
-      if (!form.classList.contains('hidden')) form.querySelector('.report-ta').focus();
-    }}
-    return;
-  }}
-  const cancelBtn = e.target.closest('.report-cancel-btn');
-  if (cancelBtn) {{
-    const form = document.getElementById('report-form-' + cancelBtn.dataset.id);
-    if (form) {{ form.classList.add('hidden'); form.querySelector('.report-ta').value = ''; }}
-    return;
-  }}
-  const submitBtn = e.target.closest('.report-submit-btn');
-  if (submitBtn) {{
-    const id = submitBtn.dataset.id;
-    const form = document.getElementById('report-form-' + id);
-    const ta = form?.querySelector('.report-ta');
-    const issue_description = ta?.value.trim() || '';
-    if (!issue_description) {{ ta?.focus(); return; }}
-    const requester_name = builderNameInput?.value.trim() || '';
-    if (!requester_name) {{ builderNameInput?.focus(); return; }}
-    const requester_email = builderEmailInput?.value.trim() || '';
-    submitBtn.disabled = true; submitBtn.textContent = 'Submitting…';
-    const r = await apiPost('/api/app_requests/fix', {{requester_name, requester_email, fix_of: id, issue_description}});
-    submitBtn.disabled = false; submitBtn.textContent = 'Submit';
-    if (r?.ok) {{
-      APP_REQUESTS.unshift({{
-        id: r.id, kind: 'fix', fix_of: id, requester_name, issue_description,
-        status: 'queued', error_message: null, created: new Date().toISOString(),
-        started: null, finished: null,
-      }});
-      renderBuilderLists();
-      pollRequest(r.id);
-    }} else {{
-      alert(r?.error || 'Could not submit — please try again.');
-    }}
-  }}
-}});
+{builder_logic_js(app_requests_json, builders_json, share_url)}
 </script>
 </body>
 </html>"""
 
+
+def generate_builder_page(app_requests_public, builders, share_url):
+    """Standalone version of the Build tab -- just the form + creation lists, no
+    tabs nav / apps grid / other tabs -- so it can be bookmarked, texted, or
+    emailed as a link that opens straight into building an app (`share_url`,
+    `/build`) instead of requiring someone to load the full hub and navigate to
+    the Build tab first. Reuses the exact same BUILDER_FORM_HTML/BUILDER_LISTS_HTML/
+    builder_logic_js() as the tab -- same DOM ids, same behavior, same data."""
+    app_requests_json = json.dumps(app_requests_public).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+    builders_json = json.dumps(builders).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build Your Own App &mdash; Cowork Apps</title>
+<meta name="description" content="Build your own app: pick a type, theme, and idea, and a real playable app gets created for you.">
+<meta name="theme-color" content="#7c6ee6">
+<style>
+  :root {{
+    --bg: #0f0f13;
+    --surface: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #7c6ee6;
+    --accent2: #e66e7c;
+    --text: #e8e8f0;
+    --muted: #888899;
+    --card-hover: #222232;
+  }}
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }}
+  .hidden {{ display: none !important; }}
+  #tab-builder {{ display: block; padding: 0; max-width: none; margin: 0; }}
+{BUILDER_STYLES}
+</style>
+</head>
+<body>
+<div class="standalone-wrap">
+  <div class="standalone-header">
+    <h1>&#128736; Build Your Own App</h1>
+    <p>Describe an app and it'll be built for you &mdash; playable in a few minutes.</p>
+  </div>
+{builder_share_row_html(share_url)}
+{BUILDER_FORM_HTML}
+{BUILDER_LISTS_HTML}
+  <div class="standalone-footer">
+    <a href="/">&#127968; Open the full Cowork Apps hub</a>
+  </div>
+</div>
+<script>
+{SHARED_JS_HELPERS}
+{builder_logic_js(app_requests_json, builders_json, share_url)}
+loadAppRequests();
+</script>
+</body>
+</html>"""
 
 
 def _make_png(size, color1=(124, 110, 230), color2=(230, 110, 124)):
@@ -2064,6 +2235,18 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(data)
+        elif path == "/build":
+            data = load_data()
+            app_requests_public = [strip_private_fields(r) for r in data.get("app_requests", [])]
+            share_url = f"{get_base_url()}/build"
+            html = generate_builder_page(app_requests_public, list_builders(data), share_url)
+            body = html.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(body)
         elif path.startswith("/api/category/"):
             safe_cat = path[len("/api/category/"):]
             apps = discover_apps()
