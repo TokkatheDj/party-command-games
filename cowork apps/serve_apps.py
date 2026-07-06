@@ -1108,7 +1108,15 @@ def generate_app_worker(request_id):
         try:
             result = subprocess.run(
                 ["claude", "--permission-mode", "dontAsk", "-p", prompt,
-                 "--allowedTools", f"Write({CUSTOM_APPS_DIR}\\**),Edit({CUSTOM_APPS_DIR}\\**),Read,Glob,Grep",
+                 # Every file tool is scoped to custom_apps. The prompt embeds
+                 # untrusted user input (idea/theme/issue_description), so an
+                 # unscoped Read/Glob/Grep would be a prompt-injection primitive
+                 # for reading anything on disk (e.g. email_config.json's SMTP
+                 # password) and writing it into the served HTML. The generator
+                 # only ever needs to touch the one target file, so deny the
+                 # rest -- builds read nothing; a fix reads its own file here.
+                 "--allowedTools",
+                 f"Write({CUSTOM_APPS_DIR}\\**),Edit({CUSTOM_APPS_DIR}\\**),Read({CUSTOM_APPS_DIR}\\**)",
                  "--max-turns", "30"],
                 capture_output=True, text=True, timeout=GENERATION_TIMEOUT_SEC,
                 encoding="utf-8", errors="replace", cwd=str(APPS_DIR),
@@ -2436,7 +2444,29 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
         else:
+            # Deny-by-default: this directory is the source tree + data store +
+            # SMTP config, NOT a public docroot. SimpleHTTPRequestHandler would
+            # happily serve serve_apps.py, .app_data.json (names/emails/notes),
+            # and email_config.json (SMTP password) to anyone who can reach the
+            # port (bound 0.0.0.0, plus a Tailscale PUBLIC_URL). Only the
+            # self-contained .html apps and image assets are public.
+            if not self._is_public_static(path):
+                self.send_error(404, "Not Found")
+                return
             super().do_GET()
+
+    @staticmethod
+    def _is_public_static(path):
+        # No dotfiles or dotdirs (.app_data.json, .claude/, email_config.json is
+        # not a dotfile but is denied by the suffix whitelist below anyway), and
+        # only known static app/media types. Everything else -- .py, .json,
+        # .ps1/.bat/.vbs, .md, .txt, config -- is not downloadable.
+        if any(seg.startswith(".") for seg in path.split("/") if seg):
+            return False
+        return path.lower().endswith(
+            (".html", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
+             ".woff", ".woff2")
+        )
 
     def do_POST(self):
         path = unquote(self.path.split("?")[0])
