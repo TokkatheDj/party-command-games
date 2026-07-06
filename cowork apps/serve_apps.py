@@ -298,13 +298,13 @@ THEME_ROOT_VARS = """
   }
   :root[data-theme="dark"] {
     --bg: #0f0f13;
-    --surface: #1a1a24;
-    --border: #2a2a3a;
+    --surface: #2a1f4d;
+    --border: #3d2e6b;
     --accent: #7c6ee6;
     --accent2: #e66e7c;
     --text: #e8e8f0;
-    --muted: #888899;
-    --card-hover: #222232;
+    --muted: #a99ce0;
+    --card-hover: #352763;
   }
 """
 
@@ -1438,13 +1438,13 @@ def generate_index(apps, reviews, base_url):
 {THEME_ROOT_VARS}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
   body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }}
-  header {{ background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 2rem 1.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.14); text-align: center; }}
+  header {{ background: var(--surface); padding: 2rem 1.5rem 0; border-bottom: 1px solid var(--border); text-align: center; }}
   header h1 {{ font-size: 1.8rem; font-weight: 700; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 0.3rem; }}
-  .subtitle {{ color: #a8a8c0; font-size: 0.9rem; margin-bottom: 1.2rem; }}
-  .tabs-nav {{ display: flex; border-top: 1px solid rgba(255,255,255,0.14); }}
-  .tab-btn {{ flex: 1; padding: 0.8rem; background: transparent; border: none; border-bottom: 3px solid transparent; color: #a8a8c0; font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: color 0.15s, border-color 0.15s; }}
+  .subtitle {{ color: var(--muted); font-size: 0.9rem; margin-bottom: 1.2rem; }}
+  .tabs-nav {{ display: flex; border-top: 1px solid var(--border); }}
+  .tab-btn {{ flex: 1; padding: 0.8rem; background: transparent; border: none; border-bottom: 3px solid transparent; color: var(--muted); font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: color 0.15s, border-color 0.15s; }}
   .tab-btn.active {{ color: var(--accent); border-bottom-color: var(--accent); }}
-  .tab-btn:hover {{ color: #ffffff; }}
+  .tab-btn:hover {{ color: var(--text); }}
   .search-wrap {{ padding: 1rem 1.5rem; max-width: 700px; margin: 0 auto; }}
   #search {{ width: 100%; padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 1rem; outline: none; transition: border-color 0.2s; }}
   #search:focus {{ border-color: var(--accent); }}
