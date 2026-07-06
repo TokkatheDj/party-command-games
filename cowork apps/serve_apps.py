@@ -22,6 +22,8 @@ from email.message import EmailMessage
 from pathlib import Path
 from urllib.parse import unquote
 
+from applock import data_lock
+
 APPS_DIR = Path(__file__).parent
 PORT = 8080
 DATA_FILE = APPS_DIR / ".app_data.json"
@@ -1008,8 +1010,10 @@ def update_app_request(request_id, **fields):
     """Re-read data fresh before writing, mirroring daily_check.py's update_note()
     idiom, so a slow generation doesn't clobber concurrent HTTP-server writes.
     Holds DATA_LOCK for the whole read-modify-write cycle -- see DATA_LOCK's
-    definition for why a re-read alone isn't a strong enough guarantee."""
-    with DATA_LOCK:
+    definition for why a re-read alone isn't a strong enough guarantee. Also
+    takes the cross-process data_lock() so a background generation thread's
+    write can't lose (or be lost to) a concurrent daily_check.py write."""
+    with DATA_LOCK, data_lock():
         data = load_data()
         for req in data.get("app_requests", []):
             if req.get("id") == request_id:
@@ -2510,8 +2514,10 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         # respond all happen atomically w.r.t. every other POST and every
         # background generation thread's update_app_request() calls -- see
         # DATA_LOCK's definition for why a load-once-at-the-top snapshot alone
-        # isn't safe once background threads can write concurrently.
-        with DATA_LOCK:
+        # isn't safe once background threads can write concurrently. data_lock()
+        # extends that guarantee across processes (vs. daily_check.py), whose
+        # writes DATA_LOCK -- an in-process threading.Lock -- cannot see.
+        with DATA_LOCK, data_lock():
             self._handle_post(path, payload)
 
     def _handle_post(self, path, payload):
@@ -2794,17 +2800,18 @@ def main():
     # Crash recovery: a killed subprocess can't be resumed, so any app_request
     # still "generating" from a previous run is stuck forever -- surface it as an
     # error. Safe to run now: we hold the port, so we are the one true server.
-    data = load_data()
-    interrupted = 0
-    for req in data.get("app_requests", []):
-        if req.get("status") == "generating":
-            req["status"] = "error"
-            req["error_message"] = "Interrupted by server restart -- please resubmit."
-            req["finished"] = now_iso()
-            interrupted += 1
-    if interrupted:
-        save_data(data)
-        print(f"[builder] marked {interrupted} interrupted app_request(s) as error on startup")
+    with data_lock():
+        data = load_data()
+        interrupted = 0
+        for req in data.get("app_requests", []):
+            if req.get("status") == "generating":
+                req["status"] = "error"
+                req["error_message"] = "Interrupted by server restart -- please resubmit."
+                req["finished"] = now_iso()
+                interrupted += 1
+        if interrupted:
+            save_data(data)
+            print(f"[builder] marked {interrupted} interrupted app_request(s) as error on startup")
 
     print(f"""
 +----------------------------------------------+

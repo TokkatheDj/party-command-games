@@ -11,6 +11,8 @@ import subprocess
 import time
 from pathlib import Path
 
+from applock import data_lock
+
 APPS_DIR  = Path(__file__).parent
 DATA_FILE = APPS_DIR / ".app_data.json"
 LOG_FILE  = APPS_DIR / "daily_check.log"
@@ -83,19 +85,24 @@ def update_note(note_id, reviewed_at, response):
     """Re-read the data file, update one note, write back atomically.
 
     Re-reading before each write avoids clobbering changes the HTTP server
-    made while Claude was processing the previous note.
+    made while Claude was processing the previous note. The re-read alone only
+    narrows the race; data_lock() closes it -- the whole load -> mutate -> save
+    runs while serve_apps.py is held out of its own read-modify-write cycle.
+    The slow ask_claude() call happens BEFORE this, so the lock is held only for
+    the brief write.
     """
-    data = load_data_file()
-    if data is None:
-        log(f"  Skipping save for note {note_id} -- data file unreadable")
-        return
-    for note in data.get("notes", []):
-        if note.get("id") == note_id:
-            note["reviewed"]    = True
-            note["ai_response"] = response
-            note["reviewed_at"] = reviewed_at
-            break
-    save_data_atomic(data)
+    with data_lock():
+        data = load_data_file()
+        if data is None:
+            log(f"  Skipping save for note {note_id} -- data file unreadable")
+            return
+        for note in data.get("notes", []):
+            if note.get("id") == note_id:
+                note["reviewed"]    = True
+                note["ai_response"] = response
+                note["reviewed_at"] = reviewed_at
+                break
+        save_data_atomic(data)
 
 
 def discover_app_names():
