@@ -25,15 +25,30 @@ def log(msg):
 
 
 def ask_claude(prompt):
-    """Call the Claude Code CLI. Returns (response_text, success: bool)."""
+    """Call the Claude Code CLI. Returns (response_text, success: bool).
+
+    This job only ever needs a text answer -- it must NOT be able to touch the
+    filesystem or run commands. The prompt embeds untrusted note text (added by
+    anyone via the web UI), and the user's global settings.json pre-approves
+    mcp-coderunner (shell) and mcp-filesystem (write/delete). A plain `claude -p`
+    would inherit those, turning a malicious note into arbitrary code execution.
+    So we launch hermetically: --strict-mcp-config with an empty --mcp-config
+    loads NO MCP servers, and the empty allow / explicit disallow lists deny
+    every built-in tool. The model can produce text and nothing else.
+    """
     try:
         result = subprocess.run(
-            ["claude", "-p", prompt],
+            ["claude", "-p", prompt,
+             "--strict-mcp-config", "--mcp-config", '{"mcpServers": {}}',
+             "--allowedTools", "",
+             "--disallowedTools",
+             "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,Task,NotebookEdit"],
             capture_output=True,
             text=True,
             timeout=120,
             encoding="utf-8",
             errors="replace",
+            stdin=subprocess.DEVNULL,
         )
         if result.returncode != 0:
             err = (result.stderr or "").strip() or f"exit code {result.returncode}"
