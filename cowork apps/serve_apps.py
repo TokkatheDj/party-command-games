@@ -30,6 +30,9 @@ EMAIL_CONFIG_FILE = APPS_DIR / "email_config.json"
 MAX_CONCURRENT_GENERATIONS = 2
 GENERATION_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT_GENERATIONS)
 GENERATION_TIMEOUT_SEC = 600
+# JSON payloads here are tiny (a few KB at most given per-field length caps);
+# cap the request body so a bogus/huge Content-Length can't drive a large read.
+MAX_POST_BODY = 256 * 1024
 # Guards every read-modify-write cycle against .app_data.json: do_POST holds this
 # for its whole request (load -> mutate -> save), and update_app_request() holds it
 # too, so a background generation thread's status write can never be silently
@@ -76,7 +79,29 @@ def clean_name(stem):
     name = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", stem)
     return name.replace("-", " ").replace("_", " ").title()
 
+# discover_apps() runs on every "/" load and several /api/* hits; a full rglob
+# + per-file stat over a OneDrive-backed tree dominates page-load latency. Cache
+# the result for a few seconds so one interaction's burst of requests shares a
+# single scan. New/edited apps still surface within the TTL on the next refresh.
+_APPS_CACHE = {"at": 0.0, "apps": None}
+_APPS_CACHE_LOCK = threading.Lock()
+_APPS_CACHE_TTL = 5.0
+
+
 def discover_apps():
+    now = time.time()
+    with _APPS_CACHE_LOCK:
+        cached = _APPS_CACHE["apps"]
+        if cached is not None and (now - _APPS_CACHE["at"]) < _APPS_CACHE_TTL:
+            return cached
+    apps = _discover_apps_uncached()
+    with _APPS_CACHE_LOCK:
+        _APPS_CACHE["apps"] = apps
+        _APPS_CACHE["at"] = time.time()
+    return apps
+
+
+def _discover_apps_uncached():
     apps = {}
     ignore = {"serve_apps.py", "test_apps.js", "Start-AppServer.ps1", "Run-Tests.ps1"}
     ignore_dirs = {"node_modules", "test_reports", ".playwright-mcp", ".claude", "Reviews"}
@@ -1097,7 +1122,7 @@ def generate_app_worker(request_id):
         if kind == "fix":
             original = next((r for r in data.get("app_requests", []) if r.get("id") == req.get("fix_of")), None)
             prompt = build_fix_prompt(original, req.get("issue_description", ""), target_filename)
-            mtime_before = target_full_path.stat().st_mtime if target_full_path.exists() else 0
+            mtime_before = target_full_path.stat().st_mtime_ns if target_full_path.exists() else 0
         else:
             criteria = req.get("criteria", {})
             mode = req.get("mode", "basic")
@@ -1128,7 +1153,7 @@ def generate_app_worker(request_id):
                 # A fix edits an already-existing file, so "exists and non-empty" is
                 # trivially true even if nothing happened -- require the mtime to have
                 # actually advanced as the real signal that a change was made.
-                touched = target_full_path.exists() and target_full_path.stat().st_mtime > mtime_before
+                touched = target_full_path.exists() and target_full_path.stat().st_mtime_ns > mtime_before
                 if touched:
                     print(f"[builder] {request_id} done (fix applied) -> {target_filename}", flush=True)
                     update_app_request(request_id, status="done", finished=finished, log_tail=log_tail)
@@ -2143,7 +2168,6 @@ function closePicker() {{
 }}
 
 function updatePinBtns(path) {{
-  const escaped = path.replace(/[!"#$%&'()*+,.\/:;<=>?@[\\\]^`{{|}}~]/g, '\\\\$&');
   const isPinned = Object.values(PLAYLISTS).some(p => (p.apps || []).includes(path));
   document.querySelectorAll('.pin-btn[data-path="' + path + '"]').forEach(b => {{
     b.classList.toggle('pinned', isPinned);
@@ -2470,7 +2494,13 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         path = unquote(self.path.split("?")[0])
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except (TypeError, ValueError):
+            length = -1
+        if length < 0 or length > MAX_POST_BODY:
+            self.send_error(413, "Payload too large")
+            return
         body = self.rfile.read(length)
         try:
             payload = json.loads(body.decode("utf-8")) if body else {}
@@ -2601,9 +2631,8 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/app_requests/create":
             requester_name = (payload.get("requester_name") or "").strip()[:30]
-            requester_email = (payload.get("requester_email") or "").strip()[:100]
-            if requester_email and not EMAIL_RE.match(requester_email):
-                requester_email = ""
+            raw_email = (payload.get("requester_email") or "").strip()[:100]
+            requester_email = raw_email if EMAIL_RE.match(raw_email) else ""
             mode = payload.get("mode") or "basic"
             criteria = payload.get("criteria") or {}
             if mode not in ("basic", "advanced"):
@@ -2637,7 +2666,11 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
             request_id = uuid.uuid4().hex[:8]
             target_filename = compute_target_filename(clean_criteria, data)
-            remember_builder(data, requester_name, requester_email)
+            # Only an explicitly blank email is an opt-out that clears a saved
+            # address. A non-blank-but-invalid entry (a typo) must not be treated
+            # as an opt-out and wipe a returning builder's stored email.
+            if requester_email or not raw_email:
+                remember_builder(data, requester_name, requester_email)
             record = {
                 "id": request_id,
                 "kind": "build",
@@ -2661,9 +2694,8 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/app_requests/fix":
             requester_name = (payload.get("requester_name") or "").strip()[:30]
-            requester_email = (payload.get("requester_email") or "").strip()[:100]
-            if requester_email and not EMAIL_RE.match(requester_email):
-                requester_email = ""
+            raw_email = (payload.get("requester_email") or "").strip()[:100]
+            requester_email = raw_email if EMAIL_RE.match(raw_email) else ""
             fix_of = (payload.get("fix_of") or "").strip()
             issue_description = (payload.get("issue_description") or "").strip()[:500]
             if not requester_name:
@@ -2678,7 +2710,9 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             request_id = uuid.uuid4().hex[:8]
-            remember_builder(data, requester_name, requester_email)
+            # See create: an invalid-email typo must not clear a saved address.
+            if requester_email or not raw_email:
+                remember_builder(data, requester_name, requester_email)
             record = {
                 "id": request_id,
                 "kind": "fix",
