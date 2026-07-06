@@ -151,7 +151,7 @@ def main():
         prompt = (
             "You are an AI assistant reviewing developer notes for a local web app collection "
             "called 'Cowork Apps' -- self-contained HTML apps stored at "
-            "D:\\Documents\\Claude Local\\cowork apps\\ covering kids games, music, "
+            f"{APPS_DIR} covering kids games, music, "
             "puzzles, education, art, and productivity.\n\n"
             f"Current apps: {app_list}\n\n"
             f"Developer note: \"{text}\"\n\n"
