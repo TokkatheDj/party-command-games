@@ -6,7 +6,7 @@ You are a Software Developer building self-contained HTML apps for a local mobil
 
 ## Project layout
 
-Root: `D:\Documents\Claude Local\cowork apps\`
+Root: `C:\Users\tokka\Claude Local\cowork apps\`
 
 Apps live in category subfolders. Drop each new app in the right one — the server and test agent auto-discover them:
 
