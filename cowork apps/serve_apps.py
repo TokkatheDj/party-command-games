@@ -476,18 +476,18 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
 
     <label>App type</label>
     <div class="choice-group" id="builder-app-type" data-field="app_type">
-      <span class="choice-opt selected" data-value="Game">&#127918; Game</span>
+      <span class="choice-opt selected" data-value="Arcade Game">&#127918; Arcade Game</span>
       <span class="choice-opt" data-value="Puzzle">&#129513; Puzzle</span>
       <span class="choice-opt" data-value="Quiz">&#10067; Quiz</span>
       <span class="choice-opt" data-value="Story">&#128214; Story</span>
       <span class="choice-opt" data-value="Tool">&#128295; Tool</span>
-      <span class="choice-opt" data-value="Art">&#127912; Art</span>
+      <span class="choice-opt" data-value="Arts/Crafts">&#127912; Arts/Crafts</span>
       <span class="choice-opt" data-value="Music">&#127925; Music</span>
       <span class="choice-opt" data-value="Sports">&#127941; Sports</span>
       <span class="choice-opt" data-value="Card Game">&#127183; Card Game</span>
-      <span class="choice-opt" data-value="Craft">&#129526; Craft</span>
+      <span class="choice-opt" data-value="Interactive Game">&#127939; Interactive Game</span>
       <span class="choice-opt" data-value="Cooking">&#127859; Cooking</span>
-      <span class="choice-opt" data-value="Party">&#127881; Party</span>
+      <span class="choice-opt" data-value="Party Game">&#127881; Party Game</span>
     </div>
 
     <label>Theme</label>
@@ -678,7 +678,7 @@ function builderChoice(fieldId) {{
 }}
 
 const IDEA_SUGGESTIONS = {{
-  Game: [
+  "Arcade Game": [
     ['🏰', 'Escape the maze', 'A maze game where you escape before time runs out'],
     ['🎯', 'Beat the clock', 'Race against the clock to beat your best score'],
     ['🐉', 'Collect the treasure', 'Collect gems while avoiding obstacles'],
@@ -713,12 +713,17 @@ const IDEA_SUGGESTIONS = {{
     ['🧮', 'Do the math', 'A calculator for a specific everyday task'],
     ['📆', 'Plan it out', 'A simple planner or countdown to an event'],
   ],
-  Art: [
+  "Arts/Crafts": [
     ['🎨', 'Design your own', 'A drawing canvas where you can pick colors and shapes'],
     ['🖌️', 'Paint by numbers', 'A paint-by-numbers picture to color in'],
     ['🌈', 'Mix the colors', 'An interactive canvas for mixing and blending colors'],
     ['✂️', 'Build a collage', 'Drag and arrange shapes and stickers to build a scene'],
     ['🖼️', 'Color the picture', 'An outline picture to fill in with color'],
+    ['🧵', 'Design a pattern', 'A tool for designing a repeating pattern with shapes and colors'],
+    ['🏺', 'Shape the clay', 'A virtual pottery wheel where you shape and decorate a pot'],
+    ['🌿', 'Press the flowers', 'A nature-craft app for arranging pressed flowers and leaves into art'],
+    ['🧸', 'Build a creature', 'A tool for mixing and matching parts to build a silly creature'],
+    ['🎀', 'Wrap it up', 'A gift-wrapping or decorating activity with paper, ribbon, and stickers'],
   ],
   Music: [
     ['🎹', 'Play a tune', 'A simple piano/keyboard you can play with taps'],
@@ -741,12 +746,12 @@ const IDEA_SUGGESTIONS = {{
     ['♠️', 'Beat the dealer', 'A blackjack-style card game against the house'],
     ['🀄', 'Memory match', 'A card-flipping memory game where you find every matching pair'],
   ],
-  Craft: [
-    ['🧵', 'Design a pattern', 'A tool for designing a repeating pattern with shapes and colors'],
-    ['🏺', 'Shape the clay', 'A virtual pottery wheel where you shape and decorate a pot'],
-    ['🌿', 'Press the flowers', 'A nature-craft app for arranging pressed flowers and leaves into art'],
-    ['🧸', 'Build a creature', 'A tool for mixing and matching parts to build a silly creature'],
-    ['🎀', 'Wrap it up', 'A gift-wrapping or decorating activity with paper, ribbon, and stickers'],
+  "Interactive Game": [
+    ['🌋', 'Floor is lava', 'A floor-is-lava game where the phone calls out safe spots to jump to before time runs out'],
+    ['🎌', 'Simon says', 'A Simon Says game where you follow commands only when Simon says comes first'],
+    ['🚦', 'Red light green light', 'A red light green light game where you move on green and freeze on red'],
+    ['🧊', 'Freeze dance', 'A freeze dance game where you dance until the music stops, then freeze'],
+    ['🙋', 'Follow the leader', 'A follow-the-leader game where the phone calls out actions to copy'],
   ],
   Cooking: [
     ['🍕', 'Build the order', 'A kitchen game where you build orders correctly before time runs out'],
@@ -755,7 +760,7 @@ const IDEA_SUGGESTIONS = {{
     ['🍳', 'Beat the rush', 'A restaurant rush game serving as many customers as you can'],
     ['🍪', 'Decorate it', 'A cookie or cake decorating activity with toppings and icing'],
   ],
-  Party: [
+  "Party Game": [
     ['🎉', 'Pass and play', 'A pass-the-device party game for a group taking turns'],
     ['🗳️', 'Vote it out', 'A group voting game where everyone picks their favorite answer'],
     ['🎤', 'Guess who', 'A charades or guessing game where one player acts and others guess'],
@@ -767,7 +772,7 @@ const IDEA_SUGGESTIONS = {{
 function renderIdeaChips(appType) {{
   const container = document.getElementById('builder-idea-chips');
   if (!container) return;
-  const suggestions = IDEA_SUGGESTIONS[appType] || IDEA_SUGGESTIONS.Game;
+  const suggestions = IDEA_SUGGESTIONS[appType] || IDEA_SUGGESTIONS["Arcade Game"];
   container.innerHTML = suggestions.map(([emoji, label, value]) =>
     '<span class="choice-opt idea-chip" data-value="' + escHtml(value) + '">' + emoji + ' ' + escHtml(label) + '</span>'
   ).join('');
@@ -787,9 +792,9 @@ document.getElementById('builder-idea-chips')?.addEventListener('click', (e) => 
 
 document.getElementById('builder-submit-btn')?.addEventListener('click', async () => {{
   const requester_name = builderNameInput?.value.trim() || '';
-  if (!requester_name) {{ builderNameInput?.focus(); return; }}
+  if (!requester_name) {{ alert('Please enter your name.'); builderNameInput?.focus(); return; }}
   const requester_email = builderEmailInput?.value.trim() || '';
-  if (!requester_email) {{ builderEmailInput?.focus(); return; }}
+  if (!requester_email) {{ alert('Please enter your email so we can tell you when it is ready.'); builderEmailInput?.focus(); return; }}
   const mode = document.getElementById('mode-advanced-btn').classList.contains('active') ? 'advanced' : 'basic';
 
   const criteria = {{
@@ -1027,9 +1032,9 @@ document.querySelector('.builder-lists')?.addEventListener('click', async (e) =>
     const issue_description = ta?.value.trim() || '';
     if (!issue_description) {{ ta?.focus(); return; }}
     const requester_name = builderNameInput?.value.trim() || '';
-    if (!requester_name) {{ builderNameInput?.focus(); return; }}
+    if (!requester_name) {{ alert('Please enter your name above (under Your Name) so we know who this is from.'); builderNameInput?.focus(); return; }}
     const requester_email = builderEmailInput?.value.trim() || '';
-    if (!requester_email) {{ builderEmailInput?.focus(); return; }}
+    if (!requester_email) {{ alert('Please enter your email above (under Email) so we can tell you when it is fixed.'); builderEmailInput?.focus(); return; }}
     submitBtn.disabled = true; submitBtn.textContent = 'Submitting…';
     const r = await apiPost('/api/app_requests/fix', {{requester_name, requester_email, fix_of: id, issue_description}});
     submitBtn.disabled = false; submitBtn.textContent = 'Submit';
