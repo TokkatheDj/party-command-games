@@ -495,11 +495,14 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
     </div>
     <input id="builder-theme-input" type="text" placeholder="Subject (optional) e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
 
-    <label>Difficulty</label>
-    <div class="choice-group" id="builder-difficulty" data-field="difficulty">
-      <span class="choice-opt selected" data-value="Easy">Easy</span>
-      <span class="choice-opt" data-value="Medium">Medium</span>
-      <span class="choice-opt" data-value="Hard">Hard</span>
+    <label>Age range</label>
+    <div class="choice-group" id="builder-age-range" data-field="age_range">
+      <span class="choice-opt" data-value="Under 6">Under 6</span>
+      <span class="choice-opt" data-value="6-9">6-9</span>
+      <span class="choice-opt" data-value="10-13">10-13</span>
+      <span class="choice-opt" data-value="14-17">14-17</span>
+      <span class="choice-opt" data-value="18+">18+</span>
+      <span class="choice-opt selected" data-value="All ages">All ages</span>
     </div>
 
     <label>Your idea (one line)</label>
@@ -507,6 +510,13 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
     <textarea id="builder-idea-input" placeholder="e.g. A maze game where you're a dragon collecting gems" maxlength="200"></textarea>
 
     <div id="builder-advanced-fields" class="hidden">
+      <label>Difficulty</label>
+      <div class="choice-group" id="builder-difficulty" data-field="difficulty">
+        <span class="choice-opt selected" data-value="Easy">Easy</span>
+        <span class="choice-opt" data-value="Medium">Medium</span>
+        <span class="choice-opt" data-value="Hard">Hard</span>
+      </div>
+
       <label>Mechanics (pick any)</label>
       <div class="choice-checkboxes" id="builder-mechanics">
         <label class="choice-checkbox"><input type="checkbox" value="Timer/Countdown"> Timer/Countdown</label>
@@ -519,15 +529,6 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
         <label class="choice-checkbox"><input type="checkbox" value="Touch/swipe"> Touch/swipe</label>
         <label class="choice-checkbox"><input type="checkbox" value="Randomized"> Randomized</label>
         <label class="choice-checkbox"><input type="checkbox" value="Save progress"> Save progress</label>
-      </div>
-
-      <label>Age range</label>
-      <div class="choice-group" id="builder-age-range" data-field="age_range">
-        <span class="choice-opt" data-value="4-6">4-6</span>
-        <span class="choice-opt" data-value="7-9">7-9</span>
-        <span class="choice-opt" data-value="10-12">10-12</span>
-        <span class="choice-opt" data-value="13-16">13-16</span>
-        <span class="choice-opt selected" data-value="All ages">All ages</span>
       </div>
 
       <label>Anything specific? (optional)</label>
@@ -733,6 +734,9 @@ renderIdeaChips(builderChoice('builder-app-type') || 'Game');
 document.getElementById('builder-idea-chips')?.addEventListener('click', (e) => {{
   const chip = e.target.closest('.idea-chip');
   if (!chip) return;
+  const container = document.getElementById('builder-idea-chips');
+  container?.querySelectorAll('.idea-chip').forEach(c => c.classList.remove('selected'));
+  chip.classList.add('selected');
   const ta = document.getElementById('builder-idea-input');
   if (ta) {{ ta.value = chip.dataset.value; ta.focus(); }}
 }});
@@ -747,14 +751,14 @@ document.getElementById('builder-submit-btn')?.addEventListener('click', async (
   const criteria = {{
     app_type: builderChoice('builder-app-type'),
     theme: document.getElementById('builder-theme-input').value.trim(),
-    difficulty: builderChoice('builder-difficulty'),
+    age_range: builderChoice('builder-age-range'),
     color_vibe: builderChoice('builder-color-vibe'),
     idea: document.getElementById('builder-idea-input').value.trim(),
   }};
   if (!criteria.idea) {{ document.getElementById('builder-idea-input').focus(); return; }}
   if (mode === 'advanced') {{
+    criteria.difficulty = builderChoice('builder-difficulty');
     criteria.mechanics = Array.from(document.querySelectorAll('#builder-mechanics input:checked')).map(cb => cb.value);
-    criteria.age_range = builderChoice('builder-age-range');
     const tech = document.getElementById('builder-tech-input').value.trim();
     const inspired = document.getElementById('builder-inspired-input').value.trim();
     if (tech) criteria.tech_requests = tech;
@@ -875,7 +879,8 @@ function renderBuilderLists() {{
   const builds = APP_REQUESTS.filter(r => (r.kind || 'build') === 'build');
   const mine = myName ? builds.filter(r => (r.requester_name || '').trim().toLowerCase() === myName) : [];
   mineList.innerHTML = mine.length ? mine.map(builderCardHtml).join('') : '<p class="builder-empty">Nothing yet — build your first app above!</p>';
-  familyList.innerHTML = builds.length ? builds.map(builderCardHtml).join('') : '<p class="builder-empty">No apps built yet.</p>';
+  const familyRecent = builds.slice(0, 5);
+  familyList.innerHTML = familyRecent.length ? familyRecent.map(builderCardHtml).join('') : '<p class="builder-empty">No apps built yet.</p>';
   APP_REQUESTS.forEach(r => {{
     if (r.status === 'queued' || r.status === 'generating') pollRequest(r.id);
   }});
@@ -1416,7 +1421,7 @@ def build_prompt(criteria, mode, target_filename, requester_name):
     target_full = CUSTOM_APPS_DIR / target_filename
     mechanics_line = f"Requested mechanics: {', '.join(criteria.get('mechanics', []))}\n" if criteria.get("mechanics") else ""
     theme_line = f"Theme: {criteria.get('theme')}\n" if criteria.get("theme") else ""
-    age_line = f"Target age range: {criteria.get('age_range')}\n" if criteria.get("age_range") else ""
+    difficulty_line = f"Difficulty: {criteria.get('difficulty')}\n" if criteria.get("difficulty") else ""
     tech_line = f"Specific technical requests: {criteria.get('tech_requests')}\n" if criteria.get("tech_requests") else ""
     inspired_line = f"Should feel similar in spirit to: {criteria.get('inspired_by')}\n" if criteria.get("inspired_by") else ""
     slug = slug_from_filename(target_filename)
@@ -1426,10 +1431,10 @@ def build_prompt(criteria, mode, target_filename, requester_name):
         "library called 'AppVerse', built by a kid using a 'Build Your Own App' wizard.\n\n"
         f"App type: {criteria.get('app_type')}\n"
         f"{theme_line}"
-        f"Difficulty: {criteria.get('difficulty')}\n"
+        f"Target age range: {criteria.get('age_range')}\n"
         f"Visual color vibe: {criteria.get('color_vibe')}\n"
         f"One-line idea: {criteria.get('idea')}\n"
-        f"{mechanics_line}{age_line}{tech_line}{inspired_line}"
+        f"{mechanics_line}{difficulty_line}{tech_line}{inspired_line}"
         f"Requested by: {requester_name}\n\n"
         "MANDATORY OUTPUT LOCATION -- this is the single most important rule:\n"
         f"Create exactly one file at this exact absolute path: {target_full}\n"
@@ -3150,14 +3155,14 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             if not requester_email:
                 self._json({"ok": False, "error": "please enter a valid email address"}, status=400)
                 return
-            for field in ("app_type", "difficulty", "color_vibe", "idea"):
+            for field in ("app_type", "age_range", "color_vibe", "idea"):
                 if not str(criteria.get(field, "")).strip():
                     self._json({"ok": False, "error": f"missing required field: {field}"}, status=400)
                     return
 
             clean_criteria = {
                 "app_type": str(criteria["app_type"]).strip()[:40],
-                "difficulty": str(criteria["difficulty"]).strip()[:20],
+                "age_range": str(criteria["age_range"]).strip()[:20],
                 "color_vibe": str(criteria["color_vibe"]).strip()[:40],
                 "idea": str(criteria["idea"]).strip()[:200],
             }
@@ -3167,8 +3172,8 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 mechanics = criteria.get("mechanics") or []
                 if isinstance(mechanics, list):
                     clean_criteria["mechanics"] = [str(m).strip()[:40] for m in mechanics][:10]
-                if criteria.get("age_range"):
-                    clean_criteria["age_range"] = str(criteria["age_range"]).strip()[:20]
+                if criteria.get("difficulty"):
+                    clean_criteria["difficulty"] = str(criteria["difficulty"]).strip()[:20]
                 if criteria.get("tech_requests"):
                     clean_criteria["tech_requests"] = str(criteria["tech_requests"]).strip()[:300]
                 if criteria.get("inspired_by"):
