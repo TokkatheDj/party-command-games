@@ -986,7 +986,7 @@ function pollRequest(id) {{
     const idx = APP_REQUESTS.findIndex(r => r.id === id);
     const prevStatus = idx >= 0 ? APP_REQUESTS[idx].status : null;
     if (idx >= 0) APP_REQUESTS[idx] = Object.assign({{}}, APP_REQUESTS[idx], status);
-    if (status.status === 'done' && prevStatus !== 'done' && !status.feedback) {{
+    if (status.status === 'done' && prevStatus !== 'done' && !status.feedback && (status.kind || 'build') === 'build') {{
       showFeedbackPopup(id);
     }}
     if (status.status === 'done' || status.status === 'error') {{
