@@ -1030,6 +1030,26 @@ def app_names_for_context(limit=20):
     return ", ".join(names[:limit])
 
 
+NEEDS_REPLY_INSTRUCTION = (
+    "After your response, on its own final line, write exactly 'NEEDS_REPLY: yes' "
+    "if you asked a question or are waiting on a decision from them before doing "
+    "anything else, or 'NEEDS_REPLY: no' if this is purely informational and needs "
+    "no further input from them."
+)
+
+NEEDS_REPLY_RE = re.compile(r'\n?NEEDS_REPLY:\s*(yes|no)\s*$', re.IGNORECASE)
+
+
+def parse_needs_reply(response):
+    """Strips the trailing NEEDS_REPLY marker the prompt asks for and returns
+    (cleaned_response, needs_reply: bool). If the model didn't include the
+    marker, needs_reply defaults to False and the text is returned as-is."""
+    m = NEEDS_REPLY_RE.search(response)
+    if not m:
+        return response, False
+    return response[:m.start()].rstrip(), m.group(1).lower() == "yes"
+
+
 def build_note_prompt(text):
     return (
         "You are an AI assistant reviewing developer notes for a local family app "
@@ -1041,7 +1061,8 @@ def build_note_prompt(text):
         "For bug reports: suggest how to investigate and fix. "
         "For feature ideas: assess feasibility and outline an approach. "
         "For questions: answer directly. "
-        "Be specific -- reference actual file names or code patterns if relevant."
+        "Be specific -- reference actual file names or code patterns if relevant.\n\n"
+        f"{NEEDS_REPLY_INSTRUCTION}"
     )
 
 
@@ -1069,7 +1090,8 @@ def build_note_reply_prompt(note, reply_text):
         "(2-5 sentences), continuing the conversation naturally given everything said "
         "above. You cannot write or edit files yourself in this conversation -- if they've "
         "asked you to go ahead and build or implement something, say so plainly and "
-        "summarize exactly what change a person should make in a real Claude Code session."
+        "summarize exactly what change a person should make in a real Claude Code session.\n\n"
+        f"{NEEDS_REPLY_INSTRUCTION}"
     )
 
 
@@ -1108,7 +1130,7 @@ def ask_claude_note(prompt, timeout):
         return f"Error: {e}", False
 
 
-def update_note_review(note_id, reply_id, response):
+def update_note_review(note_id, reply_id, response, needs_reply=False):
     """Re-read-modify-write under DATA_LOCK, mirroring update_app_request(). If
     reply_id is set, updates that reply inside the note's replies list;
     otherwise updates the note's own top-level review fields. Also takes the
@@ -1127,18 +1149,20 @@ def update_note_review(note_id, reply_id, response):
             reply["reviewed"] = True
             reply["ai_response"] = response
             reply["reviewed_at"] = reviewed_at
+            reply["needs_reply"] = needs_reply
         else:
             note["reviewed"] = True
             note["ai_response"] = response
             note["reviewed_at"] = reviewed_at
+            note["needs_reply"] = needs_reply
         save_data(data)
 
 
-def notify_note_async(snippet, response, is_reply):
-    threading.Thread(target=send_note_notification, args=(snippet, response, is_reply), daemon=True).start()
+def notify_note_async(snippet, response, is_reply, needs_reply=False):
+    threading.Thread(target=send_note_notification, args=(snippet, response, is_reply, needs_reply), daemon=True).start()
 
 
-def send_note_notification(snippet, response, is_reply):
+def send_note_notification(snippet, response, is_reply, needs_reply=False):
     """Best-effort 'your note got an AI reply' email. Must never raise into the
     caller -- see send_build_notification for the same reasoning. Requires an
     'owner_email' field in email_config.json; silently skips without one."""
@@ -1149,7 +1173,10 @@ def send_note_notification(snippet, response, is_reply):
     if not to_email:
         return
     link = f"{get_base_url()}/#notes"
-    kind = "replied to your note" if is_reply else "reviewed your note"
+    if needs_reply:
+        kind = "is waiting on your reply"
+    else:
+        kind = "replied to your note" if is_reply else "reviewed your note"
     msg = EmailMessage()
     msg["Subject"] = f"AppVerse: AI {kind}"
     msg["From"] = f'{cfg.get("from_name", "AppVerse")} <{cfg["smtp_user"]}>'
@@ -1190,9 +1217,10 @@ def review_note_worker(note_id, reply_id=None):
         print(f"[notes] reviewing {tag}", flush=True)
         response, success = ask_claude_note(prompt, NOTE_REVIEW_TIMEOUT_SEC)
         if success:
-            update_note_review(note_id, reply_id, response)
-            print(f"[notes] {tag} reviewed ({len(response)} chars)", flush=True)
-            notify_note_async(snippet, response, is_reply=bool(reply_id))
+            response, needs_reply = parse_needs_reply(response)
+            update_note_review(note_id, reply_id, response, needs_reply)
+            print(f"[notes] {tag} reviewed ({len(response)} chars, needs_reply={needs_reply})", flush=True)
+            notify_note_async(snippet, response, is_reply=bool(reply_id), needs_reply=needs_reply)
         else:
             print(f"[notes] {tag} failed, leaving pending: {response[:150]}", flush=True)
 
@@ -1545,8 +1573,20 @@ def generate_index(apps, reviews, base_url):
     note_count = len(notes)
     def _note_pending(n):
         return not n.get("reviewed") or any(not r.get("reviewed") for r in n.get("replies", []))
+    def _note_needs_reply(n):
+        replies = n.get("replies", [])
+        latest = replies[-1] if replies else n
+        return bool(latest.get("reviewed")) and bool(latest.get("needs_reply"))
     pending_count = sum(1 for n in notes if _note_pending(n))
-    notes_tab_label = f"({pending_count} pending)" if pending_count else f"({note_count})"
+    needs_reply_count = sum(1 for n in notes if _note_needs_reply(n))
+    if pending_count and needs_reply_count:
+        notes_tab_label = f"({pending_count} pending, {needs_reply_count} need reply)"
+    elif needs_reply_count:
+        notes_tab_label = f"({needs_reply_count} need reply)"
+    elif pending_count:
+        notes_tab_label = f"({pending_count} pending)"
+    else:
+        notes_tab_label = f"({note_count})"
     playlists = data.get("playlists", {})
     playlists_json = json.dumps(playlists).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     playlist_count = len(playlists)
@@ -1563,18 +1603,28 @@ def generate_index(apps, reviews, base_url):
     notes_items_html = ""
     for note in notes:
         created = note.get("created", "")[:16].replace("T", " ")
-        status_cls = "reviewed" if note.get("reviewed") else "pending"
-        status_txt = "AI Reviewed" if note.get("reviewed") else "Pending AI Review"
+        replies = note.get("replies", [])
+        if not note.get("reviewed"):
+            status_cls, status_txt = "pending", "Pending AI Review"
+        elif not replies and note.get("needs_reply"):
+            status_cls, status_txt = "needs-reply", "Awaiting Your Reply"
+        else:
+            status_cls, status_txt = "reviewed", "AI Reviewed"
         _air = (note.get("ai_response") or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
         ai_block = f'<div class="ai-response">{_air}</div>' if _air else ""
         nid = note.get("id", "")
         ntxt = note.get("text","").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 
         replies_html = ""
-        for r in note.get("replies", []):
+        for idx, r in enumerate(replies):
+            is_latest = idx == len(replies) - 1
             r_created = r.get("created", "")[:16].replace("T", " ")
-            r_status_cls = "reviewed" if r.get("reviewed") else "pending"
-            r_status_txt = "AI Reviewed" if r.get("reviewed") else "Pending AI Review"
+            if not r.get("reviewed"):
+                r_status_cls, r_status_txt = "pending", "Pending AI Review"
+            elif is_latest and r.get("needs_reply"):
+                r_status_cls, r_status_txt = "needs-reply", "Awaiting Your Reply"
+            else:
+                r_status_cls, r_status_txt = "reviewed", "AI Reviewed"
             r_air = (r.get("ai_response") or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
             r_ai_block = f'<div class="ai-response">{r_air}</div>' if r_air else ""
             r_txt = (r.get("text","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
@@ -1780,6 +1830,7 @@ def generate_index(apps, reviews, base_url):
   }}
   .note-badge.pending {{ background: rgba(230,110,124,0.15); color: var(--accent2); }}
   .note-badge.reviewed {{ background: rgba(68,238,102,0.12); color: #44ee66; }}
+  .note-badge.needs-reply {{ background: rgba(230,162,60,0.16); color: #e6a23c; }}
   .note-delete {{
     background: none; border: none; color: var(--muted);
     cursor: pointer; font-size: 1rem; padding: 0; line-height: 1;
@@ -2802,6 +2853,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                     "reviewed": False,
                     "ai_response": None,
                     "reviewed_at": None,
+                    "needs_reply": False,
                     "replies": []
                 }
                 data.setdefault("notes", []).append(note)
@@ -2826,7 +2878,8 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                     "created": now_iso(),
                     "reviewed": False,
                     "ai_response": None,
-                    "reviewed_at": None
+                    "reviewed_at": None,
+                    "needs_reply": False
                 }
                 note.setdefault("replies", []).append(reply)
                 save_data(data)

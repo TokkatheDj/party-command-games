@@ -18,7 +18,7 @@ from pathlib import Path
 from serve_apps import (
     APPS_DIR, DATA_FILE, NOTE_REVIEW_TIMEOUT_SEC,
     load_data, build_note_prompt, build_note_reply_prompt,
-    update_note_review, notify_note_async, ask_claude_note,
+    update_note_review, notify_note_async, ask_claude_note, parse_needs_reply,
 )
 
 LOG_FILE = APPS_DIR / "daily_check.log"
@@ -92,10 +92,11 @@ def main():
         response, success = ask_claude_note(prompt, NOTE_REVIEW_TIMEOUT_SEC)
 
         if success:
-            update_note_review(note_id, reply_id, response)
-            notify_note_async(snippet, response, is_reply=bool(reply_id))
+            response, needs_reply = parse_needs_reply(response)
+            update_note_review(note_id, reply_id, response, needs_reply)
+            notify_note_async(snippet, response, is_reply=bool(reply_id), needs_reply=needs_reply)
             reviewed_count += 1
-            log(f"Response saved ({len(response)} chars)")
+            log(f"Response saved ({len(response)} chars, needs_reply={needs_reply})")
         else:
             log(f"Claude failed for {tag}, leaving pending: {response[:120]}")
 
