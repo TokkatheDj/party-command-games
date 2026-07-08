@@ -30,6 +30,8 @@ EMAIL_CONFIG_FILE = APPS_DIR / "email_config.json"
 MAX_CONCURRENT_GENERATIONS = 2
 GENERATION_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT_GENERATIONS)
 GENERATION_TIMEOUT_SEC = 600
+NOTE_REVIEW_SEMAPHORE = threading.Semaphore(2)
+NOTE_REVIEW_TIMEOUT_SEC = 120
 # Guards every read-modify-write cycle against .app_data.json: do_POST holds this
 # for its whole request (load -> mutate -> save), and update_app_request() holds it
 # too, so a background generation thread's status write can never be silently
@@ -993,6 +995,164 @@ def update_app_request(request_id, **fields):
         save_data(data)
 
 
+def app_names_for_context(limit=20):
+    apps = discover_apps()
+    names = [a["name"] for cat in apps.values() for a in cat]
+    return ", ".join(names[:limit])
+
+
+def build_note_prompt(text):
+    return (
+        "You are an AI assistant reviewing developer notes for a local family app "
+        f"library called 'AppVerse' -- self-contained HTML apps stored at {APPS_DIR} "
+        "covering kids games, music, puzzles, education, art, and productivity.\n\n"
+        f"Current apps: {app_names_for_context()}\n\n"
+        f"Developer note: \"{text}\"\n\n"
+        "Provide a concise, actionable response (2-5 sentences). "
+        "For bug reports: suggest how to investigate and fix. "
+        "For feature ideas: assess feasibility and outline an approach. "
+        "For questions: answer directly. "
+        "Be specific -- reference actual file names or code patterns if relevant."
+    )
+
+
+def build_note_reply_prompt(note, reply_text):
+    """Builds a conversation transcript from the note's original exchange plus
+    every earlier reply, so the model answers the latest message in context
+    instead of cold, one-shot like the first response."""
+    convo = [f'Family member: "{note.get("text", "")}"']
+    if note.get("ai_response"):
+        convo.append(f'You (AI): "{note["ai_response"]}"')
+    for r in note.get("replies", []):
+        convo.append(f'Family member: "{r.get("text", "")}"')
+        if r.get("ai_response"):
+            convo.append(f'You (AI): "{r["ai_response"]}"')
+    convo.append(f'Family member: "{reply_text}"')
+    transcript = "\n".join(convo)
+    return (
+        "You are an AI assistant continuing a conversation about a developer note for a "
+        f"local family app library called 'AppVerse' -- self-contained HTML apps stored "
+        f"at {APPS_DIR} covering kids games, music, puzzles, education, art, and "
+        "productivity.\n\n"
+        f"Current apps: {app_names_for_context()}\n\n"
+        f"Conversation so far:\n{transcript}\n\n"
+        "Reply to the family member's latest message with a concise, actionable response "
+        "(2-5 sentences), continuing the conversation naturally given everything said "
+        "above. You cannot write or edit files yourself in this conversation -- if they've "
+        "asked you to go ahead and build or implement something, say so plainly and "
+        "summarize exactly what change a person should make in a real Claude Code session."
+    )
+
+
+def ask_claude_note(prompt, timeout):
+    """Same idiom as daily_check.py's ask_claude() -- runs headless `claude -p`
+    and returns (response_text, success)."""
+    try:
+        result = subprocess.run(
+            ["claude", "-p", prompt],
+            capture_output=True, text=True, timeout=timeout,
+            encoding="utf-8", errors="replace", cwd=str(APPS_DIR),
+        )
+        if result.returncode != 0:
+            err = (result.stderr or "").strip() or f"exit code {result.returncode}"
+            return err, False
+        text = (result.stdout or "").strip()
+        return (text or "(no response)"), True
+    except subprocess.TimeoutExpired:
+        return "Timed out waiting for Claude response.", False
+    except FileNotFoundError:
+        return "claude CLI not found -- ensure Claude Code is installed and on PATH.", False
+    except Exception as e:
+        return f"Error: {e}", False
+
+
+def update_note_review(note_id, reply_id, response):
+    """Re-read-modify-write under DATA_LOCK, mirroring update_app_request(). If
+    reply_id is set, updates that reply inside the note's replies list;
+    otherwise updates the note's own top-level review fields."""
+    with DATA_LOCK:
+        data = load_data()
+        note = next((n for n in data.get("notes", []) if n.get("id") == note_id), None)
+        if note is None:
+            return
+        reviewed_at = now_iso()
+        if reply_id:
+            reply = next((r for r in note.get("replies", []) if r.get("id") == reply_id), None)
+            if reply is None:
+                return
+            reply["reviewed"] = True
+            reply["ai_response"] = response
+            reply["reviewed_at"] = reviewed_at
+        else:
+            note["reviewed"] = True
+            note["ai_response"] = response
+            note["reviewed_at"] = reviewed_at
+        save_data(data)
+
+
+def notify_note_async(snippet, response, is_reply):
+    threading.Thread(target=send_note_notification, args=(snippet, response, is_reply), daemon=True).start()
+
+
+def send_note_notification(snippet, response, is_reply):
+    """Best-effort 'your note got an AI reply' email. Must never raise into the
+    caller -- see send_build_notification for the same reasoning. Requires an
+    'owner_email' field in email_config.json; silently skips without one."""
+    cfg = load_email_config()
+    if not cfg:
+        return
+    to_email = cfg.get("owner_email")
+    if not to_email:
+        return
+    link = f"{get_base_url()}/#notes"
+    kind = "replied to your note" if is_reply else "reviewed your note"
+    msg = EmailMessage()
+    msg["Subject"] = f"AppVerse: AI {kind}"
+    msg["From"] = f'{cfg.get("from_name", "AppVerse")} <{cfg["smtp_user"]}>'
+    msg["To"] = to_email
+    msg.set_content(
+        f"You wrote:\n{(snippet or '')[:200]}\n\n"
+        f"AI response:\n{response}\n\n"
+        f"Reply here: {link}\n"
+    )
+    try:
+        with smtplib.SMTP(cfg["smtp_host"], cfg.get("smtp_port", 587), timeout=15) as smtp:
+            smtp.starttls()
+            smtp.login(cfg["smtp_user"], cfg["smtp_app_password"])
+            smtp.send_message(msg)
+        print(f"[notes] notification email sent to {to_email}", flush=True)
+    except Exception as e:
+        print(f"[notes] notification email failed: {e}", flush=True)
+
+
+def review_note_worker(note_id, reply_id=None):
+    with NOTE_REVIEW_SEMAPHORE:
+        data = load_data()
+        note = next((n for n in data.get("notes", []) if n.get("id") == note_id), None)
+        if note is None:
+            return
+        tag = f"{note_id}/{reply_id}" if reply_id else note_id
+
+        if reply_id:
+            reply = next((r for r in note.get("replies", []) if r.get("id") == reply_id), None)
+            if reply is None:
+                return
+            prompt = build_note_reply_prompt(note, reply.get("text", ""))
+            snippet = reply.get("text", "")
+        else:
+            prompt = build_note_prompt(note.get("text", ""))
+            snippet = note.get("text", "")
+
+        print(f"[notes] reviewing {tag}", flush=True)
+        response, success = ask_claude_note(prompt, NOTE_REVIEW_TIMEOUT_SEC)
+        if success:
+            update_note_review(note_id, reply_id, response)
+            print(f"[notes] {tag} reviewed ({len(response)} chars)", flush=True)
+            notify_note_async(snippet, response, is_reply=bool(reply_id))
+        else:
+            print(f"[notes] {tag} failed, leaving pending: {response[:150]}", flush=True)
+
+
 def build_prompt(criteria, mode, target_filename, requester_name):
     target_full = CUSTOM_APPS_DIR / target_filename
     mechanics_line = f"Requested mechanics: {', '.join(criteria.get('mechanics', []))}\n" if criteria.get("mechanics") else ""
@@ -1331,7 +1491,9 @@ def generate_index(apps, reviews, base_url):
     review_count = len(reviews)
     notes = sorted(data.get("notes", []), key=lambda n: n.get("created", ""), reverse=True)
     note_count = len(notes)
-    pending_count = sum(1 for n in notes if not n.get("reviewed"))
+    def _note_pending(n):
+        return not n.get("reviewed") or any(not r.get("reviewed") for r in n.get("replies", []))
+    pending_count = sum(1 for n in notes if _note_pending(n))
     notes_tab_label = f"({pending_count} pending)" if pending_count else f"({note_count})"
     playlists = data.get("playlists", {})
     playlists_json = json.dumps(playlists).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
@@ -1355,7 +1517,37 @@ def generate_index(apps, reviews, base_url):
         ai_block = f'<div class="ai-response">{_air}</div>' if _air else ""
         nid = note.get("id", "")
         ntxt = note.get("text","").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-        notes_items_html += f'<div class="note-card" id="note-{nid}"><div class="note-header"><span class="note-ts">{created}</span><span class="note-badge {status_cls}">{status_txt}</span><button class="note-delete" data-id="{nid}">&#x1F5D1;</button></div><div class="note-text">{ntxt}</div>{ai_block}</div>\n'
+
+        replies_html = ""
+        for r in note.get("replies", []):
+            r_created = r.get("created", "")[:16].replace("T", " ")
+            r_status_cls = "reviewed" if r.get("reviewed") else "pending"
+            r_status_txt = "AI Reviewed" if r.get("reviewed") else "Pending AI Review"
+            r_air = (r.get("ai_response") or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            r_ai_block = f'<div class="ai-response">{r_air}</div>' if r_air else ""
+            r_txt = (r.get("text","")).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+            replies_html += (
+                f'<div class="note-reply"><div class="note-header"><span class="note-ts">{r_created}</span>'
+                f'<span class="note-badge {r_status_cls}">{r_status_txt}</span></div>'
+                f'<div class="note-text">{r_txt}</div>{r_ai_block}</div>\n'
+            )
+
+        reply_form = (
+            f'<div class="note-reply-toggle-row"><button class="note-reply-toggle-btn" data-id="{nid}">&#128172; Reply</button></div>'
+            f'<div class="quick-note-form hidden" id="reply-{nid}">'
+            f'<textarea class="quick-note-ta" placeholder="Reply to the AI..."></textarea>'
+            f'<div class="quick-note-actions">'
+            f'<button class="quick-note-submit note-reply-submit" data-id="{nid}">Send</button>'
+            f'<button class="quick-note-cancel note-reply-cancel" data-id="{nid}">Cancel</button>'
+            f'</div></div>'
+        ) if note.get("reviewed") else ""
+
+        notes_items_html += (
+            f'<div class="note-card" id="note-{nid}"><div class="note-header"><span class="note-ts">{created}</span>'
+            f'<span class="note-badge {status_cls}">{status_txt}</span>'
+            f'<button class="note-delete" data-id="{nid}">&#x1F5D1;</button></div>'
+            f'<div class="note-text">{ntxt}</div>{ai_block}{replies_html}{reply_form}</div>\n'
+        )
     if not notes_items_html:
         notes_items_html = '<p class="no-notes">No notes yet. Add one above for the daily AI check.</p>'
 
@@ -1564,6 +1756,10 @@ def generate_index(apps, reviews, base_url):
   .quick-note-submit:hover {{ opacity: 0.85; }}
   .quick-note-cancel {{ background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.8rem; padding: 0.35rem 0.7rem; cursor: pointer; transition: color 0.15s; }}
   .quick-note-cancel:hover {{ color: var(--text); }}
+  .note-reply {{ margin: 0.6rem 0 0 1rem; padding: 0.7rem 0.9rem; border-left: 2px solid var(--border); background: rgba(124,110,230,0.04); border-radius: 0 8px 8px 0; }}
+  .note-reply-toggle-row {{ margin-top: 0.7rem; }}
+  .note-reply-toggle-btn {{ background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.78rem; padding: 0.3rem 0.7rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; }}
+  .note-reply-toggle-btn:hover {{ color: var(--accent); border-color: var(--accent); }}
   .cat-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; padding: 1rem 1.5rem 2rem; max-width: 700px; margin: 0 auto; }}
   .cat-tile {{ background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.4rem; cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.12s; text-align: center; }}
   .cat-tile:hover, .cat-tile:active {{ background: var(--card-hover); border-color: var(--accent); transform: translateY(-2px); }}
@@ -2210,6 +2406,29 @@ document.querySelectorAll('.note-delete').forEach(btn => {{
     if (r && r.ok) location.reload();
   }});
 }});
+document.querySelectorAll('.note-reply-toggle-btn').forEach(btn => {{
+  btn.addEventListener('click', () => {{
+    const form = document.getElementById('reply-' + btn.dataset.id);
+    if (form) {{ form.classList.toggle('hidden'); if (!form.classList.contains('hidden')) form.querySelector('textarea').focus(); }}
+  }});
+}});
+document.querySelectorAll('.note-reply-submit').forEach(btn => {{
+  btn.addEventListener('click', async () => {{
+    const form = document.getElementById('reply-' + btn.dataset.id);
+    const ta = form.querySelector('textarea');
+    const text = ta.value.trim();
+    if (!text) {{ ta.focus(); return; }}
+    btn.disabled = true; btn.textContent = 'Sending...';
+    await apiPost('/api/notes/reply', {{note_id: btn.dataset.id, text}});
+    location.reload();
+  }});
+}});
+document.querySelectorAll('.note-reply-cancel').forEach(btn => {{
+  btn.addEventListener('click', () => {{
+    const form = document.getElementById('reply-' + btn.dataset.id);
+    if (form) {{ form.classList.add('hidden'); form.querySelector('textarea').value = ''; }}
+  }});
+}});
 
 {builder_logic_js(app_requests_json, builders_json, share_url)}
 {THEME_TOGGLE_JS}
@@ -2501,10 +2720,12 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                     "created": now_iso(),
                     "reviewed": False,
                     "ai_response": None,
-                    "reviewed_at": None
+                    "reviewed_at": None,
+                    "replies": []
                 }
                 data.setdefault("notes", []).append(note)
                 save_data(data)
+                threading.Thread(target=review_note_worker, args=(note["id"],), daemon=True).start()
             self._json({"ok": True})
 
         elif path == "/api/notes/delete":
@@ -2512,6 +2733,26 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             data["notes"] = [n for n in data.get("notes", []) if n.get("id") != nid]
             save_data(data)
             self._json({"ok": True})
+
+        elif path == "/api/notes/reply":
+            nid = payload.get("note_id", "")
+            text = payload.get("text", "").strip()
+            note = next((n for n in data.get("notes", []) if n.get("id") == nid), None)
+            if note and text:
+                reply = {
+                    "id": uuid.uuid4().hex[:8],
+                    "text": text,
+                    "created": now_iso(),
+                    "reviewed": False,
+                    "ai_response": None,
+                    "reviewed_at": None
+                }
+                note.setdefault("replies", []).append(reply)
+                save_data(data)
+                threading.Thread(target=review_note_worker, args=(nid, reply["id"]), daemon=True).start()
+                self._json({"ok": True, "id": reply["id"]})
+            else:
+                self._json({"ok": False})
 
         elif path == "/api/playlist/create":
             name = payload.get("name", "").strip()
@@ -2741,6 +2982,21 @@ def main():
     if interrupted:
         save_data(data)
         print(f"[builder] marked {interrupted} interrupted app_request(s) as error on startup")
+
+    # Kick off review for anything still unreviewed from before this startup --
+    # e.g. a note added while the server was down, or one left pending by an
+    # older build that predates real-time review.
+    pending_notes = []
+    for note in data.get("notes", []):
+        if not note.get("reviewed"):
+            pending_notes.append((note.get("id"), None))
+        for r in note.get("replies", []):
+            if not r.get("reviewed"):
+                pending_notes.append((note.get("id"), r.get("id")))
+    for note_id, reply_id in pending_notes:
+        threading.Thread(target=review_note_worker, args=(note_id, reply_id), daemon=True).start()
+    if pending_notes:
+        print(f"[notes] kicked off review for {len(pending_notes)} note item(s) pending from before startup")
 
     print(f"""
 +----------------------------------------------+

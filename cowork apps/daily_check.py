@@ -1,99 +1,48 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
-daily_check.py -- Daily AI review of Cowork Apps notes.
-Reads unreviewed notes, asks Claude to analyze each one, saves responses.
-Scheduled via Windows Task Scheduler (see Setup-DailyCheck.ps1).
+daily_check.py -- Backstop AI review of AppVerse notes.
+
+serve_apps.py now reviews notes and replies in real time as they're
+submitted (review_note_worker()), emailing a notification as soon as each
+one is answered. This script exists only to catch anything that stayed
+unreviewed anyway -- submitted while the server was down, a headless
+`claude -p` call that timed out, etc. -- via a once-a-day Task Scheduler
+run. It reuses the exact same prompt-building, review-saving, and
+notification-email logic as the real-time path (imported from serve_apps)
+so the two never drift apart.
 """
-import json
-import os
-import re
-import subprocess
 import time
 from pathlib import Path
 
-APPS_DIR  = Path(__file__).parent
-DATA_FILE = APPS_DIR / ".app_data.json"
-LOG_FILE  = APPS_DIR / "daily_check.log"
+from serve_apps import (
+    APPS_DIR, DATA_FILE, NOTE_REVIEW_TIMEOUT_SEC,
+    load_data, build_note_prompt, build_note_reply_prompt,
+    update_note_review, notify_note_async, ask_claude_note,
+)
+
+LOG_FILE = APPS_DIR / "daily_check.log"
 
 
 def log(msg):
-    ts   = time.strftime("%Y-%m-%d %H:%M:%S")
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}] {msg}"
     print(line, flush=True)
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
 
-def ask_claude(prompt):
-    """Call the Claude Code CLI. Returns (response_text, success: bool)."""
-    try:
-        result = subprocess.run(
-            ["claude", "-p", prompt],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            encoding="utf-8",
-            errors="replace",
-        )
-        if result.returncode != 0:
-            err = (result.stderr or "").strip() or f"exit code {result.returncode}"
-            return err, False
-        text = (result.stdout or "").strip()
-        return (text or "(no response)"), True
-    except subprocess.TimeoutExpired:
-        return "Timed out waiting for Claude response.", False
-    except FileNotFoundError:
-        return "claude CLI not found -- ensure Claude Code is installed and on PATH.", False
-    except Exception as e:
-        return f"Error: {e}", False
-
-
-def load_data_file():
-    """Read .app_data.json with a try/except. Returns dict or None on failure."""
-    try:
-        return json.loads(DATA_FILE.read_text(encoding="utf-8"))
-    except Exception as e:
-        log(f"Could not read data file: {e}")
-        return None
-
-
-def save_data_atomic(data):
-    """Write data atomically via temp file + os.replace to avoid corruption on kill."""
-    tmp = DATA_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    os.replace(tmp, DATA_FILE)
-
-
-def update_note(note_id, reviewed_at, response):
-    """Re-read the data file, update one note, write back atomically.
-
-    Re-reading before each write avoids clobbering changes the HTTP server
-    made while Claude was processing the previous note.
-    """
-    data = load_data_file()
-    if data is None:
-        log(f"  Skipping save for note {note_id} -- data file unreadable")
-        return
+def find_pending(data):
+    """Returns a list of (note_id, reply_id_or_None) for everything still
+    unreviewed -- the note itself if it has no ai_response yet, plus any of
+    its replies that don't either."""
+    pending = []
     for note in data.get("notes", []):
-        if note.get("id") == note_id:
-            note["reviewed"]    = True
-            note["ai_response"] = response
-            note["reviewed_at"] = reviewed_at
-            break
-    save_data_atomic(data)
-
-
-def discover_app_names():
-    """Return a list of app display names for Claude context."""
-    ignore = {"node_modules", "test_reports", ".playwright-mcp", ".claude", "Reviews"}
-    names = []
-    for html in sorted(APPS_DIR.rglob("*.html")):
-        if any(p.name in ignore for p in html.parents):
-            continue
-        name = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", html.stem)
-        name = name.replace("-", " ").replace("_", " ").title()
-        names.append(name)
-    return names
+        if not note.get("reviewed"):
+            pending.append((note.get("id"), None))
+        for r in note.get("replies", []):
+            if not r.get("reviewed"):
+                pending.append((note.get("id"), r.get("id")))
+    return pending
 
 
 def main():
@@ -104,53 +53,52 @@ def main():
         log("No .app_data.json found -- nothing to review.")
         return
 
-    data = load_data_file()
-    if data is None:
-        log("Aborting -- data file could not be parsed.")
-        return
-
+    data = load_data()
     notes = data.get("notes", [])
-    unreviewed = [n for n in notes if not n.get("reviewed")]
+    pending = find_pending(data)
 
-    if not unreviewed:
-        log(f"No unreviewed notes ({len(notes)} total). All done.")
+    if not pending:
+        log(f"Nothing left pending ({len(notes)} note(s) total) -- real-time review already caught everything.")
         log("=" * 50)
         return
 
-    app_list = ", ".join(discover_app_names()[:20])
-    log(f"Found {len(unreviewed)} unreviewed note(s) of {len(notes)} total")
+    log(f"Found {len(pending)} item(s) still unreviewed after real-time review")
 
     reviewed_count = 0
-    for note in unreviewed:
-        note_id = note.get("id", "")
-        text    = note.get("text", "").strip()
-        log(f"Reviewing: {text[:80]}{'...' if len(text) > 80 else ''}")
+    for note_id, reply_id in pending:
+        # Re-read fresh each iteration: real-time review may have already
+        # caught this one (or an earlier iteration's save changed the file).
+        data = load_data()
+        note = next((n for n in data.get("notes", []) if n.get("id") == note_id), None)
+        if note is None:
+            continue
 
-        prompt = (
-            "You are an AI assistant reviewing developer notes for a local web app collection "
-            "called 'Cowork Apps' -- self-contained HTML apps stored at "
-            "D:\\Documents\\Claude Local\\cowork apps\\ covering kids games, music, "
-            "puzzles, education, art, and productivity.\n\n"
-            f"Current apps: {app_list}\n\n"
-            f"Developer note: \"{text}\"\n\n"
-            "Provide a concise, actionable response (2-5 sentences). "
-            "For bug reports: suggest how to investigate and fix. "
-            "For feature ideas: assess feasibility and outline an approach. "
-            "For questions: answer directly. "
-            "Be specific -- reference actual file names or code patterns if relevant."
-        )
+        if reply_id:
+            reply = next((r for r in note.get("replies", []) if r.get("id") == reply_id), None)
+            if reply is None or reply.get("reviewed"):
+                continue
+            prompt = build_note_reply_prompt(note, reply.get("text", ""))
+            snippet = reply.get("text", "")
+        else:
+            if note.get("reviewed"):
+                continue
+            prompt = build_note_prompt(note.get("text", ""))
+            snippet = note.get("text", "")
 
-        response, success = ask_claude(prompt)
+        tag = f"{note_id}/{reply_id}" if reply_id else note_id
+        log(f"Reviewing {tag}: {snippet[:80]}{'...' if len(snippet) > 80 else ''}")
+
+        response, success = ask_claude_note(prompt, NOTE_REVIEW_TIMEOUT_SEC)
 
         if success:
-            reviewed_at = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
-            update_note(note_id, reviewed_at, response)
+            update_note_review(note_id, reply_id, response)
+            notify_note_async(snippet, response, is_reply=bool(reply_id))
             reviewed_count += 1
             log(f"Response saved ({len(response)} chars)")
         else:
-            log(f"Claude failed for note {note_id}, leaving pending: {response[:120]}")
+            log(f"Claude failed for {tag}, leaving pending: {response[:120]}")
 
-    log(f"Completed: {reviewed_count}/{len(unreviewed)} note(s) reviewed.")
+    log(f"Completed: {reviewed_count}/{len(pending)} item(s) reviewed.")
     log("=" * 50)
 
 
