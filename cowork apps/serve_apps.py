@@ -483,6 +483,11 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
       <span class="choice-opt" data-value="Tool">&#128295; Tool</span>
       <span class="choice-opt" data-value="Art">&#127912; Art</span>
       <span class="choice-opt" data-value="Music">&#127925; Music</span>
+      <span class="choice-opt" data-value="Sports">&#127941; Sports</span>
+      <span class="choice-opt" data-value="Card Game">&#127183; Card Game</span>
+      <span class="choice-opt" data-value="Craft">&#129526; Craft</span>
+      <span class="choice-opt" data-value="Cooking">&#127859; Cooking</span>
+      <span class="choice-opt" data-value="Party">&#127881; Party</span>
     </div>
 
     <label>Theme</label>
@@ -492,6 +497,10 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
       <span class="choice-opt" data-value="Dark &amp; Mysterious">Dark &amp; Mysterious</span>
       <span class="choice-opt" data-value="Neon &amp; Energetic">Neon &amp; Energetic</span>
       <span class="choice-opt" data-value="Pastel &amp; Soft">Pastel &amp; Soft</span>
+      <span class="choice-opt" data-value="Retro &amp; Nostalgic">Retro &amp; Nostalgic</span>
+      <span class="choice-opt" data-value="Nature &amp; Earthy">Nature &amp; Earthy</span>
+      <span class="choice-opt" data-value="Elegant &amp; Minimal">Elegant &amp; Minimal</span>
+      <span class="choice-opt" data-value="Spooky &amp; Fun">Spooky &amp; Fun</span>
     </div>
     <input id="builder-theme-input" type="text" placeholder="Subject (optional) e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
 
@@ -717,6 +726,41 @@ const IDEA_SUGGESTIONS = {{
     ['🎼', 'Follow the notes', 'A rhythm game where you match falling notes'],
     ['🎤', 'Sing along', 'A karaoke-style app that shows lyrics as music plays'],
     ['🔊', 'Mix the sounds', 'An app for layering and mixing different sound effects'],
+  ],
+  Sports: [
+    ['⛳', 'Mini golf run', 'A mini golf course where you putt through obstacles to sink the ball'],
+    ['🏹', 'Hit the target', 'An archery or target-throwing game aiming for the highest score'],
+    ['⚾', 'Swing for it', 'A batting or swinging game timed to hit a pitch or ball'],
+    ['🎳', 'Bowl a strike', 'A bowling game where you aim and knock down all the pins'],
+    ['🥊', 'Beat the record', 'A reflex sports challenge where you try to beat your own best time'],
+  ],
+  "Card Game": [
+    ['🂡', 'Deal me in', 'A classic card game like solitaire or rummy playable solo'],
+    ['🃏', 'Match the set', 'A card matching game where you collect sets before your opponent'],
+    ['🎴', 'Build the deck', 'A roguelike deck-builder where you draft cards to beat escalating foes'],
+    ['♠️', 'Beat the dealer', 'A blackjack-style card game against the house'],
+    ['🀄', 'Memory match', 'A card-flipping memory game where you find every matching pair'],
+  ],
+  Craft: [
+    ['🧵', 'Design a pattern', 'A tool for designing a repeating pattern with shapes and colors'],
+    ['🏺', 'Shape the clay', 'A virtual pottery wheel where you shape and decorate a pot'],
+    ['🌿', 'Press the flowers', 'A nature-craft app for arranging pressed flowers and leaves into art'],
+    ['🧸', 'Build a creature', 'A tool for mixing and matching parts to build a silly creature'],
+    ['🎀', 'Wrap it up', 'A gift-wrapping or decorating activity with paper, ribbon, and stickers'],
+  ],
+  Cooking: [
+    ['🍕', 'Build the order', 'A kitchen game where you build orders correctly before time runs out'],
+    ['🥧', 'Bake it right', 'A baking simulation where you follow steps to bake something'],
+    ['🍹', 'Mix the recipe', 'A drink or recipe mixer where you combine ingredients in the right order'],
+    ['🍳', 'Beat the rush', 'A restaurant rush game serving as many customers as you can'],
+    ['🍪', 'Decorate it', 'A cookie or cake decorating activity with toppings and icing'],
+  ],
+  Party: [
+    ['🎉', 'Pass and play', 'A pass-the-device party game for a group taking turns'],
+    ['🗳️', 'Vote it out', 'A group voting game where everyone picks their favorite answer'],
+    ['🎤', 'Guess who', 'A charades or guessing game where one player acts and others guess'],
+    ['🎲', 'Roll and dare', 'A party game combining dice rolls with fun prompts or dares'],
+    ['🏁', 'Team challenge', 'A multiplayer mini-game where teams compete in quick challenges'],
   ],
 }};
 
