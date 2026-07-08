@@ -485,23 +485,21 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
       <span class="choice-opt" data-value="Music">&#127925; Music</span>
     </div>
 
-    <label>Theme / subject</label>
-    <input id="builder-theme-input" type="text" placeholder="e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
-
-    <label>Difficulty</label>
-    <div class="choice-group" id="builder-difficulty" data-field="difficulty">
-      <span class="choice-opt selected" data-value="Easy">Easy</span>
-      <span class="choice-opt" data-value="Medium">Medium</span>
-      <span class="choice-opt" data-value="Hard">Hard</span>
-    </div>
-
-    <label>Color vibe</label>
+    <label>Theme</label>
     <div class="choice-group" id="builder-color-vibe" data-field="color_vibe">
       <span class="choice-opt selected" data-value="Bright &amp; Playful">Bright &amp; Playful</span>
       <span class="choice-opt" data-value="Cool &amp; Calm">Cool &amp; Calm</span>
       <span class="choice-opt" data-value="Dark &amp; Mysterious">Dark &amp; Mysterious</span>
       <span class="choice-opt" data-value="Neon &amp; Energetic">Neon &amp; Energetic</span>
       <span class="choice-opt" data-value="Pastel &amp; Soft">Pastel &amp; Soft</span>
+    </div>
+    <input id="builder-theme-input" type="text" placeholder="Subject (optional) e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
+
+    <label>Difficulty</label>
+    <div class="choice-group" id="builder-difficulty" data-field="difficulty">
+      <span class="choice-opt selected" data-value="Easy">Easy</span>
+      <span class="choice-opt" data-value="Medium">Medium</span>
+      <span class="choice-opt" data-value="Hard">Hard</span>
     </div>
 
     <label>Your idea (one line)</label>
@@ -753,7 +751,6 @@ document.getElementById('builder-submit-btn')?.addEventListener('click', async (
     color_vibe: builderChoice('builder-color-vibe'),
     idea: document.getElementById('builder-idea-input').value.trim(),
   }};
-  if (!criteria.theme) {{ document.getElementById('builder-theme-input').focus(); return; }}
   if (!criteria.idea) {{ document.getElementById('builder-idea-input').focus(); return; }}
   if (mode === 'advanced') {{
     criteria.mechanics = Array.from(document.querySelectorAll('#builder-mechanics input:checked')).map(cb => cb.value);
@@ -1418,6 +1415,7 @@ def review_note_worker(note_id, reply_id=None):
 def build_prompt(criteria, mode, target_filename, requester_name):
     target_full = CUSTOM_APPS_DIR / target_filename
     mechanics_line = f"Requested mechanics: {', '.join(criteria.get('mechanics', []))}\n" if criteria.get("mechanics") else ""
+    theme_line = f"Theme: {criteria.get('theme')}\n" if criteria.get("theme") else ""
     age_line = f"Target age range: {criteria.get('age_range')}\n" if criteria.get("age_range") else ""
     tech_line = f"Specific technical requests: {criteria.get('tech_requests')}\n" if criteria.get("tech_requests") else ""
     inspired_line = f"Should feel similar in spirit to: {criteria.get('inspired_by')}\n" if criteria.get("inspired_by") else ""
@@ -1427,7 +1425,7 @@ def build_prompt(criteria, mode, target_filename, requester_name):
         "You are generating exactly ONE new self-contained HTML app for a local family app "
         "library called 'AppVerse', built by a kid using a 'Build Your Own App' wizard.\n\n"
         f"App type: {criteria.get('app_type')}\n"
-        f"Theme: {criteria.get('theme')}\n"
+        f"{theme_line}"
         f"Difficulty: {criteria.get('difficulty')}\n"
         f"Visual color vibe: {criteria.get('color_vibe')}\n"
         f"One-line idea: {criteria.get('idea')}\n"
@@ -3152,18 +3150,19 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             if not requester_email:
                 self._json({"ok": False, "error": "please enter a valid email address"}, status=400)
                 return
-            for field in ("app_type", "theme", "difficulty", "color_vibe", "idea"):
+            for field in ("app_type", "difficulty", "color_vibe", "idea"):
                 if not str(criteria.get(field, "")).strip():
                     self._json({"ok": False, "error": f"missing required field: {field}"}, status=400)
                     return
 
             clean_criteria = {
                 "app_type": str(criteria["app_type"]).strip()[:40],
-                "theme": str(criteria["theme"]).strip()[:60],
                 "difficulty": str(criteria["difficulty"]).strip()[:20],
                 "color_vibe": str(criteria["color_vibe"]).strip()[:40],
                 "idea": str(criteria["idea"]).strip()[:200],
             }
+            if criteria.get("theme"):
+                clean_criteria["theme"] = str(criteria["theme"]).strip()[:60]
             if mode == "advanced":
                 mechanics = criteria.get("mechanics") or []
                 if isinstance(mechanics, list):
