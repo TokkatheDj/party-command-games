@@ -389,9 +389,7 @@ BUILDER_STYLES = """
 .builder-optional { text-transform: none; letter-spacing: normal; font-weight: 400; opacity: 0.75; }
 #builder-idea-input, #builder-tech-input { width: 100%; min-height: 60px; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; resize: vertical; transition: border-color 0.2s; }
 #builder-idea-input:focus, #builder-tech-input:focus { border-color: var(--accent); }
-.mode-toggle { display: flex; gap: 0.4rem; margin-bottom: 0.5rem; }
-.mode-toggle-btn { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.85rem; font-weight: 600; padding: 0.5rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
-.mode-toggle-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(124,110,230,0.1); }
+#builder-mode-select { width: 100%; margin-bottom: 0.5rem; min-height: 44px; padding: 0.5rem 0.85rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; outline: none; border: 1px solid var(--accent); color: var(--accent); background: rgba(124,110,230,0.1); transition: border-color 0.15s; }
 .choice-group { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .choice-opt { font-size: 0.85rem; color: var(--text); cursor: pointer; border-radius: 7px; padding: 0.4rem 0.75rem; border: 2px solid var(--border); transition: border-color 0.12s, background 0.12s; min-height: 44px; display: inline-flex; align-items: center; }
 .choice-opt.selected { border-color: var(--accent); background: rgba(124,110,230,0.12); color: var(--accent); }
@@ -469,10 +467,10 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
     <label>Email <span class="builder-optional">(so we can tell you when it's ready)</span></label>
     <input id="builder-email-input" type="email" placeholder="you@example.com" autocomplete="off" maxlength="100">
 
-    <div class="mode-toggle">
-      <button class="mode-toggle-btn active" id="mode-basic-btn" data-mode="basic">Basic</button>
-      <button class="mode-toggle-btn" id="mode-advanced-btn" data-mode="advanced">Advanced</button>
-    </div>
+    <select id="builder-mode-select">
+      <option value="basic" selected>Basic</option>
+      <option value="advanced">Advanced</option>
+    </select>
 
     <label>App type</label>
     <div class="choice-group" id="builder-app-type" data-field="app_type">
@@ -614,6 +612,13 @@ function builderEmailFor(name) {{
   return (BUILDERS.find(b => b.name === name) || {{}}).email || '';
 }}
 
+function showNameControl(which) {{
+  if (!builderNameSelect || !builderNameInput) return;
+  builderNameSelect.classList.toggle('hidden', which !== 'select');
+  builderNameInput.classList.toggle('hidden', which !== 'input');
+  if (which === 'input') builderNameInput.focus();
+}}
+
 if (builderNameSelect) {{
   for (const b of BUILDERS) {{
     const opt = document.createElement('option');
@@ -622,7 +627,16 @@ if (builderNameSelect) {{
     builderNameSelect.appendChild(opt);
   }}
   builderNameSelect.addEventListener('change', () => {{
-    if (!builderNameSelect.value) return;
+    if (!builderNameSelect.value) {{
+      // "New name..." chosen -- hand off to the text input, on the same line,
+      // ready to type, instead of showing both controls at once.
+      builderNameInput.value = '';
+      if (builderEmailInput) builderEmailInput.value = '';
+      localStorage.removeItem('cowork-builder-name');
+      localStorage.removeItem('cowork-builder-email');
+      showNameControl('input');
+      return;
+    }}
     builderNameInput.value = builderNameSelect.value;
     builderEmailInput.value = builderEmailFor(builderNameSelect.value);
     localStorage.setItem('cowork-builder-name', builderNameInput.value);
@@ -631,8 +645,12 @@ if (builderNameSelect) {{
 }}
 if (builderNameInput) {{
   builderNameInput.value = localStorage.getItem('cowork-builder-name') || '';
-  if (builderNameSelect && BUILDERS.some(b => b.name === builderNameInput.value)) {{
+  const knownName = builderNameSelect && BUILDERS.some(b => b.name === builderNameInput.value);
+  if (knownName) {{
     builderNameSelect.value = builderNameInput.value;
+    showNameControl('select');
+  }} else {{
+    showNameControl('input');
   }}
   builderNameInput.addEventListener('input', () => {{
     const typed = builderNameInput.value.trim();
@@ -655,11 +673,8 @@ if (builderEmailInput) {{
   }});
 }}
 
-document.getElementById('mode-basic-btn')?.addEventListener('click', () => setBuilderMode('basic'));
-document.getElementById('mode-advanced-btn')?.addEventListener('click', () => setBuilderMode('advanced'));
+document.getElementById('builder-mode-select')?.addEventListener('change', (e) => setBuilderMode(e.target.value));
 function setBuilderMode(mode) {{
-  document.getElementById('mode-basic-btn').classList.toggle('active', mode === 'basic');
-  document.getElementById('mode-advanced-btn').classList.toggle('active', mode === 'advanced');
   document.getElementById('builder-advanced-fields').classList.toggle('hidden', mode !== 'advanced');
 }}
 
@@ -795,7 +810,7 @@ document.getElementById('builder-submit-btn')?.addEventListener('click', async (
   if (!requester_name) {{ alert('Please enter your name.'); builderNameInput?.focus(); return; }}
   const requester_email = builderEmailInput?.value.trim() || '';
   if (!requester_email) {{ alert('Please enter your email so we can tell you when it is ready.'); builderEmailInput?.focus(); return; }}
-  const mode = document.getElementById('mode-advanced-btn').classList.contains('active') ? 'advanced' : 'basic';
+  const mode = document.getElementById('builder-mode-select')?.value || 'basic';
 
   const criteria = {{
     app_type: builderChoice('builder-app-type'),
