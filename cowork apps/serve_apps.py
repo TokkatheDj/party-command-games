@@ -441,6 +441,7 @@ BUILDER_STYLES = """
 .feedback-emoji-opt { font-size: 1.4rem; min-width: 44px; min-height: 44px; border: 2px solid var(--border); border-radius: 8px; background: var(--bg); cursor: pointer; transition: border-color 0.12s; }
 .feedback-emoji-opt:hover { border-color: var(--accent); }
 .feedback-given { margin-top: 0.4rem; font-size: 0.8rem; color: var(--muted); font-style: italic; }
+.feedback-comment-text { margin-top: 0.3rem; font-size: 0.83rem; color: var(--text); font-style: italic; line-height: 1.4; }
 .feedback-comment-btn { background: none; border: none; color: var(--accent); font-size: 0.78rem; cursor: pointer; text-decoration: underline; padding: 0; }
 .feedback-comment-form { margin-top: 0.4rem; }
 .feedback-comment-ta { width: 100%; min-height: 50px; padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; resize: vertical; outline: none; font-family: inherit; line-height: 1.4; transition: border-color 0.2s; }
@@ -500,7 +501,8 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
       <option value="Elegant &amp; Minimal">Elegant &amp; Minimal</option>
       <option value="Spooky &amp; Fun">Spooky &amp; Fun</option>
     </select>
-    <input id="builder-theme-input" type="text" placeholder="Subject (optional) e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
+    <label>Subject <span class="builder-optional">(optional)</span></label>
+    <input id="builder-theme-input" type="text" placeholder="e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
 
     <label>Age range</label>
     <select class="builder-select" id="builder-age-range" data-field="age_range">
@@ -796,7 +798,7 @@ function renderIdeaChips(appType) {{
   ).join('');
 }}
 
-renderIdeaChips(builderChoice('builder-app-type') || 'Game');
+renderIdeaChips(builderChoice('builder-app-type') || 'Arcade Game');
 
 document.getElementById('builder-idea-chips')?.addEventListener('click', (e) => {{
   const chip = e.target.closest('.idea-chip');
@@ -859,6 +861,9 @@ function feedbackWidgetHtml(r) {{
     let html = '<div class="feedback-given">Thanks for the feedback! ' + (FEEDBACK_EMOJI[r.feedback.rating] || '')
       + (canComment ? ' <button class="feedback-comment-btn" data-id="' + r.id + '">Add a comment</button>' : '')
       + '</div>';
+    if (r.feedback.comment) {{
+      html += '<div class="feedback-comment-text">&ldquo;' + escHtml(r.feedback.comment) + '&rdquo;</div>';
+    }}
     if (canComment) {{
       html += '<div class="feedback-comment-form hidden" id="feedback-comment-form-' + r.id + '">'
         + '<textarea class="feedback-comment-ta" placeholder="Anything else? (optional)" maxlength="300"></textarea>'
@@ -3254,11 +3259,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
             request_id = uuid.uuid4().hex[:8]
             target_filename = compute_target_filename(clean_criteria, data)
-            # Only an explicitly blank email is an opt-out that clears a saved
-            # address. A non-blank-but-invalid entry (a typo) must not be treated
-            # as an opt-out and wipe a returning builder's stored email.
-            if requester_email or not raw_email:
-                remember_builder(data, requester_name, requester_email)
+            remember_builder(data, requester_name, requester_email)
             record = {
                 "id": request_id,
                 "kind": "build",
@@ -3304,9 +3305,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             request_id = uuid.uuid4().hex[:8]
-            # See create: an invalid-email typo must not clear a saved address.
-            if requester_email or not raw_email:
-                remember_builder(data, requester_name, requester_email)
+            remember_builder(data, requester_name, requester_email)
             record = {
                 "id": request_id,
                 "kind": "fix",
