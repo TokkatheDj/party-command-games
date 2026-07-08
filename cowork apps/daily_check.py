@@ -7,9 +7,10 @@ submitted (review_note_worker()), emailing a notification as soon as each
 one is answered. This script exists only to catch anything that stayed
 unreviewed anyway -- submitted while the server was down, a headless
 `claude -p` call that timed out, etc. -- via a once-a-day Task Scheduler
-run. It reuses the exact same prompt-building, review-saving, and
-notification-email logic as the real-time path (imported from serve_apps)
-so the two never drift apart.
+run. It reuses the exact same prompt-building, review-saving (including the
+hardened, hermetic `claude -p` invocation and cross-process data_lock()),
+and notification-email logic as the real-time path (imported from
+serve_apps) so the two never drift apart.
 """
 import time
 from pathlib import Path

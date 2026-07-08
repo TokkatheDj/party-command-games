@@ -19,7 +19,7 @@ You are a [role] building ONE brand new, fully functional, self-contained app
 as a single HTML file for the Cowork Apps library.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\[folder_name]'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\[folder_name]'
 (if this folder does not exist yet, create it first). Read their filenames and,
 if short, their <!-- CONCEPT: --> line at the top. Build a mental list of
 concepts already covered so you don't repeat them.
@@ -30,13 +30,13 @@ summary so I know it may be time to archive older ones. Do not delete anything.
 [category-specific idea rotation — see filled-in examples below]
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 Do not skip or re-derive any of it; CLAUDE.md is authoritative.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\[folder_name]' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\[folder_name]' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
 Do NOT overwrite existing files. If the filename conflicts, append -2.
 
@@ -58,7 +58,7 @@ functional, self-contained interactive data viz or simulation as a single
 HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\data_visualization_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\data_visualization_apps'
 (if this folder does not exist yet, create it first). Read their filenames and,
 if short, their <!-- CONCEPT: --> line at the top. Build a mental list of
 concepts already covered so you don't repeat them.
@@ -90,13 +90,13 @@ Any math, formulas, or models must be CORRECT — verify the logic across a
 range of inputs, not just one example, and label units honestly.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 Do not skip or re-derive any of it; CLAUDE.md is authoritative.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\data_visualization_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\data_visualization_apps' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
   Example: 2026-06-24-predator-prey-sim.html
 Do NOT overwrite existing files. If the filename conflicts, append -2.
@@ -121,7 +121,7 @@ functional, self-contained game or activity for ages 4-10 as a single HTML
 file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\kids_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\kids_apps'
 (if this folder does not exist yet, create it first). Read their filenames and,
 if short, their <!-- CONCEPT: --> line at the top. Build a mental list of
 concepts already covered so you don't repeat them.
@@ -153,7 +153,7 @@ Bias toward whatever category is thinnest in the existing folder rather than
 whatever's already overrepresented (check the file list from Step 1 first).
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 Pay special attention to the Kids Apps theme guidance in CLAUDE.md: bright
@@ -163,7 +163,7 @@ this age group has less precise motor control). Do not skip or re-derive any
 of it; CLAUDE.md is authoritative.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\kids_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\kids_apps' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
   Example: 2026-06-24-star-catcher.html
 Do NOT overwrite existing files. If the filename conflicts, append -2.
@@ -185,7 +185,7 @@ You are a logic-puzzle developer building ONE brand new, fully functional,
 self-contained puzzle as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\adult_puzzle_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\adult_puzzle_apps'
 (if this folder does not exist yet, create it first). Read their filenames and,
 if short, their <!-- CONCEPT: --> line at the top. Build a mental list of
 concepts already covered so you don't repeat them.
@@ -220,7 +220,7 @@ broken app, not a minor issue. This is the single most commonly skipped
 requirement for this category.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 Pay special attention to the Puzzle/Adult Apps theme guidance in CLAUDE.md:
@@ -229,7 +229,7 @@ accents, 'Segoe UI'/system-ui font stack. Do not skip or re-derive any of it;
 CLAUDE.md is authoritative.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\adult_puzzle_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\adult_puzzle_apps' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
   Example: 2026-06-24-futoshiki-inequality.html
 Do NOT overwrite existing files. If the filename conflicts, append -2.
@@ -251,7 +251,7 @@ You are a generative-art developer building ONE brand new, fully functional,
 self-contained interactive art piece as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\art_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\art_apps'
 (if this folder does not exist yet, create it first). Read their filenames and,
 if short, their <!-- CONCEPT: --> line at the top. Build a mental list of
 concepts already covered so you don't repeat them.
@@ -286,7 +286,7 @@ Check the file list from Step 1 and bias toward whatever's thin or missing
 this writing) rather than another particle/flow-field piece.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 Pay special attention to the Art/Music theme guidance in CLAUDE.md: near-black
@@ -295,7 +295,7 @@ canvas be the star, not the controls. Do not skip or re-derive any of it;
 CLAUDE.md is authoritative.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\art_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\art_apps' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
   Example: 2026-06-28-cyclic-spiral-automaton.html
 Do NOT overwrite existing files. If the filename conflicts, append -2.
@@ -317,7 +317,7 @@ You are a teacher-tools developer building ONE brand new, fully functional,
 self-contained classroom utility as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\classroom_tools'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\classroom_tools'
 (if this folder does not exist yet, create it first). Read their filenames and,
 if short, their <!-- CONCEPT: --> line at the top. Build a mental list of
 concepts already covered so you don't repeat them.
@@ -355,7 +355,7 @@ board, and a multi-station rotation timer are all notably absent as of this
 writing) rather than another name picker or scoreboard.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -367,7 +367,7 @@ type and high contrast over dense layouts. Do not skip or re-derive anything
 else in CLAUDE.md; it is authoritative.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\classroom_tools' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\classroom_tools' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
   Example: 2026-06-28-live-poll-counter.html
 Do NOT overwrite existing files. If the filename conflicts, append -2.
@@ -389,7 +389,7 @@ You are an educational-software developer building ONE brand new, fully
 functional, self-contained learning app as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\educational_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\educational_apps'
 (if this folder does not exist yet, create it first). Read their filenames and,
 if short, their <!-- CONCEPT: --> line at the top. Build a mental list of
 concepts already covered so you don't repeat them.
@@ -426,7 +426,7 @@ history, civics, and reading/literacy are the most notably absent subjects
 as of this writing.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -438,7 +438,7 @@ answer is worse than a missing feature. Do not skip or re-derive anything
 else in CLAUDE.md; it is authoritative.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\educational_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\educational_apps' with filename:
   YYYY-MM-DD-[subject]-kebab-case-name.html   (use today's date)
   Example: 2026-06-27-science-animal-classification-sorter.html
 Do NOT overwrite existing files. If the filename conflicts, append -2.
@@ -460,7 +460,7 @@ You are a wellness-and-productivity app developer building ONE brand new,
 fully functional, self-contained tool as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\health_productivity_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\health_productivity_apps'
 (if this folder does not exist yet, create it first). Read their filenames and,
 if short, their <!-- CONCEPT: --> line at the top. Build a mental list of
 concepts already covered so you don't repeat them.
@@ -492,7 +492,7 @@ sleep tracking, journaling/gratitude, screen-time, and a standalone
 meditation timer are all notably absent as of this writing.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -504,7 +504,7 @@ optional nice-to-have — verify data survives a page reload before finishing.
 Do not skip or re-derive anything else in CLAUDE.md; it is authoritative.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\health_productivity_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\health_productivity_apps' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
   Example: 2026-06-28-focus-garden-pomodoro.html
 Do NOT overwrite existing files. If the filename conflicts, append -2.
@@ -526,7 +526,7 @@ You are a music-software developer building ONE brand new, fully functional,
 self-contained audio tool as a single HTML file using the Web Audio API.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\music_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\music_apps'
 (if this folder does not exist yet, create it first). Read their filenames and,
 if short, their <!-- CONCEPT: --> line at the top. Build a mental list of
 concepts already covered so you don't repeat them.
@@ -565,7 +565,7 @@ ear-training, a metronome/practice tool, and a mic-input visualizer are all
 notably absent, and rhythm-memory games are already at their limit.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 Pay special attention to the Art/Music theme guidance in CLAUDE.md:
@@ -577,7 +577,7 @@ first use. Do not skip or re-derive anything else in CLAUDE.md; it is
 authoritative.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\music_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\music_apps' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
   Example: 2026-06-24-string-field.html
 Do NOT overwrite existing files. If the filename conflicts, append -2.
@@ -599,7 +599,7 @@ You are a game developer building ONE brand new, fully functional,
 self-contained arcade action game as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\action_games',
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\action_games',
 including any files in a nested subfolder if one exists (this folder has an
 old 'Action Games Generator' subfolder from an earlier run — check both
 locations for existing concepts, but see Step 4 for where to save new ones).
@@ -630,7 +630,7 @@ Strongly prefer one of those, or a genuinely new mechanic within an existing
 genre, over adding a third entry to any category above.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -641,7 +641,7 @@ and touch lag or missed taps make them unplayable on the Pixel devices this
 library targets. Do not skip or re-derive anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\action_games' directly (NOT
+Save to 'C:\Users\tokka\Claude Local\cowork apps\action_games' directly (NOT
 into a subfolder — the existing 'Action Games Generator' subfolder is a
 legacy artifact; don't add to it) with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
@@ -664,7 +664,7 @@ You are a game developer building ONE brand new, fully functional,
 self-contained card game as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\card_games_apps',
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\card_games_apps',
 including any files in a nested subfolder if one exists (this folder has an
 old 'Card Games' subfolder from an earlier run — check both locations for
 existing concepts, but see Step 4 for where to save new ones). Read filenames
@@ -697,7 +697,7 @@ Check the file list from Step 1 and bias toward whatever's thin or missing
 rather than a second TriPeaks-style solitaire.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -708,7 +708,7 @@ detection can't produce a false result. Do not skip or re-derive anything
 else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\card_games_apps' directly (NOT
+Save to 'C:\Users\tokka\Claude Local\cowork apps\card_games_apps' directly (NOT
 into a subfolder — the existing 'Card Games' subfolder is a legacy artifact;
 don't add to it) with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
@@ -732,7 +732,7 @@ self-contained DJ/performance tool as a single HTML file using the Web Audio
 API.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\dj_music_apps',
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\dj_music_apps',
 including any files in a nested subfolder if one exists (this folder has an
 old 'DJ' subfolder from an earlier run — check both locations for existing
 concepts, but see Step 4 for where to save new ones). Read filenames and, if
@@ -764,7 +764,7 @@ Check the file list from Step 1 and bias toward whatever's thin rather than
 another turntable/scratch tool, which is already the most-covered mechanic.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 Pay special attention to the Art/Music theme guidance in CLAUDE.md:
@@ -774,7 +774,7 @@ until a user gesture — always create/resume it inside a click/tap handler,
 never on page load. Do not skip or re-derive anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\dj_music_apps' directly (NOT
+Save to 'C:\Users\tokka\Claude Local\cowork apps\dj_music_apps' directly (NOT
 into a subfolder — the existing 'DJ' subfolder is a legacy artifact; don't
 add to it) with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
@@ -797,7 +797,7 @@ You are a creative developer building ONE brand new, fully functional,
 self-contained fashion/styling app as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\fashion_apps',
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\fashion_apps',
 including any files in a nested subfolder if one exists (this folder has an
 old 'Fashion' subfolder from an earlier run — check both locations for
 existing concepts, but see Step 4 for where to save new ones). Read filenames
@@ -831,7 +831,7 @@ through these categories — don't always pick the same type:
 Check the file list from Step 1 and bias toward whatever's thin or missing.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -840,7 +840,7 @@ accent palette fits the subject matter better than a strictly muted one. Do
 not skip or re-derive anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\fashion_apps' directly (NOT
+Save to 'C:\Users\tokka\Claude Local\cowork apps\fashion_apps' directly (NOT
 into a subfolder — the existing 'Fashion' subfolder is a legacy artifact;
 don't add to it) with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
@@ -863,7 +863,7 @@ functional, self-contained music-*learning* game as a single HTML file
 Music Production/, which is DAW-style production tools).
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\music_game_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\music_game_apps'
 (if this folder does not exist yet, create it first). Read filenames and, if
 short, the <!-- CONCEPT: --> line at the top. Build a mental list of concepts
 already covered so you don't repeat them. Note: two guitar-strum instrument
@@ -895,7 +895,7 @@ Check the file list from Step 1 and bias toward whatever's thin or missing —
 notation/theory literacy beyond staff-reading is the most open ground.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 Pay special attention to the Art/Music theme guidance in CLAUDE.md:
@@ -907,7 +907,7 @@ verified musically correct, not just plausible-sounding. Do not skip or
 re-derive anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\music_game_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\music_game_apps' with filename:
   YYYY-MM-DD-[subtype]-kebab-case-name.html   (use today's date)
   Example: 2026-06-26-ear-training-interval-quest.html
 Do NOT overwrite existing files. If the filename conflicts, append -2.
@@ -931,7 +931,7 @@ by multiple people sharing one screen (pass-and-play or call-and-response,
 not networked multiplayer).
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\party_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\party_apps'
 (if this folder does not exist yet, create it first). Read filenames and, if
 short, the <!-- CONCEPT: --> line at the top. Build a mental list of concepts
 already covered so you don't repeat them. Note: this folder already has
@@ -962,7 +962,7 @@ Check the file list from Step 1 and bias toward voting/prediction or
 storytelling-chain games, which are the most open ground.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -974,7 +974,7 @@ nobody should need to ask "wait, whose turn is it?". Do not skip or re-derive
 anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\party_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\party_apps' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
 Do NOT overwrite existing files. If the filename conflicts, append -2.
 
@@ -995,7 +995,7 @@ You are a game developer building ONE brand new, fully functional,
 self-contained arcade shooter as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\shooting_games_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\shooting_games_apps'
 (if this folder does not exist yet, create it first). Read filenames and, if
 short, the <!-- CONCEPT: --> line at the top. Build a mental list of concepts
 already covered so you don't repeat them. Note: there is also a stray
@@ -1028,7 +1028,7 @@ defense formats, which are completely unrepresented, over another
 twin-stick or cannon game.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -1039,7 +1039,7 @@ unplayable on the Pixel devices this library targets. Do not skip or
 re-derive anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\shooting_games_apps' (the
+Save to 'C:\Users\tokka\Claude Local\cowork apps\shooting_games_apps' (the
 snake_case folder — NOT the stray 'Shooting Games' Title Case folder, which
 is a legacy artifact) with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
@@ -1062,7 +1062,7 @@ You are a game developer building ONE brand new, fully functional,
 self-contained sports simulation/mini-game as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\sports_games_apps',
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\sports_games_apps',
 including any files in a nested subfolder if one exists (this folder has an
 old 'Sports Games Generator' subfolder from an earlier run — check both
 locations for existing concepts, but see Step 4 for where to save new ones).
@@ -1086,7 +1086,7 @@ different control scheme from what's already there (e.g. avoid another
 timing-bar mechanic if two already use one).
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -1096,7 +1096,7 @@ an incorrect one clearly fails) and that touch controls work as well as
 mouse. Do not skip or re-derive anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\sports_games_apps' directly
+Save to 'C:\Users\tokka\Claude Local\cowork apps\sports_games_apps' directly
 (NOT into a subfolder — the existing 'Sports Games Generator' subfolder is a
 legacy artifact; don't add to it) with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
@@ -1118,7 +1118,7 @@ self-contained tabletop/board game simulation as a single HTML file (vs. an
 AI opponent or solo/pass-and-play — not networked multiplayer).
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\table_games_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\table_games_apps'
 (if this folder does not exist yet, create it first). Read filenames and, if
 short, the <!-- CONCEPT: --> line at the top. Build a mental list of concepts
 already covered so you don't repeat them. Note: two push-your-luck dice games
@@ -1152,7 +1152,7 @@ hidden-role/elimination games, which are the most open ground, over another
 dice game.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -1163,7 +1163,7 @@ not just confirming it doesn't crash. Do not skip or re-derive anything else
 in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\table_games_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\table_games_apps' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
 Do NOT overwrite existing files. If the filename conflicts, append -2.
 
@@ -1186,7 +1186,7 @@ from health_productivity_apps/, which covers general wellness/focus rather
 than clinically-grounded therapeutic techniques).
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\therapy_apps'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\therapy_apps'
 (if this folder does not exist yet, create it first). Read filenames and, if
 short, the <!-- CONCEPT: --> line at the top. Build a mental list of concepts
 already covered so you don't repeat them. Note: two EMDR bilateral-stimulation
@@ -1219,7 +1219,7 @@ This tool may be used by someone in a genuinely difficult moment; accuracy
 and a calm, non-gimmicky tone matter more than novelty here.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -1231,7 +1231,7 @@ since these tools are meant to be revisited. Do not skip or re-derive
 anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\therapy_apps' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\therapy_apps' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
 Do NOT overwrite existing files. If the filename conflicts, append -2.
 
@@ -1258,9 +1258,9 @@ age tiers: kid, teen, or adult.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
 List all .html files in each of:
-  'D:\Documents\Claude Local\cowork apps\Content Creation Apps\kid_apps'
-  'D:\Documents\Claude Local\cowork apps\Content Creation Apps\teen_apps'
-  'D:\Documents\Claude Local\cowork apps\Content Creation Apps\adult_apps'
+  'C:\Users\tokka\Claude Local\cowork apps\Content Creation Apps\kid_apps'
+  'C:\Users\tokka\Claude Local\cowork apps\Content Creation Apps\teen_apps'
+  'C:\Users\tokka\Claude Local\cowork apps\Content Creation Apps\adult_apps'
 Read filenames and, if short, the <!-- CONCEPT: --> line at the top. Pick
 whichever tier has the fewest apps (or was generated longest ago) to keep
 the three tiers roughly balanced, then build a mental list of concepts
@@ -1292,7 +1292,7 @@ Bias toward whichever tier and concept is thinnest per Step 1, rather than
 defaulting to whatever's easiest to build.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 Match the theme to the tier: KID tier should follow CLAUDE.md's Kids Apps
@@ -1302,7 +1302,7 @@ stack). Do not skip or re-derive anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
 Save to the tier subfolder you picked in Step 1, e.g.:
-  'D:\Documents\Claude Local\cowork apps\Content Creation Apps\teen_apps'
+  'C:\Users\tokka\Claude Local\cowork apps\Content Creation Apps\teen_apps'
 with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
 Do NOT overwrite existing files. If the filename conflicts, append -2.
@@ -1322,7 +1322,7 @@ You are a game developer building ONE brand new, fully functional,
 self-contained cooking/restaurant game as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\Cooking Games'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\Cooking Games'
 (if this folder does not exist yet, create it first). Read filenames and, if
 short, the <!-- CONCEPT: --> line at the top. Build a mental list of concepts
 already covered so you don't repeat them. Note: this folder already has
@@ -1353,7 +1353,7 @@ puzzle formats, which are completely unrepresented, over another
 order-rush or baking game.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -1362,7 +1362,7 @@ colors fit the subject matter well within that. Do not skip or re-derive
 anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\Cooking Games' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\Cooking Games' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
 Do NOT overwrite existing files. If the filename conflicts, append -2.
 
@@ -1383,7 +1383,7 @@ You are a creative-tools developer building ONE brand new, fully functional,
 self-contained virtual craft-making tool as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\Crafts' (if
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\Crafts' (if
 this folder does not exist yet, create it first). Read filenames and, if
 short, the <!-- CONCEPT: --> line at the top. Build a mental list of concepts
 already covered so you don't repeat them. Note: two kaleidoscope/mandala-
@@ -1416,7 +1416,7 @@ jewelry design, which are completely unrepresented, over another symmetry-
 drawing tool.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -1427,7 +1427,7 @@ save-as-image option where practical, matching the pattern from the existing
 art_apps/ pieces. Do not skip or re-derive anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\Crafts' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\Crafts' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
 Do NOT overwrite existing files. If the filename conflicts, append -2.
 
@@ -1448,7 +1448,7 @@ You are a creative developer building ONE brand new, fully functional,
 self-contained motivational/inspirational app as a single HTML file.
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\Inspirational'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\Inspirational'
 (if this folder does not exist yet, create it first). Read filenames and, if
 short, the <!-- CONCEPT: --> line at the top. Build a mental list of concepts
 already covered so you don't repeat them.
@@ -1485,7 +1485,7 @@ language — cite real sources for quotes/proverbs where possible, and avoid
 vague, interchangeable affirmation text.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 This category isn't one of CLAUDE.md's named themes, so it falls under "All
@@ -1494,7 +1494,7 @@ accent colors fit the subject matter well within that. Do not skip or
 re-derive anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\Inspirational' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\Inspirational' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
 Do NOT overwrite existing files. If the filename conflicts, append -2.
 
@@ -1517,7 +1517,7 @@ using the Web Audio API (distinct from music_apps/, which is generative/
 experimental instruments, and music_game_apps/, which is learning games).
 
 --- STEP 1: CHECK WHAT ALREADY EXISTS ---
-List all .html files in 'D:\Documents\Claude Local\cowork apps\Music Production'
+List all .html files in 'C:\Users\tokka\Claude Local\cowork apps\Music Production'
 (if this folder does not exist yet, create it first). Read filenames and, if
 short, the <!-- CONCEPT: --> line at the top. Build a mental list of concepts
 already covered so you don't repeat them. Note: there are two files both
@@ -1550,7 +1550,7 @@ arrangement/mixing tool, which are the most open ground, over another drum
 machine or 808 clone.
 
 --- STEP 3: BUILD IT ---
-Follow every convention in 'D:\Documents\Claude Local\cowork apps\CLAUDE.md'
+Follow every convention in 'C:\Users\tokka\Claude Local\cowork apps\CLAUDE.md'
 exactly — required boilerplate, the mandatory viewport meta tag, CSS/JS
 conventions, mobile-first layout rules, and the pre-finish quality checklist.
 Pay special attention to the Art/Music theme guidance in CLAUDE.md:
@@ -1560,7 +1560,7 @@ until a user gesture — always create/resume it inside a click/tap handler,
 never on page load. Do not skip or re-derive anything else in CLAUDE.md.
 
 --- STEP 4: SAVE IT ---
-Save to 'D:\Documents\Claude Local\cowork apps\Music Production' with filename:
+Save to 'C:\Users\tokka\Claude Local\cowork apps\Music Production' with filename:
   YYYY-MM-DD-kebab-case-name.html   (use today's date)
 Do NOT overwrite existing files. If the filename conflicts, append -2.
 

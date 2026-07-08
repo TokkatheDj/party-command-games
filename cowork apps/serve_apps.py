@@ -22,6 +22,8 @@ from email.message import EmailMessage
 from pathlib import Path
 from urllib.parse import unquote
 
+from applock import data_lock
+
 APPS_DIR = Path(__file__).parent
 PORT = 8080
 DATA_FILE = APPS_DIR / ".app_data.json"
@@ -32,6 +34,9 @@ GENERATION_SEMAPHORE = threading.Semaphore(MAX_CONCURRENT_GENERATIONS)
 GENERATION_TIMEOUT_SEC = 600
 NOTE_REVIEW_SEMAPHORE = threading.Semaphore(2)
 NOTE_REVIEW_TIMEOUT_SEC = 120
+# JSON payloads here are tiny (a few KB at most given per-field length caps);
+# cap the request body so a bogus/huge Content-Length can't drive a large read.
+MAX_POST_BODY = 256 * 1024
 # Guards every read-modify-write cycle against .app_data.json: do_POST holds this
 # for its whole request (load -> mutate -> save), and update_app_request() holds it
 # too, so a background generation thread's status write can never be silently
@@ -78,7 +83,29 @@ def clean_name(stem):
     name = re.sub(r"^\d{4}-\d{2}-\d{2}-", "", stem)
     return name.replace("-", " ").replace("_", " ").title()
 
+# discover_apps() runs on every "/" load and several /api/* hits; a full rglob
+# + per-file stat over a OneDrive-backed tree dominates page-load latency. Cache
+# the result for a few seconds so one interaction's burst of requests shares a
+# single scan. New/edited apps still surface within the TTL on the next refresh.
+_APPS_CACHE = {"at": 0.0, "apps": None}
+_APPS_CACHE_LOCK = threading.Lock()
+_APPS_CACHE_TTL = 5.0
+
+
 def discover_apps():
+    now = time.time()
+    with _APPS_CACHE_LOCK:
+        cached = _APPS_CACHE["apps"]
+        if cached is not None and (now - _APPS_CACHE["at"]) < _APPS_CACHE_TTL:
+            return cached
+    apps = _discover_apps_uncached()
+    with _APPS_CACHE_LOCK:
+        _APPS_CACHE["apps"] = apps
+        _APPS_CACHE["at"] = time.time()
+    return apps
+
+
+def _discover_apps_uncached():
     apps = {}
     ignore = {"serve_apps.py", "test_apps.js", "Start-AppServer.ps1", "Run-Tests.ps1"}
     ignore_dirs = {"node_modules", "test_reports", ".playwright-mcp", ".claude", "Reviews"}
@@ -985,8 +1012,10 @@ def update_app_request(request_id, **fields):
     """Re-read data fresh before writing, mirroring daily_check.py's update_note()
     idiom, so a slow generation doesn't clobber concurrent HTTP-server writes.
     Holds DATA_LOCK for the whole read-modify-write cycle -- see DATA_LOCK's
-    definition for why a re-read alone isn't a strong enough guarantee."""
-    with DATA_LOCK:
+    definition for why a re-read alone isn't a strong enough guarantee. Also
+    takes the cross-process data_lock() so a background generation thread's
+    write can't lose (or be lost to) a concurrent daily_check.py write."""
+    with DATA_LOCK, data_lock():
         data = load_data()
         for req in data.get("app_requests", []):
             if req.get("id") == request_id:
@@ -1045,13 +1074,26 @@ def build_note_reply_prompt(note, reply_text):
 
 
 def ask_claude_note(prompt, timeout):
-    """Same idiom as daily_check.py's ask_claude() -- runs headless `claude -p`
-    and returns (response_text, success)."""
+    """Runs headless `claude -p` and returns (response_text, success).
+
+    The prompt embeds untrusted note/reply text typed by anyone via the web
+    UI, and a plain `claude -p` would inherit the user's global settings.json
+    allow-list (which pre-approves mcp-coderunner/mcp-filesystem) -- turning a
+    malicious note into arbitrary code execution the moment it's reviewed.
+    This job only ever needs a text answer, so it runs hermetically: no MCP
+    servers, no tools allowed, every built-in tool explicitly denied. Same
+    hardening as daily_check.py's ask_claude() -- see there for the full
+    rationale."""
     try:
         result = subprocess.run(
-            ["claude", "-p", prompt],
+            ["claude", "-p", prompt,
+             "--strict-mcp-config", "--mcp-config", '{"mcpServers": {}}',
+             "--allowedTools", "",
+             "--disallowedTools",
+             "Bash,Edit,Write,Read,Glob,Grep,WebFetch,WebSearch,Task,NotebookEdit"],
             capture_output=True, text=True, timeout=timeout,
             encoding="utf-8", errors="replace", cwd=str(APPS_DIR),
+            stdin=subprocess.DEVNULL,
         )
         if result.returncode != 0:
             err = (result.stderr or "").strip() or f"exit code {result.returncode}"
@@ -1069,8 +1111,10 @@ def ask_claude_note(prompt, timeout):
 def update_note_review(note_id, reply_id, response):
     """Re-read-modify-write under DATA_LOCK, mirroring update_app_request(). If
     reply_id is set, updates that reply inside the note's replies list;
-    otherwise updates the note's own top-level review fields."""
-    with DATA_LOCK:
+    otherwise updates the note's own top-level review fields. Also takes the
+    cross-process data_lock() -- daily_check.py can be reviewing a different
+    pending item at the same moment this real-time worker saves one."""
+    with DATA_LOCK, data_lock():
         data = load_data()
         note = next((n for n in data.get("notes", []) if n.get("id") == note_id), None)
         if note is None:
@@ -1257,7 +1301,7 @@ def generate_app_worker(request_id):
         if kind == "fix":
             original = next((r for r in data.get("app_requests", []) if r.get("id") == req.get("fix_of")), None)
             prompt = build_fix_prompt(original, req.get("issue_description", ""), target_filename)
-            mtime_before = target_full_path.stat().st_mtime if target_full_path.exists() else 0
+            mtime_before = target_full_path.stat().st_mtime_ns if target_full_path.exists() else 0
         else:
             criteria = req.get("criteria", {})
             mode = req.get("mode", "basic")
@@ -1268,7 +1312,15 @@ def generate_app_worker(request_id):
         try:
             result = subprocess.run(
                 ["claude", "--permission-mode", "dontAsk", "-p", prompt,
-                 "--allowedTools", f"Write({CUSTOM_APPS_DIR}\\**),Edit({CUSTOM_APPS_DIR}\\**),Read,Glob,Grep",
+                 # Every file tool is scoped to custom_apps. The prompt embeds
+                 # untrusted user input (idea/theme/issue_description), so an
+                 # unscoped Read/Glob/Grep would be a prompt-injection primitive
+                 # for reading anything on disk (e.g. email_config.json's SMTP
+                 # password) and writing it into the served HTML. The generator
+                 # only ever needs to touch the one target file, so deny the
+                 # rest -- builds read nothing; a fix reads its own file here.
+                 "--allowedTools",
+                 f"Write({CUSTOM_APPS_DIR}\\**),Edit({CUSTOM_APPS_DIR}\\**),Read({CUSTOM_APPS_DIR}\\**)",
                  "--max-turns", "30"],
                 capture_output=True, text=True, timeout=GENERATION_TIMEOUT_SEC,
                 encoding="utf-8", errors="replace", cwd=str(APPS_DIR),
@@ -1280,7 +1332,7 @@ def generate_app_worker(request_id):
                 # A fix edits an already-existing file, so "exists and non-empty" is
                 # trivially true even if nothing happened -- require the mtime to have
                 # actually advanced as the real signal that a change was made.
-                touched = target_full_path.exists() and target_full_path.stat().st_mtime > mtime_before
+                touched = target_full_path.exists() and target_full_path.stat().st_mtime_ns > mtime_before
                 if touched:
                     print(f"[builder] {request_id} done (fix applied) -> {target_filename}", flush=True)
                     update_app_request(request_id, status="done", finished=finished, log_tail=log_tail)
@@ -2331,7 +2383,6 @@ function closePicker() {{
 }}
 
 function updatePinBtns(path) {{
-  const escaped = path.replace(/[!"#$%&'()*+,.\/:;<=>?@[\\\]^`{{|}}~]/g, '\\\\$&');
   const isPinned = Object.values(PLAYLISTS).some(p => (p.apps || []).includes(path));
   document.querySelectorAll('.pin-btn[data-path="' + path + '"]').forEach(b => {{
     b.classList.toggle('pinned', isPinned);
@@ -2655,11 +2706,39 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
         else:
+            # Deny-by-default: this directory is the source tree + data store +
+            # SMTP config, NOT a public docroot. SimpleHTTPRequestHandler would
+            # happily serve serve_apps.py, .app_data.json (names/emails/notes),
+            # and email_config.json (SMTP password) to anyone who can reach the
+            # port (bound 0.0.0.0, plus a Tailscale PUBLIC_URL). Only the
+            # self-contained .html apps and image assets are public.
+            if not self._is_public_static(path):
+                self.send_error(404, "Not Found")
+                return
             super().do_GET()
+
+    @staticmethod
+    def _is_public_static(path):
+        # No dotfiles or dotdirs (.app_data.json, .claude/, email_config.json is
+        # not a dotfile but is denied by the suffix whitelist below anyway), and
+        # only known static app/media types. Everything else -- .py, .json,
+        # .ps1/.bat/.vbs, .md, .txt, config -- is not downloadable.
+        if any(seg.startswith(".") for seg in path.split("/") if seg):
+            return False
+        return path.lower().endswith(
+            (".html", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
+             ".woff", ".woff2")
+        )
 
     def do_POST(self):
         path = unquote(self.path.split("?")[0])
-        length = int(self.headers.get("Content-Length", 0))
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except (TypeError, ValueError):
+            length = -1
+        if length < 0 or length > MAX_POST_BODY:
+            self.send_error(413, "Payload too large")
+            return
         body = self.rfile.read(length)
         try:
             payload = json.loads(body.decode("utf-8")) if body else {}
@@ -2669,8 +2748,10 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         # respond all happen atomically w.r.t. every other POST and every
         # background generation thread's update_app_request() calls -- see
         # DATA_LOCK's definition for why a load-once-at-the-top snapshot alone
-        # isn't safe once background threads can write concurrently.
-        with DATA_LOCK:
+        # isn't safe once background threads can write concurrently. data_lock()
+        # extends that guarantee across processes (vs. daily_check.py), whose
+        # writes DATA_LOCK -- an in-process threading.Lock -- cannot see.
+        with DATA_LOCK, data_lock():
             self._handle_post(path, payload)
 
     def _handle_post(self, path, payload):
@@ -2812,9 +2893,8 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/app_requests/create":
             requester_name = (payload.get("requester_name") or "").strip()[:30]
-            requester_email = (payload.get("requester_email") or "").strip()[:100]
-            if requester_email and not EMAIL_RE.match(requester_email):
-                requester_email = ""
+            raw_email = (payload.get("requester_email") or "").strip()[:100]
+            requester_email = raw_email if EMAIL_RE.match(raw_email) else ""
             mode = payload.get("mode") or "basic"
             criteria = payload.get("criteria") or {}
             if mode not in ("basic", "advanced"):
@@ -2848,7 +2928,11 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
             request_id = uuid.uuid4().hex[:8]
             target_filename = compute_target_filename(clean_criteria, data)
-            remember_builder(data, requester_name, requester_email)
+            # Only an explicitly blank email is an opt-out that clears a saved
+            # address. A non-blank-but-invalid entry (a typo) must not be treated
+            # as an opt-out and wipe a returning builder's stored email.
+            if requester_email or not raw_email:
+                remember_builder(data, requester_name, requester_email)
             record = {
                 "id": request_id,
                 "kind": "build",
@@ -2872,9 +2956,8 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
         elif path == "/api/app_requests/fix":
             requester_name = (payload.get("requester_name") or "").strip()[:30]
-            requester_email = (payload.get("requester_email") or "").strip()[:100]
-            if requester_email and not EMAIL_RE.match(requester_email):
-                requester_email = ""
+            raw_email = (payload.get("requester_email") or "").strip()[:100]
+            requester_email = raw_email if EMAIL_RE.match(raw_email) else ""
             fix_of = (payload.get("fix_of") or "").strip()
             issue_description = (payload.get("issue_description") or "").strip()[:500]
             if not requester_name:
@@ -2889,7 +2972,9 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             request_id = uuid.uuid4().hex[:8]
-            remember_builder(data, requester_name, requester_email)
+            # See create: an invalid-email typo must not clear a saved address.
+            if requester_email or not raw_email:
+                remember_builder(data, requester_name, requester_email)
             record = {
                 "id": request_id,
                 "kind": "fix",
@@ -2971,17 +3056,18 @@ def main():
     # Crash recovery: a killed subprocess can't be resumed, so any app_request
     # still "generating" from a previous run is stuck forever -- surface it as an
     # error. Safe to run now: we hold the port, so we are the one true server.
-    data = load_data()
-    interrupted = 0
-    for req in data.get("app_requests", []):
-        if req.get("status") == "generating":
-            req["status"] = "error"
-            req["error_message"] = "Interrupted by server restart -- please resubmit."
-            req["finished"] = now_iso()
-            interrupted += 1
-    if interrupted:
-        save_data(data)
-        print(f"[builder] marked {interrupted} interrupted app_request(s) as error on startup")
+    with data_lock():
+        data = load_data()
+        interrupted = 0
+        for req in data.get("app_requests", []):
+            if req.get("status") == "generating":
+                req["status"] = "error"
+                req["error_message"] = "Interrupted by server restart -- please resubmit."
+                req["finished"] = now_iso()
+                interrupted += 1
+        if interrupted:
+            save_data(data)
+            print(f"[builder] marked {interrupted} interrupted app_request(s) as error on startup")
 
     # Kick off review for anything still unreviewed from before this startup --
     # e.g. a note added while the server was down, or one left pending by an

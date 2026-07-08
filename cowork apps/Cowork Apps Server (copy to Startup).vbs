@@ -11,4 +11,4 @@
 ' To stop the server: close the minimized "serve_apps" window, or end the
 ' "python.exe" process in Task Manager.
 ' To disable auto-start: delete this file from the Startup folder.
-CreateObject("WScript.Shell").Run """D:\Documents\Claude Local\cowork apps\restart-server.bat""", 0, False
+CreateObject("WScript.Shell").Run """C:\Users\tokka\Claude Local\cowork apps\restart-server.bat""", 0, False
