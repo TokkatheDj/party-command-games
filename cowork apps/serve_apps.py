@@ -389,7 +389,7 @@ BUILDER_STYLES = """
 .builder-optional { text-transform: none; letter-spacing: normal; font-weight: 400; opacity: 0.75; }
 #builder-idea-input, #builder-tech-input { width: 100%; min-height: 60px; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; resize: vertical; transition: border-color 0.2s; }
 #builder-idea-input:focus, #builder-tech-input:focus { border-color: var(--accent); }
-#builder-mode-select { width: 100%; margin-bottom: 0.5rem; min-height: 44px; padding: 0.5rem 0.85rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; outline: none; border: 1px solid var(--accent); color: var(--accent); background: rgba(124,110,230,0.1); transition: border-color 0.15s; }
+.builder-select { width: 100%; margin-bottom: 0.5rem; min-height: 44px; padding: 0.5rem 0.85rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; outline: none; border: 1px solid var(--accent); color: var(--accent); background: rgba(124,110,230,0.1); transition: border-color 0.15s; }
 .choice-group { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .choice-opt { font-size: 0.85rem; color: var(--text); cursor: pointer; border-radius: 7px; padding: 0.4rem 0.75rem; border: 2px solid var(--border); transition: border-color 0.12s, background 0.12s; min-height: 44px; display: inline-flex; align-items: center; }
 .choice-opt.selected { border-color: var(--accent); background: rgba(124,110,230,0.12); color: var(--accent); }
@@ -467,50 +467,50 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
     <label>Email <span class="builder-optional">(so we can tell you when it's ready)</span></label>
     <input id="builder-email-input" type="email" placeholder="you@example.com" autocomplete="off" maxlength="100">
 
-    <select id="builder-mode-select">
+    <select class="builder-select" id="builder-mode-select">
       <option value="basic" selected>Basic</option>
       <option value="advanced">Advanced</option>
     </select>
 
     <label>App type</label>
-    <div class="choice-group" id="builder-app-type" data-field="app_type">
-      <span class="choice-opt selected" data-value="Arcade Game">&#127918; Arcade Game</span>
-      <span class="choice-opt" data-value="Puzzle">&#129513; Puzzle</span>
-      <span class="choice-opt" data-value="Quiz">&#10067; Quiz</span>
-      <span class="choice-opt" data-value="Story">&#128214; Story</span>
-      <span class="choice-opt" data-value="Tool">&#128295; Tool</span>
-      <span class="choice-opt" data-value="Arts/Crafts">&#127912; Arts/Crafts</span>
-      <span class="choice-opt" data-value="Music">&#127925; Music</span>
-      <span class="choice-opt" data-value="Sports">&#127941; Sports</span>
-      <span class="choice-opt" data-value="Card Game">&#127183; Card Game</span>
-      <span class="choice-opt" data-value="Interactive Game">&#127939; Interactive Game</span>
-      <span class="choice-opt" data-value="Cooking">&#127859; Cooking</span>
-      <span class="choice-opt" data-value="Party Game">&#127881; Party Game</span>
-    </div>
+    <select class="builder-select" id="builder-app-type" data-field="app_type">
+      <option value="Arcade Game" selected>&#127918; Arcade Game</option>
+      <option value="Puzzle">&#129513; Puzzle</option>
+      <option value="Quiz">&#10067; Quiz</option>
+      <option value="Story">&#128214; Story</option>
+      <option value="Tool">&#128295; Tool</option>
+      <option value="Arts/Crafts">&#127912; Arts/Crafts</option>
+      <option value="Music">&#127925; Music</option>
+      <option value="Sports">&#127941; Sports</option>
+      <option value="Card Game">&#127183; Card Game</option>
+      <option value="Interactive Game">&#127939; Interactive Game</option>
+      <option value="Cooking">&#127859; Cooking</option>
+      <option value="Party Game">&#127881; Party Game</option>
+    </select>
 
     <label>Theme</label>
-    <div class="choice-group" id="builder-color-vibe" data-field="color_vibe">
-      <span class="choice-opt selected" data-value="Bright &amp; Playful">Bright &amp; Playful</span>
-      <span class="choice-opt" data-value="Cool &amp; Calm">Cool &amp; Calm</span>
-      <span class="choice-opt" data-value="Dark &amp; Mysterious">Dark &amp; Mysterious</span>
-      <span class="choice-opt" data-value="Neon &amp; Energetic">Neon &amp; Energetic</span>
-      <span class="choice-opt" data-value="Pastel &amp; Soft">Pastel &amp; Soft</span>
-      <span class="choice-opt" data-value="Retro &amp; Nostalgic">Retro &amp; Nostalgic</span>
-      <span class="choice-opt" data-value="Nature &amp; Earthy">Nature &amp; Earthy</span>
-      <span class="choice-opt" data-value="Elegant &amp; Minimal">Elegant &amp; Minimal</span>
-      <span class="choice-opt" data-value="Spooky &amp; Fun">Spooky &amp; Fun</span>
-    </div>
+    <select class="builder-select" id="builder-color-vibe" data-field="color_vibe">
+      <option value="Bright &amp; Playful" selected>Bright &amp; Playful</option>
+      <option value="Cool &amp; Calm">Cool &amp; Calm</option>
+      <option value="Dark &amp; Mysterious">Dark &amp; Mysterious</option>
+      <option value="Neon &amp; Energetic">Neon &amp; Energetic</option>
+      <option value="Pastel &amp; Soft">Pastel &amp; Soft</option>
+      <option value="Retro &amp; Nostalgic">Retro &amp; Nostalgic</option>
+      <option value="Nature &amp; Earthy">Nature &amp; Earthy</option>
+      <option value="Elegant &amp; Minimal">Elegant &amp; Minimal</option>
+      <option value="Spooky &amp; Fun">Spooky &amp; Fun</option>
+    </select>
     <input id="builder-theme-input" type="text" placeholder="Subject (optional) e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
 
     <label>Age range</label>
-    <div class="choice-group" id="builder-age-range" data-field="age_range">
-      <span class="choice-opt" data-value="Under 6">Under 6</span>
-      <span class="choice-opt" data-value="6-9">6-9</span>
-      <span class="choice-opt" data-value="10-13">10-13</span>
-      <span class="choice-opt" data-value="14-17">14-17</span>
-      <span class="choice-opt" data-value="18+">18+</span>
-      <span class="choice-opt selected" data-value="All ages">All ages</span>
-    </div>
+    <select class="builder-select" id="builder-age-range" data-field="age_range">
+      <option value="Under 6">Under 6</option>
+      <option value="6-9">6-9</option>
+      <option value="10-13">10-13</option>
+      <option value="14-17">14-17</option>
+      <option value="18+">18+</option>
+      <option value="All ages" selected>All ages</option>
+    </select>
 
     <label>Your idea (one line)</label>
     <div class="idea-chips" id="builder-idea-chips"></div>
@@ -684,11 +684,14 @@ document.querySelectorAll('.choice-group').forEach(group => {{
     if (!opt || !group.contains(opt)) return;
     group.querySelectorAll('.choice-opt').forEach(o => o.classList.remove('selected'));
     opt.classList.add('selected');
-    if (group.id === 'builder-app-type') renderIdeaChips(opt.dataset.value);
   }});
 }});
 
+document.getElementById('builder-app-type')?.addEventListener('change', (e) => renderIdeaChips(e.target.value));
+
 function builderChoice(fieldId) {{
+  const el = document.getElementById(fieldId);
+  if (el && el.tagName === 'SELECT') return el.value || '';
   return document.querySelector('#' + fieldId + ' .choice-opt.selected')?.dataset.value || '';
 }}
 
