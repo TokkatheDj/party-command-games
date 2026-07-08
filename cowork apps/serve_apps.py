@@ -272,13 +272,18 @@ def compute_target_filename(criteria, data):
 
 
 EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+FEEDBACK_RATINGS = {"love", "like", "meh", "dislike"}
 
 
 def strip_private_fields(request_record):
     """Drop fields from an app_request record that shouldn't leave the server:
     log_tail (debug-only subprocess output) and requester_email (only needed
-    server-side to send the build-finished notification, not for card display)."""
-    return {k: v for k, v in request_record.items() if k not in ("log_tail", "requester_email")}
+    server-side to send the build-finished notification, not for card display).
+    has_email tells the client whether a notification will fire, without ever
+    exposing the actual address."""
+    stripped = {k: v for k, v in request_record.items() if k not in ("log_tail", "requester_email")}
+    stripped["has_email"] = bool(request_record.get("requester_email"))
+    return stripped
 
 
 def remember_builder(data, name, email):
@@ -385,13 +390,13 @@ BUILDER_STYLES = """
 #builder-idea-input, #builder-tech-input { width: 100%; min-height: 60px; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; resize: vertical; transition: border-color 0.2s; }
 #builder-idea-input:focus, #builder-tech-input:focus { border-color: var(--accent); }
 .mode-toggle { display: flex; gap: 0.4rem; margin-bottom: 0.5rem; }
-.mode-toggle-btn { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.85rem; font-weight: 600; padding: 0.5rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
+.mode-toggle-btn { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.85rem; font-weight: 600; padding: 0.5rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 .mode-toggle-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(124,110,230,0.1); }
 .choice-group { display: flex; gap: 0.4rem; flex-wrap: wrap; }
-.choice-opt { font-size: 0.85rem; color: var(--text); cursor: pointer; border-radius: 7px; padding: 0.4rem 0.75rem; border: 2px solid var(--border); transition: border-color 0.12s, background 0.12s; }
+.choice-opt { font-size: 0.85rem; color: var(--text); cursor: pointer; border-radius: 7px; padding: 0.4rem 0.75rem; border: 2px solid var(--border); transition: border-color 0.12s, background 0.12s; min-height: 44px; display: inline-flex; align-items: center; }
 .choice-opt.selected { border-color: var(--accent); background: rgba(124,110,230,0.12); color: var(--accent); }
 .choice-checkboxes { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.choice-checkbox { display: flex; align-items: center; gap: 0.35rem; font-size: 0.83rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 0.35rem 0.6rem; cursor: pointer; }
+.choice-checkbox { display: flex; align-items: center; gap: 0.35rem; font-size: 0.83rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 0.35rem 0.6rem; cursor: pointer; min-height: 44px; }
 .choice-checkbox input { accent-color: var(--accent); }
 #builder-advanced-fields.hidden { display: none; }
 .idea-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
@@ -408,6 +413,8 @@ BUILDER_STYLES = """
 .builder-card-list { display: flex; flex-direction: column; gap: 0.6rem; }
 .builder-empty { color: var(--muted); font-style: italic; font-size: 0.88rem; }
 .builder-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 0.9rem; }
+.builder-card-highlight { outline: 2px solid var(--accent); outline-offset: 2px; }
+.builder-next-steps { margin-top: 0.4rem; font-size: 0.8rem; color: var(--muted); line-height: 1.4; }
 .builder-card-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.3rem; }
 .builder-card-title { font-size: 0.9rem; color: var(--text); font-weight: 600; }
 .builder-card-meta { font-size: 0.75rem; color: var(--muted); }
@@ -429,6 +436,20 @@ BUILDER_STYLES = """
 .fix-status { margin-top: 0.4rem; font-size: 0.8rem; color: var(--muted); font-style: italic; }
 .fix-status-done { color: #44ee66; font-style: normal; }
 .fix-status-error { color: var(--accent2); font-style: normal; }
+.feedback-btn { display: inline-block; margin-top: 0.4rem; margin-right: 0.4rem; font-size: 0.78rem; color: var(--accent); background: none; border: 1px solid var(--accent); border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; transition: opacity 0.15s; }
+.feedback-btn:hover { opacity: 0.8; }
+.feedback-form { margin-top: 0.5rem; }
+.feedback-emoji-row { display: flex; gap: 0.5rem; margin-top: 0.4rem; }
+.feedback-emoji-opt { font-size: 1.4rem; min-width: 44px; min-height: 44px; border: 2px solid var(--border); border-radius: 8px; background: var(--bg); cursor: pointer; transition: border-color 0.12s; }
+.feedback-emoji-opt:hover { border-color: var(--accent); }
+.feedback-given { margin-top: 0.4rem; font-size: 0.8rem; color: var(--muted); font-style: italic; }
+.feedback-comment-btn { background: none; border: none; color: var(--accent); font-size: 0.78rem; cursor: pointer; text-decoration: underline; padding: 0; }
+.feedback-comment-form { margin-top: 0.4rem; }
+.feedback-comment-ta { width: 100%; min-height: 50px; padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; resize: vertical; outline: none; font-family: inherit; line-height: 1.4; transition: border-color 0.2s; }
+.feedback-comment-ta:focus { border-color: var(--accent); }
+.feedback-popup { position: fixed; left: 0.75rem; right: 0.75rem; bottom: 0.75rem; z-index: 60; background: var(--surface); border: 1px solid var(--accent); border-radius: 12px; padding: 0.85rem 1rem; box-shadow: 0 4px 18px rgba(0,0,0,0.25); max-width: 420px; margin: 0 auto; }
+.feedback-popup-text { font-size: 0.88rem; color: var(--text); font-weight: 600; margin-bottom: 0.3rem; }
+.feedback-popup-close { display: block; margin-top: 0.5rem; background: none; border: none; color: var(--muted); font-size: 0.78rem; cursor: pointer; padding: 0.3rem 0; }
 .standalone-wrap { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .standalone-header { text-align: center; margin-bottom: 1.2rem; }
 .standalone-header h1 { font-size: 1.4rem; font-weight: 700; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 0.3rem; }
@@ -445,7 +466,7 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
     </select>
     <input id="builder-name-input" type="text" placeholder="e.g. Emma" autocomplete="off" maxlength="30">
 
-    <label>Email <span class="builder-optional">(optional &mdash; get notified when it's built)</span></label>
+    <label>Email <span class="builder-optional">(so we can tell you when it's ready)</span></label>
     <input id="builder-email-input" type="email" placeholder="you@example.com" autocomplete="off" maxlength="100">
 
     <div class="mode-toggle">
@@ -722,6 +743,7 @@ document.getElementById('builder-submit-btn')?.addEventListener('click', async (
   const requester_name = builderNameInput?.value.trim() || '';
   if (!requester_name) {{ builderNameInput?.focus(); return; }}
   const requester_email = builderEmailInput?.value.trim() || '';
+  if (!requester_email) {{ builderEmailInput?.focus(); return; }}
   const mode = document.getElementById('mode-advanced-btn').classList.contains('active') ? 'advanced' : 'basic';
 
   const criteria = {{
@@ -748,7 +770,7 @@ document.getElementById('builder-submit-btn')?.addEventListener('click', async (
   btn.disabled = false; btn.textContent = 'Build My App!';
   if (r?.ok) {{
     APP_REQUESTS.unshift({{
-      id: r.id, requester_name, mode, criteria,
+      id: r.id, requester_name, mode, criteria, has_email: true,
       target_filename: r.target_filename, target_path: 'custom_apps/' + r.target_filename,
       status: 'queued', error_message: null, created: new Date().toISOString(),
       started: null, finished: null,
@@ -760,6 +782,30 @@ document.getElementById('builder-submit-btn')?.addEventListener('click', async (
     alert(r?.error || 'Could not submit — please try again.');
   }}
 }});
+
+const FEEDBACK_EMOJI = {{love: "😍", like: "🙂", meh: "😐", dislike: "🙁"}};
+
+function feedbackWidgetHtml(r) {{
+  if (r.feedback) {{
+    const canComment = !r.feedback.comment;
+    let html = '<div class="feedback-given">Thanks for the feedback! ' + (FEEDBACK_EMOJI[r.feedback.rating] || '')
+      + (canComment ? ' <button class="feedback-comment-btn" data-id="' + r.id + '">Add a comment</button>' : '')
+      + '</div>';
+    if (canComment) {{
+      html += '<div class="feedback-comment-form hidden" id="feedback-comment-form-' + r.id + '">'
+        + '<textarea class="feedback-comment-ta" placeholder="Anything else? (optional)" maxlength="300"></textarea>'
+        + '<div class="quick-note-actions">'
+        + '<button class="quick-note-submit feedback-comment-submit" data-id="' + r.id + '">Submit</button>'
+        + '</div></div>';
+    }}
+    return html;
+  }}
+  return '<button class="feedback-btn" data-id="' + r.id + '">&#128172; Tell us what you think</button>'
+    + '<div class="feedback-form hidden" id="feedback-form-' + r.id + '">'
+    + '<div class="feedback-emoji-row">'
+    + Object.keys(FEEDBACK_EMOJI).map(k => '<button class="feedback-emoji-opt" data-id="' + r.id + '" data-rating="' + k + '">' + FEEDBACK_EMOJI[k] + '</button>').join('')
+    + '</div></div>';
+}}
 
 function builderCardHtml(r) {{
   const labels = {{queued: 'Queued', generating: 'Building…', done: 'Ready ✅', error: 'Error'}};
@@ -773,7 +819,19 @@ function builderCardHtml(r) {{
     ? '<a class="builder-card-open" id="builder-open-' + r.id + '" href="/' + r.target_path + '" target="_blank">Open App &rarr;</a>' : '';
   const appType = escHtml((r.criteria && r.criteria.app_type) || 'App');
 
+  let nextStepsHtml = '';
+  if (r.status === 'queued' || r.status === 'generating') {{
+    const waitLine = r.status === 'queued'
+      ? 'Lined up to build, usually starts within a minute.'
+      : 'Building now, usually takes 1 to 4 minutes (a little longer if a few apps are building at once).';
+    const emailLine = r.has_email
+      ? 'We will email you the second it is ready, feel free to close this tab.'
+      : 'No email was given, so keep this tab open or check back to see when it is done.';
+    nextStepsHtml = '<div class="builder-next-steps">' + waitLine + ' ' + emailLine + '</div>';
+  }}
+
   let reportHtml = '';
+  let feedbackHtml = '';
   if (r.status === 'done') {{
     const fixes = APP_REQUESTS.filter(f => f.kind === 'fix' && f.fix_of === r.id);
     const active = fixes.find(f => f.status === 'queued' || f.status === 'generating');
@@ -798,6 +856,8 @@ function builderCardHtml(r) {{
       + '<button class="quick-note-submit report-submit-btn" data-id="' + r.id + '">Submit</button>'
       + '</div></div>'
       + fixStatusHtml;
+
+    feedbackHtml = feedbackWidgetHtml(r);
   }}
 
   return '<div class="builder-card" id="builder-card-' + r.id + '">'
@@ -806,7 +866,7 @@ function builderCardHtml(r) {{
     + '<span class="builder-badge ' + r.status + '" id="builder-badge-' + r.id + '">' + badgeLabel + '</span>'
     + '</div>'
     + '<div class="builder-card-meta">' + idea + '</div>'
-    + errorHtml + dismissHtml + openHtml + reportHtml
+    + nextStepsHtml + errorHtml + dismissHtml + openHtml + reportHtml + feedbackHtml
     + '</div>';
 }}
 
@@ -855,13 +915,31 @@ function pollRequest(id) {{
       generatingStartedAt = Date.parse(status.started + 'Z');
     }}
     const idx = APP_REQUESTS.findIndex(r => r.id === id);
+    const prevStatus = idx >= 0 ? APP_REQUESTS[idx].status : null;
     if (idx >= 0) APP_REQUESTS[idx] = Object.assign({{}}, APP_REQUESTS[idx], status);
+    if (status.status === 'done' && prevStatus !== 'done' && !status.feedback) {{
+      showFeedbackPopup(id);
+    }}
     if (status.status === 'done' || status.status === 'error') {{
       clearInterval(builderPolls[id]);
       delete builderPolls[id];
     }}
     renderBuilderLists();
   }}, 4000);
+}}
+
+function showFeedbackPopup(id) {{
+  document.getElementById('feedback-popup')?.remove();
+  const popup = document.createElement('div');
+  popup.className = 'feedback-popup';
+  popup.id = 'feedback-popup';
+  popup.innerHTML = '<div class="feedback-popup-text">Your app is ready! What did you think?</div>'
+    + '<div class="feedback-emoji-row">'
+    + Object.keys(FEEDBACK_EMOJI).map(k => '<button class="feedback-emoji-opt" data-id="' + id + '" data-rating="' + k + '">' + FEEDBACK_EMOJI[k] + '</button>').join('')
+    + '</div>'
+    + '<button class="feedback-popup-close" type="button">Not now</button>';
+  document.querySelector('.builder-lists')?.appendChild(popup);
+  popup.querySelector('.feedback-popup-close').addEventListener('click', () => popup.remove());
 }}
 
 document.querySelector('.builder-lists')?.addEventListener('click', async (e) => {{
@@ -905,6 +983,7 @@ document.querySelector('.builder-lists')?.addEventListener('click', async (e) =>
     const requester_name = builderNameInput?.value.trim() || '';
     if (!requester_name) {{ builderNameInput?.focus(); return; }}
     const requester_email = builderEmailInput?.value.trim() || '';
+    if (!requester_email) {{ builderEmailInput?.focus(); return; }}
     submitBtn.disabled = true; submitBtn.textContent = 'Submitting…';
     const r = await apiPost('/api/app_requests/fix', {{requester_name, requester_email, fix_of: id, issue_description}});
     submitBtn.disabled = false; submitBtn.textContent = 'Submit';
@@ -918,6 +997,53 @@ document.querySelector('.builder-lists')?.addEventListener('click', async (e) =>
       pollRequest(r.id);
     }} else {{
       alert(r?.error || 'Could not submit — please try again.');
+    }}
+    return;
+  }}
+  const feedbackBtn = e.target.closest('.feedback-btn');
+  if (feedbackBtn) {{
+    const form = document.getElementById('feedback-form-' + feedbackBtn.dataset.id);
+    if (form) form.classList.toggle('hidden');
+    return;
+  }}
+  const emojiOpt = e.target.closest('.feedback-emoji-opt');
+  if (emojiOpt) {{
+    const id = emojiOpt.dataset.id;
+    const rating = emojiOpt.dataset.rating;
+    const r = await apiPost('/api/app_requests/feedback', {{id, rating, comment: ''}});
+    if (r?.ok) {{
+      const idx = APP_REQUESTS.findIndex(x => x.id === id);
+      if (idx >= 0) APP_REQUESTS[idx] = Object.assign({{}}, APP_REQUESTS[idx], {{feedback: {{rating, comment: ''}}}});
+      document.getElementById('feedback-popup')?.remove();
+      renderBuilderLists();
+    }}
+    return;
+  }}
+  const commentBtn = e.target.closest('.feedback-comment-btn');
+  if (commentBtn) {{
+    const form = document.getElementById('feedback-comment-form-' + commentBtn.dataset.id);
+    if (form) {{
+      form.classList.toggle('hidden');
+      if (!form.classList.contains('hidden')) form.querySelector('.feedback-comment-ta').focus();
+    }}
+    return;
+  }}
+  const commentSubmitBtn = e.target.closest('.feedback-comment-submit');
+  if (commentSubmitBtn) {{
+    const id = commentSubmitBtn.dataset.id;
+    const existing = APP_REQUESTS.find(x => x.id === id);
+    const rating = existing?.feedback?.rating;
+    if (!rating) return;
+    const form = document.getElementById('feedback-comment-form-' + id);
+    const ta = form?.querySelector('.feedback-comment-ta');
+    const comment = ta?.value.trim() || '';
+    commentSubmitBtn.disabled = true;
+    const r = await apiPost('/api/app_requests/feedback', {{id, rating, comment}});
+    commentSubmitBtn.disabled = false;
+    if (r?.ok) {{
+      const idx = APP_REQUESTS.findIndex(x => x.id === id);
+      if (idx >= 0) APP_REQUESTS[idx] = Object.assign({{}}, APP_REQUESTS[idx], {{feedback: {{rating, comment}}}});
+      renderBuilderLists();
     }}
   }}
 }});
@@ -945,6 +1071,25 @@ builderCopyBtn?.addEventListener('click', async () => {{
     setTimeout(() => builderShareCopied.classList.add('hidden'), 1800);
   }}
 }});
+
+function focusRequestFromHash() {{
+  const m = location.hash.match(/^#request-([a-z0-9]+)$/);
+  if (!m) return;
+  const id = m[1];
+  const tryFocus = () => {{
+    const card = document.getElementById('builder-card-' + id);
+    if (!card) return false;
+    card.scrollIntoView({{behavior: 'smooth', block: 'center'}});
+    card.classList.add('builder-card-highlight');
+    setTimeout(() => card.classList.remove('builder-card-highlight'), 4000);
+    card.querySelector('.feedback-btn')?.click();
+    return true;
+  }};
+  if (!tryFocus()) {{
+    const iv = setInterval(() => {{ if (tryFocus()) clearInterval(iv); }}, 300);
+    setTimeout(() => clearInterval(iv), 5000);
+  }}
+}}
 """
 
 
@@ -967,7 +1112,7 @@ def get_base_url():
     return os.environ.get("PUBLIC_URL") or f"http://{get_local_ip()}:{PORT}"
 
 
-def notify_async(requester_name, requester_email, target_path):
+def notify_async(requester_name, requester_email, target_path, request_id):
     """Fires send_build_notification() on its own daemon thread instead of
     calling it inline. generate_app_worker calls this from inside
     `with GENERATION_SEMAPHORE:` -- a blocking SMTP call there would hold a
@@ -975,11 +1120,11 @@ def notify_async(requester_name, requester_email, target_path):
     slow or unreachable mail server takes to respond, for a reason that has
     nothing to do with app generation."""
     threading.Thread(
-        target=send_build_notification, args=(requester_name, requester_email, target_path), daemon=True,
+        target=send_build_notification, args=(requester_name, requester_email, target_path, request_id), daemon=True,
     ).start()
 
 
-def send_build_notification(requester_name, requester_email, target_path):
+def send_build_notification(requester_name, requester_email, target_path, request_id):
     """Best-effort 'your app is ready' email. Must never raise into the caller --
     a missing/unconfigured email_config.json or an SMTP hiccup should not affect
     the build itself, so every failure path here just logs and returns."""
@@ -989,6 +1134,7 @@ def send_build_notification(requester_name, requester_email, target_path):
     if not cfg:
         return
     link = f"{get_base_url()}/{target_path}"
+    feedback_link = f"{get_base_url()}/build#request-{request_id}"
     msg = EmailMessage()
     msg["Subject"] = f"Your app is ready, {requester_name}!"
     msg["From"] = f'{cfg.get("from_name", "AppVerse")} <{cfg["smtp_user"]}>'
@@ -996,6 +1142,7 @@ def send_build_notification(requester_name, requester_email, target_path):
     msg.set_content(
         f"Hi {requester_name},\n\n"
         f"Your app is built and ready to play:\n{link}\n\n"
+        f"Tell us what you think:\n{feedback_link}\n\n"
         "Have fun!\n"
     )
     try:
@@ -1006,6 +1153,49 @@ def send_build_notification(requester_name, requester_email, target_path):
         print(f"[builder] notification email sent to {requester_email}", flush=True)
     except Exception as e:
         print(f"[builder] notification email failed: {e}", flush=True)
+
+
+def notify_feedback_async(requester_name, rating, comment, request_id):
+    """Same fire-and-forget pattern as notify_async(), mirroring
+    notify_note_async()/send_note_notification() -- reused here because the
+    feedback endpoint runs synchronously inside _handle_post, which already
+    holds DATA_LOCK/data_lock() for its whole duration. A blocking SMTP call
+    on that path would stall every other concurrent request, including the
+    background worker's own lock-needing writes."""
+    threading.Thread(
+        target=send_feedback_notification, args=(requester_name, rating, comment, request_id), daemon=True,
+    ).start()
+
+
+def send_feedback_notification(requester_name, rating, comment, request_id):
+    """Best-effort 'new feedback' email to the site owner. Must never raise
+    into the caller -- see send_build_notification for the same reasoning.
+    Requires an 'owner_email' field in email_config.json; silently skips
+    without one."""
+    cfg = load_email_config()
+    if not cfg:
+        return
+    to_email = cfg.get("owner_email")
+    if not to_email:
+        return
+    link = f"{get_base_url()}/build#request-{request_id}"
+    msg = EmailMessage()
+    msg["Subject"] = f"AppVerse: {requester_name} left feedback"
+    msg["From"] = f'{cfg.get("from_name", "AppVerse")} <{cfg["smtp_user"]}>'
+    msg["To"] = to_email
+    msg.set_content(
+        f"{requester_name} rated their app: {rating}\n\n"
+        + (f"Comment:\n{comment}\n\n" if comment else "")
+        + f"View it: {link}\n"
+    )
+    try:
+        with smtplib.SMTP(cfg["smtp_host"], cfg.get("smtp_port", 587), timeout=15) as smtp:
+            smtp.starttls()
+            smtp.login(cfg["smtp_user"], cfg["smtp_app_password"])
+            smtp.send_message(msg)
+        print(f"[builder] feedback notification email sent to {to_email}", flush=True)
+    except Exception as e:
+        print(f"[builder] feedback notification email failed: {e}", flush=True)
 
 
 def update_app_request(request_id, **fields):
@@ -1364,7 +1554,7 @@ def generate_app_worker(request_id):
                 if touched:
                     print(f"[builder] {request_id} done (fix applied) -> {target_filename}", flush=True)
                     update_app_request(request_id, status="done", finished=finished, log_tail=log_tail)
-                    notify_async(requester_name, req.get("requester_email", ""), req.get("target_path", f"custom_apps/{target_filename}"))
+                    notify_async(requester_name, req.get("requester_email", ""), req.get("target_path", f"custom_apps/{target_filename}"), request_id)
                 else:
                     err = f"Fix did not modify the file (exit code {result.returncode})."
                     print(f"[builder] {request_id} error: {err}", flush=True)
@@ -1393,7 +1583,7 @@ def generate_app_worker(request_id):
                     target_filename=actual_filename,
                     target_path=f"custom_apps/{actual_filename}",
                 )
-                notify_async(requester_name, req.get("requester_email", ""), f"custom_apps/{actual_filename}")
+                notify_async(requester_name, req.get("requester_email", ""), f"custom_apps/{actual_filename}", request_id)
             else:
                 err = f"No file was created (exit code {result.returncode})."
                 print(f"[builder] {request_id} error: {err}", flush=True)
@@ -2585,7 +2775,7 @@ def generate_builder_page(app_requests_public, builders, share_url):
 {SHARED_JS_HELPERS}
 {builder_logic_js(app_requests_json, builders_json, share_url)}
 {THEME_TOGGLE_JS}
-loadAppRequests();
+loadAppRequests().then(focusRequestFromHash);
 </script>
 </body>
 </html>"""
@@ -2956,6 +3146,12 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             if not requester_name:
                 self._json({"ok": False, "error": "missing required field: requester_name"}, status=400)
                 return
+            if not raw_email:
+                self._json({"ok": False, "error": "missing required field: requester_email"}, status=400)
+                return
+            if not requester_email:
+                self._json({"ok": False, "error": "please enter a valid email address"}, status=400)
+                return
             for field in ("app_type", "theme", "difficulty", "color_vibe", "idea"):
                 if not str(criteria.get(field, "")).strip():
                     self._json({"ok": False, "error": f"missing required field: {field}"}, status=400)
@@ -3016,6 +3212,12 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             if not requester_name:
                 self._json({"ok": False, "error": "missing required field: requester_name"}, status=400)
                 return
+            if not raw_email:
+                self._json({"ok": False, "error": "missing required field: requester_email"}, status=400)
+                return
+            if not requester_email:
+                self._json({"ok": False, "error": "please enter a valid email address"}, status=400)
+                return
             if not issue_description:
                 self._json({"ok": False, "error": "missing required field: issue_description"}, status=400)
                 return
@@ -3063,6 +3265,22 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 return
             data["app_requests"] = [r for r in data.get("app_requests", []) if r.get("id") != request_id]
             save_data(data)
+            self._json({"ok": True})
+
+        elif path == "/api/app_requests/feedback":
+            request_id = (payload.get("id") or "").strip()
+            rating = (payload.get("rating") or "").strip()
+            comment = (payload.get("comment") or "").strip()[:300]
+            if rating not in FEEDBACK_RATINGS:
+                self._json({"ok": False, "error": "invalid rating"}, status=400)
+                return
+            req = next((r for r in data.get("app_requests", []) if r.get("id") == request_id), None)
+            if req is None or req.get("status") != "done" or req.get("kind", "build") != "build":
+                self._json({"ok": False, "error": "not found or not ready"}, status=404)
+                return
+            req["feedback"] = {"rating": rating, "comment": comment, "submitted_at": now_iso()}
+            save_data(data)
+            notify_feedback_async(req.get("requester_name", ""), rating, comment, request_id)
             self._json({"ok": True})
 
         else:
