@@ -1496,7 +1496,13 @@ def build_prompt(criteria, mode, target_filename, requester_name):
         '<meta name="viewport" content="width=device-width, initial-scale=1.0, '
         'maximum-scale=1.0, user-scalable=no">\n'
         "- Single self-contained HTML file: all CSS and JS inline, no external dependencies, "
-        "no CDN links, no external fonts or images.\n"
+        "no CDN links, no external fonts or images. There is NO server and NO internet access "
+        "available to you or the app -- if the request mentions \"online\" play, real-time "
+        "networked multiplayer, or connecting with players on other devices, build it as local "
+        "same-device pass-and-play or split-screen multiplayer instead (this is always possible "
+        "and is what \"Local multiplayer\" already means in this project); never attempt real "
+        "network code, and never spend extra turns trying to reconcile an online request with "
+        "these constraints -- just build the local equivalent and move on.\n"
         "- Always include this universal reset: "
         "* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }\n"
         "- Always include this on html, body: margin: 0; padding: 0; "
