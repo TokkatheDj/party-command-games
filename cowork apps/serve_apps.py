@@ -408,6 +408,9 @@ BUILDER_STYLES = """
 .builder-share-copied { display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: #44ee66; }
 .builder-print-link { display: block; margin-top: 0.6rem; font-size: 0.8rem; color: var(--accent); text-decoration: none; }
 .builder-print-link:hover { text-decoration: underline; }
+.builder-email-links-btn { display: block; margin-top: 0.5rem; background: none; border: none; color: var(--accent); font-size: 0.8rem; text-decoration: none; cursor: pointer; padding: 0; font-family: inherit; }
+.builder-email-links-btn:hover { text-decoration: underline; }
+.builder-email-links-sent { display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: #44ee66; }
 .builder-lists { margin-top: 1.5rem; }
 .builder-list-heading { font-size: 0.85rem; font-weight: 600; color: var(--text); margin: 1.2rem 0 0.6rem; }
 .builder-card-list { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -737,6 +740,8 @@ def builder_share_row_html(share_url):
     </div>
     <span class="builder-share-copied hidden" id="builder-share-copied">Copied!</span>
     <a class="builder-print-link" href="/build/print" target="_blank">&#128424; Prefer paper? Print a blank form</a>
+    <button class="builder-email-links-btn" id="builder-email-links-btn" type="button">&#128231; Email me both versions</button>
+    <span class="builder-email-links-sent hidden" id="builder-email-links-sent">Sent!</span>
   </div>"""
 
 
@@ -1294,6 +1299,24 @@ builderCopyBtn?.addEventListener('click', async () => {{
   }}
 }});
 
+document.getElementById('builder-email-links-btn')?.addEventListener('click', async () => {{
+  const email = builderEmailInput?.value.trim() || '';
+  if (!email) {{ alert('Please enter your email above first.'); builderEmailInput?.focus(); return; }}
+  const btn = document.getElementById('builder-email-links-btn');
+  btn.disabled = true;
+  const r = await apiPost('/api/build/email_links', {{email}});
+  btn.disabled = false;
+  if (r?.ok) {{
+    const sent = document.getElementById('builder-email-links-sent');
+    if (sent) {{
+      sent.classList.remove('hidden');
+      setTimeout(() => sent.classList.add('hidden'), 2500);
+    }}
+  }} else {{
+    alert(r?.error || 'Could not send — please try again.');
+  }}
+}});
+
 function focusRequestFromHash() {{
   const m = location.hash.match(/^#request-([a-z0-9]+)$/);
   if (!m) return;
@@ -1418,6 +1441,41 @@ def send_feedback_notification(requester_name, rating, comment, request_id):
         print(f"[builder] feedback notification email sent to {to_email}", flush=True)
     except Exception as e:
         print(f"[builder] feedback notification email failed: {e}", flush=True)
+
+
+def notify_build_links_async(to_email):
+    """Same fire-and-forget pattern as notify_async() -- see that docstring.
+    Triggered by the 'Email me both versions' button on /build, so this must
+    not block the request thread on an SMTP round-trip."""
+    threading.Thread(target=send_build_links_email, args=(to_email,), daemon=True).start()
+
+
+def send_build_links_email(to_email):
+    """Best-effort email of the /build and /build/print links to whoever
+    clicked 'Email me both versions'. Must never raise into the caller -- see
+    send_build_notification for the same reasoning."""
+    cfg = load_email_config()
+    if not cfg:
+        return
+    build_url = f"{get_base_url()}/build"
+    print_url = f"{get_base_url()}/build/print"
+    msg = EmailMessage()
+    msg["Subject"] = "AppVerse: Build Your Own App -- both versions"
+    msg["From"] = f'{cfg.get("from_name", "AppVerse")} <{cfg["smtp_user"]}>'
+    msg["To"] = to_email
+    msg.set_content(
+        "Here are both versions of the Build Your Own App wizard:\n\n"
+        f"Digital form (fill out on a phone or computer):\n{build_url}\n\n"
+        f"Printable form (fill out with a pencil, then enter the answers at the link above):\n{print_url}\n"
+    )
+    try:
+        with smtplib.SMTP(cfg["smtp_host"], cfg.get("smtp_port", 587), timeout=15) as smtp:
+            smtp.starttls()
+            smtp.login(cfg["smtp_user"], cfg["smtp_app_password"])
+            smtp.send_message(msg)
+        print(f"[builder] build-links email sent to {to_email}", flush=True)
+    except Exception as e:
+        print(f"[builder] build-links email failed: {e}", flush=True)
 
 
 def update_app_request(request_id, **fields):
@@ -3515,6 +3573,14 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             req["feedback"] = {"rating": rating, "comment": comment, "submitted_at": now_iso()}
             save_data(data)
             notify_feedback_async(req.get("requester_name", ""), rating, comment, request_id)
+            self._json({"ok": True})
+
+        elif path == "/api/build/email_links":
+            email = (payload.get("email") or "").strip()[:100]
+            if not email or not EMAIL_RE.match(email):
+                self._json({"ok": False, "error": "please enter a valid email address"}, status=400)
+                return
+            notify_build_links_async(email)
             self._json({"ok": True})
 
         else:
