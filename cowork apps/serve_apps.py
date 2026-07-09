@@ -406,6 +406,8 @@ BUILDER_STYLES = """
 .builder-copy-btn, .builder-share-btn { background: var(--accent); border: none; border-radius: 8px; color: #fff; font-size: 0.82rem; font-weight: 600; padding: 0.5rem 0.85rem; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
 .builder-copy-btn:hover, .builder-share-btn:hover { opacity: 0.85; }
 .builder-share-copied { display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: #44ee66; }
+.builder-print-link { display: block; margin-top: 0.6rem; font-size: 0.8rem; color: var(--accent); text-decoration: none; }
+.builder-print-link:hover { text-decoration: underline; }
 .builder-lists { margin-top: 1.5rem; }
 .builder-list-heading { font-size: 0.85rem; font-weight: 600; color: var(--text); margin: 1.2rem 0 0.6rem; }
 .builder-card-list { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -491,27 +493,27 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
 
     <label>Theme</label>
     <select class="builder-select" id="builder-color-vibe" data-field="color_vibe">
-      <option value="Bright &amp; Playful" selected>Bright &amp; Playful</option>
-      <option value="Cool &amp; Calm">Cool &amp; Calm</option>
-      <option value="Dark &amp; Mysterious">Dark &amp; Mysterious</option>
-      <option value="Neon &amp; Energetic">Neon &amp; Energetic</option>
-      <option value="Pastel &amp; Soft">Pastel &amp; Soft</option>
-      <option value="Retro &amp; Nostalgic">Retro &amp; Nostalgic</option>
-      <option value="Nature &amp; Earthy">Nature &amp; Earthy</option>
-      <option value="Elegant &amp; Minimal">Elegant &amp; Minimal</option>
-      <option value="Spooky &amp; Fun">Spooky &amp; Fun</option>
+      <option value="Bright &amp; Playful" selected>&#127752; Bright &amp; Playful</option>
+      <option value="Cool &amp; Calm">&#128167; Cool &amp; Calm</option>
+      <option value="Dark &amp; Mysterious">&#127769; Dark &amp; Mysterious</option>
+      <option value="Neon &amp; Energetic">&#9889; Neon &amp; Energetic</option>
+      <option value="Pastel &amp; Soft">&#127800; Pastel &amp; Soft</option>
+      <option value="Retro &amp; Nostalgic">&#128252; Retro &amp; Nostalgic</option>
+      <option value="Nature &amp; Earthy">&#127811; Nature &amp; Earthy</option>
+      <option value="Elegant &amp; Minimal">&#10024; Elegant &amp; Minimal</option>
+      <option value="Spooky &amp; Fun">&#127875; Spooky &amp; Fun</option>
     </select>
     <label>Subject <span class="builder-optional">(optional)</span></label>
     <input id="builder-theme-input" type="text" placeholder="e.g. dinosaurs, space pirates" autocomplete="off" maxlength="60">
 
     <label>Age range</label>
     <select class="builder-select" id="builder-age-range" data-field="age_range">
-      <option value="Under 6">Under 6</option>
-      <option value="6-9">6-9</option>
-      <option value="10-13">10-13</option>
-      <option value="14-17">14-17</option>
-      <option value="18+">18+</option>
-      <option value="All ages" selected>All ages</option>
+      <option value="Under 6">&#128118; Under 6</option>
+      <option value="6-9">&#129490; 6-9</option>
+      <option value="10-13">&#127890; 10-13</option>
+      <option value="14-17">&#127911; 14-17</option>
+      <option value="18+">&#129489; 18+</option>
+      <option value="All ages" selected>&#128106; All ages</option>
     </select>
 
     <label>Your idea (one line)</label>
@@ -521,23 +523,23 @@ BUILDER_FORM_HTML = """  <div class="builder-form">
     <div id="builder-advanced-fields" class="hidden">
       <label>Difficulty</label>
       <div class="choice-group" id="builder-difficulty" data-field="difficulty">
-        <span class="choice-opt selected" data-value="Easy">Easy</span>
-        <span class="choice-opt" data-value="Medium">Medium</span>
-        <span class="choice-opt" data-value="Hard">Hard</span>
+        <span class="choice-opt selected" data-value="Easy">&#128994; Easy</span>
+        <span class="choice-opt" data-value="Medium">&#128993; Medium</span>
+        <span class="choice-opt" data-value="Hard">&#128308; Hard</span>
       </div>
 
       <label>Mechanics (pick any)</label>
       <div class="choice-checkboxes" id="builder-mechanics">
-        <label class="choice-checkbox"><input type="checkbox" value="Timer/Countdown"> Timer/Countdown</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Score/Points"> Score/Points</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Levels"> Levels</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Local multiplayer"> Local multiplayer</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Sound effects"> Sound effects</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Drag &amp; drop"> Drag &amp; drop</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Keyboard controls"> Keyboard controls</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Touch/swipe"> Touch/swipe</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Randomized"> Randomized</label>
-        <label class="choice-checkbox"><input type="checkbox" value="Save progress"> Save progress</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Timer/Countdown"> &#9201;&#65039; Timer/Countdown</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Score/Points"> &#127919; Score/Points</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Levels"> &#129692; Levels</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Local multiplayer"> &#128101; Local multiplayer</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Sound effects"> &#128266; Sound effects</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Drag &amp; drop"> &#9995; Drag &amp; drop</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Keyboard controls"> &#9000;&#65039; Keyboard controls</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Touch/swipe"> &#128070; Touch/swipe</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Randomized"> &#127922; Randomized</label>
+        <label class="choice-checkbox"><input type="checkbox" value="Save progress"> &#128190; Save progress</label>
       </div>
 
       <label>Anything specific? (optional)</label>
@@ -580,6 +582,151 @@ function escHtml(s) {
 """
 
 
+BUILD_PRINT_OPTIONS = {
+    "App type": [
+        ("Arcade Game", "&#127918;"), ("Puzzle", "&#129513;"), ("Quiz", "&#10067;"),
+        ("Story", "&#128214;"), ("Tool", "&#128295;"), ("Arts/Crafts", "&#127912;"),
+        ("Music", "&#127925;"), ("Sports", "&#127941;"), ("Card Game", "&#127183;"),
+        ("Interactive Game", "&#127939;"), ("Cooking", "&#127859;"), ("Party Game", "&#127881;"),
+    ],
+    "Theme": [
+        ("Bright &amp; Playful", "&#127752;"), ("Cool &amp; Calm", "&#128167;"), ("Dark &amp; Mysterious", "&#127769;"),
+        ("Neon &amp; Energetic", "&#9889;"), ("Pastel &amp; Soft", "&#127800;"), ("Retro &amp; Nostalgic", "&#128252;"),
+        ("Nature &amp; Earthy", "&#127811;"), ("Elegant &amp; Minimal", "&#10024;"), ("Spooky &amp; Fun", "&#127875;"),
+    ],
+    "Age range": [
+        ("Under 6", "&#128118;"), ("6-9", "&#129490;"), ("10-13", "&#127890;"),
+        ("14-17", "&#127911;"), ("18+", "&#129489;"), ("All ages", "&#128106;"),
+    ],
+    "Difficulty": [
+        ("Easy", "&#128994;"), ("Medium", "&#128993;"), ("Hard", "&#128308;"),
+    ],
+    "Mechanics (pick any)": [
+        ("Timer/Countdown", "&#9201;&#65039;"), ("Score/Points", "&#127919;"), ("Levels", "&#129692;"),
+        ("Local multiplayer", "&#128101;"), ("Sound effects", "&#128266;"), ("Drag &amp; drop", "&#9995;"),
+        ("Keyboard controls", "&#9000;&#65039;"), ("Touch/swipe", "&#128070;"), ("Randomized", "&#127922;"),
+        ("Save progress", "&#128190;"),
+    ],
+}
+
+
+def print_bubble_grid(label, multi=False):
+    """Renders one BUILD_PRINT_OPTIONS field as a grid of paper 'bubbles' --
+    circles for single-pick fields, checkbox squares for multi-pick (Mechanics)
+    -- each with the same emoji+label pairing already used in the live
+    dropdowns/checkboxes, so someone filling this out on paper sees exactly the
+    same options as the digital form."""
+    mark = "&#9723;" if multi else "&#9675;"
+    items = "".join(
+        f'<div class="print-bubble"><span class="print-mark">{mark}</span> {emoji} {name}</div>'
+        for name, emoji in BUILD_PRINT_OPTIONS[label]
+    )
+    return f'<div class="print-field"><div class="print-label">{label}</div><div class="print-bubble-grid">{items}</div></div>'
+
+
+BUILD_PRINT_STYLES = """
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1a1a1a; background: #fff; max-width: 780px; margin: 0 auto; padding: 1.5rem; }
+  .print-toolbar { text-align: center; margin-bottom: 1.2rem; }
+  .print-btn { background: #7c6ee6; color: #fff; border: none; border-radius: 8px; padding: 0.7rem 1.4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+  .print-header { text-align: center; margin-bottom: 1.2rem; }
+  .print-header h1 { font-size: 1.5rem; margin-bottom: 0.3rem; }
+  .print-instructions { background: #f3f1ff; border: 1px solid #ddd6ff; border-radius: 10px; padding: 0.9rem 1.1rem; font-size: 0.92rem; line-height: 1.5; margin-bottom: 1.4rem; }
+  .print-instructions strong { color: #5b4dc2; }
+  .print-section-title { font-size: 1.1rem; font-weight: 700; margin: 1.6rem 0 0.9rem; padding-bottom: 0.3rem; border-bottom: 2px solid #1a1a1a; }
+  .print-section-title.advanced { color: #555; }
+  .print-advanced-note { font-size: 0.85rem; color: #555; font-style: italic; margin-bottom: 0.8rem; }
+  .print-field { margin-bottom: 1.1rem; }
+  .print-label { font-weight: 700; font-size: 0.92rem; margin-bottom: 0.4rem; }
+  .print-bubble-grid { display: flex; flex-wrap: wrap; gap: 0.5rem 1.1rem; }
+  .print-bubble { font-size: 0.92rem; white-space: nowrap; }
+  .print-mark { font-size: 1.1rem; }
+  .print-line { border-bottom: 1px solid #999; height: 1.6rem; margin-top: 0.2rem; }
+  .print-lines-3 .print-line { margin-bottom: 0.5rem; }
+  .print-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #ccc; text-align: center; font-size: 0.85rem; color: #555; }
+  .print-footer .url { font-weight: 700; color: #5b4dc2; }
+  @media print {
+    .print-toolbar { display: none; }
+    body { padding: 0.3in; }
+    .print-section-title { break-after: avoid; }
+    .print-field { break-inside: avoid; }
+  }
+"""
+
+
+def generate_build_print_page(share_url):
+    """Paper version of the Build wizard for someone without easy phone/computer
+    access at the moment -- fill it out with a pencil, then have someone type
+    the answers into the real form at share_url to actually kick off the build
+    (this page has no submit capability of its own, it's pure static HTML)."""
+    idea_lines = "".join('<div class="print-line"></div>' for _ in range(3))
+    tech_lines = "".join('<div class="print-line"></div>' for _ in range(2))
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build Your Own App &mdash; Printable Form</title>
+<style>
+{BUILD_PRINT_STYLES}
+</style>
+</head>
+<body>
+  <div class="print-toolbar">
+    <button class="print-btn" type="button" onclick="window.print()">&#128424; Print this page</button>
+  </div>
+  <div class="print-header">
+    <h1>&#128736; Build Your Own App</h1>
+  </div>
+  <div class="print-instructions">
+    Fill this out with a pencil &mdash; circle or check the bubbles you want, and write on the blank lines.
+    Then go to <strong>{share_url}</strong> on a phone or computer and enter your answers there to actually
+    build the app.
+  </div>
+
+  <div class="print-section-title">Basic</div>
+
+  <div class="print-field">
+    <div class="print-label">Your name</div>
+    <div class="print-line"></div>
+  </div>
+  <div class="print-field">
+    <div class="print-label">Email <span style="font-weight:400;">(so we can tell you when it's ready)</span></div>
+    <div class="print-line"></div>
+  </div>
+  {print_bubble_grid("App type")}
+  {print_bubble_grid("Theme")}
+  <div class="print-field">
+    <div class="print-label">Subject <span style="font-weight:400;">(optional &mdash; e.g. dinosaurs, space pirates)</span></div>
+    <div class="print-line"></div>
+  </div>
+  {print_bubble_grid("Age range")}
+  <div class="print-field">
+    <div class="print-label">Your idea <span style="font-weight:400;">(one or two sentences)</span></div>
+    <div class="print-lines-3">{idea_lines}</div>
+  </div>
+
+  <div class="print-section-title advanced">Advanced <span style="font-weight:400;">(optional &mdash; skip if Basic is enough)</span></div>
+  <div class="print-advanced-note">Only fill this out if you want more control over how the app turns out.</div>
+
+  {print_bubble_grid("Difficulty")}
+  {print_bubble_grid("Mechanics (pick any)", multi=True)}
+  <div class="print-field">
+    <div class="print-label">Anything specific? <span style="font-weight:400;">(optional &mdash; e.g. a leaderboard of best times)</span></div>
+    <div class="print-lines-3">{tech_lines}</div>
+  </div>
+  <div class="print-field">
+    <div class="print-label">Make it feel like&hellip; <span style="font-weight:400;">(optional &mdash; e.g. Flappy Bird)</span></div>
+    <div class="print-line"></div>
+  </div>
+
+  <div class="print-footer">
+    Enter these answers at<br><span class="url">{share_url}</span>
+  </div>
+</body>
+</html>"""
+
+
 def builder_share_row_html(share_url):
     return f"""  <div class="builder-share">
     <label>Share this form</label>
@@ -589,6 +736,7 @@ def builder_share_row_html(share_url):
       <button class="builder-share-btn hidden" id="builder-native-share-btn" type="button">&#128228; Share&hellip;</button>
     </div>
     <span class="builder-share-copied hidden" id="builder-share-copied">Copied!</span>
+    <a class="builder-print-link" href="/build/print" target="_blank">&#128424; Prefer paper? Print a blank form</a>
   </div>"""
 
 
@@ -2937,6 +3085,16 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             app_requests_public = [strip_private_fields(r) for r in data.get("app_requests", [])]
             share_url = f"{get_base_url()}/build"
             html = generate_builder_page(app_requests_public, list_builders(data), share_url)
+            body = html.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(body)
+        elif path == "/build/print":
+            share_url = f"{get_base_url()}/build"
+            html = generate_build_print_page(share_url)
             body = html.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
