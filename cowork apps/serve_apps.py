@@ -63,10 +63,17 @@ CATEGORY_ICONS = {
     "Fashion Apps": "\U0001f457",
     "Music Game Apps": "\U0001f3b6",
     "Party Apps": "\U0001f389",
-    "Shooting Games Apps": "\U0001f3af",
     "Sports Games Apps": "⚽",
     "Table Games Apps": "\U0001f3b2",
     "Therapy Apps": "\U0001f9d8",
+    # Newer category folders created directly in Title Case (e.g. "Shooting Games/"
+    # instead of the older "shooting_games_apps/" -> title-cased convention above),
+    # so their category string is the folder name as-is -- these keys must match it.
+    "Cooking Games": "\U0001f373",
+    "Crafts": "\U0001f9f6",
+    "Inspirational": "\U0001f31f",
+    "Music Production": "\U0001f39b️",
+    "Shooting Games": "\U0001f3af",
 }
 
 def get_local_ip():
@@ -314,11 +321,12 @@ def list_builders(data):
     )
 
 
-# Light/dark theme: shared CSS custom-property values, the anti-flash init
-# script (must run before first paint, so it's inlined as the first thing in
-# <head>), and the toggle button + its wiring JS. Used by both generate_index()
-# and generate_builder_page() so there's one definition of "what dark mode
-# looks like" instead of two that can drift.
+# Light/dark theme: shared CSS custom-property values, a server-rendered
+# data-theme attribute (so the correct theme is already in the very first
+# byte of HTML -- no anti-flash JS needed), and the toggle button + its
+# wiring JS. Used by both generate_index() and generate_builder_page() so
+# there's one definition of "what dark mode looks like" instead of two that
+# can drift.
 THEME_ROOT_VARS = """
   :root {
     --bg: #f5f5fa;
@@ -342,9 +350,15 @@ THEME_ROOT_VARS = """
   }
 """
 
-THEME_INIT_SCRIPT = """<script>
-(function(){var t=localStorage.getItem('appverse-theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');})();
-</script>"""
+
+def theme_html_attr(data):
+    """data-theme attribute for the <html> tag, computed server-side from the
+    saved global preference (data["theme"]) so dark/light mode is the same on
+    every device and every URL (localhost, LAN IP, Tailscale hostname) that
+    opens this hub. A localStorage-only choice resets per browser origin,
+    which is exactly the "keeps going back to light" symptom this replaces."""
+    return ' data-theme="dark"' if data.get("theme") == "dark" else ""
+
 
 THEME_TOGGLE_HTML = '<button id="theme-toggle-btn" class="theme-toggle-btn" type="button" aria-label="Toggle dark mode">&#127769;</button>'
 
@@ -358,14 +372,13 @@ function updateThemeToggleIcon() {
 updateThemeToggleIcon();
 themeToggleBtn?.addEventListener('click', () => {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  if (isDark) {
-    document.documentElement.removeAttribute('data-theme');
-    localStorage.setItem('appverse-theme', 'light');
-  } else {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    localStorage.setItem('appverse-theme', 'dark');
-  }
+  const next = isDark ? 'light' : 'dark';
+  if (next === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  else document.documentElement.removeAttribute('data-theme');
   updateThemeToggleIcon();
+  // Saved server-side (not localStorage) so the choice carries over to every
+  // device/URL that opens this hub, instead of resetting per browser origin.
+  apiPost('/api/theme', { theme: next });
 });
 """
 
@@ -2191,9 +2204,8 @@ def generate_index(apps, reviews, base_url):
         )
 
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en"{theme_html_attr(data)}>
 <head>
-{THEME_INIT_SCRIPT}
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AppVerse</title>
@@ -2343,7 +2355,7 @@ def generate_index(apps, reviews, base_url):
   .cat-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; padding: 1rem 1.5rem 2rem; max-width: 700px; margin: 0 auto; }}
   .cat-tile {{ background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.2rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.4rem; cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.12s; text-align: center; }}
   .cat-tile:hover, .cat-tile:active {{ background: var(--card-hover); border-color: var(--accent); transform: translateY(-2px); }}
-  .cat-tile-icon {{ font-size: 2rem; line-height: 1; }}
+  .cat-tile-icon {{ font-size: 3rem; line-height: 1; }}
   .cat-tile-name {{ color: var(--text); font-size: 0.9rem; font-weight: 600; }}
   .cat-tile-count {{ color: var(--muted); font-size: 0.75rem; }}
   .cat-tile-new {{ color: var(--accent2); font-weight: 700; }}
@@ -3025,11 +3037,11 @@ def generate_builder_page(app_requests_public, builders, share_url):
     builder_logic_js() as the tab -- same DOM ids, same behavior, same data."""
     app_requests_json = json.dumps(app_requests_public).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     builders_json = json.dumps(builders).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+    data = load_data()
 
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="en"{theme_html_attr(data)}>
 <head>
-{THEME_INIT_SCRIPT}
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Build Your Own App &mdash; AppVerse</title>
@@ -3573,6 +3585,15 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             req["feedback"] = {"rating": rating, "comment": comment, "submitted_at": now_iso()}
             save_data(data)
             notify_feedback_async(req.get("requester_name", ""), rating, comment, request_id)
+            self._json({"ok": True})
+
+        elif path == "/api/theme":
+            theme = (payload.get("theme") or "").strip()
+            if theme not in ("dark", "light"):
+                self._json({"ok": False, "error": "invalid theme"}, status=400)
+                return
+            data["theme"] = theme
+            save_data(data)
             self._json({"ok": True})
 
         elif path == "/api/build/email_links":
