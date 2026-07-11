@@ -1,0 +1,486 @@
+<!-- CONCEPT: VOTING/SOCIAL - "Most Likely To Showdown": the group points at one player each round and the screen tallies votes into a live scoreboard; built-in 80+ prompts for endless replay. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Most Likely To Showdown — Party Voting Game (3–10 players, ~15–25 min)</title>
+<style>
+  :root{
+    --bg1:#2b0b4d; --bg2:#5a0f8a; --bg3:#0d1b54;
+    --accent:#ffd23f; --accent2:#ff4d8d; --good:#36e27b; --ink:#fff;
+    --panel:rgba(255,255,255,.08); --panelB:rgba(255,255,255,.16);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
+    color:var(--ink);
+    background:linear-gradient(135deg,var(--bg1),var(--bg2) 45%,var(--bg3));
+    background-attachment:fixed;
+    min-height:100%;
+    overflow-x:hidden;
+    user-select:none;
+  }
+  #app{max-width:1100px;margin:0 auto;padding:18px 16px 40px;min-height:100vh;display:flex;flex-direction:column;}
+  .screen{display:none;animation:pop .35s ease;}
+  .screen.active{display:flex;flex-direction:column;flex:1;}
+  @keyframes pop{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:none;}}
+  h1{font-size:clamp(2.4rem,7vw,4.6rem);margin:.1em 0 0;line-height:1;text-align:center;
+     text-shadow:0 4px 0 rgba(0,0,0,.25);letter-spacing:-1px;}
+  .sub{text-align:center;font-size:clamp(1rem,2.6vw,1.5rem);opacity:.92;margin:.4em 0 0;}
+  .pill{display:inline-block;background:var(--panel);border:1px solid var(--panelB);
+        border-radius:999px;padding:.35em .9em;margin:.25em;font-size:1rem;}
+  .btn{
+    cursor:pointer;border:none;border-radius:18px;font-family:inherit;font-weight:bold;
+    padding:.7em 1.1em;font-size:clamp(1.1rem,2.6vw,1.6rem);color:#231;
+    background:linear-gradient(180deg,#ffe27a,var(--accent));
+    box-shadow:0 6px 0 #c99a00, 0 10px 18px rgba(0,0,0,.3);
+    transition:transform .08s, box-shadow .08s;touch-action:manipulation;
+  }
+  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #c99a00,0 4px 10px rgba(0,0,0,.3);}
+  .btn.pink{background:linear-gradient(180deg,#ff86b4,var(--accent2));color:#fff;box-shadow:0 6px 0 #b71a55,0 10px 18px rgba(0,0,0,.3);}
+  .btn.pink:active{box-shadow:0 2px 0 #b71a55;}
+  .btn.ghost{background:var(--panel);color:#fff;border:2px solid var(--panelB);box-shadow:none;}
+  .btn.ghost:active{transform:translateY(2px);}
+  .btn.big{width:100%;padding:1em;font-size:clamp(1.3rem,3.4vw,2rem);}
+  .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:center;}
+  .center{justify-content:center;align-items:center;}
+  .spacer{flex:1;}
+  /* SETUP */
+  .card{background:var(--panel);border:1px solid var(--panelB);border-radius:22px;padding:18px;margin:14px 0;}
+  .nameRow{display:flex;gap:10px;margin:8px 0;align-items:center;}
+  .nameRow input{flex:1;font-family:inherit;font-size:1.3rem;padding:.55em .7em;border-radius:14px;border:none;
+     background:rgba(255,255,255,.92);color:#222;min-width:0;}
+  .nameRow input:focus{outline:3px solid var(--accent);}
+  .miniX{background:var(--accent2);color:#fff;border:none;border-radius:12px;width:46px;height:46px;font-size:1.4rem;font-weight:bold;cursor:pointer;flex:0 0 auto;}
+  .toggle{display:flex;gap:8px;flex-wrap:wrap;}
+  .toggle .opt{background:var(--panel);border:2px solid var(--panelB);border-radius:14px;padding:.5em 1em;cursor:pointer;font-size:1.1rem;}
+  .toggle .opt.sel{background:var(--accent);color:#231;border-color:#fff;font-weight:bold;}
+  /* PLAY */
+  .roundtag{text-align:center;font-size:1.1rem;letter-spacing:2px;opacity:.85;text-transform:uppercase;margin-top:6px;}
+  .prompt{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;
+     font-size:clamp(2rem,6.5vw,4rem);font-weight:bold;line-height:1.12;padding:18px 6px;
+     text-shadow:0 3px 0 rgba(0,0,0,.25);}
+  .prompt .lead{display:block;font-size:.5em;font-weight:normal;opacity:.85;margin-bottom:.3em;letter-spacing:3px;text-transform:uppercase;color:var(--accent);}
+  .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));}
+  .pbtn{
+    position:relative;border:none;border-radius:18px;cursor:pointer;font-family:inherit;font-weight:bold;
+    color:#fff;font-size:clamp(1.1rem,3vw,1.7rem);padding:1em .5em;min-height:84px;
+    box-shadow:0 6px 14px rgba(0,0,0,.35);transition:transform .08s,filter .1s;overflow:hidden;
+    word-break:break-word;
+  }
+  .pbtn:active{transform:scale(.96);}
+  .pbtn .sc{position:absolute;top:6px;right:10px;font-size:.85rem;background:rgba(0,0,0,.3);border-radius:999px;padding:.1em .6em;}
+  .pbtn.flash{animation:flash .5s;}
+  @keyframes flash{0%{filter:brightness(2.2);}100%{filter:brightness(1);}}
+  /* REVEAL / WINNER */
+  .bigname{text-align:center;font-size:clamp(2.4rem,9vw,5.5rem);font-weight:bold;margin:.1em 0;
+     text-shadow:0 4px 0 rgba(0,0,0,.3);}
+  .scoreList{list-style:none;padding:0;margin:10px 0;}
+  .scoreList li{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--panelB);
+     border-radius:16px;padding:.6em 1em;margin:8px 0;font-size:clamp(1.1rem,3vw,1.7rem);}
+  .scoreList .rank{font-weight:bold;color:var(--accent);width:1.6em;text-align:center;}
+  .scoreList .pts{margin-left:auto;font-weight:bold;background:rgba(0,0,0,.25);border-radius:999px;padding:.1em .7em;}
+  .scoreList li.lead{outline:3px solid var(--accent);}
+  .crown{font-size:1.2em;}
+  .foot{text-align:center;opacity:.7;font-size:.95rem;margin-top:14px;}
+  .topbar{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:4px;}
+  .topbar .tiny{background:var(--panel);border:1px solid var(--panelB);border-radius:999px;padding:.3em .8em;font-size:.95rem;cursor:pointer;}
+  .confetti{position:fixed;top:-12px;width:12px;height:18px;opacity:.95;z-index:5;pointer-events:none;border-radius:2px;}
+  @keyframes fall{to{transform:translateY(110vh) rotate(720deg);}}
+  .hint{text-align:center;opacity:.8;font-size:1rem;margin:6px 0 0;}
+  label.cb{display:flex;align-items:center;gap:10px;font-size:1.1rem;cursor:pointer;justify-content:center;margin-top:6px;}
+  label.cb input{width:24px;height:24px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== HOME ===== -->
+  <section id="home" class="screen active">
+    <div class="spacer"></div>
+    <h1>MOST&nbsp;LIKELY&nbsp;TO<br><span style="color:var(--accent)">SHOWDOWN</span></h1>
+    <p class="sub">The whole room points at one person. The screen keeps score. Chaos &amp; laughs ensue.</p>
+    <div class="row" style="margin-top:14px">
+      <span class="pill">👥 3–10 players</span>
+      <span class="pill">⏱ ~15–25 min</span>
+      <span class="pill">📺 One screen, everyone plays</span>
+      <span class="pill">👨‍👩‍👧 Family-friendly</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="row">
+      <button class="btn big pink" onclick="goSetup()">▶ START GAME</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost" onclick="show('rules')">How to play</button>
+    </div>
+    <div class="spacer"></div>
+    <p class="foot">No internet, no apps, no accounts — just this screen and your crew.</p>
+  </section>
+
+  <!-- ===== RULES ===== -->
+  <section id="rules" class="screen">
+    <div class="topbar"><span class="tiny" onclick="show('home')">‹ Back</span><span></span></div>
+    <h1 style="font-size:clamp(2rem,6vw,3.4rem)">How to Play</h1>
+    <div class="card" style="font-size:clamp(1.05rem,2.8vw,1.4rem);line-height:1.5">
+      <p><b>1.</b> Add everyone's name on the next screen.</p>
+      <p><b>2.</b> A prompt appears, like <i>“Most likely to become a famous TikToker.”</i></p>
+      <p><b>3.</b> On the count of <b>3… 2… 1… POINT!</b> everyone points at the person they think fits best.</p>
+      <p><b>4.</b> Whoever got the most fingers pointed at them — tap their name on the screen. They score a point (tap again for ties or extra votes).</p>
+      <p><b>5.</b> First to the target score wins the Showdown. 👑</p>
+      <p style="opacity:.85"><b>Host tip:</b> One person holds the screen and taps the round's winner. It's fast — keep it moving!</p>
+    </div>
+    <div class="row"><button class="btn big" onclick="goSetup()">Got it — set up players</button></div>
+  </section>
+
+  <!-- ===== SETUP ===== -->
+  <section id="setup" class="screen">
+    <div class="topbar"><span class="tiny" onclick="show('home')">‹ Home</span><span class="tiny" onclick="show('rules')">Rules</span></div>
+    <h1 style="font-size:clamp(2rem,6vw,3.4rem)">Who's Playing?</h1>
+    <div class="card">
+      <div id="names"></div>
+      <button class="btn ghost" style="width:100%;margin-top:6px" onclick="addName()">+ Add player</button>
+    </div>
+    <div class="card">
+      <p style="margin:.2em 0 .5em;font-size:1.1rem;opacity:.9">Win at score:</p>
+      <div class="toggle" id="targetToggle">
+        <span class="opt" data-t="5">5</span>
+        <span class="opt sel" data-t="7">7</span>
+        <span class="opt" data-t="10">10</span>
+        <span class="opt" data-t="0">No limit</span>
+      </div>
+      <label class="cb"><input type="checkbox" id="spicyChk"> Include spicier "roast" prompts (still family-friendly)</label>
+    </div>
+    <p class="hint" id="setupHint">Add at least 3 players to begin.</p>
+    <div class="row"><button class="btn big pink" id="beginBtn" onclick="beginGame()">Let's Go! ▶</button></div>
+  </section>
+
+  <!-- ===== PLAY ===== -->
+  <section id="play" class="screen">
+    <div class="topbar">
+      <span class="tiny" onclick="confirmQuit()">✕ Quit</span>
+      <span class="tiny" onclick="openBoard()">📊 Scores</span>
+    </div>
+    <div class="roundtag" id="roundTag">Round 1</div>
+    <div class="prompt" id="promptText"></div>
+    <p class="hint">Count down <b>3·2·1·POINT</b> — then tap who the room chose:</p>
+    <div class="grid" id="playerGrid"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn ghost" onclick="skipPrompt()">↻ Skip prompt</button>
+      <button class="btn" onclick="nextRound(true)">No winner ▶</button>
+    </div>
+  </section>
+
+  <!-- ===== REVEAL ===== -->
+  <section id="reveal" class="screen">
+    <div class="spacer"></div>
+    <div class="roundtag" id="revealTag"></div>
+    <p class="sub" style="opacity:.85">Most likely to…</p>
+    <div class="bigname" id="revealName">🎉</div>
+    <p class="sub" id="revealLine"></p>
+    <div class="spacer"></div>
+    <div class="row"><button class="btn big pink" onclick="afterReveal()" id="revealBtn">Next Round ▶</button></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost" onclick="undoLast()">↩ Undo that point</button></div>
+    <div class="spacer"></div>
+  </section>
+
+  <!-- ===== BOARD ===== -->
+  <section id="board" class="screen">
+    <div class="topbar"><span class="tiny" onclick="show('play')">‹ Back</span><span class="tiny" id="boardTarget"></span></div>
+    <h1 style="font-size:clamp(2rem,6vw,3.4rem)">Scoreboard</h1>
+    <ul class="scoreList" id="boardList"></ul>
+    <div class="row"><button class="btn big" onclick="show('play')">Keep Playing ▶</button></div>
+  </section>
+
+  <!-- ===== WINNER ===== -->
+  <section id="winner" class="screen">
+    <div class="spacer"></div>
+    <p class="sub">👑 The Showdown Champion is…</p>
+    <div class="bigname" id="winName" style="color:var(--accent)"></div>
+    <ul class="scoreList" id="finalList"></ul>
+    <div class="spacer"></div>
+    <div class="row">
+      <button class="btn big pink" onclick="rematch()">Rematch (same crew) ▶</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost" onclick="newGame()">New Game</button>
+    </div>
+    <div class="spacer"></div>
+  </section>
+
+</div>
+
+<script>
+/* ============ DATA ============ */
+const PROMPTS = [
+ "become a famous TikToker or YouTuber",
+ "survive the longest in a zombie apocalypse",
+ "accidentally become the leader of a small country",
+ "show up an hour late to their own wedding",
+ "talk their way out of a speeding ticket",
+ "adopt 12 cats and name them all",
+ "win a hot-dog eating contest",
+ "forget where they parked the car",
+ "cry happy tears at a movie",
+ "start a conversation with a complete stranger",
+ "get lost using GPS",
+ "become a world-class chess champion",
+ "laugh at the worst possible moment",
+ "fall asleep during a thriller movie",
+ "spend their whole paycheck on snacks",
+ "go viral for something embarrassing",
+ "be the first to dance at a party",
+ "win a gold medal at the Olympics",
+ "accidentally text the wrong person",
+ "rescue a stranded animal on the highway",
+ "become a millionaire from a weird invention",
+ "binge an entire TV series in one weekend",
+ "forget their own phone number",
+ "give the best motivational speech ever",
+ "befriend a celebrity in an elevator",
+ "trip over absolutely nothing",
+ "still be using the same phone in ten years",
+ "host the most over-the-top dinner party",
+ "get a tattoo on a dare",
+ "name a pet after a food",
+ "be voted class clown",
+ "remember everyone's birthday",
+ "wear pajamas to the grocery store",
+ "become a professional video gamer",
+ "win an argument they were clearly losing",
+ "save the day in an emergency",
+ "sing karaoke without being asked twice",
+ "read the entire instruction manual",
+ "plan a surprise party flawlessly",
+ "get distracted by a dog mid-sentence",
+ "move to a tiny cabin in the woods",
+ "start a band on a whim",
+ "be the human alarm clock of the group",
+ "google a question they could've just asked",
+ "become a famous chef",
+ "fall for an obvious prank",
+ "give the most thoughtful gift",
+ "learn five languages just for fun",
+ "be the designated photographer of the group",
+ "accidentally start a new trend",
+ "win 'employee of the month' forever",
+ "talk to plants like they're people",
+ "show up with snacks for everyone",
+ "stay calm in a crisis",
+ "get way too competitive at board games",
+ "make friends with the waiter",
+ "become an astronaut",
+ "keep a New Year's resolution all year",
+ "have a secret hidden talent",
+ "narrate their own life out loud",
+ "win the lottery and tell no one",
+ "be the first to need a nap at a party",
+ "become a stand-up comedian",
+ "overpack for a one-night trip",
+ "rescue the group when the plan falls apart",
+ "have the cleanest, tidiest house",
+ "start crying laughing and not be able to stop",
+ "become mayor of the town",
+ "befriend every dog in the neighborhood",
+ "be unbeatable at trivia night",
+ "leave a party without saying goodbye",
+ "turn any task into a competition",
+ "write a best-selling novel someday",
+ "remember a random fact at the perfect time",
+ "be the group's unofficial therapist",
+ "get the whole room singing along",
+ "build something amazing out of cardboard"
+];
+const SPICY = [
+ "lose their phone at the party",
+ "send a risky text and regret it",
+ "double-book themselves on the same night",
+ "argue with a referee on TV",
+ "eat the last slice without asking",
+ "fall asleep before midnight on New Year's",
+ "start a group chat nobody asked for",
+ "leave you 'on read' for three days",
+ "show up to the gym once and quit",
+ "lose a game and demand a rematch",
+ "take the most selfies tonight",
+ "be late to this very game",
+ "overshare on a first date",
+ "burn water while cooking",
+ "ghost a plan at the last minute",
+ "get competitive over literally anything"
+];
+
+/* ============ STATE ============ */
+let players = [];      // {name, score, color}
+let target = 7;
+let usePool = [];      // shuffled prompt strings
+let poolPos = 0;
+let round = 1;
+let currentPrompt = "";
+let history = [];      // playerIndex stack for undo
+const COLORS = ["#ff4d8d","#36a2ff","#ffb13f","#36e27b","#b06bff","#ff6b5e","#19c6c0","#ff8fcf","#7ed957","#ffce3f"];
+
+/* ============ AUDIO ============ */
+let actx=null;
+function ac(){ if(!actx){ try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } return actx; }
+function beep(freq=440,dur=.12,type="triangle",vol=.25,when=0){
+  const c=ac(); if(!c) return;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type; o.frequency.value=freq;
+  const t=c.currentTime+when;
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+.01);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur+.02);
+}
+function sndPoint(){ beep(523,.1,"triangle",.25); beep(784,.12,"triangle",.25,.08); beep(1046,.18,"triangle",.25,.18); }
+function sndWin(){ [523,659,784,1046,1318].forEach((f,i)=>beep(f,.25,"triangle",.3,i*.12)); }
+function sndClick(){ beep(330,.05,"square",.15); }
+
+/* ============ NAV ============ */
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function goSetup(){ ac(); if(document.getElementById('names').children.length===0) seedNames(); show('setup'); }
+
+/* ============ SETUP ============ */
+function seedNames(){ ['','',''].forEach(()=>addNameField('')); refreshSetup(); }
+function addNameField(val){
+  const wrap=document.getElementById('names');
+  const div=document.createElement('div'); div.className='nameRow';
+  const inp=document.createElement('input');
+  inp.type='text'; inp.placeholder='Player '+(wrap.children.length+1);
+  inp.maxLength=14; inp.value=val||'';
+  inp.addEventListener('input',refreshSetup);
+  const x=document.createElement('button'); x.className='miniX'; x.textContent='×';
+  x.onclick=()=>{ div.remove(); refreshSetup(); };
+  div.appendChild(inp); div.appendChild(x); wrap.appendChild(div);
+}
+function addName(){ sndClick(); const wrap=document.getElementById('names'); if(wrap.children.length>=10) return; addNameField(''); refreshSetup(); const inputs=wrap.querySelectorAll('input'); inputs[inputs.length-1].focus(); }
+function currentNames(){ return [...document.querySelectorAll('#names input')].map(i=>i.value.trim()).filter(Boolean); }
+function refreshSetup(){
+  const n=currentNames().length;
+  const hint=document.getElementById('setupHint');
+  const btn=document.getElementById('beginBtn');
+  if(n<3){ hint.textContent='Add at least 3 players to begin. ('+n+'/3)'; btn.style.opacity=.5; }
+  else { hint.textContent=n+' players ready!'; btn.style.opacity=1; }
+}
+document.getElementById('targetToggle').addEventListener('click',e=>{
+  const o=e.target.closest('.opt'); if(!o) return; sndClick();
+  document.querySelectorAll('#targetToggle .opt').forEach(x=>x.classList.remove('sel'));
+  o.classList.add('sel');
+});
+
+/* ============ GAME FLOW ============ */
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function buildPool(){
+  const spicy=document.getElementById('spicyChk').checked;
+  let list=[...PROMPTS]; if(spicy) list=list.concat(SPICY);
+  usePool=shuffle(list); poolPos=0;
+}
+function beginGame(){
+  const names=currentNames();
+  if(names.length<3){ document.getElementById('setupHint').textContent='You need at least 3 players!'; return; }
+  const seen={};
+  players=names.map((nm,i)=>{
+    let label=nm; const k=nm.toLowerCase();
+    if(seen[k]){ label=nm+' '+(++seen[k]); } else seen[k]=1;
+    return {name:label,score:0,color:COLORS[i%COLORS.length]};
+  });
+  target=parseInt(document.querySelector('#targetToggle .opt.sel').dataset.t,10);
+  buildPool(); round=1; history=[];
+  newPrompt(); renderGrid(); show('play'); sndPoint();
+}
+function newPrompt(){
+  if(poolPos>=usePool.length){ buildPool(); }
+  currentPrompt=usePool[poolPos++];
+  document.getElementById('promptText').innerHTML='<span class="lead">Most likely to…</span>'+escapeHtml(currentPrompt);
+  document.getElementById('roundTag').textContent='Round '+round;
+}
+function skipPrompt(){ sndClick(); newPrompt(); }
+function renderGrid(){
+  const g=document.getElementById('playerGrid'); g.innerHTML='';
+  players.forEach((p,i)=>{
+    const b=document.createElement('button'); b.className='pbtn';
+    b.style.background='linear-gradient(180deg,'+p.color+'cc,'+p.color+')';
+    b.innerHTML='<span class="sc">'+p.score+'</span>'+escapeHtml(p.name);
+    b.onclick=()=>awardPoint(i,b);
+    g.appendChild(b);
+  });
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function awardPoint(i,btn){
+  players[i].score++;
+  history.push(i);
+  if(btn){ btn.classList.remove('flash'); void btn.offsetWidth; btn.classList.add('flash'); btn.querySelector('.sc').textContent=players[i].score; }
+  sndPoint();
+  document.getElementById('revealTag').textContent='Round '+round;
+  document.getElementById('revealName').textContent='👉 '+players[i].name;
+  document.getElementById('revealName').style.color=players[i].color;
+  document.getElementById('revealLine').innerHTML='<b>'+escapeHtml(currentPrompt)+'</b>';
+  const btnEl=document.getElementById('revealBtn');
+  if(target>0 && players[i].score>=target){
+    btnEl.textContent='See the Champion 👑';
+    btnEl.onclick=declareWinner;
+  } else {
+    btnEl.textContent='Next Round ▶';
+    btnEl.onclick=afterReveal;
+  }
+  show('reveal');
+}
+function undoLast(){
+  if(history.length){ const i=history.pop(); players[i].score=Math.max(0,players[i].score-1); }
+  sndClick(); renderGrid(); show('play');
+}
+function afterReveal(){ round++; newPrompt(); renderGrid(); show('play'); }
+function nextRound(noWinner){
+  if(noWinner){ sndClick(); round++; newPrompt(); renderGrid(); }
+}
+
+/* ============ BOARD ============ */
+function renderBoard(listId,markLeader){
+  const ul=document.getElementById(listId); ul.innerHTML='';
+  const sorted=[...players].sort((a,b)=>b.score-a.score);
+  const top=sorted.length?sorted[0].score:0;
+  sorted.forEach((p,idx)=>{
+    const li=document.createElement('li');
+    const isTop=(markLeader && p.score===top && top>0);
+    if(isTop) li.classList.add('lead');
+    const crown=isTop?'<span class="crown">👑</span>':'';
+    li.innerHTML='<span class="rank">'+(idx+1)+'</span><span style="color:'+p.color+'">'+escapeHtml(p.name)+'</span> '+crown+'<span class="pts">'+p.score+'</span>';
+    ul.appendChild(li);
+  });
+}
+function openBoard(){ document.getElementById('boardTarget').textContent= target>0?('First to '+target):'Free play'; renderBoard('boardList',true); show('board'); }
+
+/* ============ WINNER ============ */
+function declareWinner(){
+  const sorted=[...players].sort((a,b)=>b.score-a.score);
+  document.getElementById('winName').textContent='👑 '+sorted[0].name;
+  document.getElementById('winName').style.color=sorted[0].color;
+  renderBoard('finalList',true);
+  show('winner'); sndWin(); confettiBurst();
+}
+function confettiBurst(){
+  for(let i=0;i<70;i++){
+    const c=document.createElement('div'); c.className='confetti';
+    c.style.left=Math.random()*100+'vw';
+    c.style.background=COLORS[Math.floor(Math.random()*COLORS.length)];
+    c.style.animation='fall '+(2+Math.random()*2)+'s linear '+(Math.random()*.8)+'s forwards';
+    c.style.transform='rotate('+Math.random()*360+'deg)';
+    document.body.appendChild(c);
+    setTimeout(()=>c.remove(),5200);
+  }
+}
+function rematch(){
+  players.forEach(p=>p.score=0); history=[]; round=1; buildPool();
+  newPrompt(); renderGrid(); show('play'); sndPoint();
+}
+function newGame(){ players=[]; document.getElementById('names').innerHTML=''; show('home'); }
+function confirmQuit(){ if(confirm('Quit this game and return home? Scores will be lost.')){ newGame(); } }
+</script>
+</body>
+</html>

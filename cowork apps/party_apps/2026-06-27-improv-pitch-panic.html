@@ -1,0 +1,449 @@
+<!-- CONCEPT: IMPROV/CREATIVE - "Pitch Panic": each player gets a randomly generated absurd product + a wild catch, improvises a 30-second sales pitch, then the room taps a Cheer Meter to score them. Host-controlled, one screen for everyone. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pitch Panic — Improv Party Game</title>
+<style>
+  :root{
+    --bg1:#1a0b2e; --bg2:#2d1259; --hot:#ff3d8b; --gold:#ffd23f;
+    --cyan:#22e0d6; --lime:#9cff57; --ink:#11071f; --paper:#fff7ee;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    font-family:'Trebuchet MS','Segoe UI',system-ui,sans-serif;
+    background:radial-gradient(circle at 30% 0%,var(--bg2),var(--bg1) 70%);
+    color:var(--paper); overflow:hidden; user-select:none;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #app{width:100%; height:100%; max-width:1100px; position:relative;}
+  .screen{
+    position:absolute; inset:0; display:none; flex-direction:column;
+    align-items:center; justify-content:center; padding:4vmin 5vmin;
+    text-align:center; animation:pop .35s ease;
+  }
+  .screen.on{display:flex;}
+  @keyframes pop{from{opacity:0; transform:scale(.96)} to{opacity:1; transform:scale(1)}}
+  h1{font-size:clamp(40px,11vmin,120px); margin:0; line-height:.95;
+     text-shadow:0 0 30px rgba(255,61,139,.5);}
+  .tag{color:var(--cyan); font-size:clamp(14px,2.6vmin,22px); font-weight:bold;
+       letter-spacing:1px; margin-top:1.4vmin;}
+  .sub{opacity:.85; font-size:clamp(13px,2.2vmin,19px); margin-top:1vmin; max-width:680px;}
+  button{font-family:inherit; cursor:pointer; border:none; font-weight:bold;}
+  .big{
+    background:linear-gradient(135deg,var(--hot),#ff7a3d); color:#fff;
+    font-size:clamp(22px,4.6vmin,40px); padding:2.4vmin 6vmin; border-radius:999px;
+    box-shadow:0 8px 0 #b51e60, 0 14px 30px rgba(0,0,0,.4); margin-top:3vmin;
+    transition:transform .08s;
+  }
+  .big:active{transform:translateY(5px); box-shadow:0 3px 0 #b51e60;}
+  .ghost{background:rgba(255,255,255,.12); color:var(--paper);
+    font-size:clamp(15px,2.6vmin,22px); padding:1.6vmin 4vmin; border-radius:999px;
+    margin-top:2vmin; border:2px solid rgba(255,255,255,.25);}
+  .ghost:active{transform:translateY(2px);}
+  .row{display:flex; gap:2vmin; flex-wrap:wrap; justify-content:center;}
+
+  /* setup */
+  #players{display:flex; flex-direction:column; gap:1.4vmin; width:min(560px,90vw); margin-top:2vmin;}
+  .pinput{display:flex; gap:1.4vmin; align-items:center;}
+  .pinput input{
+    flex:1; font-family:inherit; font-size:clamp(17px,3vmin,24px); padding:1.4vmin 2vmin;
+    border-radius:14px; border:3px solid var(--cyan); background:var(--ink); color:var(--paper);
+  }
+  .pinput input:focus{outline:none; border-color:var(--gold);}
+  .pinput .del{background:var(--hot); color:#fff; border-radius:12px; font-size:22px;
+    width:48px; height:48px; flex:none;}
+  .rounds{display:flex; gap:1.6vmin; margin-top:2.4vmin;}
+  .rounds button{background:rgba(255,255,255,.1); color:var(--paper); border:3px solid transparent;
+    border-radius:16px; padding:1.4vmin 3vmin; font-size:clamp(16px,3vmin,24px);}
+  .rounds button.sel{background:var(--gold); color:var(--ink); border-color:#fff;}
+
+  /* turn */
+  .turnname{font-size:clamp(36px,9vmin,84px); color:var(--gold); margin:1vmin 0;}
+  .roundpill{background:var(--hot); color:#fff; padding:.8vmin 3vmin; border-radius:999px;
+    font-size:clamp(15px,2.8vmin,22px); font-weight:bold;}
+
+  /* product card */
+  .card{
+    background:var(--paper); color:var(--ink); border-radius:28px; padding:5vmin 5vmin;
+    width:min(760px,92vw); box-shadow:0 20px 60px rgba(0,0,0,.5);
+    border:6px solid var(--gold); position:relative;
+  }
+  .card .lbl{color:var(--hot); font-size:clamp(13px,2.4vmin,18px); letter-spacing:2px; font-weight:bold;}
+  .product{font-size:clamp(32px,8vmin,72px); font-weight:900; line-height:1.02; margin:1vmin 0 3vmin;}
+  .catchbox{background:#fff0f6; border:3px dashed var(--hot); border-radius:18px; padding:2.4vmin 3vmin;}
+  .catchbox .clbl{color:var(--hot); font-weight:bold; font-size:clamp(13px,2.2vmin,17px); letter-spacing:1px;}
+  .catch{font-size:clamp(20px,4.4vmin,34px); font-weight:bold; margin-top:.6vmin;}
+
+  /* timer */
+  .clock{font-size:clamp(90px,30vmin,260px); font-weight:900; line-height:1;
+    text-shadow:0 0 40px rgba(34,224,214,.5);}
+  .clock.warn{color:var(--hot); animation:pulse .5s infinite;}
+  @keyframes pulse{50%{transform:scale(1.08)}}
+  .nowpitch{font-size:clamp(20px,4vmin,32px); color:var(--gold); margin-bottom:1vmin;}
+
+  /* cheer meter */
+  #cheerBtn{
+    width:min(620px,88vw); height:min(360px,46vh);
+    background:radial-gradient(circle,var(--lime),#3bbf2e); color:var(--ink);
+    border-radius:36px; font-size:clamp(30px,7vmin,60px); font-weight:900;
+    box-shadow:0 12px 0 #228a18, inset 0 0 60px rgba(255,255,255,.3);
+  }
+  #cheerBtn:active{transform:scale(.98);}
+  .meterwrap{width:min(620px,88vw); height:34px; background:rgba(0,0,0,.4); border-radius:999px;
+    margin-top:2.4vmin; overflow:hidden; border:3px solid rgba(255,255,255,.3);}
+  #meterFill{height:100%; width:0%; background:linear-gradient(90deg,var(--gold),var(--hot)); transition:width .08s;}
+  .cheerInfo{font-size:clamp(18px,3.4vmin,26px); margin-top:1.4vmin; font-weight:bold;}
+
+  /* scoreboard */
+  .board{width:min(700px,92vw); margin-top:2vmin; max-height:60vh; overflow:auto;}
+  .scorerow{display:flex; align-items:center; justify-content:space-between;
+    background:rgba(255,255,255,.08); border-radius:16px; padding:1.6vmin 3vmin; margin-bottom:1.2vmin;
+    font-size:clamp(18px,3.4vmin,28px);}
+  .scorerow.lead{background:linear-gradient(90deg,rgba(255,210,63,.3),rgba(255,61,139,.2)); border:2px solid var(--gold);}
+  .scorerow .nm{font-weight:bold; display:flex; gap:1.4vmin; align-items:center;}
+  .scorerow .pts{color:var(--gold); font-weight:900;}
+  .rank{font-size:clamp(20px,4vmin,32px); width:1.6em; text-align:center;}
+
+  .winner{font-size:clamp(40px,11vmin,110px); color:var(--gold); margin:1vmin 0;
+    text-shadow:0 0 40px rgba(255,210,63,.6);}
+  .crown{font-size:clamp(50px,14vmin,140px);}
+  .confetti{position:absolute; top:-20px; font-size:24px; pointer-events:none; animation:fall linear forwards;}
+  @keyframes fall{to{transform:translateY(110vh) rotate(540deg); opacity:.9}}
+  .hint{position:absolute; bottom:2.2vmin; font-size:clamp(12px,2vmin,16px); opacity:.6;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TITLE -->
+  <section id="s-title" class="screen on">
+    <h1>PITCH<br>PANIC</h1>
+    <div class="tag">⚡ IMPROV / CREATIVE PARTY GAME ⚡</div>
+    <div class="sub">Get a ridiculous product + a wild catch. Improvise a 30-second sales pitch. The whole room taps the Cheer Meter to score you. Funniest pitcher wins.</div>
+    <div class="sub" style="color:var(--lime); margin-top:2vmin;">👥 3–10 players &nbsp;•&nbsp; ⏱️ 15–25 min</div>
+    <button class="big" onclick="go('setup')">START</button>
+    <div class="hint">One screen, passed around • Host taps the buttons</div>
+  </section>
+
+  <!-- SETUP -->
+  <section id="s-setup" class="screen">
+    <h1 style="font-size:clamp(30px,8vmin,70px)">Who's Pitching?</h1>
+    <div class="sub">Add 3–10 players. Tap the field to type a name.</div>
+    <div id="players"></div>
+    <button class="ghost" onclick="addPlayer()">+ Add Player</button>
+    <div class="sub" style="margin-top:2.6vmin">Rounds (each player pitches once per round):</div>
+    <div class="rounds" id="roundPick">
+      <button data-r="2">2</button>
+      <button data-r="3" class="sel">3</button>
+      <button data-r="4">4</button>
+    </div>
+    <button class="big" onclick="startGame()">LET'S PITCH →</button>
+  </section>
+
+  <!-- TURN -->
+  <section id="s-turn" class="screen">
+    <div class="roundpill" id="turnRound">ROUND 1</div>
+    <div class="sub" style="margin-top:3vmin">Pass the screen to…</div>
+    <div class="turnname" id="turnName">—</div>
+    <div class="sub">Everyone else: get ready to judge! 👀</div>
+    <button class="big" onclick="revealProduct()">REVEAL MY PRODUCT</button>
+  </section>
+
+  <!-- REVEAL -->
+  <section id="s-reveal" class="screen">
+    <div class="card">
+      <div class="lbl">YOUR PRODUCT IS…</div>
+      <div class="product" id="prodName">—</div>
+      <div class="catchbox">
+        <div class="clbl">⚠️ THE CATCH — you MUST work this in:</div>
+        <div class="catch" id="catchText">—</div>
+      </div>
+    </div>
+    <button class="big" onclick="startTimer()">START 30-SEC PITCH</button>
+    <button class="ghost" onclick="revealProduct()">🎲 Reroll</button>
+  </section>
+
+  <!-- TIMER -->
+  <section id="s-timer" class="screen">
+    <div class="nowpitch" id="timerName">Pitching now…</div>
+    <div class="clock" id="clock">30</div>
+    <button class="ghost" onclick="finishPitch()">Done early → Score it ⭐</button>
+  </section>
+
+  <!-- CHEER -->
+  <section id="s-cheer" class="screen">
+    <div class="nowpitch" id="cheerName">Score the pitch!</div>
+    <div class="sub" id="cheerPrompt">Whole room: TAP AS FAST AS YOU CAN for 5 seconds!</div>
+    <button id="cheerBtn">TAP TO<br>CHEER! 🎉</button>
+    <div class="meterwrap"><div id="meterFill"></div></div>
+    <div class="cheerInfo" id="cheerInfo">Tap to start the cheer…</div>
+  </section>
+
+  <!-- STANDINGS -->
+  <section id="s-board" class="screen">
+    <h1 style="font-size:clamp(28px,7vmin,60px)" id="boardTitle">Standings</h1>
+    <div class="board" id="boardList"></div>
+    <button class="big" id="boardNext" onclick="nextFromBoard()">NEXT →</button>
+  </section>
+
+  <!-- FINAL -->
+  <section id="s-final" class="screen">
+    <div class="crown">👑</div>
+    <div class="sub">The Pitch Champion is…</div>
+    <div class="winner" id="winName">—</div>
+    <div class="board" id="finalList" style="max-height:42vh"></div>
+    <div class="row">
+      <button class="big" onclick="playAgainSame()">PLAY AGAIN</button>
+      <button class="ghost" onclick="go('setup')">NEW PLAYERS</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ---------- Web Audio ---------- */
+let AC;
+function ac(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); return AC; }
+function beep(freq,dur,type,vol){
+  try{
+    const c=ac(); const o=c.createOscillator(); const g=c.createGain();
+    o.type=type||'square'; o.frequency.value=freq;
+    g.gain.value=vol||0.18; o.connect(g); g.connect(c.destination);
+    o.start(); g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dur);
+    o.stop(c.currentTime+dur);
+  }catch(e){}
+}
+function tick(){ beep(880,0.08,'square',0.12); }
+function buzzer(){ beep(150,0.5,'sawtooth',0.25); setTimeout(()=>beep(110,0.6,'sawtooth',0.25),120); }
+function blip(){ beep(660,0.1,'triangle',0.15); }
+function fanfare(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>beep(f,0.3,'triangle',0.2),i*140)); }
+
+/* ---------- Content ---------- */
+const ADJ=["Self-Aware","Inflatable","Haunted","Gluten-Free","Invisible","Emotional","Bargain","Industrial","Pocket-Sized","Quantum","Vintage","Sentient","Waterproof","Glow-in-the-Dark","Reversible","Deluxe","Solar-Powered","Bulletproof","Travel-Size","Artisanal","Robotic","Edible","Anti-Gravity","Left-Handed","Off-Brand","Turbo","Whisper-Quiet","Bedazzled","Recyclable","Single-Use","Eco-Friendly","Bluetooth","Hypoallergenic","Collapsible","Motivational","Industrial-Strength","Decorative","Wearable","Disposable","Premium"];
+const NOUN=["Toaster","Umbrella","Helmet","Sock Drawer","Lawn Gnome","Treadmill","Mousepad","Spatula","Sleeping Bag","Doorbell","Houseplant","Backpack","Alarm Clock","Trampoline","Toothbrush","Beanbag Chair","Lava Lamp","Garden Hose","Frying Pan","Beach Towel","Vacuum Cleaner","Pillow Fort","Yoga Mat","Pool Noodle","Smoke Detector","Salad Spinner","Snow Globe","Coat Rack","Stress Ball","Megaphone","Bird Feeder","Step Ladder","Ice Cube Tray","Fanny Pack","Disco Ball","Welcome Mat","Cheese Grater","Hammock","Night Light","Whoopee Cushion"];
+const CATCH=[
+  "It is somehow also a musical instrument.",
+  "It only works on Tuesdays.",
+  "It comes with a tiny, judgmental owl.",
+  "Your grandmother is the inventor — explain why.",
+  "It is banned in three countries.",
+  "It runs entirely on compliments.",
+  "Side effect: occasional time travel.",
+  "It smells faintly of breakfast.",
+  "Endorsed by a celebrity who doesn't exist.",
+  "It can only be used while whispering.",
+  "Batteries not included… and never will be.",
+  "It doubles as emergency snack storage.",
+  "It glows brighter the more you lie about it.",
+  "It is, technically, alive.",
+  "Customers report a 'mild sense of dread'.",
+  "It was found in a haunted attic.",
+  "It must be pitched as if it saves the planet.",
+  "It speaks, but only in riddles.",
+  "Comes in one size: 'too big'.",
+  "It replaces your current job entirely.",
+  "It is allergic to Mondays.",
+  "Two were already recalled. Sell anyway.",
+  "It folds into the size of a regret.",
+  "It works underwater but nowhere else.",
+  "Its main feature is 'vibes'.",
+  "It needs to be sung to once a day.",
+  "It is the official product of a made-up sport.",
+  "It comes with a warning label you must read aloud.",
+  "It can predict the weather (incorrectly).",
+  "It was a gift from aliens.",
+  "It is best friends with your refrigerator.",
+  "It can only be paid for in high-fives.",
+  "It improves with age, like a fine cheese.",
+  "It is technically a member of your family now.",
+  "It hums the same song forever.",
+  "It is 40% more dramatic than competitors.",
+  "It must be assembled blindfolded.",
+  "It is endorsed by your local pigeon population.",
+  "Warning: may develop opinions.",
+  "It comes free with a more useful product."
+];
+
+/* ---------- State ---------- */
+let players=[]; let scores={}; let order=[]; let idx=0;
+let totalRounds=3; let round=1;
+let usedProducts=new Set();
+let timerHandle=null, timeLeft=30;
+let cheerHandle=null, cheerCount=0, cheering=false, cheerStart=0;
+const CHEER_MS=5000, MAX_TAPS=70; // taps that fill the meter to 100%
+
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  document.getElementById('s-'+id).classList.add('on');
+}
+
+/* ---------- Setup ---------- */
+function addPlayer(name){
+  const wrap=document.getElementById('players');
+  if(wrap.children.length>=10) return;
+  const div=document.createElement('div'); div.className='pinput';
+  const n=wrap.children.length+1;
+  div.innerHTML=`<input type="text" placeholder="Player ${n}" value="${name||''}" maxlength="14">
+                 <button class="del" onclick="this.parentNode.remove()">✕</button>`;
+  wrap.appendChild(div);
+}
+document.getElementById('roundPick').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('#roundPick button').forEach(x=>x.classList.remove('sel'));
+  b.classList.add('sel'); totalRounds=parseInt(b.dataset.r); blip();
+});
+
+function startGame(){
+  ac(); // unlock audio on user gesture
+  const inputs=[...document.querySelectorAll('#players input')];
+  players=inputs.map((i,k)=>i.value.trim()||('Player '+(k+1)));
+  if(players.length<3){ alert('Add at least 3 players to pitch!'); return; }
+  scores={}; players.forEach(p=>scores[p]=0);
+  round=1; usedProducts=new Set();
+  newRoundOrder();
+  showTurn();
+}
+function newRoundOrder(){
+  order=[...Array(players.length).keys()];
+  for(let i=order.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [order[i],order[j]]=[order[j],order[i]]; }
+  idx=0;
+}
+
+/* ---------- Turn / Product ---------- */
+function showTurn(){
+  document.getElementById('turnRound').textContent='ROUND '+round+' / '+totalRounds;
+  document.getElementById('turnName').textContent=players[order[idx]];
+  blip(); go('turn');
+}
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function revealProduct(){
+  let name, tries=0;
+  do{ name='The '+pick(ADJ)+' '+pick(NOUN); tries++; }while(usedProducts.has(name)&&tries<30);
+  usedProducts.add(name);
+  document.getElementById('prodName').textContent=name;
+  document.getElementById('catchText').textContent=pick(CATCH);
+  blip(); go('reveal');
+}
+
+/* ---------- Timer ---------- */
+function startTimer(){
+  go('timer');
+  document.getElementById('timerName').textContent=players[order[idx]]+' is pitching…';
+  timeLeft=30; updateClock();
+  clearInterval(timerHandle);
+  timerHandle=setInterval(()=>{
+    timeLeft--; updateClock();
+    if(timeLeft<=5&&timeLeft>0) tick();
+    if(timeLeft<=0){ clearInterval(timerHandle); buzzer(); finishPitch(); }
+  },1000);
+}
+function updateClock(){
+  const c=document.getElementById('clock');
+  c.textContent=timeLeft;
+  c.classList.toggle('warn', timeLeft<=5);
+}
+
+/* ---------- Cheer meter ---------- */
+function finishPitch(){
+  clearInterval(timerHandle);
+  cheerCount=0; cheering=false;
+  document.getElementById('cheerName').textContent='Score '+players[order[idx]]+'!';
+  document.getElementById('cheerPrompt').textContent='Whole room: TAP AS FAST AS YOU CAN for 5 seconds!';
+  document.getElementById('meterFill').style.width='0%';
+  document.getElementById('cheerInfo').textContent='Tap the green button to start the cheer…';
+  document.getElementById('cheerBtn').innerHTML='TAP TO<br>CHEER! 🎉';
+  go('cheer');
+}
+const cheerBtn=document.getElementById('cheerBtn');
+function doCheer(){
+  if(!cheering){
+    cheering=true; cheerStart=Date.now(); cheerCount=0;
+    document.getElementById('cheerInfo').textContent='CHEER!!! 🔊';
+    cheerHandle=setInterval(()=>{
+      const left=CHEER_MS-(Date.now()-cheerStart);
+      if(left<=0){ endCheer(); }
+    },50);
+  }
+  cheerCount++;
+  beep(400+Math.min(cheerCount,MAX_TAPS)*12,0.05,'square',0.1);
+  const pct=Math.min(100,(cheerCount/MAX_TAPS)*100);
+  document.getElementById('meterFill').style.width=pct+'%';
+}
+cheerBtn.addEventListener('touchstart',e=>{e.preventDefault(); doCheer();},{passive:false});
+cheerBtn.addEventListener('mousedown',e=>{ if(e.button===0) doCheer(); });
+function endCheer(){
+  clearInterval(cheerHandle); cheering=false;
+  const pct=Math.min(100,(cheerCount/MAX_TAPS)*100);
+  const pts=Math.max(1,Math.round(pct)); // 1–100 hype points
+  const p=players[order[idx]]; scores[p]+=pts;
+  fanfare();
+  document.getElementById('cheerInfo').textContent='🎉 '+pts+' HYPE POINTS for '+p+'!';
+  document.getElementById('cheerBtn').innerHTML='+'+pts+' pts';
+  setTimeout(advance,1700);
+}
+function advance(){
+  idx++;
+  if(idx<order.length){ showTurn(); }
+  else { showBoard(false); }
+}
+
+/* ---------- Boards ---------- */
+function rankedList(){
+  return Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+}
+function renderBoard(elId, list){
+  const el=document.getElementById(elId); el.innerHTML='';
+  const medals=['🥇','🥈','🥉'];
+  list.forEach((e,i)=>{
+    const row=document.createElement('div');
+    row.className='scorerow'+(i===0?' lead':'');
+    row.innerHTML=`<div class="nm"><span class="rank">${medals[i]||(i+1)}</span>${e[0]}</div>
+                   <div class="pts">${e[1]}</div>`;
+    el.appendChild(row);
+  });
+}
+function showBoard(){
+  renderBoard('boardList', rankedList());
+  const last = round>=totalRounds;
+  document.getElementById('boardTitle').textContent = last ? 'Final Round Done!' : ('After Round '+round);
+  document.getElementById('boardNext').textContent = last ? 'CROWN THE CHAMPION 👑' : 'NEXT ROUND →';
+  blip(); go('board');
+}
+function nextFromBoard(){
+  if(round>=totalRounds){ showFinal(); return; }
+  round++; newRoundOrder(); showTurn();
+}
+function showFinal(){
+  const list=rankedList();
+  document.getElementById('winName').textContent=list[0][0];
+  renderBoard('finalList', list);
+  fanfare(); confetti(); go('final');
+}
+function confetti(){
+  const em=['🎉','🎊','⭐','🏆','💥','✨'];
+  for(let i=0;i<40;i++){
+    const s=document.createElement('div'); s.className='confetti';
+    s.textContent=em[Math.floor(Math.random()*em.length)];
+    s.style.left=Math.random()*100+'%';
+    s.style.animationDuration=(2+Math.random()*2.5)+'s';
+    s.style.animationDelay=(Math.random()*0.8)+'s';
+    document.getElementById('s-final').appendChild(s);
+    setTimeout(()=>s.remove(),5000);
+  }
+}
+
+/* ---------- Replay ---------- */
+function playAgainSame(){
+  document.querySelectorAll('#s-final .confetti').forEach(c=>c.remove());
+  scores={}; players.forEach(p=>scores[p]=0);
+  round=1; usedProducts=new Set(); newRoundOrder(); showTurn();
+}
+
+/* ---------- Boot ---------- */
+addPlayer('Alex'); addPlayer('Sam'); addPlayer('Riley');
+</script>
+</body>
+</html>

@@ -1,0 +1,488 @@
+<!-- CONCEPT: WORD GAMES - "Forbidden Five": pass-the-device Taboo-style clue giving where one player describes a secret word to their team WITHOUT saying any of the 5 forbidden words; team competition with timer, buzzer & live scoreboard, 70+ cards. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Forbidden Five — Party Word Game (4–10 players, ~15–30 min)</title>
+<style>
+  :root{
+    --bg1:#0d1b54; --bg2:#5a0f8a; --bg3:#b3107a;
+    --accent:#ffd23f; --accent2:#ff4d8d; --good:#36e27b; --bad:#ff5252;
+    --ink:#ffffff; --muted:rgba(255,255,255,.7);
+    --panel:rgba(255,255,255,.08); --panelB:rgba(255,255,255,.18);
+    --teamA:#36c9ff; --teamB:#ff7a59;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;}
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;}
+  body{
+    background:linear-gradient(135deg,var(--bg1),var(--bg2) 55%,var(--bg3));
+    background-attachment:fixed;color:var(--ink);overflow:hidden;
+  }
+  #app{position:fixed;inset:0;display:flex;flex-direction:column;}
+  .screen{flex:1;display:none;flex-direction:column;padding:max(16px,env(safe-area-inset-top)) 20px 22px;overflow-y:auto;}
+  .screen.active{display:flex;}
+  .center{justify-content:center;align-items:center;text-align:center;}
+  h1{font-size:clamp(40px,11vw,86px);margin:0;line-height:.95;font-weight:900;letter-spacing:-1px;
+     text-shadow:0 4px 0 rgba(0,0,0,.25);}
+  h1 .f{color:var(--accent);} h1 .five{color:var(--accent2);}
+  .tag{font-size:clamp(15px,3.6vw,20px);color:var(--muted);margin:14px 0 6px;max-width:620px;}
+  .meta{font-size:13px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:24px;}
+  button{font-family:inherit;border:none;cursor:pointer;font-weight:800;}
+  .btn{
+    background:var(--accent);color:#2a1144;border-radius:18px;padding:20px 26px;font-size:clamp(20px,5vw,26px);
+    box-shadow:0 6px 0 #c79b13;transition:transform .05s,box-shadow .05s;width:100%;max-width:440px;
+  }
+  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #c79b13;}
+  .btn.pink{background:var(--accent2);color:#fff;box-shadow:0 6px 0 #b32a5e;}
+  .btn.pink:active{box-shadow:0 2px 0 #b32a5e;}
+  .btn.ghost{background:var(--panel);color:#fff;box-shadow:0 6px 0 rgba(0,0,0,.3);border:2px solid var(--panelB);}
+  .btn.ghost:active{box-shadow:0 2px 0 rgba(0,0,0,.3);}
+  .btn.sm{font-size:17px;padding:14px 18px;}
+  .row{display:flex;gap:12px;width:100%;max-width:440px;}
+  .row>*{flex:1;}
+
+  /* setup */
+  .card{background:var(--panel);border:1px solid var(--panelB);border-radius:20px;padding:18px;width:100%;max-width:440px;margin-bottom:14px;}
+  .card h3{margin:0 0 12px;font-size:18px;color:var(--accent);text-transform:uppercase;letter-spacing:1px;}
+  .teamrow{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+  .dot{width:18px;height:18px;border-radius:50%;flex:0 0 auto;}
+  input[type=text]{flex:1;background:rgba(0,0,0,.25);border:2px solid var(--panelB);border-radius:12px;color:#fff;
+     font-size:18px;padding:12px 14px;font-weight:700;-webkit-user-select:text;user-select:text;}
+  input:focus{outline:none;border-color:var(--accent);}
+  .opts{display:flex;gap:8px;flex-wrap:wrap;}
+  .chip{background:rgba(0,0,0,.22);border:2px solid var(--panelB);border-radius:999px;padding:10px 16px;font-size:16px;color:#fff;font-weight:800;}
+  .chip.on{background:var(--accent);color:#2a1144;border-color:var(--accent);}
+
+  /* ready / pass screen */
+  .bigteam{font-size:clamp(30px,8vw,52px);font-weight:900;margin:6px 0;}
+  .sub{font-size:clamp(16px,4vw,22px);color:var(--muted);max-width:520px;margin:8px auto;line-height:1.4;}
+
+  /* play screen */
+  #play{padding-top:max(10px,env(safe-area-inset-top));}
+  .hud{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;}
+  .pill{background:var(--panel);border:1px solid var(--panelB);border-radius:999px;padding:8px 16px;font-weight:800;font-size:16px;display:flex;align-items:center;gap:8px;}
+  .timer{font-size:clamp(34px,9vw,52px);font-weight:900;font-variant-numeric:tabular-nums;min-width:90px;text-align:center;}
+  .timer.warn{color:var(--bad);animation:pulse .5s infinite alternate;}
+  @keyframes pulse{to{transform:scale(1.12);}}
+  .wordcard{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;
+     background:rgba(255,255,255,.10);border:2px solid var(--panelB);border-radius:24px;padding:22px 18px;margin:6px 0 12px;text-align:center;}
+  .word{font-size:clamp(40px,11vw,72px);font-weight:900;letter-spacing:-1px;line-height:1;margin-bottom:18px;color:var(--accent);}
+  .forbid-label{font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);margin-bottom:10px;font-weight:800;}
+  .forbid{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px;width:100%;max-width:340px;}
+  .forbid li{background:rgba(255,77,141,.16);border:1px solid rgba(255,77,141,.4);border-radius:12px;padding:11px;font-size:clamp(19px,5vw,26px);font-weight:800;}
+  .controls{display:flex;flex-direction:column;gap:10px;}
+  .ctl-top{display:flex;gap:10px;}
+  .ctl-top button{flex:1;border-radius:16px;padding:18px 8px;font-size:18px;line-height:1.1;}
+  .got{background:var(--good);color:#06351c;box-shadow:0 5px 0 #1f9c52;}
+  .got:active{transform:translateY(3px);box-shadow:0 2px 0 #1f9c52;}
+  .skip{background:var(--panel);color:#fff;border:2px solid var(--panelB);box-shadow:0 5px 0 rgba(0,0,0,.3);}
+  .skip:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.3);}
+  .buzz{background:var(--bad);color:#fff;box-shadow:0 5px 0 #a32020;width:100%;border-radius:16px;padding:16px;font-size:18px;}
+  .buzz:active{transform:translateY(3px);box-shadow:0 2px 0 #a32020;}
+  .cnt{font-size:13px;color:var(--muted);text-align:center;margin-top:2px;}
+
+  /* scoreboard */
+  .scorewrap{display:flex;flex-direction:column;gap:14px;width:100%;max-width:440px;margin:10px 0 18px;}
+  .scoreline{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--panelB);border-radius:18px;padding:16px 18px;}
+  .scoreline .nm{flex:1;font-size:clamp(22px,6vw,30px);font-weight:900;}
+  .scoreline .pts{font-size:clamp(34px,9vw,48px);font-weight:900;font-variant-numeric:tabular-nums;}
+  .crown{font-size:30px;}
+  .roundnote{font-size:15px;color:var(--muted);margin:4px 0 18px;text-align:center;}
+  .winner{font-size:clamp(34px,9vw,60px);font-weight:900;color:var(--accent);margin:6px 0;}
+  .confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;display:none;}
+  .conf{position:absolute;width:11px;height:16px;top:-20px;opacity:.9;animation:fall linear forwards;}
+  @keyframes fall{to{transform:translateY(110vh) rotate(720deg);}}
+  .howlist{text-align:left;max-width:440px;font-size:16px;line-height:1.6;color:var(--ink);}
+  .howlist b{color:var(--accent);}
+  .footnote{font-size:12px;color:var(--muted);margin-top:18px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- TITLE -->
+  <section id="home" class="screen center active">
+    <h1><span class="f">FORBIDDEN</span> <span class="five">FIVE</span></h1>
+    <p class="tag">Describe the secret word to your team — but you can't say any of the five forbidden words. Race the clock, rack up points, dodge the buzzer.</p>
+    <p class="meta">4–10 players · 2 teams · ~15–30 min</p>
+    <button class="btn" onclick="go('setup')">Set Up Game</button>
+    <button class="btn ghost sm" style="margin-top:12px;max-width:440px" onclick="go('how')">How to Play</button>
+  </section>
+
+  <!-- HOW -->
+  <section id="how" class="screen center">
+    <h2 style="font-size:clamp(28px,7vw,40px);margin:0 0 16px;color:var(--accent)">How to Play</h2>
+    <div class="howlist">
+      <p><b>1.</b> Split into two teams. Each round, one player is the <b>clue-giver</b> and holds this device so only they can see the screen.</p>
+      <p><b>2.</b> The big word on top is what your team must <b>guess</b>. Describe it out loud — but never say the word itself or any of the <b>5 forbidden words</b> below it.</p>
+      <p><b>3.</b> Team guesses it? Tap <b>Got it ✓</b> (+1). Stuck? Tap <b>Skip</b> (no points, no penalty).</p>
+      <p><b>4.</b> A watcher from the <b>other team</b> looks over your shoulder. Slip up and say a forbidden word? They tap <b>Buzz</b> (–1 and next card).</p>
+      <p><b>5.</b> When the timer ends, pass the device to the other team. First team to the target score wins!</p>
+    </div>
+    <button class="btn" style="margin-top:20px" onclick="go('setup')">Set Up Game</button>
+    <button class="btn ghost sm" style="margin-top:10px" onclick="go('home')">Back</button>
+  </section>
+
+  <!-- SETUP -->
+  <section id="setup" class="screen center">
+    <h2 style="font-size:clamp(26px,7vw,38px);margin:6px 0 16px;color:var(--accent)">Set Up</h2>
+    <div class="card">
+      <h3>Teams</h3>
+      <div class="teamrow"><span class="dot" style="background:var(--teamA)"></span><input id="nameA" type="text" value="Blue Team" maxlength="16"></div>
+      <div class="teamrow"><span class="dot" style="background:var(--teamB)"></span><input id="nameB" type="text" value="Orange Team" maxlength="16"></div>
+    </div>
+    <div class="card">
+      <h3>Round Length</h3>
+      <div class="opts" id="timeOpts">
+        <button class="chip" data-t="30">30s</button>
+        <button class="chip on" data-t="60">60s</button>
+        <button class="chip" data-t="90">90s</button>
+        <button class="chip" data-t="120">120s</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Play to</h3>
+      <div class="opts" id="goalOpts">
+        <button class="chip" data-g="10">10 pts</button>
+        <button class="chip on" data-g="15">15 pts</button>
+        <button class="chip" data-g="20">20 pts</button>
+        <button class="chip" data-g="999">No limit</button>
+      </div>
+    </div>
+    <button class="btn pink" onclick="startGame()">Start!</button>
+    <button class="btn ghost sm" style="margin-top:10px" onclick="go('home')">Back</button>
+  </section>
+
+  <!-- PASS / READY -->
+  <section id="ready" class="screen center">
+    <p class="sub" style="margin-bottom:0">Pass the device to a clue-giver on</p>
+    <div class="bigteam" id="readyTeam">Blue Team</div>
+    <p class="sub" id="readySub">Everyone else on the team gets ready to guess. A watcher from the other team — eyes on the screen for forbidden words!</p>
+    <div class="scorewrap" id="readyScores" style="margin-top:6px"></div>
+    <button class="btn" id="readyBtn" onclick="beginRound()">Start Round ▶</button>
+  </section>
+
+  <!-- PLAY -->
+  <section id="play" class="screen">
+    <div class="hud">
+      <div class="pill"><span class="dot" id="turnDot" style="width:14px;height:14px"></span><span id="turnName">Blue</span></div>
+      <div class="timer" id="timer">60</div>
+      <div class="pill" id="roundScore">+0</div>
+    </div>
+    <div class="wordcard">
+      <div class="word" id="theWord">WORD</div>
+      <div class="forbid-label">✦ Forbidden ✦</div>
+      <ul class="forbid" id="forbidList"></ul>
+    </div>
+    <div class="controls">
+      <div class="ctl-top">
+        <button class="skip" onclick="nextCard('skip')">Skip<br><span style="font-size:13px;font-weight:600;opacity:.8">no penalty</span></button>
+        <button class="got" onclick="nextCard('got')">Got it ✓<br><span style="font-size:13px;font-weight:600;opacity:.85">+1 point</span></button>
+      </div>
+      <button class="buzz" onclick="nextCard('buzz')">🚨 BUZZ — said a forbidden word (–1)</button>
+      <div class="cnt" id="cardCount"></div>
+    </div>
+  </section>
+
+  <!-- ROUND END / SCOREBOARD -->
+  <section id="board" class="screen center">
+    <h2 id="boardTitle" style="font-size:clamp(26px,7vw,38px);margin:6px 0 4px;color:var(--accent)">Round Over!</h2>
+    <p class="roundnote" id="roundNote"></p>
+    <div class="scorewrap" id="boardScores"></div>
+    <button class="btn" id="boardBtn" onclick="nextTeamTurn()">Next Team ▶</button>
+    <button class="btn ghost sm" style="margin-top:10px" onclick="confirmRestart()">End / New Game</button>
+  </section>
+
+  <!-- WIN -->
+  <section id="win" class="screen center">
+    <div class="crown" style="font-size:56px">👑</div>
+    <div class="winner" id="winName">Blue Team</div>
+    <p class="sub" id="winScore"></p>
+    <div class="scorewrap" id="winScores"></div>
+    <button class="btn" onclick="rematch()">Rematch (same teams)</button>
+    <button class="btn ghost sm" style="margin-top:10px" onclick="go('setup')">New Setup</button>
+  </section>
+
+</div>
+<div class="confetti" id="confetti"></div>
+
+<script>
+/* ---------------- CARD DECK (70 cards) ---------------- */
+const DECK = [
+  {w:"Pizza",f:["Cheese","Slice","Pepperoni","Italy","Dough"]},
+  {w:"Beach",f:["Sand","Ocean","Sun","Towel","Waves"]},
+  {w:"Birthday",f:["Cake","Candles","Party","Gift","Age"]},
+  {w:"Snowman",f:["Carrot","Cold","Frosty","Melt","Winter"]},
+  {w:"Guitar",f:["Strings","Music","Rock","Strum","Band"]},
+  {w:"Vampire",f:["Blood","Bat","Teeth","Dracula","Night"]},
+  {w:"Toothbrush",f:["Teeth","Paste","Bathroom","Clean","Morning"]},
+  {w:"Rainbow",f:["Colors","Rain","Sky","Arc","Pot"]},
+  {w:"Elephant",f:["Trunk","Big","Gray","Ears","Africa"]},
+  {w:"Soccer",f:["Ball","Goal","Kick","Field","Net"]},
+  {w:"Library",f:["Books","Quiet","Read","Shelf","Borrow"]},
+  {w:"Popcorn",f:["Movie","Butter","Kernel","Pop","Snack"]},
+  {w:"Astronaut",f:["Space","Moon","Rocket","NASA","Suit"]},
+  {w:"Umbrella",f:["Rain","Wet","Open","Handle","Cover"]},
+  {w:"Doctor",f:["Hospital","Sick","Medicine","Nurse","Patient"]},
+  {w:"Volcano",f:["Lava","Erupt","Mountain","Hot","Ash"]},
+  {w:"Spider",f:["Web","Legs","Eight","Insect","Crawl"]},
+  {w:"Sandwich",f:["Bread","Lunch","Cheese","Filling","Slice"]},
+  {w:"Camera",f:["Photo","Picture","Lens","Click","Snap"]},
+  {w:"Dentist",f:["Teeth","Drill","Floss","Cavity","Mouth"]},
+  {w:"Penguin",f:["Antarctica","Cold","Black","Waddle","Bird"]},
+  {w:"Sunglasses",f:["Eyes","Sun","Cool","Shade","Face"]},
+  {w:"Skateboard",f:["Wheels","Trick","Ride","Ramp","Roll"]},
+  {w:"Lighthouse",f:["Ocean","Light","Ship","Tall","Coast"]},
+  {w:"Pancake",f:["Syrup","Breakfast","Flat","Flip","Batter"]},
+  {w:"Robot",f:["Metal","Machine","Beep","Future","Android"]},
+  {w:"Wedding",f:["Bride","Marry","Ring","Dress","Cake"]},
+  {w:"Kangaroo",f:["Australia","Hop","Pouch","Jump","Tail"]},
+  {w:"Treadmill",f:["Run","Gym","Walk","Exercise","Belt"]},
+  {w:"Mermaid",f:["Tail","Ocean","Fish","Swim","Sea"]},
+  {w:"Backpack",f:["School","Carry","Straps","Bag","Shoulders"]},
+  {w:"Waterfall",f:["River","Fall","Cliff","Water","Cascade"]},
+  {w:"Cactus",f:["Desert","Spikes","Green","Plant","Prickly"]},
+  {w:"Telescope",f:["Stars","Space","Look","Lens","Night"]},
+  {w:"Cupcake",f:["Frosting","Bake","Small","Sweet","Wrapper"]},
+  {w:"Firefighter",f:["Fire","Hose","Truck","Rescue","Helmet"]},
+  {w:"Hamburger",f:["Beef","Bun","Grill","Patty","Cheese"]},
+  {w:"Dinosaur",f:["Extinct","Rex","Fossil","Jurassic","Reptile"]},
+  {w:"Snowflake",f:["Snow","Cold","Unique","White","Winter"]},
+  {w:"Magician",f:["Trick","Hat","Rabbit","Wand","Magic"]},
+  {w:"Pillow",f:["Sleep","Bed","Soft","Head","Fluffy"]},
+  {w:"Bicycle",f:["Wheels","Pedal","Ride","Bike","Chain"]},
+  {w:"Octopus",f:["Tentacles","Ocean","Eight","Ink","Sea"]},
+  {w:"Campfire",f:["Wood","Marshmallow","Flame","Tent","Smoke"]},
+  {w:"Scissors",f:["Cut","Paper","Sharp","Blades","Snip"]},
+  {w:"Helicopter",f:["Fly","Blades","Air","Pilot","Spin"]},
+  {w:"Chocolate",f:["Sweet","Candy","Brown","Cocoa","Bar"]},
+  {w:"Pirate",f:["Ship","Treasure","Eye patch","Sea","Parrot"]},
+  {w:"Fireworks",f:["Sky","Explode","Boom","July","Colors"]},
+  {w:"Igloo",f:["Ice","Snow","Eskimo","Dome","Cold"]},
+  {w:"Tornado",f:["Wind","Spin","Storm","Funnel","Twist"]},
+  {w:"Snorkel",f:["Swim","Ocean","Breathe","Mask","Underwater"]},
+  {w:"Trampoline",f:["Jump","Bounce","Spring","Backyard","Mat"]},
+  {w:"Microwave",f:["Heat","Food","Kitchen","Beep","Cook"]},
+  {w:"Butterfly",f:["Wings","Caterpillar","Fly","Cocoon","Flower"]},
+  {w:"Snowball",f:["Snow","Throw","Round","Cold","Fight"]},
+  {w:"Keyboard",f:["Type","Keys","Computer","Letters","Press"]},
+  {w:"Lemonade",f:["Lemon","Drink","Sour","Sugar","Stand"]},
+  {w:"Ladybug",f:["Red","Spots","Bug","Insect","Wings"]},
+  {w:"Cowboy",f:["Hat","Horse","Rodeo","Boots","Lasso"]},
+  {w:"Aquarium",f:["Fish","Tank","Water","Glass","Swim"]},
+  {w:"Marshmallow",f:["White","Soft","Roast","Sweet","Sticky"]},
+  {w:"Scarecrow",f:["Field","Straw","Crows","Farm","Hat"]},
+  {w:"Submarine",f:["Underwater","Ocean","Navy","Dive","Boat"]},
+  {w:"Pretzel",f:["Salt","Twist","Snack","Bread","Dough"]},
+  {w:"Hammock",f:["Relax","Swing","Trees","Nap","Rope"]},
+  {w:"Compass",f:["North","Direction","Map","Needle","Navigate"]},
+  {w:"Jellyfish",f:["Ocean","Sting","Clear","Float","Sea"]},
+  {w:"Sandcastle",f:["Beach","Bucket","Build","Sand","Moat"]},
+  {w:"Lawnmower",f:["Grass","Cut","Yard","Engine","Push"]},
+  {w:"Karaoke",f:["Sing","Microphone","Song","Lyrics","Stage"]},
+  {w:"Anchor",f:["Boat","Heavy","Ocean","Drop","Ship"]}
+];
+
+/* ---------------- STATE ---------------- */
+let state = {};
+function freshState(){
+  return {
+    teams:[
+      {name:document.getElementById('nameA').value.trim()||"Blue Team", color:'var(--teamA)', score:0},
+      {name:document.getElementById('nameB').value.trim()||"Orange Team", color:'var(--teamB)', score:0}
+    ],
+    roundTime:selTime, goal:selGoal,
+    turn:0, deck:[], deckPos:0,
+    roundScore:0, timeLeft:0, timerId:null, roundsPlayed:0
+  };
+}
+let selTime=60, selGoal=15;
+
+/* chip selectors */
+document.querySelectorAll('#timeOpts .chip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('#timeOpts .chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on'); selTime=+c.dataset.t;
+});
+document.querySelectorAll('#goalOpts .chip').forEach(c=>c.onclick=()=>{
+  document.querySelectorAll('#goalOpts .chip').forEach(x=>x.classList.remove('on'));
+  c.classList.add('on'); selGoal=+c.dataset.g;
+});
+
+/* ---------------- NAV ---------------- */
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ---------------- AUDIO (Web Audio API) ---------------- */
+let actx=null;
+function ac(){ if(!actx){ try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } return actx; }
+function tone(freq,dur,type,vol,when){
+  const c=ac(); if(!c) return;
+  const t=(when||0)+c.currentTime;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type||'sine'; o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol||.25,t+.01);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur+.02);
+}
+const sGot =()=>{tone(660,.1,'triangle',.3);tone(880,.16,'triangle',.3,.09);};
+const sSkip=()=>tone(300,.12,'sine',.2);
+const sBuzz=()=>{tone(150,.32,'sawtooth',.32);tone(110,.4,'square',.22,.02);};
+const sTick=()=>tone(900,.05,'square',.18);
+const sStart=()=>{tone(523,.1,'triangle',.28);tone(659,.1,'triangle',.28,.1);tone(784,.18,'triangle',.3,.2);};
+const sEnd =()=>{tone(440,.18,'sawtooth',.3);tone(330,.3,'sawtooth',.3,.16);};
+const sWin =()=>{[523,659,784,1046].forEach((f,i)=>tone(f,.22,'triangle',.3,i*.13));};
+
+/* ---------------- GAME FLOW ---------------- */
+function shuffle(a){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
+
+function startGame(){
+  ac(); // unlock audio on user gesture
+  state=freshState();
+  state.deck=shuffle(DECK);
+  state.deckPos=0; state.turn=0;
+  showReady();
+}
+function rematch(){
+  state.teams.forEach(t=>t.score=0);
+  state.deck=shuffle(DECK); state.deckPos=0; state.turn=0; state.roundsPlayed=0;
+  hideConfetti(); showReady();
+}
+
+function showReady(){
+  const t=state.teams[state.turn];
+  document.getElementById('readyTeam').textContent=t.name;
+  document.getElementById('readyTeam').style.color=t.color;
+  renderScores('readyScores');
+  go('ready');
+}
+
+function beginRound(){
+  ac();
+  state.roundScore=0; state.timeLeft=state.roundTime;
+  const t=state.teams[state.turn];
+  document.getElementById('turnName').textContent=t.name;
+  document.getElementById('turnDot').style.background=t.color;
+  updRoundScore();
+  drawCard();
+  go('play');
+  sStart();
+  clearInterval(state.timerId);
+  renderTimer();
+  state.timerId=setInterval(tick,1000);
+}
+
+function tick(){
+  state.timeLeft--;
+  renderTimer();
+  if(state.timeLeft<=5 && state.timeLeft>0) sTick();
+  if(state.timeLeft<=0){ clearInterval(state.timerId); endRound(); }
+}
+function renderTimer(){
+  const el=document.getElementById('timer');
+  el.textContent=state.timeLeft;
+  el.classList.toggle('warn', state.timeLeft<=5);
+}
+
+function drawCard(){
+  if(state.deckPos>=state.deck.length){ state.deck=shuffle(DECK); state.deckPos=0; }
+  const card=state.deck[state.deckPos];
+  document.getElementById('theWord').textContent=card.w;
+  const ul=document.getElementById('forbidList'); ul.innerHTML='';
+  card.f.forEach(x=>{const li=document.createElement('li');li.textContent=x;ul.appendChild(li);});
+  document.getElementById('cardCount').textContent='Card '+(state.roundsPlayed*0+ (state.deckPos+1))+' · deck reshuffles automatically';
+}
+
+function nextCard(kind){
+  if(kind==='got'){ state.roundScore++; sGot(); }
+  else if(kind==='buzz'){ state.roundScore--; sBuzz(); }
+  else { sSkip(); }
+  updRoundScore();
+  state.deckPos++;
+  drawCard();
+}
+function updRoundScore(){
+  const el=document.getElementById('roundScore');
+  el.textContent=(state.roundScore>=0?'+':'')+state.roundScore;
+}
+
+function endRound(){
+  sEnd();
+  const t=state.teams[state.turn];
+  t.score+=state.roundScore;
+  if(t.score<0) t.score=0;
+  state.roundsPlayed++;
+  // scoreboard
+  document.getElementById('roundNote').textContent=
+    t.name+' scored '+(state.roundScore>=0?'+':'')+state.roundScore+' this round.';
+  renderScores('boardScores');
+  // win check (only if a real goal set)
+  const winner=state.teams.find(x=>x.score>=state.goal);
+  if(state.goal!==999 && winner){
+    showWin(winner);
+  }else{
+    document.getElementById('boardTitle').textContent='Round Over!';
+    go('board');
+  }
+}
+
+function nextTeamTurn(){
+  state.turn=(state.turn+1)%2;
+  showReady();
+}
+
+function showWin(winner){
+  document.getElementById('winName').textContent=winner.name;
+  document.getElementById('winName').style.color=winner.color;
+  document.getElementById('winScore').textContent='Reached '+winner.score+' points — winner!';
+  renderScores('winScores');
+  go('win');
+  sWin(); burstConfetti();
+}
+
+/* ---------------- SCOREBOARD RENDER ---------------- */
+function renderScores(elId){
+  const wrap=document.getElementById(elId); wrap.innerHTML='';
+  const ranked=state.teams.map((t,i)=>({...t,i})).sort((a,b)=>b.score-a.score);
+  const top=ranked[0].score;
+  ranked.forEach(t=>{
+    const div=document.createElement('div');
+    div.className='scoreline';
+    div.innerHTML=`<span class="dot" style="width:22px;height:22px;background:${t.color}"></span>
+      <span class="nm">${escapeHtml(t.name)}</span>
+      ${(t.score===top && top>0)?'<span class="crown">👑</span>':''}
+      <span class="pts">${t.score}</span>`;
+    wrap.appendChild(div);
+  });
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+/* ---------------- CONFETTI ---------------- */
+function burstConfetti(){
+  const c=document.getElementById('confetti'); c.style.display='block'; c.innerHTML='';
+  const colors=['#ffd23f','#ff4d8d','#36e27b','#36c9ff','#ff7a59','#fff'];
+  for(let i=0;i<90;i++){
+    const d=document.createElement('div'); d.className='conf';
+    d.style.left=Math.random()*100+'vw';
+    d.style.background=colors[i%colors.length];
+    d.style.animationDuration=(2.4+Math.random()*2.2)+'s';
+    d.style.animationDelay=(Math.random()*.8)+'s';
+    c.appendChild(d);
+  }
+  setTimeout(hideConfetti,5200);
+}
+function hideConfetti(){const c=document.getElementById('confetti');c.style.display='none';c.innerHTML='';}
+
+/* ---------------- MISC ---------------- */
+function confirmRestart(){
+  if(confirm('End this game and return to setup?')){ clearInterval(state.timerId); hideConfetti(); go('setup'); }
+}
+function rematchReset(){}
+
+// prevent accidental scroll/zoom while playing
+document.addEventListener('gesturestart',e=>e.preventDefault());
+</script>
+</body>
+</html>

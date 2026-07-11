@@ -1,0 +1,347 @@
+<!-- CONCEPT: SPEED/REACTION (word) - "Word Bomb Pass": a hot-potato word game - the screen shows a letter chunk and a ticking bomb; say a word containing it then tap PASS to the next player; whoever is holding the bomb when it blows loses a life. 140+ letter chunks for endless replay. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Word Bomb Pass</title>
+<style>
+  :root{
+    --bg1:#1a0033; --bg2:#3d0066; --hot:#ff2e63; --gold:#ffd23f;
+    --cyan:#08d9d6; --lime:#a8ff3e; --ink:#0d0019; --card:#2a0a4a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
+    background:radial-gradient(circle at 50% 0%,var(--bg2),var(--bg1) 70%);
+    color:#fff; overflow:hidden; user-select:none; -webkit-user-select:none;
+    touch-action:manipulation;
+  }
+  .screen{
+    position:fixed; inset:0; display:none; flex-direction:column;
+    align-items:center; justify-content:center; padding:4vmin; text-align:center;
+  }
+  .screen.active{display:flex;}
+  h1{
+    font-size:clamp(2.6rem,11vw,7rem); font-weight:900; line-height:.95;
+    letter-spacing:-1px; text-transform:uppercase;
+    background:linear-gradient(180deg,var(--gold),var(--hot));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 0 30px rgba(255,46,99,.35); margin-bottom:1.5vmin;
+  }
+  .tag{font-size:clamp(1rem,3.4vw,1.5rem); color:var(--cyan); font-weight:700; margin-bottom:1vmin;}
+  .meta{font-size:clamp(.8rem,2.6vw,1.1rem); color:#c9a9ff; max-width:640px; line-height:1.5; margin-bottom:4vmin;}
+  .btn{
+    border:none; border-radius:999px; cursor:pointer; font-weight:900;
+    font-family:inherit; text-transform:uppercase; letter-spacing:.5px;
+    padding:3.2vmin 7vmin; font-size:clamp(1.3rem,5vw,2.2rem);
+    background:linear-gradient(180deg,var(--hot),#c81048); color:#fff;
+    box-shadow:0 8px 0 #7a0a2c, 0 14px 30px rgba(0,0,0,.4);
+    transition:transform .06s, box-shadow .06s;
+  }
+  .btn:active{transform:translateY(6px); box-shadow:0 2px 0 #7a0a2c,0 6px 16px rgba(0,0,0,.4);}
+  .btn.gold{background:linear-gradient(180deg,var(--gold),#e0a800); color:#3a1d00; box-shadow:0 8px 0 #8f6c00,0 14px 30px rgba(0,0,0,.4);}
+  .btn.gold:active{box-shadow:0 2px 0 #8f6c00,0 6px 16px rgba(0,0,0,.4);}
+  .btn.cyan{background:linear-gradient(180deg,var(--cyan),#069a98); color:#00211f; box-shadow:0 8px 0 #045655,0 14px 30px rgba(0,0,0,.4);}
+  .btn.cyan:active{box-shadow:0 2px 0 #045655,0 6px 16px rgba(0,0,0,.4);}
+  .btn.ghost{background:transparent; box-shadow:none; border:3px solid var(--cyan); color:var(--cyan); padding:2vmin 5vmin; font-size:clamp(1rem,3.5vw,1.4rem);}
+  .btn.ghost:active{transform:translateY(2px);}
+  .row{display:flex; gap:3vmin; flex-wrap:wrap; align-items:center; justify-content:center;}
+
+  /* setup controls */
+  .panel{background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.12); border-radius:24px; padding:4vmin 5vmin; margin-bottom:4vmin; backdrop-filter:blur(4px);}
+  .label{font-size:clamp(.95rem,3vw,1.25rem); color:var(--gold); font-weight:800; text-transform:uppercase; letter-spacing:1px; margin-bottom:2.5vmin;}
+  .stepper{display:flex; align-items:center; justify-content:center; gap:4vmin; margin-bottom:4vmin;}
+  .stepbtn{width:16vmin; height:16vmin; max-width:96px; max-height:96px; border-radius:50%; border:none; font-size:clamp(2rem,8vw,3rem); font-weight:900; background:var(--card); color:#fff; cursor:pointer; box-shadow:0 6px 0 #16002e;}
+  .stepbtn:active{transform:translateY(4px); box-shadow:0 2px 0 #16002e;}
+  .stepval{font-size:clamp(3.5rem,16vw,6rem); font-weight:900; min-width:2.5ch; color:var(--lime);}
+  .seg{display:flex; gap:2vmin; flex-wrap:wrap; justify-content:center;}
+  .seg button{border:3px solid rgba(255,255,255,.2); background:rgba(255,255,255,.05); color:#fff; border-radius:16px; padding:2.4vmin 4vmin; font-size:clamp(1rem,3.6vw,1.4rem); font-weight:800; font-family:inherit; cursor:pointer; transition:.15s;}
+  .seg button.on{background:var(--cyan); color:#00211f; border-color:var(--cyan); box-shadow:0 0 24px rgba(8,217,214,.5);}
+
+  /* game */
+  #game{justify-content:space-between; padding-top:5vmin; padding-bottom:5vmin;}
+  .topbar{width:100%; display:flex; align-items:center; justify-content:space-between; gap:2vmin;}
+  .turnname{font-size:clamp(1.4rem,6vw,2.6rem); font-weight:900; color:var(--gold); text-transform:uppercase;}
+  .roundnum{font-size:clamp(.85rem,2.8vw,1.1rem); color:#c9a9ff; font-weight:700;}
+  .chunkwrap{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1vmin;}
+  .saythis{font-size:clamp(.9rem,3.2vw,1.3rem); color:var(--cyan); font-weight:800; text-transform:uppercase; letter-spacing:2px;}
+  .chunk{
+    font-size:clamp(5rem,30vw,16rem); font-weight:900; letter-spacing:.5vmin;
+    color:#fff; text-shadow:0 0 40px var(--hot),0 0 12px var(--gold);
+    line-height:1;
+  }
+  .bomb{font-size:clamp(3rem,14vw,7rem); line-height:1; margin-top:1vmin; transform-origin:center;}
+  .passbtn{
+    width:86vw; max-width:700px; padding:6vmin 0; border:none; border-radius:30px;
+    font-size:clamp(2rem,9vw,3.4rem); font-weight:900; text-transform:uppercase;
+    background:linear-gradient(180deg,var(--lime),#5fb800); color:#10260a;
+    box-shadow:0 10px 0 #3c7a00,0 18px 36px rgba(0,0,0,.5); cursor:pointer; letter-spacing:1px;
+  }
+  .passbtn:active{transform:translateY(8px); box-shadow:0 2px 0 #3c7a00,0 8px 20px rgba(0,0,0,.5);}
+  .lives{width:100%; display:flex; flex-wrap:wrap; gap:1.4vmin; justify-content:center; margin-top:2vmin;}
+  .lifechip{display:flex; align-items:center; gap:.5ch; background:rgba(255,255,255,.07); border:2px solid rgba(255,255,255,.12); border-radius:999px; padding:1vmin 2.4vmin; font-size:clamp(.8rem,2.8vw,1.1rem); font-weight:800;}
+  .lifechip.cur{border-color:var(--gold); background:rgba(255,210,63,.18); box-shadow:0 0 18px rgba(255,210,63,.4);}
+  .lifechip.dead{opacity:.35; text-decoration:line-through;}
+  .hearts{letter-spacing:1px;}
+
+  /* explosion overlay */
+  #boom{background:radial-gradient(circle,#ff6a00,#ff2e63 60%,#1a0033); }
+  .boomtxt{font-size:clamp(3rem,18vw,9rem); font-weight:900; text-transform:uppercase; color:#fff; text-shadow:0 0 30px #000; animation:pop .4s ease;}
+  @keyframes pop{0%{transform:scale(.3); opacity:0;}60%{transform:scale(1.15);}100%{transform:scale(1); opacity:1;}}
+  .boomwho{font-size:clamp(1.6rem,8vw,3.2rem); font-weight:900; color:var(--gold); margin:2vmin 0 4vmin;}
+
+  .shake{animation:shake .25s infinite;}
+  @keyframes shake{0%,100%{transform:translate(0,0) rotate(0);}25%{transform:translate(-3px,2px) rotate(-4deg);}50%{transform:translate(3px,-2px) rotate(4deg);}75%{transform:translate(-2px,-2px) rotate(-2deg);}}
+  .winner{font-size:clamp(2.4rem,12vw,5rem); font-weight:900; color:var(--lime); text-transform:uppercase; margin:2vmin 0;}
+  .crown{font-size:clamp(4rem,20vw,9rem);}
+  .hint{font-size:clamp(.8rem,2.6vw,1.05rem); color:#b89fe0; margin-top:3vmin; max-width:560px; line-height:1.5;}
+  .corner{position:fixed; top:2vmin; right:3vmin; font-size:clamp(.7rem,2.4vw,.95rem); color:rgba(255,255,255,.4); font-weight:700;}
+  .quitbtn{position:fixed; top:2vmin; left:3vmin; background:none; border:none; color:rgba(255,255,255,.5); font-size:clamp(.9rem,3vw,1.2rem); cursor:pointer; font-family:inherit; font-weight:800;}
+</style>
+</head>
+<body>
+
+<!-- ============ HOME ============ -->
+<section id="home" class="screen active">
+  <h1>Word<br>Bomb Pass</h1>
+  <div class="tag">💣 The pass-the-phone word fuse game</div>
+  <div class="meta">Say a word containing the letters on screen, then smack PASS to the next player — before the bomb blows up in someone's hands. 3–10 players · ~5–10 min a game.</div>
+  <button class="btn gold" onclick="goSetup()">Start</button>
+  <button class="btn ghost" style="margin-top:3vmin" onclick="show('rules')">How to play</button>
+</section>
+
+<!-- ============ RULES ============ -->
+<section id="rules" class="screen">
+  <h1 style="font-size:clamp(2rem,8vw,4rem)">How to Play</h1>
+  <div class="meta" style="text-align:left; font-size:clamp(.95rem,3.4vw,1.3rem); color:#fff; line-height:1.7">
+    1️⃣ Sit in a circle and pass one phone/laptop around.<br>
+    2️⃣ The screen shows a <b style="color:var(--gold)">letter chunk</b> (like <b>TR</b> or <b>ING</b>).<br>
+    3️⃣ On your turn, say <i>any</i> real word that contains those letters in order.<br>
+    4️⃣ Smack the big green <b style="color:var(--lime)">PASS</b> button and hand the device to the next player.<br>
+    5️⃣ The bomb has a hidden fuse — whoever's holding it when it <b style="color:var(--hot)">BOOMS</b> loses a life.<br>
+    6️⃣ Run out of lives and you're out. Last player standing wins! 👑
+  </div>
+  <div class="hint">No repeats in a round (honor system). Stuck? You can still pass — but a bad/empty pass is risky karma. Keep it fast!</div>
+  <button class="btn cyan" style="margin-top:4vmin" onclick="show('home')">Back</button>
+</section>
+
+<!-- ============ SETUP ============ -->
+<section id="setup" class="screen">
+  <h1 style="font-size:clamp(2.2rem,9vw,4.5rem)">Set Up</h1>
+  <div class="panel">
+    <div class="label">Players</div>
+    <div class="stepper">
+      <button class="stepbtn" onclick="bumpPlayers(-1)">−</button>
+      <div class="stepval" id="pcount">4</div>
+      <button class="stepbtn" onclick="bumpPlayers(1)">+</button>
+    </div>
+    <div class="label">Lives each</div>
+    <div class="seg" id="livesSeg">
+      <button data-v="2">2 ❤️</button>
+      <button data-v="3" class="on">3 ❤️</button>
+      <button data-v="4">4 ❤️</button>
+    </div>
+  </div>
+  <div class="panel" style="margin-top:0">
+    <div class="label">Difficulty</div>
+    <div class="seg" id="diffSeg">
+      <button data-v="chill" class="on">😌 Chill</button>
+      <button data-v="mix">🔥 Mixed</button>
+      <button data-v="spicy">🌶️ Spicy</button>
+    </div>
+  </div>
+  <button class="btn gold" onclick="startGame()">Light the Fuse 💥</button>
+  <button class="btn ghost" style="margin-top:2.5vmin" onclick="show('home')">Back</button>
+</section>
+
+<!-- ============ GAME ============ -->
+<section id="game" class="screen">
+  <button class="quitbtn" onclick="quitGame()">✕ Quit</button>
+  <div class="corner" id="diffBadge"></div>
+  <div class="topbar">
+    <div>
+      <div class="turnname" id="turnName">Player 1</div>
+      <div class="roundnum" id="roundNum">Round 1</div>
+    </div>
+  </div>
+  <div class="chunkwrap">
+    <div class="saythis">say a word with</div>
+    <div class="chunk" id="chunk">TR</div>
+    <div class="bomb" id="bomb">💣</div>
+  </div>
+  <button class="passbtn" id="passBtn" onclick="passTurn()">PASS ➜</button>
+  <div class="lives" id="livesBar"></div>
+</section>
+
+<!-- ============ BOOM ============ -->
+<section id="boom" class="screen">
+  <div class="boomtxt">💥 BOOM 💥</div>
+  <div class="boomwho" id="boomWho"></div>
+  <button class="btn gold" id="boomBtn" onclick="afterBoom()">Next Round</button>
+</section>
+
+<!-- ============ WIN ============ -->
+<section id="win" class="screen">
+  <div class="crown">👑</div>
+  <div class="winner" id="winName">Player 1 Wins!</div>
+  <div class="tag" id="winSub"></div>
+  <div class="row" style="margin-top:4vmin">
+    <button class="btn lime gold" onclick="rematch()">Rematch</button>
+    <button class="btn cyan" onclick="show('setup')">Change Setup</button>
+  </div>
+</section>
+
+<script>
+/* ---------- letter chunk pools ---------- */
+const CHILL = ["TH","ER","IN","AN","RE","ON","AT","EN","ES","OR","TE","ED","IT","AL","AR","ST","NG","SE","HA","OU","LE","VE","CO","ME","DE","RI","RO","IC","NE","EA","RA","CE","LI","CH","LL","BE","MA","SI","CA","TA","LA","DI","FO","HO","PE","TR","UN","OW","AC","AS","EL","OO","EE","SH","WA","BA","SO","NO","GO","ND","ENT","ING","ALL","AND","FOR","HER","OUR","OUT","ONE","AGE","ARE","EAR","ATE","ICE","OWN","ACK","EST","INE","ORE","IDE","ELL","OON","AIN"];
+const SPICY = ["GHT","SCR","SPR","STR","THR","SQU","NKL","CKL","DGE","NGE","RGE","MPL","MPH","RVE","BLE","PLE","TLE","NCH","RCH","TCH","SHR","WL","KN","WR","GN","PH","MB","RV","XT","PT","CT","NK","MP","SK","SP","SW","TW","FL","GL","PL","SL","BR","CR","DR","FR","GR","PR","SCH","SPL","NTL","RDS","LVE","RSE","NSE","MBL","NDL","STL","PRO","TRA","CON","PER","COM","SUB","ANT","ENT","ICK","OCK","UCK","ASH","USH","UMP","OND"];
+
+let state = {};
+
+/* ---------- audio (Web Audio API) ---------- */
+let AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==='suspended')AC.resume(); return AC; }
+function tone(freq,dur,type,vol,when){
+  const c=ac(); if(!c)return; const t=(when||0)+c.currentTime;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type||'sine'; o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol||.2,t+.01);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur+.02);
+}
+function tick(intense){ tone(intense?900:620, .04,'square',.12); }
+function passSnd(){ tone(520,.08,'triangle',.2); tone(780,.1,'triangle',.18,.05); }
+function explode(){
+  const c=ac(); if(!c)return; const t=c.currentTime;
+  const n=c.createBufferSource(); const len=c.sampleRate*0.9;
+  const buf=c.createBuffer(1,len,c.sampleRate); const d=buf.getChannelData(0);
+  for(let i=0;i<len;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2); }
+  n.buffer=buf;
+  const g=c.createGain(); g.gain.setValueAtTime(.6,t); g.gain.exponentialRampToValueAtTime(.001,t+.9);
+  const f=c.createBiquadFilter(); f.type='lowpass'; f.frequency.setValueAtTime(1800,t); f.frequency.exponentialRampToValueAtTime(120,t+.8);
+  n.connect(f); f.connect(g); g.connect(c.destination); n.start(t);
+  tone(80,.7,'sawtooth',.4);
+}
+function fanfare(){ [523,659,784,1047].forEach((f,i)=>tone(f,.4,'triangle',.25,i*.13)); }
+
+/* ---------- navigation ---------- */
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
+function goSetup(){ ac(); show('setup'); }
+
+/* ---------- setup ---------- */
+let cfg={players:4, lives:3, diff:'chill'};
+function bumpPlayers(d){ cfg.players=Math.max(3,Math.min(10,cfg.players+d)); document.getElementById('pcount').textContent=cfg.players; }
+document.getElementById('livesSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; cfg.lives=+b.dataset.v; document.querySelectorAll('#livesSeg button').forEach(x=>x.classList.toggle('on',x===b)); });
+document.getElementById('diffSeg').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return; cfg.diff=b.dataset.v; document.querySelectorAll('#diffSeg button').forEach(x=>x.classList.toggle('on',x===b)); });
+
+/* ---------- game flow ---------- */
+function pool(){ if(cfg.diff==='chill')return CHILL.slice(); if(cfg.diff==='spicy')return SPICY.slice(); return CHILL.concat(SPICY); }
+function startGame(){
+  ac();
+  state={
+    players:[], cur:0, round:0, alive:0,
+    bank: shuffle(pool()), bankI:0,
+    chunk:'', fuse:0, elapsed:0, timer:null, lastTick:0, running:false
+  };
+  for(let i=0;i<cfg.players;i++) state.players.push({name:'Player '+(i+1), lives:cfg.lives, dead:false});
+  state.alive=cfg.players;
+  state.cur=0;
+  document.getElementById('diffBadge').textContent = (cfg.diff==='chill'?'😌 Chill':cfg.diff==='spicy'?'🌶️ Spicy':'🔥 Mixed');
+  show('game');
+  newRound(0);
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function nextChunk(){
+  if(state.bankI>=state.bank.length){ state.bank=shuffle(pool()); state.bankI=0; }
+  return state.bank[state.bankI++];
+}
+function newRound(startPlayer){
+  state.round++;
+  state.chunk=nextChunk();
+  // hidden random fuse; longer when more players alive so everyone gets a go
+  const base = 7 + Math.min(state.alive,8)*1.6;
+  state.fuse = base + Math.random()*8;       // seconds
+  state.elapsed=0; state.lastTick=0; state.running=true;
+  state.cur = startPlayer;
+  if(state.players[state.cur].dead) state.cur=nextAliveFrom(state.cur);
+  render();
+  document.getElementById('roundNum').textContent='Round '+state.round;
+  document.getElementById('chunk').textContent=state.chunk;
+  clearInterval(state.timer);
+  state.timer=setInterval(loop,80);
+}
+function loop(){
+  if(!state.running)return;
+  state.elapsed += 0.08;
+  const remain = state.fuse - state.elapsed;
+  const bomb=document.getElementById('bomb');
+  // tick cadence accelerates as fuse shortens
+  const cad = remain>6 ? 0.85 : remain>3 ? 0.45 : remain>1.2 ? 0.22 : 0.11;
+  if(state.elapsed - state.lastTick >= cad){ state.lastTick=state.elapsed; tick(remain<3); }
+  if(remain<3.2){ bomb.classList.add('shake'); } else { bomb.classList.remove('shake'); }
+  bomb.textContent = remain<1.6 ? '🧨' : '💣';
+  if(remain<=0){ boom(); }
+}
+function passTurn(){
+  if(!state.running)return;
+  passSnd();
+  state.cur = nextAliveFrom(state.cur);
+  render();
+}
+function nextAliveFrom(i){
+  let n=i;
+  for(let k=0;k<state.players.length;k++){ n=(n+1)%state.players.length; if(!state.players[n].dead)return n; }
+  return i;
+}
+function boom(){
+  state.running=false; clearInterval(state.timer);
+  document.getElementById('bomb').classList.remove('shake');
+  explode();
+  const p=state.players[state.cur];
+  p.lives--;
+  let msg;
+  if(p.lives<=0){ p.dead=true; state.alive--; msg=p.name+' is OUT! 💀'; }
+  else { msg=p.name+' loses a life ❤️ ('+p.lives+' left)'; }
+  document.getElementById('boomWho').textContent=msg;
+  const win = state.alive<=1;
+  document.getElementById('boomBtn').textContent = win ? 'See Winner 👑' : 'Next Round';
+  state._win = win;
+  show('boom');
+  if(navigator.vibrate) navigator.vibrate([90,40,160]);
+}
+function afterBoom(){
+  if(state._win){ endGame(); return; }
+  // next round starts with player after the one who blew up
+  const starter = nextAliveFrom(state.cur);
+  show('game');
+  newRound(starter);
+}
+function endGame(){
+  fanfare();
+  const w = state.players.find(p=>!p.dead) || state.players[0];
+  document.getElementById('winName').textContent = w.name+' Wins!';
+  document.getElementById('winSub').textContent = 'Survived '+state.round+' rounds 🔥';
+  show('win');
+}
+function render(){
+  document.getElementById('turnName').textContent = state.players[state.cur].name;
+  const bar=document.getElementById('livesBar'); bar.innerHTML='';
+  state.players.forEach((p,i)=>{
+    const c=document.createElement('div');
+    c.className='lifechip'+(i===state.cur&&!p.dead?' cur':'')+(p.dead?' dead':'');
+    const hearts = p.dead ? '☠️' : '❤️'.repeat(p.lives);
+    c.innerHTML = p.name.replace('Player ','P')+' <span class="hearts">'+hearts+'</span>';
+    bar.appendChild(c);
+  });
+}
+function quitGame(){ state.running=false; clearInterval(state.timer); show('home'); }
+function rematch(){ startGame(); }
+
+/* prevent context menu / long-press selection issues */
+document.addEventListener('contextmenu',e=>e.preventDefault());
+window.addEventListener('keydown',e=>{ if(e.code==='Space'){ e.preventDefault(); const g=document.getElementById('game'); if(g.classList.contains('active'))passTurn(); } });
+</script>
+</body>
+</html>
