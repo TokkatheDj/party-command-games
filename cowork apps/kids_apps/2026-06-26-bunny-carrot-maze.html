@@ -1,0 +1,474 @@
+<!-- CONCEPT: Bunny's Carrot Maze — guide a hop-happy bunny through a friendly maze with arrow keys, swipes, or big on-screen D-pad buttons; munch every carrot you pass and reach the cozy burrow to win. Each win grows the maze a little bigger with confetti & a fanfare. Gentle maze/puzzle game for ages 4-10, no enemies, no fail-shaming. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Bunny's Carrot Maze</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    font-family: "Comic Sans MS", "Baloo", "Trebuchet MS", system-ui, sans-serif;
+    background: linear-gradient(160deg, #aee9ff 0%, #c8f7d4 55%, #fff4c2 100%);
+    color: #3a2e22;
+    user-select: none; -webkit-user-select: none;
+    text-align: center;
+    overflow-x: hidden;
+  }
+  #wrap { max-width: 560px; margin: 0 auto; padding: 10px 12px 28px; }
+  h1 {
+    margin: 6px 0 2px; font-size: clamp(26px, 7vw, 40px);
+    color: #ff6b9d; text-shadow: 2px 2px 0 #fff, 4px 4px 0 rgba(255,107,157,.25);
+    letter-spacing: 1px;
+  }
+  .desc { margin: 0 auto 8px; font-size: clamp(13px, 3.4vw, 16px); color: #5a6b4a; max-width: 480px; line-height: 1.3; }
+  #hud {
+    display: flex; justify-content: center; gap: 10px; flex-wrap: wrap;
+    margin: 6px 0 10px;
+  }
+  .chip {
+    background: #fff; border-radius: 18px; padding: 8px 16px;
+    font-size: clamp(16px, 4.4vw, 20px); font-weight: bold;
+    box-shadow: 0 4px 0 rgba(0,0,0,.12); border: 3px solid #ffd86b;
+    color: #c47e00; white-space: nowrap;
+  }
+  .chip.lvl { border-color: #9be29b; color: #2f9e44; }
+  #stage { position: relative; display: inline-block; }
+  canvas {
+    background: #fff8e8; border-radius: 22px;
+    box-shadow: 0 10px 0 rgba(0,0,0,.12), inset 0 0 0 6px #ffe0a3;
+    touch-action: none; max-width: 100%; height: auto;
+  }
+  #banner {
+    position: absolute; left: 50%; top: 46%; transform: translate(-50%,-50%) scale(0);
+    background: #fff; color: #ff6b9d; font-size: clamp(22px, 6vw, 34px); font-weight: bold;
+    padding: 14px 26px; border-radius: 24px; border: 5px solid #ffd86b;
+    box-shadow: 0 8px 0 rgba(0,0,0,.15); pointer-events: none; transition: transform .35s cubic-bezier(.2,1.6,.4,1);
+    white-space: nowrap; z-index: 5;
+  }
+  #banner.show { transform: translate(-50%,-50%) scale(1); }
+  /* D-pad */
+  #pad {
+    margin: 16px auto 4px; width: 210px; height: 210px; position: relative;
+  }
+  .dbtn {
+    position: absolute; width: 68px; height: 68px; border: none; cursor: pointer;
+    background: #ffd86b; color: #7a4b00; font-size: 34px; font-weight: bold;
+    border-radius: 18px; box-shadow: 0 5px 0 #d9a93b; touch-action: manipulation;
+    display: flex; align-items: center; justify-content: center; line-height: 1;
+  }
+  .dbtn:active { transform: translateY(4px); box-shadow: 0 1px 0 #d9a93b; }
+  #up    { top: 0; left: 71px; }
+  #left  { top: 71px; left: 0; }
+  #right { top: 71px; left: 142px; }
+  #down  { top: 142px; left: 71px; }
+  #pad .hub {
+    position: absolute; top: 71px; left: 71px; width: 68px; height: 68px;
+    display: flex; align-items: center; justify-content: center; font-size: 30px;
+    pointer-events: none;
+  }
+  #controls { margin-top: 8px; }
+  .big {
+    font-family: inherit; font-size: clamp(17px, 4.6vw, 21px); font-weight: bold;
+    color: #fff; background: #ff8fb3; border: none; border-radius: 20px;
+    padding: 12px 22px; margin: 5px; cursor: pointer; box-shadow: 0 5px 0 #d96b91;
+    touch-action: manipulation;
+  }
+  .big.green { background: #5cc97a; box-shadow: 0 5px 0 #3f9e5a; }
+  .big:active { transform: translateY(4px); box-shadow: 0 1px 0 #d96b91; }
+  .big.green:active { box-shadow: 0 1px 0 #3f9e5a; }
+  .hint { font-size: 13px; color: #6b7a5a; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>🐰 Bunny's Carrot Maze 🥕</h1>
+  <p class="desc">Hop through the maze, munch every carrot, and reach the cozy burrow 🏠. Use the arrow buttons, your keyboard arrows, or swipe!</p>
+  <div id="hud">
+    <div class="chip lvl">Level <span id="lvl">1</span></div>
+    <div class="chip">🥕 <span id="carrots">0</span>/<span id="carrotsTotal">0</span></div>
+  </div>
+  <div id="stage">
+    <canvas id="cv" width="500" height="500"></canvas>
+    <div id="banner"></div>
+  </div>
+
+  <div id="pad">
+    <button class="dbtn" id="up" aria-label="Up">▲</button>
+    <button class="dbtn" id="left" aria-label="Left">◀</button>
+    <span class="hub">🐰</span>
+    <button class="dbtn" id="right" aria-label="Right">▶</button>
+    <button class="dbtn" id="down" aria-label="Down">▼</button>
+  </div>
+
+  <div id="controls">
+    <button class="big green" id="nextBtn" style="display:none">Next Maze ➜</button>
+    <button class="big" id="newBtn">New Maze 🔄</button>
+  </div>
+  <div class="hint">Tip: there are no monsters — take your time and explore!</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Audio (Web Audio API, no files) ----------
+  var AC = null;
+  function audio(){
+    if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ AC=null; } }
+    if(AC && AC.state === "suspended"){ AC.resume(); }
+    return AC;
+  }
+  function tone(freq, dur, type, vol, when){
+    var ac = audio(); if(!ac) return;
+    var t = ac.currentTime + (when||0);
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol||0.18, t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t+dur+0.02);
+  }
+  function hop(){ tone(520, 0.10, "sine", 0.14); tone(780, 0.08, "sine", 0.08, 0.02); }
+  function bump(){ tone(150, 0.12, "sawtooth", 0.06); }
+  function crunch(){ tone(320, 0.07, "square", 0.10); tone(440, 0.10, "triangle", 0.12, 0.03); }
+  function fanfare(){
+    var notes = [523,659,784,1047,1319];
+    notes.forEach(function(f,i){ tone(f, 0.22, "triangle", 0.16, i*0.12); });
+    tone(1568, 0.5, "sine", 0.12, notes.length*0.12);
+  }
+
+  // ---------- Canvas ----------
+  var cv = document.getElementById("cv");
+  var ctx = cv.getContext("2d");
+  var CSS = 500;          // css pixel size of the square board
+  var dpr = 1;
+
+  function fitCanvas(){
+    CSS = Math.min(window.innerWidth - 32, 520);
+    if(CSS < 260) CSS = 260;
+    dpr = window.devicePixelRatio || 1;
+    cv.style.width = CSS + "px";
+    cv.style.height = CSS + "px";
+    cv.width = Math.round(CSS * dpr);
+    cv.height = Math.round(CSS * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ---------- Maze ----------
+  // dirs: 0=N(up),1=E(right),2=S(down),3=W(left)
+  var DX = [0, 1, 0, -1], DY = [-1, 0, 1, 0];
+  var N = 5;                 // grid cells per side
+  var cells = [];            // each: {walls:[t,t,t,t]}
+  var cell, pad;             // pixel cell size & margin
+  var bunny = {cx:0, cr:0, px:0, py:0, tx:0, ty:0, moving:false, sx:0, sy:0, prog:1};
+  var goal = {cx:0, cr:0};
+  var carrots = [];          // {cx,cr, eaten}
+  var got = 0, total = 0;
+  var level = 1;
+  var won = false;
+  var confetti = [];
+  var startTime = 0;
+
+  function idx(c, r){ return r * N + c; }
+
+  function genMaze(n){
+    N = n; cells = [];
+    for(var i=0;i<n*n;i++) cells.push({walls:[true,true,true,true]});
+    var stack = [], visited = new Array(n*n).fill(false);
+    var cur = 0; visited[0] = true; var count = 1;
+    while(count < n*n){
+      var c = cur % n, r = (cur - c)/n;
+      var nb = [];
+      for(var d=0; d<4; d++){
+        var nc = c+DX[d], nr = r+DY[d];
+        if(nc>=0 && nc<n && nr>=0 && nr<n && !visited[idx(nc,nr)]) nb.push(d);
+      }
+      if(nb.length){
+        var d2 = nb[(Math.random()*nb.length)|0];
+        var ni = idx(c+DX[d2], r+DY[d2]);
+        cells[cur].walls[d2] = false;
+        cells[ni].walls[(d2+2)%4] = false;
+        stack.push(cur); cur = ni; visited[ni]=true; count++;
+      } else {
+        cur = stack.pop();
+      }
+    }
+  }
+
+  function placeCarrots(){
+    carrots = [];
+    var goalI = idx(goal.cx, goal.cr);
+    var want = Math.min(N + 2, Math.floor(N*N*0.35));
+    var pool = [];
+    for(var i=0;i<N*N;i++){ if(i!==0 && i!==goalI) pool.push(i); }
+    // shuffle
+    for(var j=pool.length-1;j>0;j--){ var k=(Math.random()*(j+1))|0; var t=pool[j];pool[j]=pool[k];pool[k]=t; }
+    for(var m=0;m<want && m<pool.length;m++){
+      var ci = pool[m], c = ci % N, r = (ci-c)/N;
+      carrots.push({cx:c, cr:r, eaten:false});
+    }
+    total = carrots.length; got = 0;
+  }
+
+  function newLevel(n){
+    won = false;
+    document.getElementById("nextBtn").style.display = "none";
+    genMaze(n);
+    goal.cx = N-1; goal.cr = N-1;
+    bunny.cx = 0; bunny.cr = 0; bunny.moving = false; bunny.prog = 1;
+    placeCarrots();
+    computeGeometry();
+    bunny.px = cellCenterX(0); bunny.py = cellCenterY(0);
+    bunny.tx = bunny.px; bunny.ty = bunny.py;
+    updateHUD();
+    startTime = performance.now();
+  }
+
+  function computeGeometry(){
+    pad = Math.max(10, CSS*0.045);
+    cell = (CSS - pad*2) / N;
+  }
+  function cellCenterX(c){ return pad + c*cell + cell/2; }
+  function cellCenterY(r){ return pad + r*cell + cell/2; }
+
+  function updateHUD(){
+    document.getElementById("lvl").textContent = level;
+    document.getElementById("carrots").textContent = got;
+    document.getElementById("carrotsTotal").textContent = total;
+  }
+
+  // ---------- Movement ----------
+  function tryMove(dir){
+    if(won) return;
+    if(bunny.moving) return; // wait until settled for crisp hops
+    var c = bunny.cx, r = bunny.cr;
+    if(cells[idx(c,r)].walls[dir]){ bump(); return; }
+    var nc = c+DX[dir], nr = r+DY[dir];
+    if(nc<0||nc>=N||nr<0||nr>=N){ bump(); return; }
+    bunny.cx = nc; bunny.cr = nr;
+    bunny.sx = bunny.px; bunny.sy = bunny.py;
+    bunny.tx = cellCenterX(nc); bunny.ty = cellCenterY(nr);
+    bunny.moving = true; bunny.prog = 0;
+    hop();
+  }
+
+  var lastHint = 0;
+  function arrive(){
+    // carrot?
+    for(var i=0;i<carrots.length;i++){
+      var k = carrots[i];
+      if(!k.eaten && k.cx===bunny.cx && k.cr===bunny.cr){
+        k.eaten = true; got++; updateHUD(); crunch();
+        burst(cellCenterX(k.cx), cellCenterY(k.cr), 10, ["#ff9f1c","#ffd166","#8ac926"]);
+        if(got>=total){ burrowOpen(); }
+      }
+    }
+    // goal? Only wins once every carrot is collected — until then you can hop right through it.
+    if(bunny.cx===goal.cx && bunny.cr===goal.cr){
+      if(got>=total){ winLevel(); }
+      else { hintCarrots(); }
+    }
+  }
+  function burrowOpen(){
+    tone(659,0.12,"triangle",0.14);
+    tone(880,0.16,"sine",0.12,0.10);
+    tone(1175,0.22,"sine",0.10,0.22);
+    burst(cellCenterX(goal.cx), cellCenterY(goal.cr), 20, ["#8ac926","#ffd166","#ffffff"]);
+    showBanner("Burrow open! 🏠");
+  }
+  function hintCarrots(){
+    tone(300,0.10,"sine",0.08);
+    var n = performance.now();
+    if(n - lastHint > 1400){ showBanner("Carrots first! 🥕"); lastHint = n; }
+  }
+
+  function winLevel(){
+    won = true;
+    fanfare();
+    burst(cellCenterX(goal.cx), cellCenterY(goal.cr), 60, ["#ff6b9d","#ffd166","#8ac926","#4cc9f0","#b388ff"]);
+    showBanner("You did it! 🌟");
+    var nb = document.getElementById("nextBtn");
+    setTimeout(function(){ nb.style.display = "inline-block"; }, 700);
+  }
+
+  function showBanner(text){
+    var b = document.getElementById("banner");
+    b.textContent = text; b.classList.add("show");
+    setTimeout(function(){ b.classList.remove("show"); }, 1800);
+  }
+
+  // ---------- Confetti ----------
+  function burst(x, y, count, colors){
+    for(var i=0;i<count;i++){
+      var a = Math.random()*Math.PI*2, sp = 1.5 + Math.random()*4.5;
+      confetti.push({
+        x:x, y:y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - 2,
+        g:0.12+Math.random()*0.08, life:1, size:4+Math.random()*6,
+        col:colors[(Math.random()*colors.length)|0],
+        rot:Math.random()*6, vr:(Math.random()-0.5)*0.4
+      });
+    }
+  }
+
+  // ---------- Render ----------
+  function draw(now){
+    computeGeometry(); // keep in sync with css size
+    ctx.clearRect(0,0,CSS,CSS);
+
+    // floor tint
+    ctx.fillStyle = "#fff8e8";
+    roundRect(pad-6, pad-6, CSS-(pad-6)*2, CSS-(pad-6)*2, 16); ctx.fill();
+
+    // goal burrow highlight — bright & pulsing once all carrots are gathered, dim before
+    var gx = cellCenterX(goal.cx), gy = cellCenterY(goal.cr);
+    var ready = got >= total;
+    var glow = 0.5 + 0.5*Math.sin(now/300);
+    if(ready){
+      ctx.fillStyle = "rgba(140,201,38," + (0.30 + glow*0.30) + ")";
+      ctx.beginPath(); ctx.arc(gx, gy, cell*(0.40 + glow*0.10), 0, Math.PI*2); ctx.fill();
+    } else {
+      ctx.fillStyle = "rgba(150,150,150,0.16)";
+      ctx.beginPath(); ctx.arc(gx, gy, cell*0.42, 0, Math.PI*2); ctx.fill();
+    }
+
+    // walls
+    ctx.strokeStyle = "#c77dff";
+    ctx.lineWidth = Math.max(4, cell*0.16);
+    ctx.lineCap = "round";
+    for(var r=0;r<N;r++){
+      for(var c=0;c<N;c++){
+        var w = cells[idx(c,r)].walls;
+        var x0 = pad + c*cell, y0 = pad + r*cell, x1 = x0+cell, y1 = y0+cell;
+        if(w[0]) line(x0,y0,x1,y0); // N
+        if(w[1]) line(x1,y0,x1,y1); // E
+        if(w[2]) line(x0,y1,x1,y1); // S
+        if(w[3]) line(x0,y0,x0,y1); // W
+      }
+    }
+
+    // emojis sized to cell
+    var fs = Math.floor(cell*0.62);
+    ctx.font = fs + "px serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+
+    // goal house (with a sparkle once it's open)
+    ctx.fillText("🏠", gx, gy + cell*0.02);
+    if(ready){
+      ctx.font = Math.floor(cell*0.34) + "px serif";
+      ctx.fillText("✨", gx, gy - cell*0.36);
+      ctx.font = fs + "px serif";
+    }
+
+    // carrots (gentle bob)
+    for(var i=0;i<carrots.length;i++){
+      var k = carrots[i]; if(k.eaten) continue;
+      var bob = Math.sin(now/250 + i)*cell*0.05;
+      ctx.fillText("🥕", cellCenterX(k.cx), cellCenterY(k.cr)+bob);
+    }
+
+    // bunny
+    if(bunny.moving){
+      bunny.prog += 0.12;
+      if(bunny.prog >= 1){ bunny.prog = 1; bunny.moving = false;
+        bunny.px = bunny.tx; bunny.py = bunny.ty; arrive(); }
+      else {
+        var t = bunny.prog;
+        var e = t<0.5 ? 2*t*t : -1+(4-2*t)*t; // ease
+        bunny.px = bunny.sx + (bunny.tx-bunny.sx)*e;
+        bunny.py = bunny.sy + (bunny.ty-bunny.sy)*e;
+      }
+    }
+    var squish = bunny.moving ? Math.sin(bunny.prog*Math.PI)*cell*0.10 : 0;
+    ctx.font = Math.floor(cell*0.66) + "px serif";
+    ctx.fillText("🐰", bunny.px, bunny.py - squish);
+
+    // confetti
+    for(var f=confetti.length-1; f>=0; f--){
+      var p = confetti[f];
+      p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life -= 0.012;
+      if(p.life <= 0 || p.y > CSS+30){ confetti.splice(f,1); continue; }
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+      ctx.fillStyle = p.col;
+      ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size*0.6);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+
+    requestAnimationFrame(draw);
+  }
+  function line(a,b,c,d){ ctx.beginPath(); ctx.moveTo(a,b); ctx.lineTo(c,d); ctx.stroke(); }
+  function roundRect(x,y,w,h,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+  }
+
+  // ---------- Input ----------
+  function dirFromKey(e){
+    switch(e.key){
+      case "ArrowUp": case "w": case "W": return 0;
+      case "ArrowRight": case "d": case "D": return 1;
+      case "ArrowDown": case "s": case "S": return 2;
+      case "ArrowLeft": case "a": case "A": return 3;
+    }
+    return -1;
+  }
+  window.addEventListener("keydown", function(e){
+    var d = dirFromKey(e);
+    if(d>=0){ e.preventDefault(); tryMove(d); }
+  }, {passive:false});
+
+  function bindPad(id, dir){
+    var b = document.getElementById(id);
+    var fire = function(ev){ ev.preventDefault(); tryMove(dir); };
+    b.addEventListener("touchstart", fire, {passive:false});
+    b.addEventListener("mousedown", fire);
+  }
+  bindPad("up",0); bindPad("right",1); bindPad("down",2); bindPad("left",3);
+
+  // swipe on canvas
+  var sx0=0, sy0=0, swiping=false;
+  cv.addEventListener("touchstart", function(e){
+    audio(); var t=e.changedTouches[0]; sx0=t.clientX; sy0=t.clientY; swiping=true;
+  }, {passive:true});
+  cv.addEventListener("touchend", function(e){
+    if(!swiping) return; swiping=false;
+    var t=e.changedTouches[0], dx=t.clientX-sx0, dy=t.clientY-sy0;
+    if(Math.abs(dx)<18 && Math.abs(dy)<18) return;
+    if(Math.abs(dx)>Math.abs(dy)) tryMove(dx>0?1:3);
+    else tryMove(dy>0?2:0);
+  }, {passive:true});
+  cv.addEventListener("mousedown", function(){ audio(); });
+
+  // ---------- Buttons ----------
+  document.getElementById("nextBtn").addEventListener("click", function(){
+    audio();
+    level++;
+    var n = Math.min(5 + (level-1), 12);
+    newLevel(n);
+    showBanner("Level " + level + "! 🐾");
+  });
+  document.getElementById("newBtn").addEventListener("click", function(){
+    audio();
+    var n = Math.min(5 + (level-1), 12);
+    newLevel(n);
+  });
+
+  window.addEventListener("resize", function(){ fitCanvas(); computeGeometry();
+    bunny.px = bunny.moving ? bunny.px : cellCenterX(bunny.cx);
+    bunny.py = bunny.moving ? bunny.py : cellCenterY(bunny.cr);
+  });
+
+  // ---------- Start ----------
+  fitCanvas();
+  newLevel(5);
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>

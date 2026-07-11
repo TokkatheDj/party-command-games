@@ -1,0 +1,304 @@
+<!-- AGENT FIX 2026-06-26: Added elapsed timer to HUD and win screen — move count alone wasn't enough feedback; timer shows completion speed -->
+<!-- CONCEPT: Memory Zoo — a flip-the-cards memory match puzzle; tap two cards to find matching animal pairs, each match makes the animal's happy sound and hops it into your zoo at the bottom. Three sizes (Little/Medium/Big) and a gentle move counter. Puzzle/brain memory game for ages 4-9. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Memory Zoo 🐾</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; font-family: 'Comic Sans MS', 'Trebuchet MS', 'Baloo', sans-serif; }
+  body {
+    background: linear-gradient(160deg, #ffe29a 0%, #ffb6e6 45%, #9be7ff 100%);
+    display: flex; flex-direction: column; align-items: center;
+    min-height: 100%; touch-action: manipulation;
+  }
+  #app { width: 100%; max-width: 720px; margin: 0 auto; padding: 10px 12px 4px; display: flex; flex-direction: column; align-items: center; }
+
+  h1 { font-size: clamp(28px, 7vw, 48px); margin: 6px 0 0; color: #fff;
+       text-shadow: 2px 3px 0 #ff7ac8, 4px 6px 0 rgba(0,0,0,.12); letter-spacing: 1px; }
+  .sub { color: #5a3a7a; font-size: clamp(13px,3.4vw,17px); margin: 2px 0 8px; font-weight: bold; text-align:center;}
+
+  /* Buttons */
+  .btn { border: none; cursor: pointer; border-radius: 22px; font-family: inherit; font-weight: bold;
+         color: #fff; padding: 14px 26px; font-size: clamp(18px,4.6vw,24px);
+         box-shadow: 0 6px 0 rgba(0,0,0,.18); transition: transform .08s, box-shadow .08s; margin: 6px; }
+  .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.18); }
+  .btn.green { background: linear-gradient(#6ee06e,#33b833); }
+  .btn.pink  { background: linear-gradient(#ff89c9,#ff4fb0); }
+  .btn.blue  { background: linear-gradient(#5fc8ff,#2c9cf0); }
+  .btn.orange{ background: linear-gradient(#ffc15f,#ff9526); }
+
+  /* Screens */
+  .screen { display: none; flex-direction: column; align-items: center; width: 100%; }
+  .screen.on { display: flex; }
+
+  #menu .picks { display: flex; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+
+  /* HUD */
+  #hud { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; margin: 4px 0 8px; }
+  .chip { background: #fff; border-radius: 18px; padding: 7px 16px; font-weight: bold; color: #5a3a7a;
+          font-size: clamp(15px,3.8vw,19px); box-shadow: 0 4px 0 rgba(0,0,0,.10); }
+  #hud .btn { padding: 9px 18px; font-size: clamp(15px,3.8vw,19px); margin: 0; }
+
+  /* Board */
+  #board { display: grid; gap: 10px; width: 100%; max-width: 560px; margin: 0 auto;
+           perspective: 800px; padding: 2px; }
+  .card { position: relative; width: 100%; aspect-ratio: 3/4; cursor: pointer; }
+  .card .inner { position: absolute; inset: 0; transform-style: preserve-3d;
+                 transition: transform .35s cubic-bezier(.4,1.4,.5,1); }
+  .card.flipped .inner, .card.matched .inner { transform: rotateY(180deg); }
+  .face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 16px;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 5px 0 rgba(0,0,0,.16); }
+  .front { background: linear-gradient(135deg,#a06bff,#6a8bff); }
+  .front::after { content: "🐾"; font-size: clamp(26px,8vw,46px); filter: drop-shadow(0 2px 2px rgba(0,0,0,.2)); opacity:.95;}
+  .back { background: #fff7e6; transform: rotateY(180deg); font-size: clamp(30px,10vw,60px); }
+  .card.matched { animation: pop .45s ease; }
+  .card.matched .back { background: #d8ffd8; box-shadow: 0 0 0 4px #5fd35f inset, 0 5px 0 rgba(0,0,0,.16); }
+  .card.wrong .back { animation: shake .4s; }
+  @keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.12)} 100%{transform:scale(1)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+
+  /* Zoo strip */
+  #zoo { min-height: 48px; width: 100%; max-width: 560px; margin: 10px auto 0; background: rgba(255,255,255,.55);
+         border-radius: 18px; padding: 6px 8px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+         justify-content: center; }
+  #zoo .z { font-size: clamp(22px,6vw,32px); animation: hopin .5s ease; }
+  @keyframes hopin { 0%{transform: translateY(-30px) scale(.4); opacity:0} 60%{transform: translateY(6px) scale(1.15)} 100%{transform: translateY(0) scale(1); opacity:1} }
+  .zoo-label { color:#5a3a7a; font-weight:bold; font-size: clamp(12px,3.2vw,15px); width:100%; text-align:center; opacity:.7;}
+
+  /* Win overlay */
+  #win { position: fixed; inset: 0; background: rgba(70,30,110,.5); display: none; flex-direction: column;
+         align-items: center; justify-content: center; z-index: 30; padding: 16px; text-align:center; }
+  #win.on { display: flex; }
+  .winCard { background: #fff; border-radius: 28px; padding: 26px 24px; box-shadow: 0 12px 0 rgba(0,0,0,.2); max-width: 420px; }
+  .winCard h2 { margin: 0 0 6px; color: #ff4fb0; font-size: clamp(26px,7vw,40px); }
+  .winCard p { color: #5a3a7a; font-weight: bold; font-size: clamp(16px,4.2vw,20px); margin: 6px 0 14px; }
+  .winStars { font-size: clamp(34px,10vw,52px); margin: 4px 0; }
+
+  /* Confetti */
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+  .conf { position: absolute; width: 12px; height: 12px; will-change: transform, opacity; }
+
+  .foot { color:#6a4a8a; font-size:12px; opacity:.65; margin: 6px 0 10px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>Memory Zoo 🐾</h1>
+
+  <!-- MENU -->
+  <div id="menu" class="screen on">
+    <div class="sub">Flip the cards and find the matching animal friends!<br>Match a pair and it hops into your zoo. 🦁🐧🐢</div>
+    <div class="picks">
+      <button class="btn green"  onclick="startGame('little')">🐭 Little<br><small style="font-size:13px;opacity:.9">6 cards</small></button>
+      <button class="btn blue"   onclick="startGame('medium')">🦊 Medium<br><small style="font-size:13px;opacity:.9">12 cards</small></button>
+      <button class="btn pink"   onclick="startGame('big')">🐘 Big<br><small style="font-size:13px;opacity:.9">16 cards</small></button>
+    </div>
+    <button class="btn orange" onclick="toggleSound()" id="soundBtn" style="margin-top:14px;">🔊 Sound: On</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="game" class="screen">
+    <div id="hud">
+      <div class="chip" id="moves">Tries: 0</div>
+      <div class="chip" id="found">Found: 0</div>
+      <div class="chip" id="timer">0:00</div>
+      <button class="btn pink" onclick="backToMenu()">↩ Menu</button>
+    </div>
+    <div id="board"></div>
+    <div id="zoo"><div class="zoo-label">Your Zoo</div></div>
+  </div>
+</div>
+
+<div class="foot">A cozy little memory game — have fun!</div>
+
+<!-- WIN -->
+<div id="win">
+  <div class="winCard">
+    <div class="winStars" id="winStars">⭐⭐⭐</div>
+    <h2 id="winTitle">You did it! 🎉</h2>
+    <p id="winMsg">You found every animal!</p>
+    <button class="btn green" onclick="replaySame()">🔁 Play Again</button>
+    <button class="btn blue" onclick="closeWin()">🏠 Menu</button>
+  </div>
+</div>
+<div id="confetti"></div>
+
+<script>
+/* ---------- Audio (Web Audio API, no files) ---------- */
+let actx = null, soundOn = true;
+function ac(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+function tone(freq, dur, type='sine', vol=0.25, when=0){
+  if(!soundOn) return; const c = ac(); if(!c) return;
+  const t = c.currentTime + when;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+dur+0.02);
+}
+function flipSound(){ tone(520, .12, 'triangle', .2); }
+function noMatchSound(){ tone(300,.15,'sine',.18); tone(220,.18,'sine',.18,.12); }
+function matchSound(melody){ // melody = array of freqs
+  melody.forEach((f,i)=> tone(f, .22, 'triangle', .26, i*0.12));
+}
+function winSound(){
+  const notes=[523,659,784,1047,784,1047,1319];
+  notes.forEach((f,i)=> tone(f,.3,'triangle',.28,i*0.13));
+  setTimeout(()=>{ tone(392,.5,'sine',.2); tone(523,.5,'sine',.2); tone(659,.6,'sine',.2);}, 950);
+}
+function toggleSound(){ soundOn=!soundOn; document.getElementById('soundBtn').innerHTML = soundOn? '🔊 Sound: On':'🔈 Sound: Off'; if(soundOn){ ac(); tone(660,.1,'triangle',.2);} }
+
+/* ---------- Animals ---------- */
+// each: emoji + a little happy melody when matched
+const ANIMALS = [
+  {e:'🦁', m:[392,494,587]},
+  {e:'🐧', m:[587,659,784]},
+  {e:'🐢', m:[330,392,440]},
+  {e:'🦊', m:[440,554,659]},
+  {e:'🐘', m:[262,330,392]},
+  {e:'🐸', m:[349,440,523]},
+  {e:'🐵', m:[523,587,698]},
+  {e:'🐼', m:[294,370,440]},
+  {e:'🦄', m:[659,784,988]},
+  {e:'🐙', m:[415,523,622]},
+];
+
+/* ---------- Game state ---------- */
+let deck=[], first=null, lock=false, moves=0, foundPairs=0, totalPairs=0, busy=false, curSize='little', timerInterval=null, timerSeconds=0;
+const sizeCfg = {
+  little: {pairs:3, cols:3},
+  medium: {pairs:6, cols:4},
+  big:    {pairs:8, cols:4}
+};
+const encourage = ["Nice!","Yay!","Great find!","Woohoo!","You got it!","Super!","Lovely!","Match!"];
+
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
+
+function formatTime(s){ return Math.floor(s/60)+':'+(s%60<10?'0':'')+String(s%60); }
+function startTimer(){
+  stopTimer(); timerSeconds=0;
+  document.getElementById('timer').textContent='0:00';
+  timerInterval=setInterval(()=>{ timerSeconds++; document.getElementById('timer').textContent=formatTime(timerSeconds); },1000);
+}
+function stopTimer(){ if(timerInterval){ clearInterval(timerInterval); timerInterval=null; } }
+
+function startGame(size){
+  ac(); // unlock audio on user tap
+  curSize = size;
+  const cfg = sizeCfg[size];
+  totalPairs = cfg.pairs; foundPairs=0; moves=0; first=null; lock=false;
+  // pick animals
+  const pool = ANIMALS.slice().sort(()=>Math.random()-0.5).slice(0, cfg.pairs);
+  deck = [];
+  pool.forEach((a,idx)=>{ deck.push({...a,id:idx}); deck.push({...a,id:idx}); });
+  deck.sort(()=>Math.random()-0.5);
+  // build board
+  const board = document.getElementById('board');
+  board.style.gridTemplateColumns = `repeat(${cfg.cols}, 1fr)`;
+  board.innerHTML='';
+  deck.forEach((card,i)=>{
+    const el = document.createElement('div');
+    el.className='card'; el.dataset.idx=i;
+    el.innerHTML = `<div class="inner"><div class="face front"></div><div class="face back">${card.e}</div></div>`;
+    el.addEventListener('click', ()=>flip(i));
+    board.appendChild(el);
+  });
+  // zoo
+  document.getElementById('zoo').innerHTML='<div class="zoo-label">Your Zoo</div>';
+  updateHud();
+  show('game');
+  startTimer();
+}
+
+function updateHud(){
+  document.getElementById('moves').textContent = 'Tries: '+moves;
+  document.getElementById('found').textContent = `Found: ${foundPairs}/${totalPairs}`;
+}
+
+function flip(i){
+  if(busy) return;
+  const el = document.querySelector(`.card[data-idx="${i}"]`);
+  if(!el || el.classList.contains('matched') || el.classList.contains('flipped')) return;
+  el.classList.add('flipped'); flipSound();
+  if(first===null){ first=i; return; }
+  if(first===i) return;
+  // second card
+  busy=true; moves++; updateHud();
+  const a = deck[first], b = deck[i];
+  if(a.id===b.id){
+    // match
+    setTimeout(()=>{
+      [first,i].forEach(k=>{ const c=document.querySelector(`.card[data-idx="${k}"]`); c.classList.add('matched'); });
+      matchSound(a.m);
+      addToZoo(a.e);
+      foundPairs++; updateHud();
+      first=null; busy=false;
+      if(foundPairs===totalPairs) setTimeout(winGame, 600);
+    }, 380);
+  } else {
+    // no match
+    setTimeout(()=>{
+      [first,i].forEach(k=>{ const c=document.querySelector(`.card[data-idx="${k}"]`); c.classList.add('wrong'); });
+      noMatchSound();
+      setTimeout(()=>{
+        [first,i].forEach(k=>{ const c=document.querySelector(`.card[data-idx="${k}"]`); c.classList.remove('flipped','wrong'); });
+        first=null; busy=false;
+      }, 650);
+    }, 450);
+  }
+}
+
+function addToZoo(e){
+  const z = document.getElementById('zoo');
+  const s = document.createElement('div'); s.className='z'; s.textContent=e; z.appendChild(s);
+}
+
+/* ---------- Win ---------- */
+function winGame(){
+  stopTimer();
+  // stars: based on extra tries vs perfect (perfect = totalPairs tries)
+  const perfect = totalPairs;
+  let stars = 3;
+  if(moves > perfect*2) stars = 2;
+  if(moves > perfect*3) stars = 1;
+  document.getElementById('winStars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3-stars);
+  document.getElementById('winTitle').textContent = ['Hooray! 🎉','Amazing! 🌟','You did it! 🎉'][stars-1] || 'You did it! 🎉';
+  document.getElementById('winMsg').textContent = `You found all ${totalPairs} animals in ${moves} tries and ${formatTime(timerSeconds)}!`;
+  document.getElementById('win').classList.add('on');
+  winSound(); confettiBurst();
+}
+function replaySame(){ closeWin(); startGame(curSize); }
+function closeWin(){ document.getElementById('win').classList.remove('on'); backToMenu(); }
+function backToMenu(){ stopTimer(); show('menu'); document.getElementById('win').classList.remove('on'); }
+
+/* ---------- Confetti ---------- */
+function confettiBurst(){
+  const box = document.getElementById('confetti');
+  const colors = ['#ff4fb0','#ffd23f','#3ad17a','#3aa0ff','#b06bff','#ff8a3a'];
+  for(let i=0;i<90;i++){
+    const c = document.createElement('div'); c.className='conf';
+    const col = colors[i%colors.length];
+    c.style.background = col;
+    c.style.left = Math.random()*100+'%';
+    c.style.top = '-20px';
+    c.style.borderRadius = Math.random()<.5?'50%':'2px';
+    box.appendChild(c);
+    const dx = (Math.random()*2-1)*220;
+    const dy = window.innerHeight + 60;
+    const rot = Math.random()*720-360;
+    const dur = 1800 + Math.random()*1400;
+    c.animate([
+      {transform:`translate(0,0) rotate(0deg)`, opacity:1},
+      {transform:`translate(${dx}px, ${dy}px) rotate(${rot}deg)`, opacity:1, offset:.85},
+      {transform:`translate(${dx}px, ${dy}px) rotate(${rot}deg)`, opacity:0}
+    ], {duration:dur, easing:'cubic-bezier(.2,.6,.4,1)'}).onfinish = ()=> c.remove();
+  }
+}
+</script>
+</body>
+</html>

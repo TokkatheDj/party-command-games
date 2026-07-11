@@ -1,0 +1,356 @@
+<!-- CONCEPT: Beat Buddy Boogie - a tap-to-the-beat rhythm game where kids tap a big glowing pad in time with a bouncing star to keep a dancing animal grooving, earning stars and combos. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Beat Buddy Boogie</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body { height:100%; }
+  body {
+    font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+    background: linear-gradient(160deg,#7b2ff7 0%,#f72fb0 50%,#ff9a3d 100%);
+    color:#fff; overflow:hidden; text-align:center;
+    display:flex; align-items:center; justify-content:center;
+    touch-action:manipulation;
+  }
+  #app { width:100%; max-width:560px; height:100%; max-height:880px; position:relative;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    padding:14px 12px 12px; }
+
+  h1 { font-size:clamp(28px,8vw,46px); text-shadow:3px 3px 0 #00000033, 0 0 18px #fff5;
+    letter-spacing:1px; }
+  .subtitle { font-size:clamp(13px,3.6vw,16px); opacity:.95; margin-top:2px; }
+
+  /* HUD */
+  #hud { display:flex; gap:10px; margin-top:10px; width:100%; justify-content:center; }
+  .chip { background:#ffffff2e; border:3px solid #ffffff66; border-radius:18px;
+    padding:6px 14px; font-size:clamp(15px,4.2vw,20px); font-weight:bold;
+    min-width:84px; backdrop-filter:blur(2px); }
+  .chip small { display:block; font-size:11px; opacity:.85; font-weight:normal; }
+
+  /* Stage */
+  #stage { position:relative; flex:1; width:100%; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; min-height:0; }
+  #buddy { font-size:clamp(80px,26vw,150px); line-height:1; filter:drop-shadow(0 8px 12px #0004);
+    transition:transform .08s; }
+  #buddyName { font-size:18px; margin-top:2px; opacity:.95; height:22px; }
+
+  /* Beat track */
+  #track { position:relative; width:min(90%,440px); height:120px; margin-top:6px; }
+  #ringTarget { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:108px; height:108px; border-radius:50%; border:7px dashed #ffffffcc; }
+  #ringTarget .dot { position:absolute; inset:0; margin:auto; width:14px;height:14px;border-radius:50%;
+    background:#fff; top:50%; left:50%; transform:translate(-50%,-50%); }
+  #pulse { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) scale(2.4);
+    width:108px;height:108px;border-radius:50%; border:7px solid #fff300;
+    box-shadow:0 0 20px #fff300aa; opacity:.95; }
+
+  #feedback { height:42px; font-size:clamp(22px,7vw,38px); font-weight:bold; margin-top:2px;
+    text-shadow:2px 2px 0 #0003; }
+
+  /* Big tap pad */
+  #pad { width:min(82%,400px); height:128px; border-radius:34px; margin-top:6px;
+    background:linear-gradient(#ffe14d,#ff8a00); border:6px solid #fff;
+    box-shadow:0 10px 0 #c25e00, 0 14px 22px #0005; color:#7a3b00;
+    font-size:clamp(26px,8vw,42px); font-weight:bold; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:transform .06s, box-shadow .06s; }
+  #pad:active, #pad.hit { transform:translateY(8px); box-shadow:0 2px 0 #c25e00, 0 6px 12px #0005; }
+  #pad .lab { pointer-events:none; }
+
+  /* Buttons */
+  .btn { background:linear-gradient(#37e36b,#15b04e); color:#fff; border:5px solid #fff;
+    border-radius:26px; padding:16px 30px; font-size:clamp(20px,6vw,28px); font-weight:bold;
+    cursor:pointer; box-shadow:0 7px 0 #0a7a35, 0 10px 18px #0004; margin-top:10px;
+    font-family:inherit; }
+  .btn:active { transform:translateY(5px); box-shadow:0 2px 0 #0a7a35; }
+  .btn.alt { background:linear-gradient(#39c4ff,#2a86e0); box-shadow:0 7px 0 #1a5aa8,0 10px 18px #0004; }
+
+  /* Overlays */
+  .overlay { position:absolute; inset:0; background:#1a0033ee; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:8px; padding:22px; z-index:20; }
+  .overlay h2 { font-size:clamp(30px,9vw,52px); text-shadow:3px 3px 0 #0004; }
+  .overlay p { font-size:clamp(15px,4.4vw,19px); max-width:420px; line-height:1.4; }
+  .songs { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:6px; }
+  .songBtn { background:#ffffff22; border:4px solid #ffffff77; border-radius:20px; color:#fff;
+    padding:12px 18px; font-size:18px; font-weight:bold; cursor:pointer; font-family:inherit; min-width:120px; }
+  .songBtn.sel { background:#ffd84d; color:#5a3a00; border-color:#fff; }
+  .stars { font-size:48px; height:54px; letter-spacing:4px; }
+  .hidden { display:none !important; }
+
+  /* floaty score popups + confetti */
+  .pop { position:absolute; font-weight:bold; font-size:24px; pointer-events:none;
+    animation:floatUp .8s ease-out forwards; text-shadow:2px 2px 0 #0004; z-index:15; }
+  @keyframes floatUp { from{opacity:1; transform:translateY(0) scale(1);}
+    to{opacity:0; transform:translateY(-70px) scale(1.4);} }
+  .confetti { position:absolute; width:12px; height:12px; top:-20px; z-index:18; border-radius:2px;
+    animation:fall linear forwards; }
+  @keyframes fall { to{ transform:translateY(110vh) rotate(720deg); opacity:.9; } }
+  @keyframes bop { 0%{transform:scale(1) rotate(0);} 100%{transform:scale(1.18) rotate(var(--r));} }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>🎵 Beat Buddy Boogie</h1>
+  <div class="subtitle">Tap the big pad in time with the music to keep Buddy dancing!</div>
+
+  <div id="hud">
+    <div class="chip">⭐<span id="score">0</span><small>SCORE</small></div>
+    <div class="chip">🔥<span id="combo">0</span><small>COMBO</small></div>
+    <div class="chip">🎶<span id="beats">0</span><small>BEATS</small></div>
+  </div>
+
+  <div id="stage">
+    <div id="buddy">🐱</div>
+    <div id="buddyName">Get ready…</div>
+    <div id="track">
+      <div id="ringTarget"><div class="dot"></div></div>
+      <div id="pulse"></div>
+    </div>
+    <div id="feedback"></div>
+    <div id="pad"><span class="lab">TAP!</span></div>
+  </div>
+
+  <!-- START overlay -->
+  <div id="startOverlay" class="overlay">
+    <h2>🎵 Beat Buddy Boogie 🎵</h2>
+    <p>Watch the glowing ring shrink onto the dashed circle. When they line up — <b>TAP the big pad</b> (or press the SPACE bar)! Keep the beat to make Buddy groove. 💃</p>
+    <p>Pick your buddy &amp; tune:</p>
+    <div class="songs" id="songPick"></div>
+    <button class="btn" id="startBtn">▶ Let's Boogie!</button>
+  </div>
+
+  <!-- END overlay -->
+  <div id="endOverlay" class="overlay hidden">
+    <h2 id="endTitle">Great Job!</h2>
+    <div class="stars" id="endStars">⭐⭐⭐</div>
+    <p id="endMsg"></p>
+    <button class="btn" id="againBtn">🔁 Play Again</button>
+    <button class="btn alt" id="menuBtn">🎚 Pick New Song</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // ---------- Audio (Web Audio API only) ----------
+  var AC = null;
+  function audio(){ if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC&&AC.state==="suspended"){AC.resume();} return AC; }
+  function tone(freq, dur, type, vol, when){
+    var ac = audio(); if(!ac) return;
+    var t = (when||ac.currentTime);
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = type||"sine"; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol||0.25, t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+(dur||0.2));
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t+(dur||0.2)+0.02);
+  }
+  function kick(when){ var ac=audio(); if(!ac)return; var t=when||ac.currentTime;
+    var o=ac.createOscillator(),g=ac.createGain(); o.type="sine";
+    o.frequency.setValueAtTime(160,t); o.frequency.exponentialRampToValueAtTime(50,t+0.15);
+    g.gain.setValueAtTime(0.5,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.18);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+0.2); }
+  function sparkle(){ tone(880,0.12,"triangle",0.3); tone(1320,0.16,"sine",0.22, audio()?audio().currentTime+0.05:0); }
+  function buzz(){ tone(180,0.18,"sawtooth",0.18); }
+  function cheer(){ var n=[523,659,784,1046,1318]; n.forEach(function(f,i){ var ac=audio(); tone(f,0.25,"triangle",0.28, ac?ac.currentTime+i*0.12:0); }); }
+
+  // ---------- Songs / buddies ----------
+  var SONGS = [
+    { name:"Kitty", emoji:"🐱", bpm:84, notes:[523,587,659,587], color:"#ffe14d" },
+    { name:"Puppy", emoji:"🐶", bpm:100, notes:[392,440,494,440], color:"#9be7ff" },
+    { name:"Froggy", emoji:"🐸", bpm:120, notes:[440,523,494,587], color:"#b6ff8a" }
+  ];
+  var picked = 0;
+
+  // ---------- DOM ----------
+  var $ = function(id){ return document.getElementById(id); };
+  var buddyEl=$("buddy"), nameEl=$("buddyName"), pulse=$("pulse"), pad=$("pad"),
+      fb=$("feedback"), scoreEl=$("score"), comboEl=$("combo"), beatsEl=$("beats"),
+      stage=$("stage"), startOverlay=$("startOverlay"), endOverlay=$("endOverlay"),
+      songPick=$("songPick");
+
+  // build song picker
+  SONGS.forEach(function(s,i){
+    var b=document.createElement("button");
+    b.className="songBtn"+(i===0?" sel":""); b.textContent=s.emoji+" "+s.name;
+    b.onclick=function(){ picked=i; sparkle();
+      Array.prototype.forEach.call(songPick.children,function(c){c.classList.remove("sel");});
+      b.classList.add("sel"); buddyEl.textContent=s.emoji; };
+    songPick.appendChild(b);
+  });
+
+  // ---------- Game state ----------
+  var TOTAL_BEATS = 28;
+  var state = null;
+  var raf = null;
+
+  function reset(){
+    var s = SONGS[picked];
+    state = { beat:0, interval:60000/s.bpm, lastBeat:0, nextBeat:0,
+      score:0, combo:0, bestCombo:0, hits:0, perfect:0, judged:true, song:s,
+      started:0, running:false };
+    buddyEl.textContent = s.emoji;
+    nameEl.textContent = s.name+" is ready!";
+    scoreEl.textContent="0"; comboEl.textContent="0"; beatsEl.textContent="0/"+TOTAL_BEATS;
+    fb.textContent="";
+  }
+
+  function start(){
+    audio();
+    startOverlay.classList.add("hidden");
+    endOverlay.classList.add("hidden");
+    reset();
+    state.running = true;
+    state.started = audio()?audio().currentTime:0;
+    var now = performance.now();
+    state.nextBeat = now + 1200; // count-in delay
+    state.lastBeat = now;
+    nameEl.textContent = "Here we go!";
+    loop();
+  }
+
+  function spawnPulse(){
+    // restart shrink animation: from big to target over one interval
+    pulse.style.transition = "none";
+    pulse.style.transform = "translate(-50%,-50%) scale(2.4)";
+    pulse.style.opacity = "0.95";
+    pulse.style.borderColor = state.song.color;
+    // force reflow
+    void pulse.offsetWidth;
+    pulse.style.transition = "transform "+(state.interval/1000).toFixed(3)+"s linear, opacity .2s";
+    pulse.style.transform = "translate(-50%,-50%) scale(1.0)";
+  }
+
+  function loop(){
+    if(!state.running) return;
+    var now = performance.now();
+    if(now >= state.nextBeat){
+      // a beat lands NOW (target)
+      onBeat();
+      state.lastBeat = state.nextBeat;
+      state.nextBeat += state.interval;
+      // start the next pulse heading toward the next target
+      spawnPulse();
+    }
+    raf = requestAnimationFrame(loop);
+  }
+
+  function onBeat(){
+    // if previous beat wasn't tapped, it's a miss (break combo gently, no shaming)
+    if(state.beat>0 && !state.judged){
+      state.combo = 0; comboEl.textContent="0";
+      flash("Keep going! 🎵", "#9be7ff");
+    }
+    state.judged = false;
+    state.beat++;
+    beatsEl.textContent = state.beat+"/"+TOTAL_BEATS;
+    // music: play the melody note + soft kick
+    var s=state.song; kick();
+    tone(s.notes[(state.beat-1)%s.notes.length], 0.18, "triangle", 0.22);
+    // bop the buddy on the beat
+    bopBuddy();
+    if(state.beat > TOTAL_BEATS){ finish(); }
+  }
+
+  function bopBuddy(){
+    var r = (Math.random()*30-15).toFixed(0)+"deg";
+    buddyEl.style.setProperty("--r", r);
+    buddyEl.style.animation="none"; void buddyEl.offsetWidth;
+    buddyEl.style.animation="bop .18s ease-out alternate 2";
+  }
+
+  function flash(msg,color){ fb.textContent=msg; fb.style.color=color||"#fff"; }
+
+  function tap(){
+    if(!state || !state.running) return;
+    pad.classList.add("hit"); setTimeout(function(){pad.classList.remove("hit");},90);
+    if(state.judged){
+      // tapped between beats / double tap — gentle nudge, small off-beat sound
+      buzz();
+      flash("Wait for it…","#ffd0e8");
+      return;
+    }
+    var now = performance.now();
+    var diff = Math.abs(now - state.lastBeat); // ms from the beat that just landed
+    // also consider distance to the upcoming beat (anticipation)
+    var diffNext = Math.abs(state.nextBeat - now);
+    var off = Math.min(diff, diffNext);
+    state.judged = true;
+    var quality, pts;
+    if(off < 130){ quality="PERFECT! ✨"; pts=100; state.perfect++; sparkle(); flash(quality,"#fff300"); confettiBurst(6); }
+    else if(off < 260){ quality="Great! 🎉"; pts=60; tone(784,0.14,"sine",0.25); flash(quality,"#9bffb0"); }
+    else { quality="Good! 👍"; pts=30; tone(587,0.12,"sine",0.22); flash(quality,"#9be7ff"); }
+    state.hits++;
+    state.combo++; if(state.combo>state.bestCombo) state.bestCombo=state.combo;
+    var bonus = Math.floor(state.combo/4)*10; // combo bonus
+    var total = pts + bonus;
+    state.score += total;
+    scoreEl.textContent = state.score;
+    comboEl.textContent = state.combo;
+    popScore("+"+total);
+    if(state.combo>0 && state.combo%8===0){ flash("🔥 "+state.combo+" COMBO!","#ffae00"); cheer(); }
+  }
+
+  function popScore(txt){
+    var p=document.createElement("div"); p.className="pop"; p.textContent=txt;
+    var rect=pad.getBoundingClientRect(), host=document.getElementById("app").getBoundingClientRect();
+    p.style.left=(rect.left-host.left+rect.width/2-18)+"px";
+    p.style.top=(rect.top-host.top-10)+"px"; p.style.color="#fff";
+    document.getElementById("app").appendChild(p);
+    setTimeout(function(){ p.remove(); },800);
+  }
+
+  function confettiBurst(n){
+    var host=document.getElementById("app");
+    var cols=["#ffd84d","#ff5fa2","#5fd0ff","#7CFF8A","#fff"];
+    for(var i=0;i<n;i++){
+      var c=document.createElement("div"); c.className="confetti";
+      c.style.left=(20+Math.random()*60)+"%";
+      c.style.background=cols[i%cols.length];
+      c.style.animationDuration=(1+Math.random()*1.2)+"s";
+      host.appendChild(c);
+      (function(el){ setTimeout(function(){el.remove();},2400); })(c);
+    }
+  }
+
+  function finish(){
+    state.running=false; cancelAnimationFrame(raf);
+    pulse.style.opacity="0";
+    // star rating from accuracy
+    var acc = state.hits/TOTAL_BEATS;
+    var stars = acc>=0.85?3 : acc>=0.55?2 : acc>0?1 : 0;
+    var starStr = ["💫","⭐","⭐⭐","⭐⭐⭐"][stars];
+    $("endStars").textContent = starStr;
+    var titles=["Nice try — let's groove again!","Good boogie!","Great rhythm!","🎉 Boogie Superstar! 🎉"];
+    $("endTitle").textContent = titles[stars];
+    $("endMsg").innerHTML = "Score: <b>"+state.score+"</b> &nbsp;•&nbsp; Best combo: <b>"+state.bestCombo+
+      "</b> &nbsp;•&nbsp; Perfect taps: <b>"+state.perfect+"</b><br>"+
+      (stars>=3?"You and "+state.song.name+" are unstoppable!":"Tap right when the rings line up to get more ⭐!");
+    cheer(); confettiBurst(30);
+    endOverlay.classList.remove("hidden");
+  }
+
+  // ---------- Inputs ----------
+  function press(e){ if(e){ e.preventDefault(); } tap(); }
+  pad.addEventListener("touchstart", press, {passive:false});
+  pad.addEventListener("mousedown", function(e){ press(e); });
+  document.addEventListener("keydown", function(e){
+    if(e.code==="Space" || e.key===" " || e.key==="ArrowUp" || e.key==="Enter"){
+      e.preventDefault();
+      if(state && state.running){ tap(); }
+    }
+  });
+
+  $("startBtn").onclick=function(){ sparkle(); start(); };
+  $("againBtn").onclick=function(){ sparkle(); start(); };
+  $("menuBtn").onclick=function(){ endOverlay.classList.add("hidden"); startOverlay.classList.remove("hidden"); };
+
+  // init view
+  reset();
+})();
+</script>
+</body>
+</html>

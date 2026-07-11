@@ -1,0 +1,380 @@
+<!-- CONCEPT: Bubble Pop! — colorful bubbles with happy faces float up the screen; tap to pop them for points, sounds, and confetti celebrations at score milestones. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Bubble Pop!</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+}
+canvas { display: block; }
+
+#score {
+  position: fixed; top: 14px; left: 0; right: 0; text-align: center;
+  font-family: "Comic Sans MS", "Trebuchet MS", system-ui;
+  font-size: clamp(30px, 8vw, 52px); font-weight: 900;
+  color: #fff;
+  text-shadow: 0 3px 0 rgba(0,0,0,.15), 0 0 16px rgba(255,255,255,.45);
+  pointer-events: none; z-index: 10;
+  transition: transform .08s;
+}
+
+#score.pop { transform: scale(1.2); }
+
+#msg {
+  position: fixed; top: 38%; left: 8%; right: 8%; text-align: center;
+  font-family: "Comic Sans MS", "Trebuchet MS", system-ui;
+  font-size: clamp(34px, 11vw, 68px); font-weight: 900;
+  color: #fff;
+  text-shadow: 0 4px 0 rgba(0,0,0,.2), 0 0 24px rgba(255,255,255,.3);
+  opacity: 0; pointer-events: none; z-index: 20;
+  transition: opacity .15s;
+}
+#msg.show { opacity: 1; }
+
+#hint {
+  position: fixed; bottom: 28px; left: 0; right: 0; text-align: center;
+  font-family: "Comic Sans MS", "Trebuchet MS", system-ui;
+  font-size: clamp(16px, 4vw, 22px); font-weight: 700;
+  color: rgba(255,255,255,.85);
+  text-shadow: 0 2px 0 rgba(0,0,0,.12);
+  pointer-events: none; z-index: 10;
+  transition: opacity 1.2s;
+}
+#hint.hide { opacity: 0; }
+
+#reset-btn {
+  position: fixed; top: 14px; right: 16px; z-index: 30;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,.25); border: 2.5px solid rgba(255,255,255,.55);
+  font-size: 22px; cursor: pointer; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, transform .1s;
+}
+#reset-btn:hover  { background: rgba(255,255,255,.4); }
+#reset-btn:active { transform: scale(.88); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="score">⭐ 0</div>
+<div id="msg"></div>
+<div id="hint">Tap the bubbles! 🫧</div>
+<button id="reset-btn" title="Restart">🔄</button>
+
+<script>
+const canvas   = document.getElementById('c');
+const ctx      = canvas.getContext('2d');
+const scoreEl  = document.getElementById('score');
+const msgEl    = document.getElementById('msg');
+const hintEl   = document.getElementById('hint');
+
+let W, H;
+let bubbles = [], particles = [], rings = [], confetti = [];
+let score = 0, frame = 0;
+let audioCtx = null;
+let passedMilestones = new Set();
+
+const COLORS = [
+  { c: '#ff6b8a', l: '#ffaabc' },
+  { c: '#ff8c42', l: '#ffb880' },
+  { c: '#ffd700', l: '#ffe566' },
+  { c: '#4cdf8a', l: '#80efaa' },
+  { c: '#4a9eff', l: '#80c0ff' },
+  { c: '#c47bff', l: '#d9a8ff' },
+  { c: '#ff7ec4', l: '#ffaadb' },
+  { c: '#40d9d9', l: '#70eaea' },
+];
+
+const MILESTONES = [
+  [5,   'Nice! 🌟'],
+  [10,  'Awesome! ⭐'],
+  [20,  'Super! 🎉'],
+  [30,  'WOW!! 🎊'],
+  [50,  'Amazing! 🚀'],
+  [75,  'Fantastic! 💫'],
+  [100, 'CHAMPION! 🏆'],
+];
+
+// ── Resize ────────────────────────────────────────────────────────────────
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+
+// ── Audio ─────────────────────────────────────────────────────────────────
+function getAC() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playPop() {
+  try {
+    const ac = getAC();
+    const freq = 320 + Math.random() * 320;
+    const osc  = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.22, ac.currentTime + 0.13);
+    gain.gain.setValueAtTime(0.28, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.16);
+    osc.start(); osc.stop(ac.currentTime + 0.16);
+  } catch(e) {}
+}
+
+function playCelebration() {
+  try {
+    const ac = getAC();
+    [523, 659, 784, 1047].forEach((hz, i) => {
+      const t = ac.currentTime + i * 0.08;
+      const osc  = ac.createOscillator();
+      const gain = ac.createGain();
+      osc.connect(gain); gain.connect(ac.destination);
+      osc.frequency.value = hz;
+      gain.gain.setValueAtTime(0.22, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      osc.start(t); osc.stop(t + 0.22);
+    });
+  } catch(e) {}
+}
+
+// ── Spawn bubble ──────────────────────────────────────────────────────────
+function spawnBubble() {
+  const r   = Math.min(W, H) * (0.065 + Math.random() * 0.04);
+  const col = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const spd = (0.9 + Math.random() * 0.7) * (1 + Math.min(score / 70, 1.3));
+  bubbles.push({
+    x: r + Math.random() * (W - r * 2),
+    y: H + r + 10,
+    r, color: col.c, light: col.l,
+    speed: spd,
+    wobble: Math.random() * Math.PI * 2,
+    wobbleSpeed: 0.016 + Math.random() * 0.014,
+    wobbleAmp:   0.5  + Math.random() * 0.9,
+    pulse: Math.random() * Math.PI * 2,
+    alive: true,
+  });
+}
+
+// ── Pop bubble ────────────────────────────────────────────────────────────
+function popBubble(b) {
+  b.alive = false;
+  playPop();
+
+  // Expanding ring
+  rings.push({ x: b.x, y: b.y, r: b.r * 0.5, maxR: b.r * 2.6, color: b.color, life: 1 });
+
+  // Particles
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 + Math.random() * 0.4;
+    const s = 3 + Math.random() * 4.5;
+    particles.push({ x: b.x, y: b.y, vx: Math.cos(a)*s, vy: Math.sin(a)*s - 1.2, r: 3 + Math.random()*4, color: b.color, life: 1 });
+  }
+
+  score++;
+  scoreEl.textContent = '⭐ ' + score;
+  scoreEl.classList.add('pop');
+  setTimeout(() => scoreEl.classList.remove('pop'), 120);
+
+  for (const [ms, txt] of MILESTONES) {
+    if (score === ms && !passedMilestones.has(ms)) {
+      passedMilestones.add(ms);
+      showMsg(txt);
+      playCelebration();
+      launchConfetti();
+      break;
+    }
+  }
+}
+
+function showMsg(txt) {
+  msgEl.textContent = txt;
+  msgEl.classList.add('show');
+  clearTimeout(showMsg._t);
+  showMsg._t = setTimeout(() => msgEl.classList.remove('show'), 1600);
+}
+
+function launchConfetti() {
+  for (let i = 0; i < 50; i++) {
+    confetti.push({
+      x: Math.random() * W, y: -12,
+      vx: (Math.random() - 0.5) * 7,
+      vy: 3 + Math.random() * 5,
+      rot: Math.random() * Math.PI * 2,
+      rotV: (Math.random() - 0.5) * 0.28,
+      w: 8 + Math.random() * 9, h: 5 + Math.random() * 5,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)].c,
+      life: 1,
+    });
+  }
+}
+
+// ── Hit test ──────────────────────────────────────────────────────────────
+function hitTest(px, py) {
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    if (!b.alive) continue;
+    const dx = px - b.x, dy = py - b.y;
+    if (dx*dx + dy*dy <= b.r * b.r * 1.1) { popBubble(b); return; }
+  }
+}
+
+// ── Update ────────────────────────────────────────────────────────────────
+function update() {
+  frame++;
+
+  // Spawn rate speeds up slightly with score
+  const interval = Math.max(38, 80 - Math.floor(score / 5) * 4);
+  if (frame % interval === 0 && bubbles.filter(b => b.alive).length < 15) spawnBubble();
+
+  bubbles = bubbles.filter(b => {
+    if (!b.alive) return false;
+    b.wobble += b.wobbleSpeed;
+    b.x += Math.sin(b.wobble) * b.wobbleAmp;
+    b.y -= b.speed;
+    return b.y + b.r > -30;
+  });
+
+  rings.forEach(rg => { rg.r += (rg.maxR - rg.r) * 0.13; rg.life -= 0.065; });
+  rings = rings.filter(rg => rg.life > 0);
+
+  particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.vx *= 0.97; p.life -= 0.038; });
+  particles = particles.filter(p => p.life > 0);
+
+  confetti.forEach(cf => { cf.x += cf.vx; cf.y += cf.vy; cf.rot += cf.rotV; cf.vy += 0.13; cf.life -= 0.011; });
+  confetti = confetti.filter(cf => cf.life > 0 && cf.y < H + 20);
+}
+
+// ── Draw ──────────────────────────────────────────────────────────────────
+function drawBubble(b) {
+  b.pulse += 0.045;
+  const r = b.r + Math.sin(b.pulse) * 1.4;
+
+  // Soft shadow
+  ctx.beginPath();
+  ctx.ellipse(b.x, b.y + r * 0.18, r * 0.85, r * 0.22, 0, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.07)';
+  ctx.fill();
+
+  // Body gradient
+  const gr = ctx.createRadialGradient(b.x - r*0.28, b.y - r*0.28, r*0.04, b.x, b.y, r);
+  gr.addColorStop(0, b.light);
+  gr.addColorStop(1, b.color);
+  ctx.beginPath();
+  ctx.arc(b.x, b.y, r, 0, Math.PI*2);
+  ctx.fillStyle = gr;
+  ctx.fill();
+
+  // Shine highlight
+  ctx.beginPath();
+  ctx.arc(b.x - r*0.27, b.y - r*0.3, r*0.19, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(255,255,255,0.62)';
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = 'rgba(25,15,35,0.72)';
+  [[-0.22, -0.1],[0.22, -0.1]].forEach(([ex, ey]) => {
+    ctx.beginPath();
+    ctx.arc(b.x + r*ex, b.y + r*ey, r*0.1, 0, Math.PI*2);
+    ctx.fill();
+    // Tiny eye shine
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.beginPath();
+    ctx.arc(b.x + r*(ex+0.04), b.y + r*(ey-0.04), r*0.03, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(25,15,35,0.72)';
+  });
+
+  // Smile
+  ctx.beginPath();
+  ctx.arc(b.x, b.y + r*0.07, r*0.27, 0.13*Math.PI, 0.87*Math.PI);
+  ctx.strokeStyle = 'rgba(25,15,35,0.68)';
+  ctx.lineWidth = r * 0.09;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+}
+
+function draw() {
+  // Sky gradient background
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, '#7ec8e3');
+  bg.addColorStop(1, '#dff0f8');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Rings
+  rings.forEach(rg => {
+    ctx.beginPath();
+    ctx.arc(rg.x, rg.y, rg.r, 0, Math.PI*2);
+    const alpha = Math.round(rg.life * 200).toString(16).padStart(2,'0');
+    ctx.strokeStyle = rg.color + alpha;
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  });
+
+  // Particles
+  particles.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI*2);
+    const alpha = Math.round(p.life * 210).toString(16).padStart(2,'0');
+    ctx.fillStyle = p.color + alpha;
+    ctx.fill();
+  });
+
+  // Bubbles
+  bubbles.forEach(b => { if (b.alive) drawBubble(b); });
+
+  // Confetti
+  ctx.save();
+  confetti.forEach(cf => {
+    ctx.save();
+    ctx.translate(cf.x, cf.y);
+    ctx.rotate(cf.rot);
+    ctx.globalAlpha = Math.min(cf.life * 1.5, 1);
+    ctx.fillStyle = cf.color;
+    ctx.fillRect(-cf.w/2, -cf.h/2, cf.w, cf.h);
+    ctx.restore();
+  });
+  ctx.restore();
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+
+// ── Events ────────────────────────────────────────────────────────────────
+function getPos(e, touch) {
+  const r = canvas.getBoundingClientRect();
+  return [touch.clientX - r.left, touch.clientY - r.top];
+}
+
+canvas.addEventListener('click', e => hitTest(e.clientX, e.clientY));
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  Array.from(e.changedTouches).forEach(t => hitTest(t.clientX, t.clientY));
+}, { passive: false });
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  score = 0; frame = 0; bubbles = []; particles = []; rings = []; confetti = [];
+  passedMilestones = new Set();
+  scoreEl.textContent = '⭐ 0';
+  msgEl.classList.remove('show');
+  spawnBubble(); spawnBubble(); spawnBubble();
+});
+
+window.addEventListener('resize', resize);
+
+// ── Init ──────────────────────────────────────────────────────────────────
+resize();
+spawnBubble(); spawnBubble(); spawnBubble();
+setTimeout(() => hintEl.classList.add('hide'), 3000);
+loop();
+</script>
+</body>
+</html>

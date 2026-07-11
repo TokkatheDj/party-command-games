@@ -1,0 +1,506 @@
+<!-- CONCEPT: Monster Maker Lab — a creative/sandbox dress-up toy. Tap big arrow buttons to swap your monster's body, color, eyes, mouth, horns, arms, pattern & hat, hit "Surprise Me!" to randomize, then "Bring it to Life!" to make it wiggle, blink, roar and get a silly name with confetti. Creative builder for ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Monster Maker Lab</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: 'Comic Sans MS', 'Trebuchet MS', system-ui, sans-serif;
+    background: radial-gradient(circle at 30% 15%, #6be4ff 0%, #5aa8ff 35%, #8a6bff 100%);
+    color: #16224a;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+  #app {
+    display: flex; flex-direction: column;
+    height: 100%; max-width: 760px; margin: 0 auto;
+    padding: 8px 10px 12px;
+  }
+  header { text-align: center; flex: 0 0 auto; }
+  h1 {
+    margin: 2px 0 0; font-size: clamp(26px, 7vw, 46px);
+    color: #fff; letter-spacing: 1px;
+    text-shadow: 0 3px 0 #2f3aa0, 0 5px 8px rgba(0,0,0,.25);
+  }
+  .tagline {
+    margin: 0 0 4px; color: #fff8; font-size: clamp(11px, 2.6vw, 15px);
+    font-weight: bold; text-shadow: 0 1px 2px #0004;
+  }
+
+  /* Stage */
+  #stage {
+    flex: 1 1 auto; position: relative;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 0;
+  }
+  #monsterWrap {
+    width: min(46vh, 78vw); height: min(46vh, 78vw);
+    max-width: 340px; max-height: 340px;
+    filter: drop-shadow(0 14px 10px rgba(0,0,0,.22));
+    transition: transform .12s ease;
+  }
+  #monsterSvg { width: 100%; height: 100%; overflow: visible; }
+  .alive { animation: aliveDance .6s ease-in-out infinite; }
+  @keyframes aliveDance {
+    0%,100% { transform: translateY(0) rotate(-3deg) scale(1); }
+    25% { transform: translateY(-12px) rotate(2deg) scale(1.04); }
+    50% { transform: translateY(0) rotate(3deg) scale(1.02); }
+    75% { transform: translateY(-7px) rotate(-2deg) scale(1.03); }
+  }
+  .pop { animation: pop .28s ease; }
+  @keyframes pop { 0%{transform:scale(1);} 40%{transform:scale(1.07);} 100%{transform:scale(1);} }
+
+  #nameTag {
+    position: absolute; top: 2px; left: 50%; transform: translateX(-50%) scale(0);
+    background: #fff; color: #6a2bd6; font-weight: bold;
+    padding: 7px 18px; border-radius: 30px; font-size: clamp(16px,4.5vw,26px);
+    box-shadow: 0 5px 0 #d7c4ff, 0 8px 14px rgba(0,0,0,.2);
+    white-space: nowrap; pointer-events: none;
+  }
+  #nameTag.show { animation: nameIn .5s cubic-bezier(.2,1.4,.5,1) forwards; }
+  @keyframes nameIn { to { transform: translateX(-50%) scale(1); } }
+
+  /* Controls */
+  #controls {
+    flex: 0 0 auto;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 6px; margin-top: 6px;
+  }
+  .ctrl {
+    background: rgba(255,255,255,.92);
+    border-radius: 16px; padding: 5px 3px 6px;
+    display: flex; flex-direction: column; align-items: center;
+    box-shadow: 0 4px 0 rgba(0,0,0,.12);
+  }
+  .ctrl .label { font-size: clamp(9px,2.3vw,13px); font-weight: bold; color: #5a4bb0; margin-bottom: 3px; }
+  .ctrl .row { display: flex; align-items: center; gap: 4px; }
+  .arrow {
+    width: clamp(30px,8vw,42px); height: clamp(30px,8vw,42px);
+    border: none; border-radius: 50%;
+    background: linear-gradient(#ffd24d,#ffb01f);
+    color: #7a4b00; font-size: clamp(16px,5vw,24px); font-weight: bold;
+    box-shadow: 0 4px 0 #d98a00; cursor: pointer; line-height: 1;
+  }
+  .arrow:active { transform: translateY(3px); box-shadow: 0 1px 0 #d98a00; }
+  .partIcon { font-size: clamp(16px,5vw,26px); min-width: 26px; text-align: center; }
+
+  /* Action buttons */
+  #actions {
+    flex: 0 0 auto; display: flex; gap: 8px; margin-top: 8px;
+  }
+  .bigBtn {
+    flex: 1; border: none; border-radius: 22px;
+    padding: 12px 6px; font-family: inherit; font-weight: bold;
+    font-size: clamp(15px,4vw,22px); color: #fff; cursor: pointer;
+    text-shadow: 0 2px 2px rgba(0,0,0,.25);
+  }
+  #surpriseBtn { background: linear-gradient(#ff8fd0,#ff4fae); box-shadow: 0 5px 0 #c91e7e; }
+  #aliveBtn { background: linear-gradient(#67e87a,#22c24a); box-shadow: 0 5px 0 #149636; }
+  .bigBtn:active { transform: translateY(4px); box-shadow: 0 1px 0 #0006; }
+
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 50; overflow: hidden; }
+  .confetti-bit { position: absolute; width: 12px; height: 12px; border-radius: 2px; will-change: transform; }
+
+  @media (max-height: 560px) {
+    .tagline { display: none; }
+    h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🧪 Monster Maker Lab</h1>
+    <p class="tagline">Build a silly monster, then bring it to life!</p>
+  </header>
+
+  <div id="stage">
+    <div id="nameTag"></div>
+    <div id="monsterWrap">
+      <svg id="monsterSvg" viewBox="0 0 300 300" aria-label="Your monster"></svg>
+    </div>
+  </div>
+
+  <div id="controls"></div>
+
+  <div id="actions">
+    <button id="surpriseBtn" class="bigBtn">🎲 Surprise Me!</button>
+    <button id="aliveBtn" class="bigBtn">✨ Bring it to Life!</button>
+  </div>
+</div>
+<div id="confetti"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- AUDIO (Web Audio API, no files) ---------- */
+  var AC = null;
+  function ac(){ if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+  function tone(freq, dur, type, vol, when){
+    var c = ac(); if(!c) return;
+    when = when || 0;
+    var t = c.currentTime + when;
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol||0.18, t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t+dur+0.02);
+  }
+  function boop(){ tone(420 + Math.random()*180, 0.12, 'square', 0.14); }
+  function dice(){ for(var i=0;i<5;i++) tone(300+i*90, 0.08, 'triangle', 0.12, i*0.05); }
+  function roar(){
+    var c = ac(); if(!c) return;
+    var t = c.currentTime;
+    var o = c.createOscillator(), g = c.createGain();
+    o.type='sawtooth'; o.frequency.setValueAtTime(180, t);
+    o.frequency.exponentialRampToValueAtTime(70, t+0.5);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.32, t+0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.7);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t+0.75);
+    // happy fanfare on top
+    [523,659,784,1047].forEach(function(f,i){ tone(f,0.25,'triangle',0.16, 0.35+i*0.09); });
+  }
+
+  /* ---------- OPTION DATA ---------- */
+  var COLORS = ['#ff6b6b','#ffa43b','#ffd23f','#7ed957','#37c9c9','#5a8dff','#b06bff','#ff7ad6','#9bd44b','#ff9e6b'];
+  var PATTERNS = ['none','spots','stripes','hearts'];
+  var SHAPES = ['blob','round','tall','wide'];
+  var EYECOUNT = [1,2,3];
+  var EYESTYLE = ['round','sleepy','star','spiral'];
+  var MOUTHS = ['smile','grin','tongue','fangs','ooo'];
+  var TOPS = ['none','horns','antennae','spikes','ears'];
+  var ARMS = ['none','wavy','stubby'];
+  var HATS = ['none','party','bow','tophat','flower'];
+
+  // state holds an index into each list
+  var S = {
+    shape:0, color:0, pattern:0, eyeCount:1, eyeStyle:0,
+    mouth:0, top:1, arms:1, hat:0
+  };
+
+  // control definitions: [stateKey, label, icon]
+  var CONTROLS = [
+    ['shape','Body','🫧'],
+    ['color','Color','🎨'],
+    ['pattern','Skin','✨'],
+    ['eyeCount','Eyes','👀'],
+    ['eyeStyle','Look','😊'],
+    ['mouth','Mouth','👄'],
+    ['top','Head','🦄'],
+    ['hat','Hat','🎩']
+  ];
+
+  /* ---------- SVG BUILDING ---------- */
+  function svgEl(name, attrs){
+    var e = document.createElementNS('http://www.w3.org/2000/svg', name);
+    for(var k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+  function darken(hex, amt){
+    var n = parseInt(hex.slice(1),16);
+    var r=Math.max(0,((n>>16)&255)-amt), g=Math.max(0,((n>>8)&255)-amt), b=Math.max(0,(n&255)-amt);
+    return 'rgb('+r+','+g+','+b+')';
+  }
+
+  var svg = document.getElementById('monsterSvg');
+
+  function bodyShape(){
+    var color = COLORS[S.color], dark = darken(color, 55);
+    var g = svgEl('g',{});
+    var shape = SHAPES[S.shape];
+    var body;
+    if(shape==='blob'){
+      body = svgEl('path',{ d:'M150 60 C210 60 240 110 235 160 C231 205 205 245 150 245 C95 245 69 205 65 160 C60 110 90 60 150 60 Z', fill:color, stroke:dark, 'stroke-width':6 });
+    } else if(shape==='round'){
+      body = svgEl('circle',{ cx:150, cy:155, r:92, fill:color, stroke:dark, 'stroke-width':6 });
+    } else if(shape==='tall'){
+      body = svgEl('rect',{ x:78, y:55, width:144, height:200, rx:60, fill:color, stroke:dark, 'stroke-width':6 });
+    } else { // wide
+      body = svgEl('ellipse',{ cx:150, cy:160, rx:108, ry:82, fill:color, stroke:dark, 'stroke-width':6 });
+    }
+    g.appendChild(body);
+    return g;
+  }
+
+  function patternLayer(){
+    var g = svgEl('g',{ opacity:0.55 });
+    var pat = PATTERNS[S.pattern];
+    var dark = darken(COLORS[S.color], 45);
+    if(pat==='spots'){
+      [[110,120,14],[185,135,11],[125,190,12],[180,195,15],[150,110,9]].forEach(function(p){
+        g.appendChild(svgEl('circle',{ cx:p[0], cy:p[1], r:p[2], fill:dark }));
+      });
+    } else if(pat==='stripes'){
+      [95,120,145,170,195,220].forEach(function(y){
+        g.appendChild(svgEl('rect',{ x:70, y:y, width:160, height:8, rx:4, fill:dark }));
+      });
+      g.setAttribute('opacity','0.32');
+    } else if(pat==='hearts'){
+      [[112,125],[188,140],[150,195]].forEach(function(p){
+        g.appendChild(svgEl('path',{ d:'M'+p[0]+' '+(p[1]+8)+' l-9 -10 a6 6 0 0 1 9 -7 a6 6 0 0 1 9 7 Z', fill:dark }));
+      });
+    }
+    return g;
+  }
+
+  function oneEye(cx, cy, r){
+    var g = svgEl('g',{});
+    var style = EYESTYLE[S.eyeStyle];
+    g.appendChild(svgEl('circle',{ cx:cx, cy:cy, r:r, fill:'#fff', stroke:'#2b2350', 'stroke-width':3 }));
+    if(style==='round'){
+      g.appendChild(svgEl('circle',{ cx:cx+2, cy:cy+1, r:r*0.5, fill:'#222' }));
+      g.appendChild(svgEl('circle',{ cx:cx+r*0.25, cy:cy-r*0.25, r:r*0.18, fill:'#fff' }));
+    } else if(style==='sleepy'){
+      g.appendChild(svgEl('circle',{ cx:cx, cy:cy+2, r:r*0.45, fill:'#222' }));
+      g.appendChild(svgEl('path',{ d:'M'+(cx-r)+' '+(cy-2)+' q '+r+' -'+(r*0.8)+' '+(2*r)+' 0', fill:COLORS[S.color], stroke:darken(COLORS[S.color],55),'stroke-width':3 }));
+    } else if(style==='star'){
+      g.appendChild(starPoly(cx, cy, r*0.62, '#ffd23f'));
+    } else { // spiral
+      g.appendChild(svgEl('path',{ d:spiralPath(cx,cy,r*0.78), fill:'none', stroke:'#222', 'stroke-width':3, 'stroke-linecap':'round' }));
+    }
+    return g;
+  }
+  function starPoly(cx,cy,r,fill){
+    var pts='', spikes=5;
+    for(var i=0;i<spikes*2;i++){
+      var rr = i%2===0 ? r : r*0.45;
+      var a = Math.PI/spikes*i - Math.PI/2;
+      pts += (cx+Math.cos(a)*rr)+','+(cy+Math.sin(a)*rr)+' ';
+    }
+    return svgEl('polygon',{ points:pts, fill:fill, stroke:'#c9952b','stroke-width':2 });
+  }
+  function spiralPath(cx,cy,maxR){
+    var d='M'+cx+' '+cy, t;
+    for(t=0;t<=12.6;t+=0.4){
+      var r = (t/12.6)*maxR;
+      d += ' L'+(cx+Math.cos(t)*r)+' '+(cy+Math.sin(t)*r);
+    }
+    return d;
+  }
+
+  function eyesLayer(){
+    var g = svgEl('g',{ 'class':'eyes' });
+    var n = EYECOUNT[S.eyeCount];
+    var r = n===1?28: n===2?22:18;
+    if(n===1){ g.appendChild(oneEye(150,135,r)); }
+    else if(n===2){ g.appendChild(oneEye(122,135,r)); g.appendChild(oneEye(178,135,r)); }
+    else { g.appendChild(oneEye(112,128,r)); g.appendChild(oneEye(150,118,r)); g.appendChild(oneEye(188,128,r)); }
+    return g;
+  }
+
+  function mouthLayer(){
+    var g = svgEl('g',{});
+    var m = MOUTHS[S.mouth];
+    var dark = '#7a1f3a';
+    if(m==='smile'){
+      g.appendChild(svgEl('path',{ d:'M118 185 q32 34 64 0', fill:'none', stroke:dark, 'stroke-width':7, 'stroke-linecap':'round' }));
+    } else if(m==='grin'){
+      g.appendChild(svgEl('path',{ d:'M112 182 q38 40 76 0 q-38 14 -76 0 Z', fill:'#fff', stroke:dark, 'stroke-width':5 }));
+      g.appendChild(svgEl('line',{ x1:150, y1:184, x2:150, y2:208, stroke:dark, 'stroke-width':3 }));
+    } else if(m==='tongue'){
+      g.appendChild(svgEl('path',{ d:'M120 184 q30 30 60 0', fill:'#5a132c', stroke:dark, 'stroke-width':5 }));
+      g.appendChild(svgEl('ellipse',{ cx:150, cy:205, rx:16, ry:20, fill:'#ff7a9c', stroke:dark, 'stroke-width':4 }));
+    } else if(m==='fangs'){
+      g.appendChild(svgEl('path',{ d:'M118 184 q32 28 64 0', fill:'#5a132c', stroke:dark, 'stroke-width':5 }));
+      g.appendChild(svgEl('polygon',{ points:'128,186 136,186 132,202', fill:'#fff', stroke:dark, 'stroke-width':2 }));
+      g.appendChild(svgEl('polygon',{ points:'164,186 172,186 168,202', fill:'#fff', stroke:dark, 'stroke-width':2 }));
+    } else { // ooo
+      g.appendChild(svgEl('ellipse',{ cx:150, cy:195, rx:18, ry:24, fill:'#5a132c', stroke:dark, 'stroke-width':5 }));
+    }
+    return g;
+  }
+
+  function topLayer(){
+    var g = svgEl('g',{});
+    var t = TOPS[S.top];
+    var color = COLORS[S.color], dark = darken(color,55);
+    if(t==='horns'){
+      g.appendChild(svgEl('polygon',{ points:'108,72 126,78 100,40', fill:'#fff0c2', stroke:dark, 'stroke-width':5, 'stroke-linejoin':'round' }));
+      g.appendChild(svgEl('polygon',{ points:'192,72 174,78 200,40', fill:'#fff0c2', stroke:dark, 'stroke-width':5, 'stroke-linejoin':'round' }));
+    } else if(t==='antennae'){
+      g.appendChild(svgEl('path',{ d:'M120 78 q-18 -40 -28 -52', fill:'none', stroke:dark, 'stroke-width':6, 'stroke-linecap':'round' }));
+      g.appendChild(svgEl('circle',{ cx:90, cy:24, r:11, fill:'#ffd23f', stroke:dark, 'stroke-width':4 }));
+      g.appendChild(svgEl('path',{ d:'M180 78 q18 -40 28 -52', fill:'none', stroke:dark, 'stroke-width':6, 'stroke-linecap':'round' }));
+      g.appendChild(svgEl('circle',{ cx:210, cy:24, r:11, fill:'#ff7ad6', stroke:dark, 'stroke-width':4 }));
+    } else if(t==='spikes'){
+      for(var i=0;i<5;i++){ var x=104+i*23; g.appendChild(svgEl('polygon',{ points:(x)+',78 '+(x+18)+',78 '+(x+9)+','+(78-26-(i===2?10:0))+'', fill:dark })); }
+    } else if(t==='ears'){
+      g.appendChild(svgEl('ellipse',{ cx:96, cy:78, rx:20, ry:30, fill:color, stroke:dark, 'stroke-width':6, transform:'rotate(-25 96 78)' }));
+      g.appendChild(svgEl('ellipse',{ cx:204, cy:78, rx:20, ry:30, fill:color, stroke:dark, 'stroke-width':6, transform:'rotate(25 204 78)' }));
+    }
+    return g;
+  }
+
+  function armsLayer(){
+    var g = svgEl('g',{});
+    var a = ARMS[S.arms];
+    var color = COLORS[S.color], dark = darken(color,55);
+    if(a==='wavy'){
+      g.appendChild(svgEl('path',{ d:'M70 165 q-40 -8 -52 18 q-4 14 10 14', fill:'none', stroke:color, 'stroke-width':16, 'stroke-linecap':'round' }));
+      g.appendChild(svgEl('path',{ d:'M230 165 q40 -8 52 18 q4 14 -10 14', fill:'none', stroke:color, 'stroke-width':16, 'stroke-linecap':'round' }));
+    } else if(a==='stubby'){
+      g.appendChild(svgEl('rect',{ x:42, y:158, width:34, height:18, rx:9, fill:color, stroke:dark, 'stroke-width':5 }));
+      g.appendChild(svgEl('rect',{ x:224, y:158, width:34, height:18, rx:9, fill:color, stroke:dark, 'stroke-width':5 }));
+    }
+    return g;
+  }
+
+  function hatLayer(){
+    var g = svgEl('g',{});
+    var h = HATS[S.hat];
+    if(h==='party'){
+      g.appendChild(svgEl('polygon',{ points:'150,8 178,72 122,72', fill:'#ff4fae', stroke:'#c91e7e', 'stroke-width':4, 'stroke-linejoin':'round' }));
+      g.appendChild(svgEl('circle',{ cx:150, cy:8, r:8, fill:'#ffd23f' }));
+    } else if(h==='bow'){
+      g.appendChild(svgEl('polygon',{ points:'150,70 120,52 120,88', fill:'#ff7ad6', stroke:'#c91e7e','stroke-width':4 }));
+      g.appendChild(svgEl('polygon',{ points:'150,70 180,52 180,88', fill:'#ff7ad6', stroke:'#c91e7e','stroke-width':4 }));
+      g.appendChild(svgEl('circle',{ cx:150, cy:70, r:9, fill:'#ffd23f', stroke:'#c91e7e','stroke-width':3 }));
+    } else if(h==='tophat'){
+      g.appendChild(svgEl('rect',{ x:108, y:64, width:84, height:14, rx:5, fill:'#3a2b6b' }));
+      g.appendChild(svgEl('rect',{ x:122, y:18, width:56, height:50, rx:6, fill:'#3a2b6b' }));
+      g.appendChild(svgEl('rect',{ x:122, y:50, width:56, height:12, fill:'#ff4fae' }));
+    } else if(h==='flower'){
+      [[150,30],[172,46],[166,72],[134,72],[128,46]].forEach(function(p){
+        g.appendChild(svgEl('circle',{ cx:p[0], cy:p[1], r:14, fill:'#ff8fd0' }));
+      });
+      g.appendChild(svgEl('circle',{ cx:150, cy:52, r:13, fill:'#ffd23f' }));
+    }
+    return g;
+  }
+
+  function render(){
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.appendChild(armsLayer());
+    svg.appendChild(topLayer());
+    svg.appendChild(bodyShape());
+    svg.appendChild(patternLayer());
+    svg.appendChild(eyesLayer());
+    svg.appendChild(mouthLayer());
+    svg.appendChild(hatLayer());
+  }
+
+  /* ---------- CONTROLS UI ---------- */
+  var listLen = {
+    shape:SHAPES.length, color:COLORS.length, pattern:PATTERNS.length,
+    eyeCount:EYECOUNT.length, eyeStyle:EYESTYLE.length, mouth:MOUTHS.length,
+    top:TOPS.length, arms:ARMS.length, hat:HATS.length
+  };
+  function buildControls(){
+    var wrap = document.getElementById('controls');
+    CONTROLS.forEach(function(c){
+      var key=c[0], label=c[1], icon=c[2];
+      var div = document.createElement('div'); div.className='ctrl';
+      var lab = document.createElement('div'); lab.className='label'; lab.textContent=label;
+      var row = document.createElement('div'); row.className='row';
+      var left = document.createElement('button'); left.className='arrow'; left.textContent='‹';
+      var ic = document.createElement('div'); ic.className='partIcon'; ic.textContent=icon;
+      var right = document.createElement('button'); right.className='arrow'; right.textContent='›';
+      left.addEventListener('click', function(){ cycle(key,-1); });
+      right.addEventListener('click', function(){ cycle(key,1); });
+      row.appendChild(left); row.appendChild(ic); row.appendChild(right);
+      div.appendChild(lab); div.appendChild(row); wrap.appendChild(div);
+    });
+  }
+  function cycle(key, dir){
+    resume();
+    var n = listLen[key];
+    S[key] = (S[key] + dir + n) % n;
+    boop();
+    render();
+    bounce();
+    hideName();
+  }
+  function bounce(){
+    var w = document.getElementById('monsterWrap');
+    w.classList.remove('pop'); void w.offsetWidth; w.classList.add('pop');
+  }
+
+  /* ---------- SURPRISE / RANDOMIZE ---------- */
+  function rnd(n){ return Math.floor(Math.random()*n); }
+  function surprise(){
+    resume();
+    S.shape=rnd(SHAPES.length); S.color=rnd(COLORS.length); S.pattern=rnd(PATTERNS.length);
+    S.eyeCount=rnd(EYECOUNT.length); S.eyeStyle=rnd(EYESTYLE.length); S.mouth=rnd(MOUTHS.length);
+    S.top=rnd(TOPS.length); S.arms=rnd(ARMS.length); S.hat=rnd(HATS.length);
+    dice(); render(); bounce();
+    hideName();
+  }
+
+  /* ---------- BRING TO LIFE ---------- */
+  var PRE=['Gloop','Wibble','Snork','Fuzz','Bloop','Zib','Munch','Pog','Drool','Glix','Boop','Wuzz','Tibbo','Squee','Nomp','Plonk'];
+  var SUF=['ernken','amnumber','adoodle','ington','asaurus','omatic','enstein','aboo','zilla','umpkin','aroni','ablob'];
+  function sillyName(){ return PRE[rnd(PRE.length)] + SUF[rnd(SUF.length)]; }
+  function showName(name){
+    var tag = document.getElementById('nameTag');
+    tag.textContent = name;
+    tag.classList.remove('show'); void tag.offsetWidth; tag.classList.add('show');
+  }
+  function hideName(){
+    var tag = document.getElementById('nameTag'); tag.classList.remove('show'); tag.style.transform='translateX(-50%) scale(0)';
+  }
+  function bringToLife(){
+    resume();
+    var w = document.getElementById('monsterWrap');
+    w.classList.add('alive');
+    roar();
+    confetti();
+    showName('I’m ' + sillyName() + '!');
+    setTimeout(function(){ w.classList.remove('alive'); }, 2600);
+  }
+
+  /* ---------- CONFETTI ---------- */
+  var CC = document.getElementById('confetti');
+  function confetti(){
+    var colors=['#ff6b6b','#ffd23f','#7ed957','#5a8dff','#ff7ad6','#37c9c9'];
+    for(var i=0;i<60;i++){
+      (function(){
+        var b=document.createElement('div'); b.className='confetti-bit';
+        b.style.background=colors[rnd(colors.length)];
+        var startX = 50 + (Math.random()*40-20);
+        b.style.left = startX+'%'; b.style.top='40%';
+        b.style.borderRadius = Math.random()<0.5?'50%':'2px';
+        CC.appendChild(b);
+        var ang = Math.random()*Math.PI*2, spd = 120+Math.random()*260;
+        var vx=Math.cos(ang)*spd, vy=Math.sin(ang)*spd - 220;
+        var rot=Math.random()*720-360, dur=900+Math.random()*900;
+        var start=null;
+        function step(ts){
+          if(!start) start=ts; var t=(ts-start)/dur;
+          if(t>=1){ b.remove(); return; }
+          var x=vx*t, y=vy*t + 520*t*t;
+          b.style.transform='translate('+x+'px,'+y+'px) rotate('+(rot*t)+'deg)';
+          b.style.opacity = (1-t);
+          requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      })();
+    }
+  }
+
+  function resume(){ var c=ac(); if(c && c.state==='suspended') c.resume(); }
+
+  /* ---------- BLINK IDLE ---------- */
+  setInterval(function(){
+    var eyes = svg.querySelector('.eyes');
+    if(!eyes || !eyes.animate) return;
+    eyes.style.transformOrigin='150px 135px';
+    eyes.animate([{transform:'scaleY(1)'},{transform:'scaleY(0.1)'},{transform:'scaleY(1)'}], {duration:200});
+  }, 3800);
+
+  /* ---------- INIT ---------- */
+  document.getElementById('surpriseBtn').addEventListener('click', surprise);
+  document.getElementById('aliveBtn').addEventListener('click', bringToLife);
+  buildControls();
+  render();
+})();
+</script>
+</body>
+</html>

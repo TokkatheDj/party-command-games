@@ -1,0 +1,278 @@
+<!-- CONCEPT: Twinkle Repeat - a friendly Simon-says pattern game: watch the glowing gems light up with musical notes, then tap them back in the same order; each round adds one. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Twinkle Repeat</title>
+<style>
+  :root{
+    --pink:#ff5e9a; --pink-lit:#ffd6e6;
+    --blue:#3aa0ff; --blue-lit:#cdeaff;
+    --green:#4bd66a; --green-lit:#d3ffdc;
+    --yellow:#ffcb2e; --yellow-lit:#fff2c2;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    font-family:'Trebuchet MS','Comic Sans MS',system-ui,sans-serif;
+    background:radial-gradient(circle at 30% 20%,#5b3fa8,#2a1a63 70%);
+    color:#fff; overflow:hidden;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
+    min-height:100%; user-select:none; touch-action:manipulation;
+  }
+  #stars{position:fixed; inset:0; z-index:0; pointer-events:none;}
+  .wrap{position:relative; z-index:1; width:100%; max-width:520px; padding:10px 12px 20px; text-align:center;}
+  h1{
+    margin:6px 0 2px; font-size:clamp(30px,9vw,46px);
+    text-shadow:0 3px 0 rgba(0,0,0,.25), 0 0 18px rgba(255,255,255,.4);
+    letter-spacing:1px;
+  }
+  h1 .em{display:inline-block; animation:wiggle 2s ease-in-out infinite;}
+  @keyframes wiggle{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+  .tag{margin:0 0 8px; font-size:clamp(13px,3.6vw,16px); opacity:.9;}
+  .hud{display:flex; gap:10px; justify-content:center; margin:6px 0 12px;}
+  .chip{
+    background:rgba(255,255,255,.15); border:2px solid rgba(255,255,255,.35);
+    border-radius:16px; padding:6px 16px; font-size:clamp(14px,4vw,18px); font-weight:bold;
+    min-width:96px;
+  }
+  .chip b{font-size:1.35em; display:block; line-height:1;}
+  #msg{
+    min-height:34px; font-size:clamp(18px,5.4vw,26px); font-weight:bold;
+    margin:2px 0 10px; text-shadow:0 2px 6px rgba(0,0,0,.3);
+  }
+  .board{
+    position:relative; width:min(86vw,420px); aspect-ratio:1/1; margin:0 auto;
+    display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr;
+    gap:14px;
+  }
+  .pad{
+    border:none; border-radius:26px; cursor:pointer; position:relative;
+    box-shadow:inset 0 -8px 0 rgba(0,0,0,.18), 0 6px 14px rgba(0,0,0,.3);
+    transition:transform .08s, filter .12s, box-shadow .12s;
+    display:flex; align-items:center; justify-content:center;
+    font-size:clamp(40px,13vw,64px);
+    filter:brightness(.82) saturate(1.1);
+  }
+  .pad:active{transform:scale(.96);}
+  .pad.p0{background:var(--pink);}
+  .pad.p1{background:var(--blue);}
+  .pad.p2{background:var(--green);}
+  .pad.p3{background:var(--yellow);}
+  .pad.lit{filter:brightness(1.35) saturate(1.2); transform:scale(1.04);
+    box-shadow:inset 0 -8px 0 rgba(0,0,0,.1), 0 0 34px 8px rgba(255,255,255,.75);}
+  .pad .face{filter:drop-shadow(0 2px 2px rgba(0,0,0,.25)); pointer-events:none;}
+  .board.locked .pad{cursor:default;}
+  .btns{margin-top:18px; display:flex; gap:12px; justify-content:center; flex-wrap:wrap;}
+  .big{
+    font-family:inherit; font-weight:bold; cursor:pointer; color:#3a2170;
+    background:linear-gradient(#fff,#ffe9f4); border:none; border-radius:22px;
+    padding:14px 30px; font-size:clamp(18px,5.5vw,24px);
+    box-shadow:0 6px 0 #c88, 0 8px 16px rgba(0,0,0,.3);
+    transition:transform .06s, box-shadow .06s;
+  }
+  .big:active{transform:translateY(4px); box-shadow:0 2px 0 #c88;}
+  .big.go{background:linear-gradient(#fff2b0,#ffd23e); box-shadow:0 6px 0 #b8860b,0 8px 16px rgba(0,0,0,.3);}
+  .hide{display:none!important;}
+  #confetti{position:fixed; inset:0; z-index:5; pointer-events:none;}
+  .cheer{
+    position:fixed; z-index:6; left:50%; top:42%; transform:translate(-50%,-50%);
+    font-size:clamp(46px,16vw,90px); pointer-events:none; opacity:0;
+  }
+  .cheer.show{animation:pop 1s ease-out;}
+  @keyframes pop{0%{opacity:0; transform:translate(-50%,-50%) scale(.3)}
+    30%{opacity:1; transform:translate(-50%,-50%) scale(1.15)}
+    70%{opacity:1; transform:translate(-50%,-50%) scale(1)}
+    100%{opacity:0; transform:translate(-50%,-55%) scale(1)}}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<canvas id="confetti"></canvas>
+<div class="cheer" id="cheer">🎉</div>
+
+<div class="wrap">
+  <h1><span class="em">✨</span> Twinkle Repeat <span class="em">✨</span></h1>
+  <p class="tag">Watch the gems glow, then tap them back in the same order!</p>
+
+  <div class="hud">
+    <div class="chip">Round<b id="round">–</b></div>
+    <div class="chip">Best<b id="best">0</b></div>
+  </div>
+
+  <div id="msg">Press START to play!</div>
+
+  <div class="board locked" id="board">
+    <button class="pad p0" data-i="0"><span class="face">⭐</span></button>
+    <button class="pad p1" data-i="1"><span class="face">💎</span></button>
+    <button class="pad p2" data-i="2"><span class="face">🍀</span></button>
+    <button class="pad p3" data-i="3"><span class="face">🌟</span></button>
+  </div>
+
+  <div class="btns">
+    <button class="big go" id="startBtn">▶ START</button>
+    <button class="big hide" id="watchBtn">👀 Watch Again</button>
+    <button class="big" id="restartBtn">↺ Restart</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // ---------- Audio ----------
+  var actx=null;
+  function AC(){ if(!actx){ try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } return actx; }
+  var NOTES=[523.25, 659.25, 783.99, 1046.50]; // C5 E5 G5 C6
+  function tone(freq,dur,type,vol){
+    var c=AC(); if(!c) return;
+    var o=c.createOscillator(), g=c.createGain();
+    o.type=type||'sine'; o.frequency.value=freq;
+    var t=c.currentTime;
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(vol||0.25,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+(dur||0.35));
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t+(dur||0.35)+0.05);
+  }
+  function padSound(i){ tone(NOTES[i],0.42,'triangle',0.3); }
+  function goodSound(){ tone(880,0.12,'square',0.18); setTimeout(function(){tone(1320,0.18,'square',0.18);},110); }
+  function oopsSound(){ tone(330,0.18,'sine',0.22); setTimeout(function(){tone(247,0.28,'sine',0.22);},150); }
+  function fanfare(){ [523,659,784,1046,1319].forEach(function(f,k){ setTimeout(function(){tone(f,0.3,'triangle',0.28);},k*120); }); }
+
+  // ---------- State ----------
+  var seq=[], step=0, best=0, playing=false, accepting=false;
+  var board=document.getElementById('board');
+  var pads=[].slice.call(document.querySelectorAll('.pad'));
+  var msgEl=document.getElementById('msg');
+  var roundEl=document.getElementById('round');
+  var bestEl=document.getElementById('best');
+  var startBtn=document.getElementById('startBtn');
+  var watchBtn=document.getElementById('watchBtn');
+  var restartBtn=document.getElementById('restartBtn');
+
+  function setMsg(t){ msgEl.textContent=t; }
+  function litOn(i){ pads[i].classList.add('lit'); }
+  function litOff(i){ pads[i].classList.remove('lit'); }
+
+  function flash(i,dur){
+    return new Promise(function(res){
+      litOn(i); padSound(i);
+      setTimeout(function(){ litOff(i); setTimeout(res,140); }, dur);
+    });
+  }
+
+  function speedForRound(n){ return Math.max(280, 620 - n*28); } // gets a touch faster
+
+  async function playSequence(){
+    accepting=false; board.classList.add('locked');
+    watchBtn.classList.add('hide');
+    setMsg('Watch closely… 👀');
+    await wait(500);
+    var d=speedForRound(seq.length);
+    for(var k=0;k<seq.length;k++){ await flash(seq[k], d); }
+    step=0; accepting=true; board.classList.remove('locked');
+    setMsg('Your turn! Tap the gems 🎵');
+    watchBtn.classList.remove('hide');
+  }
+
+  function nextRound(){
+    seq.push(Math.floor(Math.random()*4));
+    roundEl.textContent=seq.length;
+    playSequence();
+  }
+
+  function startGame(){
+    AC(); if(actx && actx.state==='suspended') actx.resume();
+    seq=[]; playing=true;
+    startBtn.classList.add('hide');
+    setMsg('Get ready…');
+    setTimeout(nextRound, 400);
+  }
+
+  function tapPad(i){
+    if(!accepting) return;
+    litOn(i); padSound(i);
+    setTimeout(function(){litOff(i);},180);
+    if(i===seq[step]){
+      step++;
+      if(step===seq.length){
+        accepting=false; board.classList.add('locked');
+        if(seq.length>best){ best=seq.length; bestEl.textContent=best; }
+        var milestone=(seq.length%5===0);
+        goodSound();
+        if(milestone){ celebrate(true); setMsg('WOW! '+seq.length+' in a row! 🏆'); fanfare(); }
+        else { celebrate(false); setMsg(pick(['Nice one! ⭐','Great job! 🎉','You got it! 💫','Awesome! 🌈'])); }
+        setTimeout(nextRound, milestone?1600:900);
+      }
+    } else {
+      accepting=false; board.classList.add('locked');
+      oopsSound();
+      setMsg('Almost! Let’s watch again 💛');
+      setTimeout(function(){ playSequence(); }, 1300);
+    }
+  }
+
+  // ---------- helpers ----------
+  function wait(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+  function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+  // ---------- input ----------
+  pads.forEach(function(p){
+    var i=+p.getAttribute('data-i');
+    p.addEventListener('click', function(){ tapPad(i); });
+  });
+  startBtn.addEventListener('click', startGame);
+  watchBtn.addEventListener('click', function(){ if(playing && !accepting) return; if(playing) playSequence(); });
+  restartBtn.addEventListener('click', function(){
+    playing=false; accepting=false; seq=[]; step=0;
+    board.classList.add('locked'); pads.forEach(function(p,k){litOff(k);});
+    roundEl.textContent='–'; setMsg('Press START to play!');
+    startBtn.classList.remove('hide'); watchBtn.classList.add('hide');
+  });
+
+  // ---------- twinkly background ----------
+  var sc=document.getElementById('stars'), sx=sc.getContext('2d'), dots=[];
+  function sizeStars(){ sc.width=innerWidth; sc.height=innerHeight;
+    dots=[]; for(var i=0;i<70;i++){ dots.push({x:Math.random()*sc.width,y:Math.random()*sc.height,r:Math.random()*2+0.5,p:Math.random()*Math.PI*2,s:Math.random()*0.03+0.01}); } }
+  function drawStars(){ sx.clearRect(0,0,sc.width,sc.height);
+    for(var i=0;i<dots.length;i++){ var d=dots[i]; d.p+=d.s; var a=0.4+Math.abs(Math.sin(d.p))*0.6;
+      sx.globalAlpha=a; sx.fillStyle='#fff'; sx.beginPath(); sx.arc(d.x,d.y,d.r,0,7); sx.fill(); }
+    sx.globalAlpha=1; requestAnimationFrame(drawStars); }
+  sizeStars(); drawStars();
+
+  // ---------- confetti ----------
+  var cc=document.getElementById('confetti'), cx=cc.getContext('2d'), bits=[];
+  function sizeConf(){ cc.width=innerWidth; cc.height=innerHeight; }
+  sizeConf();
+  var COLORS=['#ff5e9a','#3aa0ff','#4bd66a','#ffcb2e','#c07bff','#fff'];
+  function celebrate(big){
+    var cheer=document.getElementById('cheer');
+    cheer.textContent = big? pick(['🏆','🎊','🥳']) : pick(['🎉','⭐','💫','🌈']);
+    cheer.classList.remove('show'); void cheer.offsetWidth; cheer.classList.add('show');
+    var n=big?120:45;
+    for(var i=0;i<n;i++){
+      bits.push({x:cc.width/2+(Math.random()-0.5)*120, y:cc.height*0.42,
+        vx:(Math.random()-0.5)*11, vy:-(Math.random()*11+4),
+        g:0.32+Math.random()*0.15, s:6+Math.random()*7,
+        c:COLORS[(Math.random()*COLORS.length)|0], rot:Math.random()*6, vr:(Math.random()-0.5)*0.3, life:0});
+    }
+    if(!confRunning){ confRunning=true; runConf(); }
+  }
+  var confRunning=false;
+  function runConf(){
+    cx.clearRect(0,0,cc.width,cc.height);
+    for(var i=bits.length-1;i>=0;i--){ var b=bits[i];
+      b.vy+=b.g; b.x+=b.vx; b.y+=b.vy; b.rot+=b.vr; b.life++;
+      cx.save(); cx.translate(b.x,b.y); cx.rotate(b.rot); cx.fillStyle=b.c;
+      cx.fillRect(-b.s/2,-b.s/2,b.s,b.s*0.6); cx.restore();
+      if(b.y>cc.height+30||b.life>200) bits.splice(i,1);
+    }
+    if(bits.length){ requestAnimationFrame(runConf); } else { confRunning=false; cx.clearRect(0,0,cc.width,cc.height); }
+  }
+
+  window.addEventListener('resize', function(){ sizeStars(); sizeConf(); });
+})();
+</script>
+</body>
+</html>
