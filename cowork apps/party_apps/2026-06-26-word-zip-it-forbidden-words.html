@@ -1,0 +1,469 @@
+<!-- CONCEPT: WORD GAMES - "Zip It!": teams race a timer to get teammates to guess the secret word without saying any of its 5 forbidden words; 65 cards, team scoreboard, host buzzer. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Zip It! — Forbidden Words Party Game (4–10 players, ~15–25 min)</title>
+<style>
+  :root{
+    --bg1:#0b1d4d; --bg2:#13328a; --bg3:#06122e;
+    --accent:#ffd23f; --accent2:#ff4d8d; --good:#36e27b; --bad:#ff5252;
+    --ink:#ffffff; --muted:rgba(255,255,255,.7);
+    --panel:rgba(255,255,255,.08); --panelB:rgba(255,255,255,.18);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    font-family:"Trebuchet MS",Verdana,system-ui,sans-serif;
+    color:var(--ink);
+    background:radial-gradient(120% 120% at 20% 0%,var(--bg2),var(--bg1) 55%,var(--bg3));
+    min-height:100vh;overflow-x:hidden;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .wrap{width:min(960px,100%);min-height:100vh;padding:18px;display:flex;flex-direction:column;}
+  .screen{display:none;flex:1;flex-direction:column;animation:fade .25s ease;}
+  .screen.on{display:flex;}
+  @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  .center{align-items:center;justify-content:center;text-align:center;}
+
+  h1{font-size:clamp(48px,11vw,104px);margin:0;line-height:.95;
+     text-shadow:0 6px 0 rgba(0,0,0,.25);letter-spacing:-2px;}
+  h1 .z{color:var(--accent);}
+  h1 .i{color:var(--accent2);}
+  .tag{font-size:clamp(16px,3.5vw,22px);color:var(--muted);margin:14px 0 4px;max-width:620px;}
+  .meta{font-size:14px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;}
+
+  .btn{
+    border:none;border-radius:18px;cursor:pointer;font-family:inherit;font-weight:bold;
+    padding:20px 26px;font-size:clamp(20px,4.5vw,26px);color:#06122e;
+    background:var(--accent);box-shadow:0 6px 0 #c79a1f;transition:transform .06s,box-shadow .06s;
+    touch-action:manipulation;
+  }
+  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #c79a1f;}
+  .btn.big{width:100%;max-width:520px;padding:26px;font-size:clamp(24px,5.5vw,34px);}
+  .btn.pink{background:var(--accent2);box-shadow:0 6px 0 #c12a63;color:#fff;}
+  .btn.pink:active{box-shadow:0 2px 0 #c12a63;}
+  .btn.ghost{background:var(--panel);color:#fff;box-shadow:0 6px 0 rgba(0,0,0,.25);border:2px solid var(--panelB);}
+  .btn.ghost:active{box-shadow:0 2px 0 rgba(0,0,0,.25);}
+
+  .card{background:var(--panel);border:2px solid var(--panelB);border-radius:24px;padding:22px;margin:12px 0;width:100%;}
+  .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;}
+
+  /* setup options */
+  .opt-group{margin:16px 0;width:100%;max-width:560px;}
+  .opt-label{font-size:15px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+  .chips{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;}
+  .chip{padding:14px 22px;border-radius:14px;background:var(--panel);border:2px solid var(--panelB);
+        font-size:20px;font-weight:bold;cursor:pointer;color:#fff;min-width:64px;}
+  .chip.sel{background:var(--accent);color:#06122e;border-color:var(--accent);}
+
+  /* gameplay */
+  .topbar{display:flex;justify-content:space-between;align-items:center;width:100%;gap:10px;}
+  .teamtag{font-size:clamp(20px,5vw,30px);font-weight:bold;}
+  .timer{font-size:clamp(40px,10vw,72px);font-weight:bold;font-variant-numeric:tabular-nums;
+         padding:4px 18px;border-radius:16px;background:var(--panel);border:2px solid var(--panelB);}
+  .timer.low{color:var(--bad);animation:pulse .5s infinite alternate;}
+  @keyframes pulse{from{transform:scale(1);}to{transform:scale(1.08);}}
+
+  .playcard{background:#fff;color:#06122e;border-radius:26px;padding:28px 22px;margin:18px 0;
+            box-shadow:0 16px 40px rgba(0,0,0,.35);width:100%;}
+  .target{font-size:clamp(40px,11vw,80px);font-weight:900;letter-spacing:-1px;line-height:1;
+          text-transform:uppercase;color:#0b1d4d;}
+  .forbidden-title{margin:18px 0 10px;font-size:13px;letter-spacing:2px;text-transform:uppercase;
+                   color:var(--accent2);font-weight:bold;}
+  .forbidden{display:flex;flex-direction:column;gap:7px;}
+  .fword{background:#ffe1ec;color:#b3164d;border-radius:10px;padding:11px;font-size:clamp(19px,4.6vw,26px);
+         font-weight:bold;text-transform:uppercase;letter-spacing:.5px;}
+
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;}
+  .actions .got{grid-column:1 / -1;}
+  .turnscore{font-size:16px;color:var(--muted);margin-top:6px;}
+  .turnscore b{color:var(--accent);font-size:20px;}
+
+  /* scoreboard */
+  .scoreboard{display:flex;flex-direction:column;gap:12px;width:100%;max-width:560px;margin:14px 0;}
+  .scorerow{display:flex;justify-content:space-between;align-items:center;background:var(--panel);
+            border:2px solid var(--panelB);border-radius:16px;padding:16px 20px;font-size:clamp(20px,4.5vw,26px);font-weight:bold;}
+  .scorerow .pts{color:var(--accent);font-size:clamp(26px,6vw,38px);}
+  .scorerow.lead{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset;}
+
+  .big-result{font-size:clamp(34px,8vw,60px);font-weight:900;margin:6px 0;}
+  .confetti{position:fixed;top:-10px;width:10px;height:16px;opacity:.9;z-index:5;pointer-events:none;border-radius:2px;}
+  .small{font-size:14px;color:var(--muted);}
+  .reveal{font-size:clamp(22px,5vw,30px);font-weight:bold;margin:6px 0;}
+  .skips{font-size:14px;color:var(--muted);margin-top:4px;}
+  ul.rules{text-align:left;max-width:520px;font-size:clamp(16px,3.6vw,19px);line-height:1.5;}
+  ul.rules li{margin:8px 0;}
+  .footer{margin-top:8px;font-size:12px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HOME -->
+  <section id="home" class="screen on center">
+    <div class="meta">Word Game · 4–10 players · ~15–25 min</div>
+    <h1><span class="z">ZIP</span> <span class="i">IT!</span></h1>
+    <p class="tag">Get your team to guess the secret word — but you can't say any of the five <b>forbidden words</b>. Beat the clock, dodge the foul buzzer, climb the scoreboard.</p>
+    <button class="btn big pink" onclick="go('setup')">Set Up Game ▸</button>
+    <button class="btn ghost" style="margin-top:14px;max-width:520px;width:100%" onclick="go('rules')">How to Play</button>
+    <div class="footer">No internet needed · works offline · family-friendly</div>
+  </section>
+
+  <!-- RULES -->
+  <section id="rules" class="screen center">
+    <h1 style="font-size:clamp(34px,8vw,56px)">How to Play</h1>
+    <ul class="rules">
+      <li><b>One clue-giver</b> per team holds the device and sees the secret word + 5 forbidden words.</li>
+      <li>Describe the secret word so teammates shout it out — <b>without saying any forbidden word</b> (or the word itself).</li>
+      <li>Tap <b>GOT IT</b> for each correct guess (+1). Tap <b>SKIP</b> to pass (no penalty). Tap <b>FOUL</b> if a forbidden word slips out (−1).</li>
+      <li>Keep going until the timer runs out, then pass the device to the next team.</li>
+      <li>First team to the target score <b>wins!</b></li>
+    </ul>
+    <button class="btn big" onclick="go('setup')">Got It — Set Up ▸</button>
+    <button class="btn ghost" style="margin-top:12px" onclick="go('home')">Back</button>
+  </section>
+
+  <!-- SETUP -->
+  <section id="setup" class="screen center">
+    <h1 style="font-size:clamp(34px,8vw,56px)">Game Setup</h1>
+
+    <div class="opt-group">
+      <div class="opt-label">Teams</div>
+      <div class="chips" id="teamChips"></div>
+    </div>
+    <div class="opt-group">
+      <div class="opt-label">Seconds per turn</div>
+      <div class="chips" id="timeChips"></div>
+    </div>
+    <div class="opt-group">
+      <div class="opt-label">Win at score</div>
+      <div class="chips" id="goalChips"></div>
+    </div>
+
+    <button class="btn big pink" onclick="startGame()">Start Game ▸</button>
+    <button class="btn ghost" style="margin-top:12px" onclick="go('home')">Back</button>
+  </section>
+
+  <!-- READY (pass device) -->
+  <section id="ready" class="screen center">
+    <div class="meta" id="readyScoreLine"></div>
+    <h1 style="font-size:clamp(30px,7vw,48px)">Pass the device to</h1>
+    <div class="big-result" id="readyTeam">Team 1</div>
+    <p class="tag">The clue-giver holds the phone so teammates <b>can't see the screen</b>. Ready?</p>
+    <button class="btn big" onclick="beginTurn()">Start Turn ▸</button>
+    <button class="btn ghost" style="margin-top:12px" onclick="go('home')">Quit to Home</button>
+  </section>
+
+  <!-- PLAY -->
+  <section id="play" class="screen">
+    <div class="topbar">
+      <div class="teamtag" id="playTeam">Team 1</div>
+      <div class="timer" id="timer">60</div>
+    </div>
+    <div class="playcard">
+      <div class="target" id="target">PIZZA</div>
+      <div class="forbidden-title">Don't say</div>
+      <div class="forbidden" id="forbidden"></div>
+    </div>
+    <div class="turnscore">This turn: <b id="turnPts">0</b> point(s) · Skips left: <span id="skipsLeft">3</span></div>
+    <div class="actions" style="margin-top:auto">
+      <button class="btn got pink got-btn" onclick="gotIt()">✓ GOT IT  +1</button>
+      <button class="btn ghost" onclick="skip()">↻ SKIP</button>
+      <button class="btn ghost" onclick="foul()" style="color:#ff8a8a">✕ FOUL −1</button>
+    </div>
+  </section>
+
+  <!-- TURN SUMMARY -->
+  <section id="summary" class="screen center">
+    <h1 style="font-size:clamp(30px,7vw,48px)">Time!</h1>
+    <div class="reveal" id="summaryReveal"></div>
+    <div class="scoreboard" id="summaryBoard"></div>
+    <button class="btn big pink" id="nextBtn" onclick="nextTurn()">Next Team ▸</button>
+  </section>
+
+  <!-- WIN -->
+  <section id="win" class="screen center">
+    <div class="meta">We have a winner!</div>
+    <h1 style="font-size:clamp(40px,10vw,72px)">🏆</h1>
+    <div class="big-result" id="winTeam">Team 1 Wins!</div>
+    <div class="scoreboard" id="winBoard"></div>
+    <button class="btn big" onclick="rematch()">Play Again (same teams) ▸</button>
+    <button class="btn ghost" style="margin-top:12px" onclick="go('home')">New Game</button>
+  </section>
+
+</div>
+
+<script>
+/* ---------- CARD DECK (65 cards) ---------- */
+const DECK=[
+ ["PIZZA",["cheese","slice","Italian","pepperoni","round"]],
+ ["BEACH",["sand","ocean","sun","waves","towel"]],
+ ["GUITAR",["strings","music","play","rock","instrument"]],
+ ["SNOWMAN",["snow","carrot","cold","build","winter"]],
+ ["BIRTHDAY",["cake","candles","party","age","presents"]],
+ ["DOCTOR",["sick","hospital","medicine","patient","nurse"]],
+ ["RAINBOW",["colors","rain","sky","arc","pot"]],
+ ["ELEPHANT",["trunk","big","gray","ears","Africa"]],
+ ["TOOTHBRUSH",["teeth","clean","paste","mouth","bathroom"]],
+ ["BASKETBALL",["hoop","dribble","court","ball","dunk"]],
+ ["VAMPIRE",["blood","bat","fangs","night","Dracula"]],
+ ["PANCAKE",["flat","syrup","breakfast","flip","batter"]],
+ ["UMBRELLA",["rain","open","wet","handle","protect"]],
+ ["ROBOT",["metal","machine","beep","future","human"]],
+ ["POPCORN",["movie","kernel","butter","pop","snack"]],
+ ["DINOSAUR",["extinct","big","fossil","Rex","prehistoric"]],
+ ["WEDDING",["marriage","bride","groom","ring","vows"]],
+ ["PENGUIN",["bird","ice","waddle","black","Antarctica"]],
+ ["CAMERA",["photo","picture","lens","click","flash"]],
+ ["SPAGHETTI",["pasta","noodles","sauce","fork","Italian"]],
+ ["MOUNTAIN",["climb","high","peak","hill","snow"]],
+ ["FIREWORKS",["explode","sky","July","sparkle","loud"]],
+ ["LIBRARY",["books","quiet","read","shelves","borrow"]],
+ ["KANGAROO",["jump","pouch","Australia","hop","marsupial"]],
+ ["TELESCOPE",["stars","space","see","lens","sky"]],
+ ["CUPCAKE",["frosting","small","dessert","bake","sweet"]],
+ ["SKELETON",["bones","skull","Halloween","body","x-ray"]],
+ ["WATERFALL",["water","fall","river","cliff","splash"]],
+ ["MAGNET",["attract","metal","pull","stick","fridge"]],
+ ["HONEY",["bee","sweet","sticky","jar","gold"]],
+ ["BUTTERFLY",["wings","caterpillar","fly","colorful","cocoon"]],
+ ["SANDWICH",["bread","lunch","layers","eat","meat"]],
+ ["VOLCANO",["lava","erupt","mountain","hot","ash"]],
+ ["SCARECROW",["field","crows","straw","farm","hat"]],
+ ["LIGHTHOUSE",["light","ocean","ships","tall","coast"]],
+ ["BICYCLE",["pedal","wheels","ride","two","handlebars"]],
+ ["MERMAID",["tail","fish","ocean","half","swim"]],
+ ["THUNDER",["storm","loud","lightning","sky","boom"]],
+ ["PINEAPPLE",["fruit","spiky","tropical","pizza","yellow"]],
+ ["ASTRONAUT",["space","moon","suit","rocket","NASA"]],
+ ["SNOWFLAKE",["snow","white","cold","unique","falling"]],
+ ["HAMBURGER",["bun","meat","fast","grill","patty"]],
+ ["WIZARD",["magic","wand","spells","hat","Harry"]],
+ ["TORNADO",["wind","spin","storm","funnel","twister"]],
+ ["CACTUS",["desert","spikes","plant","green","water"]],
+ ["JELLYFISH",["sting","ocean","tentacles","float","clear"]],
+ ["KEYBOARD",["type","keys","computer","letters","piano"]],
+ ["CHOCOLATE",["sweet","brown","candy","cocoa","bar"]],
+ ["PARACHUTE",["jump","fall","plane","sky","slow"]],
+ ["OCTOPUS",["eight","tentacles","ocean","ink","arms"]],
+ ["SUNFLOWER",["yellow","tall","seeds","sun","petals"]],
+ ["TREASURE",["gold","chest","pirate","buried","map"]],
+ ["AVOCADO",["green","toast","fruit","pit","guacamole"]],
+ ["HELICOPTER",["fly","blades","air","chopper","propeller"]],
+ ["CAMPFIRE",["wood","flames","marshmallow","camp","warm"]],
+ ["SUBMARINE",["underwater","dive","ocean","navy","sonar"]],
+ ["PRETZEL",["twist","salt","snack","knot","dough"]],
+ ["HEDGEHOG",["spikes","small","curl","animal","prickly"]],
+ ["DOORBELL",["ring","door","press","button","visitor"]],
+ ["SNORKEL",["swim","breathe","water","mask","tube"]],
+ ["WINDMILL",["wind","blades","Dutch","spin","power"]],
+ ["JIGSAW",["puzzle","pieces","fit","picture","edges"]],
+ ["FLAMINGO",["pink","bird","leg","stand","Florida"]],
+ ["COMPASS",["direction","north","needle","lost","point"]],
+ ["BUBBLEGUM",["chew","blow","pink","stick","candy"]]
+];
+
+/* ---------- STATE ---------- */
+const TEAM_COLORS=["#ffd23f","#ff4d8d","#36e27b","#4db5ff"];
+let cfg={teams:2,time:60,goal:20};
+let scores=[], names=[], turnIdx=0, order=[];
+let timeLeft=60, timerId=null, turnPts=0, skips=3, curCard=null, deckOrder=[], deckPos=0, lastReveal="";
+
+/* ---------- SETUP CHIPS ---------- */
+function buildChips(id,vals,key,labelFn){
+  const el=document.getElementById(id);el.innerHTML="";
+  vals.forEach(v=>{
+    const c=document.createElement("div");
+    c.className="chip"+(cfg[key]===v?" sel":"");
+    c.textContent=labelFn?labelFn(v):v;
+    c.onclick=()=>{cfg[key]=v;buildChips(id,vals,key,labelFn);beep(660,.05,.2);};
+    el.appendChild(c);
+  });
+}
+function initSetup(){
+  buildChips("teamChips",[2,3,4],"teams");
+  buildChips("timeChips",[45,60,90],"time");
+  buildChips("goalChips",[15,20,30],"goal");
+}
+
+/* ---------- NAV ---------- */
+function go(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
+  document.getElementById(id).classList.add("on");
+  window.scrollTo(0,0);
+}
+
+/* ---------- GAME FLOW ---------- */
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function newDeck(){deckOrder=shuffle([...Array(DECK.length).keys()]);deckPos=0;}
+function drawCard(){
+  if(deckPos>=deckOrder.length)newDeck();
+  curCard=DECK[deckOrder[deckPos++]];
+}
+
+function startGame(){
+  cfg.teams=cfg.teams||2;
+  scores=Array(cfg.teams).fill(0);
+  names=Array.from({length:cfg.teams},(_,i)=>"Team "+(i+1));
+  order=Array.from({length:cfg.teams},(_,i)=>i);
+  turnIdx=0;newDeck();
+  ac&&ac.resume&&ac.resume();
+  showReady();
+}
+function rematch(){
+  scores=Array(cfg.teams).fill(0);turnIdx=0;newDeck();showReady();
+}
+function curTeam(){return order[turnIdx%order.length];}
+
+function showReady(){
+  const t=curTeam();
+  document.getElementById("readyTeam").textContent=names[t];
+  document.getElementById("readyTeam").style.color=TEAM_COLORS[t%4];
+  document.getElementById("readyScoreLine").textContent=
+    scores.map((s,i)=>names[i]+": "+s).join("   ·   ")+"   ·   Win at "+cfg.goal;
+  go("ready");
+}
+
+function beginTurn(){
+  const t=curTeam();
+  turnPts=0;skips=3;timeLeft=cfg.time;
+  document.getElementById("playTeam").textContent=names[t];
+  document.getElementById("playTeam").style.color=TEAM_COLORS[t%4];
+  document.getElementById("turnPts").textContent=0;
+  document.getElementById("skipsLeft").textContent=skips;
+  document.getElementById("timer").textContent=timeLeft;
+  document.getElementById("timer").classList.remove("low");
+  drawCard();renderCard();
+  go("play");
+  clearInterval(timerId);
+  timerId=setInterval(tick,1000);
+}
+function tick(){
+  timeLeft--;
+  const el=document.getElementById("timer");
+  el.textContent=timeLeft;
+  if(timeLeft<=5){el.classList.add("low");beep(880,.08,.25);}
+  if(timeLeft<=0){endTurn();}
+}
+function renderCard(){
+  document.getElementById("target").textContent=curCard[0];
+  const f=document.getElementById("forbidden");f.innerHTML="";
+  curCard[1].forEach(w=>{
+    const d=document.createElement("div");d.className="fword";d.textContent=w;f.appendChild(d);
+  });
+  lastReveal=curCard[0];
+}
+function gotIt(){
+  turnPts++;document.getElementById("turnPts").textContent=turnPts;
+  beep(523,.06,.25);beep(784,.08,.25,.06);
+  flash("var(--good)");drawCard();renderCard();
+}
+function skip(){
+  if(skips<=0){buzz();return;}
+  skips--;document.getElementById("skipsLeft").textContent=skips;
+  beep(330,.06,.2);drawCard();renderCard();
+}
+function foul(){
+  turnPts--;document.getElementById("turnPts").textContent=turnPts;
+  buzz();flash("var(--bad)");drawCard();renderCard();
+}
+function flash(c){
+  const card=document.querySelector(".playcard");
+  card.style.boxShadow="0 0 0 6px "+c+",0 16px 40px rgba(0,0,0,.35)";
+  setTimeout(()=>{card.style.boxShadow="0 16px 40px rgba(0,0,0,.35)";},180);
+}
+
+function endTurn(){
+  clearInterval(timerId);
+  buzz(true);
+  const t=curTeam();
+  scores[t]+=turnPts;if(scores[t]<0)scores[t]=0;
+  document.getElementById("summaryReveal").textContent=
+    names[t]+" scored "+turnPts+" point"+(turnPts===1?"":"s")+" this turn.";
+  renderBoard("summaryBoard",false);
+  // win check
+  const winner=scores.findIndex(s=>s>=cfg.goal);
+  const maxScore=Math.max(...scores);
+  if(winner>=0 && scores.filter(s=>s===maxScore).length===1){
+    document.getElementById("nextBtn").textContent="See Winner ▸";
+    document.getElementById("nextBtn").onclick=showWin;
+  }else{
+    document.getElementById("nextBtn").textContent="Next Team ▸";
+    document.getElementById("nextBtn").onclick=nextTurn;
+  }
+  go("summary");
+}
+function nextTurn(){turnIdx++;showReady();}
+
+function renderBoard(elId,leadHighlight){
+  const el=document.getElementById(elId);el.innerHTML="";
+  const ranked=scores.map((s,i)=>({s,i})).sort((a,b)=>b.s-a.s);
+  const top=ranked[0].s;
+  ranked.forEach(r=>{
+    const row=document.createElement("div");
+    row.className="scorerow"+(leadHighlight&&r.s===top&&top>0?" lead":"");
+    row.innerHTML='<span style="color:'+TEAM_COLORS[r.i%4]+'">'+names[r.i]+
+      '</span><span class="pts">'+r.s+'</span>';
+    el.appendChild(row);
+  });
+}
+
+function showWin(){
+  const maxScore=Math.max(...scores);
+  const w=scores.indexOf(maxScore);
+  document.getElementById("winTeam").textContent=names[w]+" Wins!";
+  document.getElementById("winTeam").style.color=TEAM_COLORS[w%4];
+  renderBoard("winBoard",true);
+  go("win");
+  victoryJingle();confetti();
+}
+
+/* ---------- AUDIO (Web Audio API) ---------- */
+let ac=null;
+function audio(){if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}return ac;}
+function beep(freq,dur,vol,delay){
+  const a=audio();if(!a)return;
+  const t=a.currentTime+(delay||0);
+  const o=a.createOscillator(),g=a.createGain();
+  o.frequency.value=freq;o.type="triangle";
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol||.2,t+.01);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+dur+.02);
+}
+function buzz(long){
+  const a=audio();if(!a)return;
+  const t=a.currentTime;
+  const o=a.createOscillator(),g=a.createGain();
+  o.type="sawtooth";o.frequency.value=long?150:110;
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(.25,t+.02);
+  g.gain.exponentialRampToValueAtTime(.0001,t+(long?.7:.35));
+  o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+(long?.72:.37));
+}
+function victoryJingle(){
+  [523,659,784,1047].forEach((f,i)=>beep(f,.25,.25,i*.13));
+}
+
+/* ---------- CONFETTI ---------- */
+function confetti(){
+  const cols=["#ffd23f","#ff4d8d","#36e27b","#4db5ff","#fff"];
+  for(let i=0;i<70;i++){
+    const c=document.createElement("div");c.className="confetti";
+    c.style.left=Math.random()*100+"vw";
+    c.style.background=cols[i%cols.length];
+    c.style.transform="rotate("+Math.random()*360+"deg)";
+    document.body.appendChild(c);
+    const dur=2200+Math.random()*1800;
+    c.animate([{transform:"translateY(0) rotate(0)",opacity:1},
+               {transform:"translateY(105vh) rotate("+(360+Math.random()*360)+"deg)",opacity:.9}],
+              {duration:dur,easing:"ease-in"});
+    setTimeout(()=>c.remove(),dur);
+  }
+}
+
+/* ---------- INIT ---------- */
+initSetup();
+</script>
+</body>
+</html>

@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<!-- CONCEPT: TRIVIA - Host-run team trivia: reveal escalating-value questions, tap the team that nailed it, finish with a wager-it-all Final round. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lightning Categories — Team Trivia</title>
+<style>
+  :root{
+    --bg1:#1a0b3d; --bg2:#3b0764; --bg3:#7c1d6f;
+    --gold:#ffd23f; --gold2:#ffb703;
+    --pink:#ff4d8d; --cyan:#22d3ee; --green:#34d399; --red:#f87171;
+    --ink:#13072e; --paper:#fff7ed;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; height:100%;}
+  body{
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
+    color:#fff; min-height:100%;
+    background:radial-gradient(1200px 800px at 20% -10%, #5b21b6 0%, transparent 60%),
+               radial-gradient(1000px 700px at 110% 110%, #be185d 0%, transparent 55%),
+               linear-gradient(160deg,var(--bg1),var(--bg2) 55%,var(--bg3));
+    background-attachment:fixed;
+    display:flex; flex-direction:column; align-items:center;
+    padding:max(14px,2.2vh) 14px calc(20px + env(safe-area-inset-bottom));
+  }
+  .wrap{width:min(1100px,100%); flex:1; display:flex; flex-direction:column;}
+  .screen{display:none; animation:pop .35s ease both;}
+  .screen.active{display:flex; flex-direction:column; flex:1;}
+  @keyframes pop{from{opacity:0; transform:translateY(14px) scale(.98);} to{opacity:1; transform:none;}}
+
+  h1{margin:0; font-size:clamp(34px,7vw,68px); line-height:1;
+     color:var(--gold);
+     text-shadow:0 3px 0 #b45309,0 6px 18px rgba(0,0,0,.45);
+     letter-spacing:.5px; text-align:center;}
+  .sub{text-align:center; font-size:clamp(15px,2.4vw,21px); opacity:.92; margin:10px 0 4px;}
+  .meta{text-align:center; font-size:clamp(12px,1.9vw,15px); opacity:.7; margin-bottom:8px;}
+
+  .card{background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.16);
+        border-radius:22px; padding:clamp(16px,3vw,30px); backdrop-filter:blur(6px);
+        box-shadow:0 14px 40px rgba(0,0,0,.35);}
+
+  .btn{cursor:pointer; border:none; border-radius:16px; font-weight:800;
+       font-family:inherit; font-size:clamp(17px,2.6vw,22px);
+       padding:16px 22px; color:var(--ink);
+       background:linear-gradient(180deg,var(--gold),var(--gold2));
+       box-shadow:0 6px 0 #a16207,0 10px 22px rgba(0,0,0,.35);
+       transition:transform .05s, box-shadow .05s; user-select:none;}
+  .btn:active{transform:translateY(4px); box-shadow:0 2px 0 #a16207,0 6px 14px rgba(0,0,0,.35);}
+  .btn.big{font-size:clamp(20px,3.4vw,30px); padding:20px 30px; width:100%;}
+  .btn.ghost{background:rgba(255,255,255,.12); color:#fff; box-shadow:0 6px 0 rgba(0,0,0,.3);}
+  .btn.ghost:active{box-shadow:0 2px 0 rgba(0,0,0,.3);}
+  .btn.pink{background:linear-gradient(180deg,#ff6fa5,var(--pink)); color:#fff; box-shadow:0 6px 0 #9d174d,0 10px 22px rgba(0,0,0,.35);}
+  .btn.pink:active{box-shadow:0 2px 0 #9d174d;}
+  .btn.cyan{background:linear-gradient(180deg,#67e8f9,var(--cyan)); color:var(--ink); box-shadow:0 6px 0 #0e7490,0 10px 22px rgba(0,0,0,.35);}
+  .btn.cyan:active{box-shadow:0 2px 0 #0e7490;}
+  .btn:disabled{opacity:.4; filter:grayscale(.4); cursor:not-allowed; transform:none; box-shadow:0 6px 0 rgba(0,0,0,.3);}
+  .row{display:flex; gap:12px; flex-wrap:wrap;}
+  .row.center{justify-content:center;}
+
+  /* Setup */
+  .teamcount{display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:6px 0 4px;}
+  .pill{cursor:pointer; border-radius:50px; padding:14px 24px; font-weight:800; font-size:22px;
+        background:rgba(255,255,255,.1); border:2px solid rgba(255,255,255,.25); color:#fff;}
+  .pill.sel{background:linear-gradient(180deg,var(--gold),var(--gold2)); color:var(--ink); border-color:#fff;}
+  .teamnames{display:grid; gap:10px; margin-top:14px;}
+  .teamnames input{font-family:inherit; font-size:20px; font-weight:700; padding:14px 16px;
+        border-radius:14px; border:2px solid rgba(255,255,255,.25);
+        background:rgba(0,0,0,.25); color:#fff;}
+  .teamnames input:focus{outline:none; border-color:var(--gold);}
+  .opt{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:12px;
+       background:rgba(0,0,0,.18); padding:12px 16px; border-radius:14px;}
+  .opt label{font-weight:700; font-size:clamp(15px,2.2vw,18px);}
+  .stepper{display:flex; align-items:center; gap:10px;}
+  .stepper button{width:46px; height:46px; border-radius:12px; border:none; cursor:pointer;
+        font-size:26px; font-weight:900; color:var(--ink);
+        background:linear-gradient(180deg,#fff,#e5e7eb); box-shadow:0 4px 0 #9ca3af;}
+  .stepper button:active{transform:translateY(3px); box-shadow:0 1px 0 #9ca3af;}
+  .stepper .val{min-width:46px; text-align:center; font-size:26px; font-weight:900; color:var(--gold);}
+
+  /* Scoreboard strip */
+  .scorestrip{display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-bottom:14px;}
+  .tscore{flex:1 1 120px; min-width:110px; max-width:230px; border-radius:16px; padding:10px 12px;
+          text-align:center; border:2px solid rgba(255,255,255,.2); background:rgba(0,0,0,.25);}
+  .tscore .nm{font-weight:800; font-size:clamp(14px,2vw,18px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .tscore .pt{font-weight:900; font-size:clamp(22px,3.6vw,32px); color:var(--gold);}
+  .tscore.lead{border-color:var(--gold); box-shadow:0 0 0 3px rgba(255,210,63,.25), 0 8px 20px rgba(0,0,0,.4);}
+
+  .catbanner{text-align:center; margin:6px 0 2px;}
+  .catbanner .lbl{font-size:clamp(13px,2vw,16px); letter-spacing:3px; text-transform:uppercase; opacity:.7;}
+  .catbanner .cat{font-size:clamp(28px,5.5vw,52px); font-weight:900; color:var(--cyan);
+        text-shadow:0 3px 0 #0e7490,0 6px 16px rgba(0,0,0,.4);}
+  .progress{display:flex; gap:8px; justify-content:center; margin:10px 0;}
+  .dot{width:14px; height:14px; border-radius:50%; background:rgba(255,255,255,.2);}
+  .dot.done{background:var(--green);}
+  .dot.cur{background:var(--gold); box-shadow:0 0 0 4px rgba(255,210,63,.3);}
+
+  .qbox{flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; gap:18px; padding:10px 4px;}
+  .value{font-size:clamp(22px,4vw,34px); font-weight:900; color:var(--gold); }
+  .question{font-size:clamp(26px,5.2vw,46px); font-weight:800; line-height:1.18; max-width:18ch;}
+  .answer{font-size:clamp(24px,4.6vw,40px); font-weight:900; color:var(--green);
+        background:rgba(52,211,153,.12); border:2px dashed rgba(52,211,153,.5);
+        padding:14px 22px; border-radius:18px; animation:pop .3s both;}
+  .hint{opacity:.65; font-size:clamp(13px,2vw,16px);}
+
+  .awardgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; width:100%; margin-top:4px;}
+  .awardgrid .btn{width:100%;}
+
+  /* Final */
+  .wagerlist{display:grid; gap:12px; margin:14px 0;}
+  .wrow{display:flex; align-items:center; gap:10px; background:rgba(0,0,0,.22); padding:12px 14px; border-radius:16px; flex-wrap:wrap;}
+  .wrow .wnm{font-weight:800; font-size:clamp(15px,2.4vw,20px); flex:1 1 120px;}
+  .wrow .wsc{opacity:.7; font-size:14px;}
+  .wrow .stepper .val{color:var(--pink); min-width:80px;}
+
+  .winbig{font-size:clamp(40px,9vw,90px); font-weight:900; color:var(--gold);
+        text-shadow:0 4px 0 #b45309,0 8px 22px rgba(0,0,0,.5); text-align:center; line-height:1;}
+  .podium{display:flex; gap:14px; justify-content:center; align-items:flex-end; margin:24px 0; flex-wrap:wrap;}
+  .pod{border-radius:16px 16px 0 0; padding:14px 16px 18px; text-align:center; min-width:120px;
+       background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.05)); border:2px solid rgba(255,255,255,.2);}
+  .pod .pn{font-weight:800; font-size:clamp(15px,2.4vw,20px);}
+  .pod .pp{font-weight:900; font-size:clamp(20px,3.4vw,30px); color:var(--gold);}
+  .pod.first{border-color:var(--gold); transform:scale(1.06);}
+  .pod .rk{font-size:30px;}
+
+  .footer{margin-top:14px; opacity:.55; font-size:12px; text-align:center;}
+  .toast{position:fixed; left:50%; top:18px; transform:translateX(-50%);
+        background:var(--ink); color:#fff; padding:12px 20px; border-radius:50px; font-weight:800;
+        border:2px solid var(--gold); box-shadow:0 8px 24px rgba(0,0,0,.5); z-index:50; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  @media (max-width:520px){ .opt{flex-direction:column; align-items:stretch;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== HOME ===== -->
+  <section id="home" class="screen active" style="justify-content:center;">
+    <h1>Lightning&nbsp;Categories</h1>
+    <p class="sub">Host-run team trivia. Reveal a question, tap the team that nailed it, race up the scoreboard — then bet it all in the Final round.</p>
+    <p class="meta">👥 3–10 players (2–4 teams) &nbsp;•&nbsp; ⏱️ 15–25 min &nbsp;•&nbsp; 📺 One screen, one host</p>
+    <div class="card" style="margin-top:14px;">
+      <div style="font-size:clamp(16px,2.6vw,20px); line-height:1.55;">
+        <b style="color:var(--gold)">How it works:</b> Split into 2–4 teams. The host reads each question aloud.
+        First team to shout the right answer earns the points (easy → hard, worth more each step).
+        The host taps that team to award them. End on the <b style="color:var(--pink)">Final Wager</b> — teams bet their points on one tough question.
+      </div>
+    </div>
+    <div class="row center" style="margin-top:18px;">
+      <button class="btn big" style="max-width:420px;" onclick="goSetup()">Start Game ⚡</button>
+    </div>
+    <p class="footer">No internet needed • Family-friendly • 60+ questions across 12 categories</p>
+  </section>
+
+  <!-- ===== SETUP ===== -->
+  <section id="setup" class="screen" style="justify-content:center;">
+    <h1 style="font-size:clamp(28px,6vw,52px)">Set Up Teams</h1>
+    <div class="card" style="margin-top:14px;">
+      <div style="text-align:center; font-weight:800; font-size:clamp(15px,2.4vw,18px); margin-bottom:10px;">How many teams?</div>
+      <div class="teamcount" id="teamCount"></div>
+      <div class="teamnames" id="teamNames"></div>
+
+      <div class="opt">
+        <label>Category rounds this game</label>
+        <div class="stepper">
+          <button onclick="bumpRounds(-1)">–</button>
+          <div class="val" id="roundVal">5</div>
+          <button onclick="bumpRounds(1)">+</button>
+        </div>
+      </div>
+      <div class="opt">
+        <label>Final Wager round</label>
+        <div class="stepper">
+          <button onclick="toggleFinal()" id="finalToggle" style="width:auto; padding:0 18px; font-size:18px;">ON</button>
+        </div>
+      </div>
+    </div>
+    <div class="row center" style="margin-top:18px;">
+      <button class="btn ghost" onclick="show('home')">Back</button>
+      <button class="btn big" style="max-width:340px;" onclick="startGame()">Let's Play! 🎉</button>
+    </div>
+  </section>
+
+  <!-- ===== PLAY ===== -->
+  <section id="play" class="screen">
+    <div class="scorestrip" id="scoreStrip"></div>
+    <div class="catbanner">
+      <div class="lbl">Round <span id="roundNow">1</span> of <span id="roundTot">5</span> — Category</div>
+      <div class="cat" id="catName">—</div>
+    </div>
+    <div class="progress" id="progress"></div>
+
+    <div class="card" style="flex:1; display:flex;">
+      <div class="qbox">
+        <div class="value" id="qValue">100 pts</div>
+        <div class="question" id="qText">—</div>
+        <div id="answerWrap" style="display:none;">
+          <div class="answer" id="aText">—</div>
+        </div>
+        <div class="hint" id="qHint">Host: read it aloud. First correct shout wins.</div>
+      </div>
+    </div>
+
+    <!-- reveal controls -->
+    <div id="revealRow" class="row center" style="margin-top:14px;">
+      <button class="btn cyan big" style="max-width:520px;" onclick="revealAnswer()">Reveal Answer 👀</button>
+    </div>
+
+    <!-- award controls -->
+    <div id="awardRow" style="display:none; margin-top:14px;">
+      <div style="text-align:center; font-weight:800; opacity:.85; margin-bottom:8px;">Who got it? Tap to award <span id="awVal">100</span> pts</div>
+      <div class="awardgrid" id="awardGrid"></div>
+      <div class="row center" style="margin-top:10px;">
+        <button class="btn ghost" onclick="nextQuestion(true)">No one — skip ⏭️</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FINAL WAGER ===== -->
+  <section id="finalBet" class="screen" style="justify-content:center;">
+    <h1 style="color:var(--pink); text-shadow:0 3px 0 #9d174d,0 6px 18px rgba(0,0,0,.45)">Final Wager</h1>
+    <p class="sub">Each team secretly decides a bet (0 up to their current score). Set it, then face one tough question — right answer wins the bet, wrong loses it.</p>
+    <div class="card">
+      <div class="wagerlist" id="wagerList"></div>
+    </div>
+    <div class="row center" style="margin-top:16px;">
+      <button class="btn pink big" style="max-width:420px;" onclick="lockWagers()">Lock Bets & Show Question 🔒</button>
+    </div>
+  </section>
+
+  <!-- ===== FINAL QUESTION ===== -->
+  <section id="finalQ" class="screen">
+    <div class="scorestrip" id="finalScoreStrip"></div>
+    <div class="catbanner"><div class="lbl">Final Question — <span id="finalCat">—</span></div></div>
+    <div class="card" style="flex:1; display:flex;">
+      <div class="qbox">
+        <div class="value" style="color:var(--pink)">Bet it all!</div>
+        <div class="question" id="finalQText">—</div>
+        <div id="finalAnswerWrap" style="display:none;"><div class="answer" id="finalAText">—</div></div>
+      </div>
+    </div>
+    <div id="finalRevealRow" class="row center" style="margin-top:14px;">
+      <button class="btn cyan big" style="max-width:520px;" onclick="revealFinal()">Reveal Answer 👀</button>
+    </div>
+    <div id="finalJudge" style="display:none; margin-top:14px;">
+      <div style="text-align:center; font-weight:800; opacity:.85; margin-bottom:8px;">Tap each team: ✅ correct (win bet) or ❌ wrong (lose bet)</div>
+      <div class="awardgrid" id="finalJudgeGrid"></div>
+      <div class="row center" style="margin-top:10px;">
+        <button class="btn big" id="finalDoneBtn" style="max-width:360px;" onclick="finishGame()" disabled>See Results 🏆</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== RESULTS ===== -->
+  <section id="results" class="screen" style="justify-content:center;">
+    <div class="winbig" id="winLine">🏆</div>
+    <div class="podium" id="podium"></div>
+    <div class="row center">
+      <button class="btn ghost" onclick="rematch()">Rematch (same teams) 🔁</button>
+      <button class="btn big" style="max-width:300px;" onclick="show('home')">New Game</button>
+    </div>
+    <p class="footer">Thanks for playing Lightning Categories!</p>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================ AUDIO ============================ */
+let AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } return AC; }
+function tone(freq,dur,type,vol,when){
+  const a=ac(); if(!a) return; const t=(when||a.currentTime);
+  const o=a.createOscillator(), g=a.createGain();
+  o.type=type||'sine'; o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol||.25,t+.012);
+  g.gain.exponentialRampToValueAtTime(.0001,t+dur);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+dur+.02);
+}
+const S={
+  tap(){ tone(520,.07,'triangle',.18); },
+  reveal(){ tone(330,.12,'sine',.2); tone(495,.18,'sine',.18, ac()&&ac().currentTime+.08); },
+  correct(){ const a=ac(); if(!a)return; const t=a.currentTime; [523,659,784,1047].forEach((f,i)=>tone(f,.18,'triangle',.22,t+i*.07)); },
+  wrong(){ tone(180,.3,'sawtooth',.22); tone(120,.4,'sawtooth',.2, ac()&&ac().currentTime+.05); },
+  round(){ const a=ac(); if(!a)return; const t=a.currentTime; [392,523,659].forEach((f,i)=>tone(f,.22,'sine',.2,t+i*.09)); },
+  win(){ const a=ac(); if(!a)return; const t=a.currentTime; [523,659,784,1047,1319].forEach((f,i)=>tone(f,.3,'triangle',.24,t+i*.12)); }
+};
+
+/* ============================ DATA ============================ */
+const VALUES=[100,200,300,400,500];
+// 12 categories x 5 questions (easy -> hard). Family-friendly, short answers.
+const BANK={
+ "Animal Kingdom":[
+   {q:"What is the tallest land animal?",a:"Giraffe"},
+   {q:"A group of lions is called a what?",a:"A pride"},
+   {q:"Which mammal is famous for its black-and-white bamboo diet?",a:"Giant panda"},
+   {q:"How many hearts does an octopus have?",a:"Three"},
+   {q:"What is the only mammal capable of true flight?",a:"The bat"}
+ ],
+ "World Geography":[
+   {q:"What is the largest ocean on Earth?",a:"The Pacific"},
+   {q:"Which country is shaped like a boot?",a:"Italy"},
+   {q:"The Sahara Desert is on which continent?",a:"Africa"},
+   {q:"What is the capital of Australia?",a:"Canberra"},
+   {q:"Which river is the longest in the world?",a:"The Nile (or Amazon by some measures)"}
+ ],
+ "Movies & TV":[
+   {q:"What kind of fish is Nemo in 'Finding Nemo'?",a:"A clownfish"},
+   {q:"In 'The Wizard of Oz', what color are Dorothy's slippers?",a:"Ruby red"},
+   {q:"Which animated movie features a snowman named Olaf?",a:"Frozen"},
+   {q:"What is the name of the hobbit who carries the ring in 'Lord of the Rings'?",a:"Frodo Baggins"},
+   {q:"Who directed 'Jaws', 'E.T.' and 'Jurassic Park'?",a:"Steven Spielberg"}
+ ],
+ "Music":[
+   {q:"How many strings does a standard guitar have?",a:"Six"},
+   {q:"Which instrument has 88 keys?",a:"The piano"},
+   {q:"What 'B' band sang 'Hey Jude' and 'Let It Be'?",a:"The Beatles"},
+   {q:"What name is given to a group of musicians playing together with a conductor?",a:"An orchestra"},
+   {q:"Which Italian word means 'very loud' in music?",a:"Fortissimo"}
+ ],
+ "Food & Drink":[
+   {q:"What fruit is dried to make a raisin?",a:"A grape"},
+   {q:"Which spice is the most expensive in the world by weight?",a:"Saffron"},
+   {q:"Guacamole is mainly made from which fruit?",a:"Avocado"},
+   {q:"What country did the pizza originate in?",a:"Italy"},
+   {q:"What is tofu made from?",a:"Soybeans"}
+ ],
+ "Science":[
+   {q:"What gas do plants breathe in that humans breathe out?",a:"Carbon dioxide"},
+   {q:"What is H2O more commonly known as?",a:"Water"},
+   {q:"What force pulls objects toward the Earth?",a:"Gravity"},
+   {q:"What is the hardest natural substance on Earth?",a:"Diamond"},
+   {q:"What is the powerhouse of the cell?",a:"The mitochondria"}
+ ],
+ "History":[
+   {q:"Who was the first President of the United States?",a:"George Washington"},
+   {q:"The Great Wall is located in which country?",a:"China"},
+   {q:"Which ancient civilization built the pyramids of Giza?",a:"The Egyptians"},
+   {q:"In what year did World War II end?",a:"1945"},
+   {q:"Who was the female pharaoh known for a famous reign and relationship with Mark Antony?",a:"Cleopatra"}
+ ],
+ "Sports":[
+   {q:"How many players are on a soccer team on the field?",a:"Eleven"},
+   {q:"In which sport would you perform a slam dunk?",a:"Basketball"},
+   {q:"How many rings are on the Olympic flag?",a:"Five"},
+   {q:"In tennis, what is a score of zero called?",a:"Love"},
+   {q:"How many points is a touchdown worth in American football?",a:"Six"}
+ ],
+ "Outer Space":[
+   {q:"What is the closest planet to the Sun?",a:"Mercury"},
+   {q:"What is the name of our galaxy?",a:"The Milky Way"},
+   {q:"Which planet is known as the Red Planet?",a:"Mars"},
+   {q:"What was the first human-made object to land a person on the Moon?",a:"Apollo 11 (the Eagle lander)"},
+   {q:"Which planet has the most moons in our solar system?",a:"Saturn"}
+ ],
+ "Words & Language":[
+   {q:"How many letters are in the English alphabet?",a:"26"},
+   {q:"What do you call a word that means the opposite of another?",a:"An antonym"},
+   {q:"'Bonjour' means hello in which language?",a:"French"},
+   {q:"What is a group of words with a subject and verb called?",a:"A sentence (or clause)"},
+   {q:"What is the longest word made of only the letters in 'typewriter'? (top row of keyboard)",a:"Typewriter"}
+ ],
+ "The Human Body":[
+   {q:"How many bones does an adult human have?",a:"206"},
+   {q:"What organ pumps blood around the body?",a:"The heart"},
+   {q:"How many lungs does a human have?",a:"Two"},
+   {q:"What is the largest organ of the human body?",a:"The skin"},
+   {q:"What part of the eye controls how much light enters?",a:"The iris (pupil)"}
+ ],
+ "Pop Culture":[
+   {q:"What red-and-blue superhero is bitten by a radioactive spider?",a:"Spider-Man"},
+   {q:"In Monopoly, what do you collect when you pass GO?",a:"$200"},
+   {q:"What video-game plumber rescues Princess Peach?",a:"Mario"},
+   {q:"Which social app is known for short videos and a music-note logo?",a:"TikTok"},
+   {q:"What's the name of the coffee chain with a green mermaid logo?",a:"Starbucks"}
+ ],
+ "Nature & Earth":[
+   {q:"What do you call frozen rain?",a:"Hail (or sleet/snow)"},
+   {q:"What is the tallest type of tree in the world?",a:"The coast redwood"},
+   {q:"What natural event is measured by the Richter scale?",a:"An earthquake"},
+   {q:"What colorful arc appears after rain when the sun shines?",a:"A rainbow"},
+   {q:"What do you call a scientist who studies the weather?",a:"A meteorologist"}
+ ]
+};
+const FINALS=[
+  {c:"Geography",q:"What is the smallest country in the world by area?",a:"Vatican City"},
+  {c:"Science",q:"What is the chemical symbol for gold?",a:"Au"},
+  {c:"History",q:"Who painted the Mona Lisa?",a:"Leonardo da Vinci"},
+  {c:"Animals",q:"What is the fastest land animal?",a:"The cheetah"},
+  {c:"Space",q:"How many planets are in our solar system?",a:"Eight"},
+  {c:"Body",q:"What is the smallest bone in the human body?",a:"The stapes (in the ear)"},
+  {c:"Words",q:"What 9-letter word starting with 'c' means fear of confined spaces?",a:"Claustrophobia (close enough)"},
+  {c:"Music",q:"How many keys on a piano are black?",a:"36"}
+];
+
+/* ============================ STATE ============================ */
+const PALETTE=['var(--pink)','var(--cyan)','var(--green)','var(--gold)'];
+let G={ teams:[], roundsTotal:5, useFinal:true,
+        catOrder:[], round:0, qIndex:0, value:100, answered:false,
+        finalData:null };
+let selCount=2;
+
+/* ============================ HELPERS ============================ */
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active'); window.scrollTo(0,0); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),1400); }
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
+
+/* ============================ SETUP UI ============================ */
+function goSetup(){ ac(); buildSetup(); show('setup'); }
+function buildSetup(){
+  const tc=document.getElementById('teamCount'); tc.innerHTML='';
+  [2,3,4].forEach(n=>{ const d=document.createElement('div'); d.className='pill'+(n===selCount?' sel':'');
+    d.textContent=n+' Teams'; d.onclick=()=>{selCount=n; S.tap(); buildSetup();}; tc.appendChild(d); });
+  const tn=document.getElementById('teamNames');
+  const existing=[...tn.querySelectorAll('input')].map(i=>i.value);
+  const defaults=['Red Hot Chili Steppers','Cyan-tists','The Green Machine','Golden Buzzers','Team Five','Team Six'];
+  tn.innerHTML='';
+  for(let i=0;i<selCount;i++){ const inp=document.createElement('input');
+    inp.maxLength=22; inp.value=existing[i]!==undefined?existing[i]:defaults[i];
+    inp.placeholder='Team '+(i+1)+' name'; tn.appendChild(inp); }
+}
+function bumpRounds(d){ const max=Object.keys(BANK).length;
+  G.roundsTotal=Math.max(3,Math.min(max,G.roundsTotal+d));
+  document.getElementById('roundVal').textContent=G.roundsTotal; S.tap(); }
+function toggleFinal(){ G.useFinal=!G.useFinal; document.getElementById('finalToggle').textContent=G.useFinal?'ON':'OFF'; S.tap(); }
+
+/* ============================ GAME START ============================ */
+function startGame(){
+  ac();
+  const names=[...document.querySelectorAll('#teamNames input')].map((i,idx)=>i.value.trim()||('Team '+(idx+1)));
+  G.teams=names.map((n,i)=>({name:n, score:0, color:PALETTE[i%PALETTE.length], bet:0, finalDone:false, finalWin:null}));
+  G.catOrder=shuffle(Object.keys(BANK)).slice(0,G.roundsTotal);
+  G.round=0; G.qIndex=0; G.answered=false;
+  startRound();
+}
+function rematch(){ G.teams.forEach(t=>{t.score=0; t.bet=0; t.finalDone=false; t.finalWin=null;});
+  G.catOrder=shuffle(Object.keys(BANK)).slice(0,G.roundsTotal); G.round=0; G.qIndex=0; startRound(); }
+
+function startRound(){
+  S.round();
+  document.getElementById('roundNow').textContent=G.round+1;
+  document.getElementById('roundTot').textContent=G.roundsTotal;
+  document.getElementById('catName').textContent=G.catOrder[G.round];
+  G.qIndex=0; renderProgress(); loadQuestion(); show('play');
+}
+function renderProgress(){
+  const p=document.getElementById('progress'); p.innerHTML='';
+  for(let i=0;i<5;i++){ const d=document.createElement('div');
+    d.className='dot'+(i<G.qIndex?' done':(i===G.qIndex?' cur':'')); p.appendChild(d); }
+}
+function renderScores(stripId){
+  const strip=document.getElementById(stripId); strip.innerHTML='';
+  const max=Math.max(...G.teams.map(t=>t.score),0);
+  G.teams.forEach(t=>{ const d=document.createElement('div');
+    d.className='tscore'+(t.score===max&&max>0?' lead':'');
+    d.innerHTML=`<div class="nm" style="color:${t.color}">${t.score===max&&max>0?'👑 ':''}${escapeHtml(t.name)}</div><div class="pt">${t.score}</div>`;
+    strip.appendChild(d); });
+}
+function escapeHtml(s){ return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ============================ QUESTION FLOW ============================ */
+function loadQuestion(){
+  renderScores('scoreStrip'); renderProgress();
+  const cat=G.catOrder[G.round]; const item=BANK[cat][G.qIndex];
+  G.value=VALUES[G.qIndex]; G.answered=false;
+  document.getElementById('qValue').textContent=G.value+' pts';
+  document.getElementById('qText').textContent=item.q;
+  document.getElementById('aText').textContent=item.a;
+  document.getElementById('answerWrap').style.display='none';
+  document.getElementById('qHint').style.display='block';
+  document.getElementById('revealRow').style.display='flex';
+  document.getElementById('awardRow').style.display='none';
+}
+function revealAnswer(){
+  S.reveal();
+  document.getElementById('answerWrap').style.display='block';
+  document.getElementById('qHint').style.display='none';
+  document.getElementById('revealRow').style.display='none';
+  document.getElementById('awVal').textContent=G.value;
+  const grid=document.getElementById('awardGrid'); grid.innerHTML='';
+  G.teams.forEach((t,i)=>{ const b=document.createElement('button');
+    b.className='btn'; b.style.background=t.color; b.style.color=(t.color==='var(--gold)'||t.color==='var(--cyan)'||t.color==='var(--green)')?'var(--ink)':'#fff';
+    b.textContent=t.name; b.onclick=()=>awardTo(i); grid.appendChild(b); });
+  document.getElementById('awardRow').style.display='block';
+}
+function awardTo(i){
+  if(G.answered) return; G.answered=true;
+  G.teams[i].score+=G.value; S.correct();
+  toast('+'+G.value+' → '+G.teams[i].name);
+  nextQuestion(false);
+}
+function nextQuestion(skipped){
+  if(skipped){ if(G.answered) return; G.answered=true; S.wrong(); }
+  G.qIndex++;
+  if(G.qIndex>=5){
+    G.round++;
+    if(G.round>=G.roundsTotal){ endCategoryRounds(); return; }
+    startRound(); return;
+  }
+  loadQuestion();
+}
+function endCategoryRounds(){
+  if(G.useFinal && G.teams.some(t=>t.score>0)){ startFinal(); }
+  else finishGame();
+}
+
+/* ============================ FINAL WAGER ============================ */
+function startFinal(){
+  S.round();
+  G.finalData=FINALS[Math.floor(Math.random()*FINALS.length)];
+  G.teams.forEach(t=>{ t.bet=Math.min(100,t.score); if(t.score===0)t.bet=0; t.finalDone=false; t.finalWin=null; });
+  buildWagerList(); show('finalBet');
+}
+function buildWagerList(){
+  const list=document.getElementById('wagerList'); list.innerHTML='';
+  G.teams.forEach((t,i)=>{
+    const row=document.createElement('div'); row.className='wrow';
+    row.innerHTML=`<div class="wnm" style="color:${t.color}">${escapeHtml(t.name)}<div class="wsc">score: ${t.score}</div></div>`;
+    const step=document.createElement('div'); step.className='stepper';
+    const minus=document.createElement('button'); minus.textContent='–';
+    const val=document.createElement('div'); val.className='val'; val.id='bet'+i; val.textContent=t.bet;
+    const plus=document.createElement('button'); plus.textContent='+';
+    const stepSize=()=> (t.score>=1000?100:(t.score>=300?50:25));
+    minus.onclick=()=>{ t.bet=Math.max(0,t.bet-stepSize()); val.textContent=t.bet; S.tap(); };
+    plus.onclick=()=>{ t.bet=Math.min(t.score,t.bet+stepSize()); val.textContent=t.bet; S.tap(); };
+    const allin=document.createElement('button'); allin.textContent='MAX'; allin.style.width='auto'; allin.style.padding='0 14px'; allin.style.fontSize='16px';
+    allin.onclick=()=>{ t.bet=t.score; val.textContent=t.bet; S.tap(); };
+    step.appendChild(minus); step.appendChild(val); step.appendChild(plus); step.appendChild(allin);
+    row.appendChild(step); list.appendChild(row);
+  });
+}
+function lockWagers(){
+  S.reveal();
+  document.getElementById('finalCat').textContent=G.finalData.c;
+  document.getElementById('finalQText').textContent=G.finalData.q;
+  document.getElementById('finalAText').textContent=G.finalData.a;
+  document.getElementById('finalAnswerWrap').style.display='none';
+  document.getElementById('finalRevealRow').style.display='flex';
+  document.getElementById('finalJudge').style.display='none';
+  renderScores('finalScoreStrip');
+  show('finalQ');
+}
+function revealFinal(){
+  S.reveal();
+  document.getElementById('finalAnswerWrap').style.display='block';
+  document.getElementById('finalRevealRow').style.display='none';
+  const grid=document.getElementById('finalJudgeGrid'); grid.innerHTML='';
+  G.teams.forEach((t,i)=>{
+    const cell=document.createElement('div');
+    cell.style.cssText='display:flex; flex-direction:column; gap:6px; background:rgba(0,0,0,.22); padding:10px; border-radius:14px;';
+    cell.innerHTML=`<div style="font-weight:800; text-align:center; color:${t.color}">${escapeHtml(t.name)} <span style="opacity:.7; font-size:13px">(bet ${t.bet})</span></div>`;
+    const r=document.createElement('div'); r.className='row'; r.style.justifyContent='center';
+    const yes=document.createElement('button'); yes.className='btn'; yes.style.background='var(--green)'; yes.style.color='var(--ink)'; yes.style.flex='1'; yes.textContent='✅ Win';
+    const no=document.createElement('button'); no.className='btn'; no.style.background='var(--red)'; no.style.color='#fff'; no.style.flex='1'; no.textContent='❌ Lose';
+    yes.onclick=()=>judgeFinal(i,true,yes,no);
+    no.onclick=()=>judgeFinal(i,false,yes,no);
+    r.appendChild(yes); r.appendChild(no); cell.appendChild(r); grid.appendChild(cell);
+  });
+  document.getElementById('finalJudge').style.display='block';
+  document.getElementById('finalDoneBtn').disabled=false;
+}
+function judgeFinal(i,win,yesBtn,noBtn){
+  const t=G.teams[i];
+  if(t.finalDone){ t.score += t.finalWin? -t.bet : t.bet; } // undo previous
+  t.finalDone=true; t.finalWin=win;
+  t.score += win? t.bet : -t.bet;
+  win?S.correct():S.wrong();
+  yesBtn.style.outline=win?'4px solid #fff':'none';
+  noBtn.style.outline=win?'none':'4px solid #fff';
+  renderScores('finalScoreStrip');
+}
+
+/* ============================ RESULTS ============================ */
+function finishGame(){
+  S.win();
+  const sorted=[...G.teams].sort((a,b)=>b.score-a.score);
+  const top=sorted[0].score;
+  const winners=sorted.filter(t=>t.score===top);
+  document.getElementById('winLine').textContent = winners.length>1
+    ? '🏆 It’s a tie!' : '🏆 '+winners[0].name+' wins!';
+  const pod=document.getElementById('podium'); pod.innerHTML='';
+  const medals=['🥇','🥈','🥉'];
+  sorted.forEach((t,idx)=>{ const d=document.createElement('div');
+    d.className='pod'+(idx===0?' first':'');
+    d.innerHTML=`<div class="rk">${medals[idx]||'•'}</div><div class="pn" style="color:${t.color}">${escapeHtml(t.name)}</div><div class="pp">${t.score}</div>`;
+    pod.appendChild(d); });
+  show('results');
+}
+
+/* init */
+buildSetup();
+document.getElementById('roundVal').textContent=G.roundsTotal;
+</script>
+</body>
+</html>

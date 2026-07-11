@@ -1,0 +1,434 @@
+<!-- CONCEPT: WORD GAMES (speed/pass-the-device) - FUSE: a category is shown, a hidden ticking timer counts down, players shout an answer then tap PASS to hand the device on; whoever's holding it when it explodes takes a strike. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FUSE — Hot Potato Word Bomb</title>
+<style>
+  :root{
+    --bg1:#1a0033; --bg2:#3d0066; --accent:#ffcc00; --hot:#ff3b3b;
+    --cool:#00e0c6; --pink:#ff4fa3; --ink:#fff; --panel:rgba(0,0,0,.32);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;margin:0;}
+  body{
+    font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;
+    color:var(--ink);
+    background:radial-gradient(circle at 50% -10%, #5a1090 0%, var(--bg2) 45%, var(--bg1) 100%);
+    overflow:hidden; user-select:none; touch-action:manipulation;
+  }
+  .screen{
+    position:absolute; inset:0; display:none; flex-direction:column;
+    align-items:center; justify-content:center; padding:20px; text-align:center;
+  }
+  .screen.active{display:flex;}
+  h1{
+    font-size:clamp(48px,11vw,120px); margin:0; line-height:.9; letter-spacing:2px;
+    color:var(--accent); text-shadow:0 0 18px rgba(255,204,0,.5), 4px 5px 0 #8a0000;
+    font-weight:900;
+  }
+  .tag{font-size:clamp(15px,3.4vw,24px); opacity:.92; margin:12px 0 4px; max-width:620px;}
+  .meta{font-size:clamp(12px,2.8vw,16px); opacity:.65; margin-bottom:8px;}
+  .btn{
+    border:none; border-radius:18px; cursor:pointer; font-weight:900;
+    font-family:inherit; color:#1a0033; background:var(--accent);
+    box-shadow:0 7px 0 #b38f00, 0 10px 22px rgba(0,0,0,.4);
+    transition:transform .05s, box-shadow .05s;
+    padding:18px 34px; font-size:clamp(20px,5vw,30px); margin:8px;
+  }
+  .btn:active{transform:translateY(5px); box-shadow:0 2px 0 #b38f00;}
+  .btn.alt{background:var(--cool); box-shadow:0 7px 0 #008f80,0 10px 22px rgba(0,0,0,.4);}
+  .btn.alt:active{box-shadow:0 2px 0 #008f80;}
+  .btn.ghost{background:transparent; color:#fff; box-shadow:none; border:3px solid rgba(255,255,255,.45); font-size:clamp(15px,3.6vw,20px); padding:12px 22px;}
+  .btn.ghost:active{transform:translateY(2px);}
+  .card{background:var(--panel); border-radius:24px; padding:22px 22px; max-width:680px; width:100%;}
+
+  /* Setup */
+  .row{display:flex; align-items:center; justify-content:center; gap:16px; flex-wrap:wrap; margin:14px 0;}
+  .stepper{display:flex; align-items:center; gap:14px;}
+  .stepper button{width:62px;height:62px;border-radius:50%;border:none;font-size:34px;font-weight:900;background:var(--pink);color:#fff;cursor:pointer;box-shadow:0 5px 0 #a02468;}
+  .stepper button:active{transform:translateY(3px);box-shadow:0 2px 0 #a02468;}
+  .stepval{font-size:clamp(40px,10vw,64px);font-weight:900;min-width:90px;color:var(--accent);}
+  .lbl{font-size:clamp(15px,3.6vw,20px);opacity:.85;margin-bottom:2px;font-weight:700;letter-spacing:1px;}
+  .packs{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px;}
+  .pack{padding:10px 16px;border-radius:30px;border:3px solid rgba(255,255,255,.3);background:rgba(255,255,255,.06);font-size:clamp(13px,3.2vw,17px);font-weight:700;cursor:pointer;}
+  .pack.on{background:var(--cool);color:#06231f;border-color:var(--cool);}
+
+  /* Get ready */
+  #ready .who{font-size:clamp(26px,7vw,46px);font-weight:900;color:var(--cool);margin:6px 0 2px;}
+  #ready .cat{font-size:clamp(30px,8vw,60px);font-weight:900;color:var(--accent);text-shadow:2px 3px 0 #8a0000;margin:10px 0;}
+
+  /* Play */
+  #play{justify-content:space-between;padding:18px 16px 26px;}
+  .topbar{width:100%;display:flex;justify-content:space-between;align-items:center;font-weight:800;font-size:clamp(13px,3.4vw,18px);}
+  .holder{color:var(--cool);}
+  .catbox{font-size:clamp(28px,8.5vw,66px);font-weight:900;color:#fff;line-height:1.05;text-shadow:2px 3px 0 #8a0000;padding:0 6px;}
+  .catlabel{font-size:clamp(13px,3.4vw,18px);opacity:.7;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+  .bomb{font-size:clamp(120px,38vw,240px);line-height:1;filter:drop-shadow(0 0 18px rgba(255,90,0,.5));transition:transform .08s;}
+  .pass{
+    width:min(86vw,520px);height:clamp(150px,30vh,230px);border-radius:34px;border:none;
+    background:linear-gradient(180deg,#ff5a3b,#d40000);color:#fff;font-size:clamp(40px,12vw,74px);
+    font-weight:900;letter-spacing:3px;cursor:pointer;box-shadow:0 10px 0 #7a0000,0 16px 34px rgba(0,0,0,.5);
+    text-shadow:0 3px 6px rgba(0,0,0,.4);
+  }
+  .pass:active{transform:translateY(7px);box-shadow:0 3px 0 #7a0000;}
+  .hint{font-size:clamp(13px,3.4vw,18px);opacity:.7;margin-top:6px;}
+
+  /* Boom */
+  #boom .big{font-size:clamp(60px,17vw,150px);font-weight:900;color:var(--hot);text-shadow:0 0 30px rgba(255,0,0,.7);}
+  #boom .loser{font-size:clamp(30px,8vw,56px);font-weight:900;color:var(--accent);margin:6px 0;}
+  #boom .sub{font-size:clamp(16px,4vw,24px);opacity:.9;}
+
+  /* Scoreboard */
+  .scores{display:flex;flex-direction:column;gap:8px;width:100%;max-width:520px;margin:10px 0;}
+  .scrow{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.08);border-radius:14px;padding:10px 16px;font-size:clamp(16px,4.4vw,24px);font-weight:800;}
+  .scrow.out{opacity:.4;}
+  .scrow .nm{display:flex;align-items:center;gap:10px;}
+  .strikes{letter-spacing:3px;font-size:clamp(16px,4.4vw,24px);}
+  .crown{color:var(--accent);}
+  .flash{animation:fl .5s linear infinite;}
+  @keyframes fl{50%{opacity:.25;}}
+  .shake{animation:sh .4s linear;}
+  @keyframes sh{0%,100%{transform:translate(0,0)}20%{transform:translate(-10px,6px)}40%{transform:translate(9px,-7px)}60%{transform:translate(-7px,5px)}80%{transform:translate(6px,-4px)}}
+  .small{font-size:clamp(12px,3vw,15px);opacity:.6;margin-top:14px;}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="screen active" id="home">
+  <h1>FUSE</h1>
+  <div class="tag">Hot Potato Word Bomb. A category appears, the fuse is lit — shout an answer, smack <b>PASS</b>, and get rid of the bomb before it blows!</div>
+  <div class="meta">👥 3–10 players &nbsp;•&nbsp; ⏱ 10–20 min &nbsp;•&nbsp; pass-the-device</div>
+  <div class="row">
+    <button class="btn" onclick="go('setup')">START</button>
+    <button class="btn ghost" onclick="go('how')">How to play</button>
+  </div>
+  <div class="small">Family-friendly • No internet needed • Sound on for the full effect 🔊</div>
+</div>
+
+<!-- HOW -->
+<div class="screen" id="how">
+  <div class="card">
+    <h1 style="font-size:clamp(34px,9vw,64px)">How to play</h1>
+    <div class="tag" style="text-align:left">
+      1. Sit in a circle and pick how many are playing.<br><br>
+      2. A <b>category</b> shows on screen with a lit bomb. The fuse length is a secret!<br><br>
+      3. The holder must <b>say one answer out loud</b> that fits the category, then tap the giant <b>PASS</b> button to hand the device to the next person.<br><br>
+      4. No repeats, no stalling — others can challenge a bad answer.<br><br>
+      5. 💥 Whoever is holding the device when the bomb explodes earns a <b>strike</b>.<br><br>
+      6. Three strikes and you're out. <b>Last player standing wins!</b>
+    </div>
+    <button class="btn alt" onclick="go('setup')">Got it — let's play</button>
+    <button class="btn ghost" onclick="go('home')">Back</button>
+  </div>
+</div>
+
+<!-- SETUP -->
+<div class="screen" id="setup">
+  <div class="card">
+    <div class="lbl">PLAYERS</div>
+    <div class="stepper" style="justify-content:center">
+      <button onclick="adjP(-1)">−</button>
+      <div class="stepval" id="pCount">4</div>
+      <button onclick="adjP(1)">+</button>
+    </div>
+
+    <div class="lbl" style="margin-top:18px">STRIKES TO BE OUT</div>
+    <div class="stepper" style="justify-content:center">
+      <button onclick="adjS(-1)">−</button>
+      <div class="stepval" id="sCount">3</div>
+      <button onclick="adjS(1)">+</button>
+    </div>
+
+    <div class="lbl" style="margin-top:18px">CATEGORY PACKS</div>
+    <div class="packs" id="packs"></div>
+
+    <div class="row" style="margin-top:18px">
+      <button class="btn" onclick="startGame()">DEAL ME IN</button>
+      <button class="btn ghost" onclick="go('home')">Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- READY -->
+<div class="screen" id="ready">
+  <div class="catlabel">Pass the device to</div>
+  <div class="who" id="readyWho">Player 1</div>
+  <div class="tag" style="margin:14px 0 2px">Get ready — the category is…</div>
+  <div class="cat" id="readyCat">—</div>
+  <button class="btn" onclick="beginRound()">LIGHT THE FUSE 🔥</button>
+  <div class="hint">Tap when everyone's set. The timer is a secret!</div>
+</div>
+
+<!-- PLAY -->
+<div class="screen" id="play">
+  <div class="topbar">
+    <div>Round <span id="roundNo">1</span></div>
+    <div class="holder">Holding: <span id="holderName">Player 1</span></div>
+  </div>
+  <div>
+    <div class="catlabel">Category</div>
+    <div class="catbox" id="catbox">—</div>
+  </div>
+  <div class="bomb" id="bomb">💣</div>
+  <button class="pass" id="passBtn" onclick="passIt()">PASS!</button>
+  <div class="hint">Say an answer out loud, then PASS to the next player →</div>
+</div>
+
+<!-- BOOM -->
+<div class="screen" id="boom">
+  <div class="big" id="boomBig">💥 BOOM 💥</div>
+  <div class="loser" id="boomLoser">Player 1</div>
+  <div class="sub" id="boomSub">takes a strike!</div>
+  <div class="scores" id="boomScores"></div>
+  <button class="btn" id="nextBtn" onclick="nextRound()">NEXT ROUND</button>
+</div>
+
+<!-- WIN -->
+<div class="screen" id="win">
+  <h1 style="color:var(--cool)">WINNER!</h1>
+  <div class="loser" style="color:var(--accent);font-size:clamp(34px,9vw,64px)" id="winName">Player 1</div>
+  <div class="sub">survived the bomb 🏆</div>
+  <div class="scores" id="winScores"></div>
+  <div class="row">
+    <button class="btn" onclick="rematch()">REMATCH (same crew)</button>
+    <button class="btn ghost" onclick="go('home')">New Game</button>
+  </div>
+</div>
+
+<script>
+/* ============ CATEGORY PACKS ============ */
+const PACKS = {
+  "Everyday": [
+    "Things in a kitchen","Things you find at the beach","Things in a backpack","Things that are cold",
+    "Things with wheels","Things in a bathroom","Things you plug in","Things that are sticky",
+    "Things in a classroom","Things you wear","Things that are round","Things in a garden",
+    "Things in a fridge","Things that make noise","Things found in a park","Things you fold"
+  ],
+  "Food": [
+    "Types of fruit","Pizza toppings","Things you put on toast","Ice cream flavors","Breakfast foods",
+    "Things in a salad","Kinds of pasta","Sandwich fillings","Spicy foods","Vegetables",
+    "Things you can grill","Desserts","Drinks (no booze!)","Cheeses","Things made of potato","Candy"
+  ],
+  "Animals": [
+    "Animals at the zoo","Pets","Animals that fly","Animals in the ocean","Farm animals",
+    "Animals with stripes or spots","Insects & bugs","Animals bigger than a dog","Things that hop",
+    "Animals in the jungle","Reptiles","Birds","Animals in a cartoon"
+  ],
+  "Pop Culture": [
+    "Superheroes","Disney/Pixar movies","Famous cartoon characters","Video games","Board games",
+    "Movie sequels","TV game shows","Famous robots","Magical creatures","Things in Harry Potter",
+    "Famous duos","Movie villains","Things in a fairy tale"
+  ],
+  "Travel & Places": [
+    "Countries","Capital cities","Things at an airport","Things you pack for a trip","Famous landmarks",
+    "Beach activities","Things in a hotel room","Modes of transport","Theme park rides","US states",
+    "Cold-weather destinations","Things at a campsite"
+  ],
+  "Words & Letters": [
+    "Words that start with S","Words that start with B","Words that rhyme with 'cat'","Three-letter words",
+    "Words that start with T","Body parts","Colors","Words that start with M","Boys' names","Girls' names",
+    "Words ending in -ING","Words that start with P","Things that are red"
+  ],
+  "Sports & Fun": [
+    "Sports with a ball","Olympic sports","Things at a gym","Playground games","Things you do at a party",
+    "Hobbies","Dance moves","Card games","Things at a birthday party","Outdoor activities",
+    "Things you collect","Musical instruments"
+  ]
+};
+
+/* ============ STATE ============ */
+let players=[], strikesOut=3, numPlayers=4;
+let activePacks=Object.keys(PACKS);
+let pool=[], poolIdx=0;
+let holder=0, round=1;
+let timer=null, tickTimer=null, fuseEnd=0, fuseTotal=0, lastTickGap=0;
+let running=false, lastBoomIdx=-1;
+
+/* ============ AUDIO ============ */
+let AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+function tone(freq,dur,type="square",vol=.18,slideTo){
+  const c=ac(); if(!c)return;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type; o.frequency.value=freq;
+  if(slideTo)o.frequency.exponentialRampToValueAtTime(slideTo,c.currentTime+dur);
+  g.gain.setValueAtTime(vol,c.currentTime);
+  g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+dur);
+  o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime+dur);
+}
+function tick(){ tone(1400,.05,"square",.12); }
+function passSfx(){ tone(680,.08,"triangle",.2,1100); }
+function boomSfx(){
+  const c=ac(); if(!c)return;
+  // noise burst
+  const b=c.createBuffer(1,c.sampleRate*0.6,c.sampleRate); const d=b.getChannelData(0);
+  for(let i=0;i<d.length;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2); }
+  const src=c.createBufferSource(); src.buffer=b;
+  const g=c.createGain(); g.gain.setValueAtTime(.55,c.currentTime); g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+.6);
+  const f=c.createBiquadFilter(); f.type="lowpass"; f.frequency.value=900;
+  src.connect(f).connect(g).connect(c.destination); src.start();
+  tone(90,.5,"sawtooth",.4,40);
+}
+function winSfx(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone(f,.22,"triangle",.22),i*150)); }
+
+/* ============ NAV ============ */
+function go(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+/* ============ SETUP ============ */
+function adjP(d){ numPlayers=Math.max(3,Math.min(10,numPlayers+d)); document.getElementById("pCount").textContent=numPlayers; }
+function adjS(d){ strikesOut=Math.max(1,Math.min(5,strikesOut+d)); document.getElementById("sCount").textContent=strikesOut; }
+function renderPacks(){
+  const wrap=document.getElementById("packs"); wrap.innerHTML="";
+  Object.keys(PACKS).forEach(name=>{
+    const el=document.createElement("div");
+    el.className="pack"+(activePacks.includes(name)?" on":"");
+    el.textContent=name;
+    el.onclick=()=>{ ac();
+      if(activePacks.includes(name)){ if(activePacks.length>1) activePacks=activePacks.filter(p=>p!==name); }
+      else activePacks.push(name);
+      renderPacks();
+    };
+    wrap.appendChild(el);
+  });
+}
+function buildPool(){
+  pool=[]; activePacks.forEach(p=>{ PACKS[p].forEach(c=>pool.push(c)); });
+  // shuffle
+  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+  poolIdx=0;
+}
+function nextCat(){
+  if(poolIdx>=pool.length){ buildPool(); }
+  return pool[poolIdx++];
+}
+
+/* ============ GAME FLOW ============ */
+function startGame(){
+  ac();
+  players=[]; for(let i=0;i<numPlayers;i++) players.push({name:"Player "+(i+1),strikes:0,out:false});
+  buildPool();
+  round=1; holder=0; lastBoomIdx=-1;
+  setupReady();
+}
+function rematch(){
+  players.forEach(p=>{p.strikes=0;p.out=false;});
+  buildPool(); round=1; holder=0; lastBoomIdx=-1; setupReady();
+}
+function alive(){ return players.filter(p=>!p.out); }
+
+function setupReady(){
+  // pick a starting holder who's still in (rotate from last boom loser if possible)
+  let start = (lastBoomIdx>=0)? lastBoomIdx : holder;
+  start = nextAliveFrom(start);
+  holder=start;
+  document.getElementById("readyWho").textContent=players[holder].name;
+  document.getElementById("readyCat").textContent=nextCatPreview();
+  document.getElementById("roundNo").textContent=round;
+  go("ready");
+}
+let pendingCat="";
+function nextCatPreview(){ pendingCat=nextCat(); return pendingCat; }
+
+function nextAliveFrom(idx){
+  let i=idx;
+  for(let n=0;n<players.length;n++){ if(!players[i].out) return i; i=(i+1)%players.length; }
+  return idx;
+}
+function advanceHolder(){
+  let i=(holder+1)%players.length;
+  for(let n=0;n<players.length;n++){ if(!players[i].out) return i; i=(i+1)%players.length; }
+  return holder;
+}
+
+function beginRound(){
+  ac();
+  document.getElementById("catbox").textContent=pendingCat;
+  document.getElementById("holderName").textContent=players[holder].name;
+  document.getElementById("roundNo").textContent=round;
+  document.getElementById("bomb").textContent="💣";
+  go("play");
+  // secret fuse: scale a bit with player count so everyone gets a turn-ish
+  fuseTotal = 9000 + Math.random()*13000; // 9–22 s
+  fuseEnd = performance.now()+fuseTotal;
+  running=true;
+  scheduleTick();
+  timer=setTimeout(explode, fuseTotal);
+}
+function scheduleTick(){
+  if(!running)return;
+  const remain=fuseEnd-performance.now();
+  // ticks speed up as fuse shortens
+  const frac=Math.max(0,remain/fuseTotal);
+  const gap=180+frac*620; // 800ms -> 180ms
+  tick();
+  const b=document.getElementById("bomb");
+  b.style.transform="scale("+(1+(1-frac)*0.18)+")";
+  if(frac<0.28) b.classList.add("flash");
+  tickTimer=setTimeout(scheduleTick, gap);
+}
+function passIt(){
+  if(!running)return;
+  passSfx();
+  holder=advanceHolder();
+  document.getElementById("holderName").textContent=players[holder].name;
+  const b=document.getElementById("bomb"); b.classList.add("shake");
+  setTimeout(()=>b.classList.remove("shake"),380);
+}
+function explode(){
+  running=false;
+  clearTimeout(tickTimer); clearTimeout(timer);
+  boomSfx();
+  const b=document.getElementById("bomb"); b.textContent="💥"; b.classList.add("shake"); b.classList.remove("flash");
+  if(navigator.vibrate)navigator.vibrate([120,60,180]);
+  const loser=players[holder];
+  loser.strikes++;
+  lastBoomIdx=holder;
+  if(loser.strikes>=strikesOut) loser.out=true;
+  setTimeout(showBoom,420);
+}
+function showBoom(){
+  const loser=players[holder];
+  document.getElementById("boomLoser").textContent=loser.name;
+  document.getElementById("boomSub").textContent = loser.out
+     ? "is OUT of the game! 💀" : "takes a strike! ("+loser.strikes+"/"+strikesOut+")";
+  renderScores("boomScores");
+  go("boom");
+  // check winner
+  if(alive().length<=1){
+    setTimeout(()=>{ winSfx();
+      const w=alive()[0]||loser;
+      document.getElementById("winName").textContent=w.name;
+      renderScores("winScores"); go("win");
+    }, 1400);
+  }
+}
+function nextRound(){
+  if(alive().length<=1) return; // win screen will show
+  round++;
+  setupReady();
+}
+function renderScores(elId){
+  const el=document.getElementById(elId); el.innerHTML="";
+  const sorted=[...players].sort((a,b)=>a.strikes-b.strikes);
+  sorted.forEach(p=>{
+    const row=document.createElement("div");
+    row.className="scrow"+(p.out?" out":"");
+    const dots = "❌".repeat(p.strikes) + "•".repeat(Math.max(0,strikesOut-p.strikes));
+    row.innerHTML='<div class="nm">'+(p.out?"💀 ":"")+p.name+'</div><div class="strikes">'+dots+'</div>';
+    el.appendChild(row);
+  });
+}
+
+/* init */
+renderPacks();
+document.body.addEventListener("touchstart",()=>ac(),{once:true});
+document.body.addEventListener("click",()=>ac(),{once:true});
+</script>
+</body>
+</html>

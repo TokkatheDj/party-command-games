@@ -1,0 +1,383 @@
+<!-- CONCEPT: TRIVIA (estimation/wager round) - Everyone guesses a number out loud, host reveals the answer, closest guess scores. One-screen host mode, 3-10 players, ~15-25 min. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guess-timate Gauntlet</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; }
+  body {
+    font-family: 'Segoe UI', 'Arial Black', Arial, sans-serif;
+    background: radial-gradient(circle at 20% 15%, #2b1d5e 0%, #140d33 55%, #0a0620 100%);
+    color:#fff; min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    user-select:none;
+  }
+  .screen { display:none; width:100%; max-width:1100px; padding:24px; flex-direction:column; align-items:center; flex:1; }
+  .screen.active { display:flex; }
+  h1 { font-size:clamp(2.2rem,6vw,4.2rem); font-weight:900; letter-spacing:1px; text-align:center;
+       background:linear-gradient(90deg,#ffd94d,#ff7a59,#ff4da6); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .tagline { font-size:clamp(1rem,2.5vw,1.4rem); color:#cfc6ff; text-align:center; margin:10px 0 4px; }
+  .meta { font-size:clamp(.9rem,2vw,1.1rem); color:#8f85c9; text-align:center; margin-bottom:18px; }
+  .card { background:rgba(255,255,255,.07); border:2px solid rgba(255,255,255,.15); border-radius:20px; padding:22px; width:100%; max-width:720px; margin-bottom:16px; }
+  .card h2 { color:#ffd94d; font-size:1.3rem; margin-bottom:10px; }
+  .card p, .card li { font-size:1.05rem; line-height:1.5; color:#e8e4ff; }
+  .card ol { padding-left:24px; }
+  button {
+    font-family:inherit; font-weight:800; border:none; border-radius:16px; cursor:pointer;
+    transition:transform .08s, filter .1s; color:#1a1040; touch-action:manipulation;
+  }
+  button:active { transform:scale(.96); }
+  .btn-big { font-size:clamp(1.3rem,3.5vw,1.9rem); padding:20px 44px; background:linear-gradient(135deg,#ffd94d,#ff9a3d); box-shadow:0 6px 0 #a35c00; margin:8px; }
+  .btn-mid { font-size:1.15rem; padding:14px 26px; background:linear-gradient(135deg,#7ee8fa,#80ff72); box-shadow:0 4px 0 #1d7a3a; margin:6px; }
+  .btn-ghost { font-size:1rem; padding:12px 22px; background:rgba(255,255,255,.14); color:#fff; border:2px solid rgba(255,255,255,.3); margin:6px; }
+  input[type=text] {
+    font-size:1.2rem; padding:14px 16px; border-radius:14px; border:2px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.1); color:#fff; width:100%; max-width:340px; outline:none; text-align:center;
+  }
+  input[type=text]::placeholder { color:#9a90d6; }
+  .player-chips { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin:14px 0; }
+  .chip { background:rgba(255,255,255,.12); border:2px solid rgba(255,255,255,.25); border-radius:999px; padding:10px 18px; font-size:1.1rem; font-weight:700; display:flex; align-items:center; gap:10px; }
+  .chip b { color:#ffd94d; }
+  .chip .x { cursor:pointer; color:#ff7a7a; font-weight:900; font-size:1.1rem; padding:0 4px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center; }
+  .seg { display:flex; gap:8px; margin:10px 0 4px; }
+  .seg button { font-size:1.1rem; padding:12px 24px; background:rgba(255,255,255,.12); color:#fff; border:2px solid rgba(255,255,255,.3); }
+  .seg button.sel { background:linear-gradient(135deg,#ffd94d,#ff9a3d); color:#1a1040; border-color:transparent; }
+  .roundbar { font-size:clamp(1rem,2.5vw,1.3rem); color:#8f85c9; font-weight:700; margin-bottom:10px; letter-spacing:2px; text-transform:uppercase; }
+  .question {
+    font-size:clamp(1.7rem,4.8vw,3.2rem); font-weight:900; text-align:center; line-height:1.25;
+    margin:14px 0 20px; text-shadow:0 3px 12px rgba(0,0,0,.5); max-width:1000px;
+  }
+  .instruct { font-size:clamp(1rem,2.4vw,1.35rem); color:#7ee8fa; text-align:center; font-weight:700; margin-bottom:22px; }
+  .answer {
+    font-size:clamp(2.6rem,9vw,6rem); font-weight:900; color:#80ff72; text-align:center;
+    text-shadow:0 0 30px rgba(128,255,114,.4); margin:6px 0;
+  }
+  .fact { font-size:clamp(1rem,2.4vw,1.3rem); color:#cfc6ff; text-align:center; font-style:italic; margin-bottom:18px; max-width:800px; }
+  .award-grid { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin:12px 0 18px; }
+  .pbtn {
+    font-size:1.25rem; padding:16px 24px; border-radius:16px; min-width:130px;
+    background:rgba(255,255,255,.12); color:#fff; border:3px solid rgba(255,255,255,.3);
+  }
+  .pbtn.won { background:linear-gradient(135deg,#7ee8fa,#80ff72); color:#1a1040; border-color:transparent; box-shadow:0 0 18px rgba(128,255,114,.5); }
+  .pbtn.exact { background:linear-gradient(135deg,#ffd94d,#ff4da6); color:#1a1040; border-color:transparent; box-shadow:0 0 22px rgba(255,77,166,.6); }
+  .pbtn small { display:block; font-size:.8rem; font-weight:700; opacity:.85; }
+  .hint { color:#8f85c9; font-size:.95rem; text-align:center; margin-bottom:10px; }
+  .scorebar {
+    display:flex; flex-wrap:wrap; gap:8px 18px; justify-content:center; background:rgba(0,0,0,.35);
+    border-radius:14px; padding:10px 16px; margin-top:auto; width:100%; max-width:900px;
+  }
+  .scorebar span { font-size:1.05rem; font-weight:700; color:#e8e4ff; }
+  .scorebar b { color:#ffd94d; }
+  .podium { display:flex; align-items:flex-end; gap:14px; justify-content:center; margin:24px 0; }
+  .pod { background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,.06)); border-radius:14px 14px 0 0; width:min(26vw,180px); display:flex; flex-direction:column; justify-content:flex-start; align-items:center; padding-top:10px; }
+  .pod .nm { font-weight:900; font-size:1.15rem; text-align:center; padding:0 6px; word-break:break-word; }
+  .pod .pt { color:#ffd94d; font-weight:800; }
+  .pod .medal { font-size:2rem; }
+  .winner-line { font-size:clamp(1.4rem,4vw,2.4rem); font-weight:900; color:#80ff72; text-align:center; margin:8px 0; }
+  .confetti { position:fixed; top:-12px; font-size:1.5rem; pointer-events:none; animation:fall linear forwards; z-index:50; }
+  @keyframes fall { to { transform:translateY(110vh) rotate(720deg); opacity:.7; } }
+  @media (max-width:600px){ .btn-big{ padding:16px 26px; } .pbtn{ min-width:44%; } }
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP SCREEN ============ -->
+<div class="screen active" id="scr-setup">
+  <h1>Guess-timate Gauntlet</h1>
+  <div class="tagline">Nobody knows the answer — the closest guess wins!</div>
+  <div class="meta">3–10 players &nbsp;•&nbsp; ~15–25 minutes &nbsp;•&nbsp; one shared screen, host taps</div>
+
+  <div class="card">
+    <h2>How to play (read once, aloud)</h2>
+    <ol>
+      <li>A number question appears — everyone shouts or writes a guess. No phones!</li>
+      <li>Host taps <b>Reveal</b>, then taps whoever guessed <b>closest</b> (+2). Tap again if they nailed it <b>exactly</b> (+1 bonus). Ties? Tap them all.</li>
+      <li>Most points after the final round takes the crown.</li>
+    </ol>
+  </div>
+
+  <div class="card" style="text-align:center;">
+    <h2>Players</h2>
+    <div class="row">
+      <input type="text" id="name-in" placeholder="Type a name…" maxlength="14">
+      <button class="btn-mid" id="btn-add">+ Add</button>
+    </div>
+    <div class="player-chips" id="chips"></div>
+    <h2 style="margin-top:8px;">Rounds</h2>
+    <div class="seg" id="round-seg" style="justify-content:center;">
+      <button data-r="7">7</button>
+      <button data-r="10" class="sel">10</button>
+      <button data-r="15">15</button>
+    </div>
+  </div>
+
+  <button class="btn-big" id="btn-start">Start Game ▶</button>
+  <div class="hint" id="setup-hint">Add at least 2 players to start (3+ recommended)</div>
+</div>
+
+<!-- ============ QUESTION SCREEN ============ -->
+<div class="screen" id="scr-q">
+  <div class="roundbar" id="roundbar">Round 1 of 10</div>
+  <div class="question" id="q-text"></div>
+  <div class="instruct" id="q-instruct">🗣️ Everyone lock in a guess — say it out loud!</div>
+
+  <div id="reveal-zone" style="display:none; flex-direction:column; align-items:center; width:100%;">
+    <div class="answer" id="a-text"></div>
+    <div class="fact" id="a-fact"></div>
+    <div class="hint">Tap the closest guesser (+2). Tap again for an exact guess (+3). Third tap clears.</div>
+    <div class="award-grid" id="award-grid"></div>
+  </div>
+
+  <div class="row" id="q-controls">
+    <button class="btn-big" id="btn-reveal">Reveal Answer 🔓</button>
+  </div>
+  <div class="row" id="next-controls" style="display:none;">
+    <button class="btn-big" id="btn-next">Next Question ▶</button>
+  </div>
+
+  <div class="scorebar" id="scorebar"></div>
+</div>
+
+<!-- ============ END SCREEN ============ -->
+<div class="screen" id="scr-end">
+  <h1 style="margin-top:20px;">🏆 Final Results</h1>
+  <div class="winner-line" id="winner-line"></div>
+  <div class="podium" id="podium"></div>
+  <div class="scorebar" id="final-scores" style="margin-top:0;"></div>
+  <div class="row" style="margin-top:22px;">
+    <button class="btn-big" id="btn-again">Play Again 🔁</button>
+    <button class="btn-ghost" id="btn-new">New Game (new players)</button>
+  </div>
+</div>
+
+<script>
+/* ================= QUESTION BANK (70 numeric estimation questions) ================= */
+const BANK = [
+ {q:"How many bones are in the adult human body?", a:206, d:"206", f:"Babies start with about 300 — many fuse together."},
+ {q:"How many keys are on a standard piano?", a:88, d:"88", f:"52 white keys and 36 black keys."},
+ {q:"How tall is the Eiffel Tower, in meters?", a:330, d:"330 m", f:"That's about the height of an 81-story building."},
+ {q:"How many member countries are in the United Nations?", a:193, d:"193", f:"South Sudan was the most recent to join, in 2011."},
+ {q:"How many elements are on the periodic table?", a:118, d:"118", f:"Element 118 is oganesson, confirmed in 2015."},
+ {q:"How tall is Mount Everest, in meters?", a:8849, d:"8,849 m", f:"It grows a few millimeters taller every year."},
+ {q:"How long is a marathon, in kilometers?", a:42.195, d:"42.195 km", f:"The odd distance was set at the 1908 London Olympics."},
+ {q:"How many total gifts are given in 'The 12 Days of Christmas' song?", a:364, d:"364", f:"Almost one gift for every day of the year."},
+ {q:"How many teeth are in a full adult set (with wisdom teeth)?", a:32, d:"32", f:"Kids only get 20 baby teeth."},
+ {q:"How many time zones does Russia span?", a:11, d:"11", f:"It's almost lunchtime somewhere in Russia at all times."},
+ {q:"What's the world record for hot dogs eaten in 10 minutes?", a:76, d:"76", f:"Set by Joey Chestnut in 2021."},
+ {q:"How many bones are in one human foot?", a:26, d:"26", f:"Both feet together hold about a quarter of your bones."},
+ {q:"About how many times does a human heart beat per day?", a:100000, d:"~100,000", f:"That's over 35 million beats a year."},
+ {q:"How many FIFA World Cups has Brazil won?", a:5, d:"5", f:"More than any other country."},
+ {q:"How far is the Moon from Earth on average, in kilometers?", a:384400, d:"384,400 km", f:"You could fit all the other planets in that gap."},
+ {q:"How many letters are in the Hawaiian alphabet?", a:13, d:"13", f:"Just 8 consonants and 5 vowels."},
+ {q:"How many players are on a rugby union team (on the field)?", a:15, d:"15", f:"Rugby league uses 13."},
+ {q:"In what year did the Titanic sink?", a:1912, d:"1912", f:"On its very first voyage."},
+ {q:"How many stripes are on the United States flag?", a:13, d:"13", f:"One for each original colony."},
+ {q:"How many dimples are on a typical regulation golf ball?", a:336, d:"~336", f:"Dimples help the ball fly nearly twice as far."},
+ {q:"In what year did Disneyland open in California?", a:1955, d:"1955", f:"Opening day was so hot the asphalt melted shoes."},
+ {q:"About how long is the Amazon River, in kilometers?", a:6400, d:"~6,400 km", f:"It carries more water than the next seven biggest rivers combined."},
+ {q:"How many countries are in Africa?", a:54, d:"54", f:"More than a quarter of all the world's countries."},
+ {q:"At about what temperature (°C) does water boil at the top of Mount Everest?", a:71, d:"~71°C", f:"Low air pressure makes a truly terrible cup of tea."},
+ {q:"How many bones does a shark have?", a:0, d:"0", f:"Shark skeletons are made entirely of cartilage."},
+ {q:"What's the fastest officially recorded tennis serve, in km/h?", a:263, d:"263 km/h", f:"Hit by Sam Groth in 2012."},
+ {q:"How high is a regulation basketball hoop, in centimeters?", a:305, d:"305 cm", f:"Exactly 10 feet — unchanged since 1891."},
+ {q:"How many cards are in a standard deck including both jokers?", a:54, d:"54", f:"52 cards plus 2 jokers."},
+ {q:"How many white keys are on a standard piano?", a:52, d:"52", f:"The rest of the 88 are black."},
+ {q:"About how many days does an adult housefly live?", a:28, d:"~28", f:"Roughly a month of buzzing."},
+ {q:"How deep is the deepest known point of the ocean, in meters?", a:10935, d:"~10,935 m", f:"Challenger Deep could swallow Mount Everest with room to spare."},
+ {q:"How many steps lead to the top of the Eiffel Tower?", a:1665, d:"1,665", f:"Most visitors wisely take the elevator."},
+ {q:"In what year did women win the right to vote across the United States?", a:1920, d:"1920", f:"The 19th Amendment sealed it."},
+ {q:"How many US states share a border with Canada?", a:13, d:"13", f:"Including Alaska — the longest border of them all."},
+ {q:"What's a cheetah's top running speed, in km/h?", a:112, d:"~112 km/h", f:"But only for about 30 seconds at a time."},
+ {q:"How many hearts does an octopus have?", a:3, d:"3", f:"Two pump to the gills, one to the body."},
+ {q:"What's the longest recorded flight of a chicken, in seconds?", a:13, d:"13 seconds", f:"A truly heroic effort."},
+ {q:"How many plays is Shakespeare credited with writing?", a:37, d:"~37", f:"Plus 154 sonnets on the side."},
+ {q:"How many moons does Mars have?", a:2, d:"2", f:"Phobos and Deimos — 'fear' and 'dread'."},
+ {q:"In what year did humans first walk on the Moon?", a:1969, d:"1969", f:"Apollo 11, July 20th."},
+ {q:"About how many seeds are on the outside of one strawberry?", a:200, d:"~200", f:"It's the only fruit that wears its seeds on the outside."},
+ {q:"How many bones are in a giraffe's neck?", a:7, d:"7", f:"The same number as a human neck — just much bigger."},
+ {q:"How tall is the Burj Khalifa, in meters?", a:828, d:"828 m", f:"You can watch the sunset twice from top to bottom."},
+ {q:"About how many islands make up the Philippines?", a:7641, d:"~7,641", f:"Only about 2,000 of them are inhabited."},
+ {q:"How many minutes of playing time are in a regulation NBA game?", a:48, d:"48", f:"Four 12-minute quarters."},
+ {q:"In what year was Google founded?", a:1998, d:"1998", f:"In a garage in Menlo Park, California."},
+ {q:"About how much does a blue whale's tongue weigh, in kilograms?", a:2700, d:"~2,700 kg", f:"As much as an adult elephant."},
+ {q:"In what year was Mount Rushmore completed?", a:1941, d:"1941", f:"After 14 years of carving."},
+ {q:"How many ridges are on the edge of a US quarter?", a:119, d:"119", f:"Originally added to stop people shaving off silver."},
+ {q:"How many letters are in the longest word in major English dictionaries?", a:45, d:"45", f:"Pneumonoultramicroscopicsilicovolcanoconiosis — a lung disease."},
+ {q:"Per a famous university machine test: how many licks to the center of a Tootsie Pop?", a:364, d:"364", f:"Purdue University built a licking machine to find out."},
+ {q:"How many rooms are in Buckingham Palace?", a:775, d:"775", f:"Including 78 bathrooms."},
+ {q:"About how old is the oldest known living tree, in years?", a:4850, d:"~4,850", f:"A bristlecone pine named Methuselah, older than the pyramids."},
+ {q:"About how long is the Tour de France route, in kilometers?", a:3500, d:"~3,500 km", f:"Ridden over just 21 race days."},
+ {q:"In what year was the world's first crossword puzzle published?", a:1913, d:"1913", f:"In the New York World newspaper."},
+ {q:"How tall is the world's tallest living tree, in meters?", a:116, d:"~116 m", f:"A coast redwood named Hyperion — its location is kept secret."},
+ {q:"About how many muscles are in an elephant's trunk?", a:40000, d:"~40,000", f:"Humans have about 600 in their whole body."},
+ {q:"About how many eggs can a queen bee lay in a single day?", a:2000, d:"~2,000", f:"More than her own body weight, daily."},
+ {q:"About how many seconds does sunlight take to reach Earth?", a:500, d:"~500 s", f:"About 8 minutes and 20 seconds."},
+ {q:"How many squares are on a Monopoly board?", a:40, d:"40", f:"22 of them are properties you can buy."},
+ {q:"How many countries does the equator pass through?", a:13, d:"13", f:"Ecuador is literally named after it."},
+ {q:"In what year was Pac-Man released in arcades?", a:1980, d:"1980", f:"Its design was inspired by a pizza missing a slice."},
+ {q:"About how many bones is a human baby born with?", a:300, d:"~300", f:"They fuse down to 206 by adulthood."},
+ {q:"What percentage of Earth's surface is covered by water?", a:71, d:"~71%", f:"And we've explored only a fraction of the oceans."},
+ {q:"How many minutes are in a non-leap year?", a:525600, d:"525,600", f:"As sung in the musical Rent."},
+ {q:"How many compartments does a cow's stomach have?", a:4, d:"4", f:"Grass is hard work to digest."},
+ {q:"How many US state capitals are named after presidents?", a:4, d:"4", f:"Jackson, Lincoln, Madison, and Jefferson City."},
+ {q:"In what year did euro coins and banknotes enter circulation?", a:2002, d:"2002", f:"Twelve countries switched overnight on January 1st."},
+ {q:"How many vertebrae are in the human spine?", a:33, d:"33", f:"Including the fused ones in your tailbone."},
+ {q:"How many Oscars did the movie Titanic (1997) win?", a:11, d:"11", f:"Tied for the most ever by a single film."}
+];
+
+/* ================= AUDIO (Web Audio API) ================= */
+let AC=null;
+function ac(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }
+function tone(freq,start,dur,type='sine',vol=0.18){
+  const c=ac(),o=c.createOscillator(),g=c.createGain();
+  o.type=type; o.frequency.value=freq; o.connect(g); g.connect(c.destination);
+  const t=c.currentTime+start;
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.02);
+  g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.start(t); o.stop(t+dur+0.05);
+}
+const sReveal=()=>{ tone(523,0,.15,'triangle'); tone(784,.12,.25,'triangle'); };
+const sAward=()=>{ tone(880,0,.12,'square',.1); };
+const sExact=()=>{ tone(880,0,.1,'square',.1); tone(1175,.09,.18,'square',.1); };
+const sClear=()=>{ tone(300,0,.12,'sawtooth',.08); };
+const sNext=()=>{ tone(440,0,.1,'sine',.12); };
+const sFanfare=()=>{ [523,659,784,1047].forEach((f,i)=>tone(f,i*.16,.3,'triangle',.2)); tone(1319,.7,.6,'triangle',.22); };
+
+/* ================= STATE ================= */
+let players=[];            // {name, score}
+let totalRounds=10;
+let order=[];              // shuffled question indices for this game
+let round=0;               // 0-based
+let awards={};             // playerIdx -> 0|2|3 for current question
+
+const $=id=>document.getElementById(id);
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $(id).classList.add('active'); }
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+
+/* ================= SETUP ================= */
+function renderChips(){
+  const c=$('chips'); c.innerHTML='';
+  players.forEach((p,i)=>{
+    const el=document.createElement('div'); el.className='chip';
+    el.innerHTML=`<b>${p.name}</b><span class="x" data-i="${i}">✕</span>`;
+    c.appendChild(el);
+  });
+  c.querySelectorAll('.x').forEach(x=>x.onclick=()=>{ players.splice(+x.dataset.i,1); renderChips(); });
+  $('setup-hint').textContent = players.length>=2 ? `${players.length} player${players.length>1?'s':''} ready` : 'Add at least 2 players to start (3+ recommended)';
+}
+function addPlayer(){
+  const v=$('name-in').value.trim();
+  if(!v) return;
+  if(players.length>=10){ $('setup-hint').textContent='Max 10 players!'; return; }
+  if(players.some(p=>p.name.toLowerCase()===v.toLowerCase())){ $('setup-hint').textContent='Name already added!'; return; }
+  players.push({name:v,score:0}); $('name-in').value=''; $('name-in').focus(); renderChips();
+}
+$('btn-add').onclick=addPlayer;
+$('name-in').addEventListener('keydown',e=>{ if(e.key==='Enter') addPlayer(); });
+$('round-seg').querySelectorAll('button').forEach(b=>{
+  b.onclick=()=>{ $('round-seg').querySelectorAll('button').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); totalRounds=+b.dataset.r; };
+});
+$('btn-start').onclick=()=>{
+  if(players.length<2){ $('setup-hint').textContent='Need at least 2 players!'; return; }
+  ac(); startGame();
+};
+
+/* ================= GAME FLOW ================= */
+function startGame(){
+  players.forEach(p=>p.score=0);
+  order=shuffle([...BANK.keys()]).slice(0,totalRounds);
+  round=0;
+  showQuestion();
+  show('scr-q');
+}
+function showQuestion(){
+  awards={};
+  const item=BANK[order[round]];
+  $('roundbar').textContent=`Round ${round+1} of ${totalRounds}`;
+  $('q-text').textContent=item.q;
+  $('reveal-zone').style.display='none';
+  $('q-instruct').style.display='block';
+  $('q-controls').style.display='flex';
+  $('next-controls').style.display='none';
+  renderScorebar();
+}
+$('btn-reveal').onclick=()=>{
+  const item=BANK[order[round]];
+  $('a-text').textContent=item.d;
+  $('a-fact').textContent=item.f||'';
+  $('q-instruct').style.display='none';
+  $('q-controls').style.display='none';
+  $('reveal-zone').style.display='flex';
+  $('next-controls').style.display='flex';
+  buildAwardGrid();
+  sReveal();
+};
+function buildAwardGrid(){
+  const g=$('award-grid'); g.innerHTML='';
+  players.forEach((p,i)=>{
+    const b=document.createElement('button'); b.className='pbtn';
+    b.innerHTML=`${p.name}<small>tap to award</small>`;
+    b.onclick=()=>{
+      const cur=awards[i]||0;
+      if(cur===0){ awards[i]=2; b.className='pbtn won'; b.innerHTML=`${p.name}<small>Closest +2</small>`; sAward(); }
+      else if(cur===2){ awards[i]=3; b.className='pbtn exact'; b.innerHTML=`${p.name}<small>EXACT! +3</small>`; sExact(); }
+      else { awards[i]=0; b.className='pbtn'; b.innerHTML=`${p.name}<small>tap to award</small>`; sClear(); }
+      renderScorebar();
+    };
+    g.appendChild(b);
+  });
+}
+$('btn-next').onclick=()=>{
+  players.forEach((p,i)=>{ p.score += (awards[i]||0); });
+  round++;
+  sNext();
+  if(round>=totalRounds) endGame(); else showQuestion();
+};
+function renderScorebar(){
+  const bar=$('scorebar'); bar.innerHTML='';
+  players.forEach((p,i)=>{
+    const pend=awards[i]?` (+${awards[i]})`:'';
+    const s=document.createElement('span'); s.innerHTML=`${p.name}: <b>${p.score}${pend}</b>`;
+    bar.appendChild(s);
+  });
+}
+
+/* ================= END ================= */
+function endGame(){
+  const sorted=[...players].sort((a,b)=>b.score-a.score);
+  const top=sorted[0].score;
+  const winners=sorted.filter(p=>p.score===top).map(p=>p.name);
+  $('winner-line').textContent = winners.length>1 ? `It's a tie: ${winners.join(' & ')}!` : `${winners[0]} takes the crown! 👑`;
+  const pod=$('podium'); pod.innerHTML='';
+  const medals=['🥇','🥈','🥉'], heights=[170,130,100], podOrder=[1,0,2];
+  podOrder.forEach(rank=>{
+    if(!sorted[rank]) return;
+    const d=document.createElement('div'); d.className='pod'; d.style.height=heights[rank]+'px';
+    d.innerHTML=`<div class="medal">${medals[rank]}</div><div class="nm">${sorted[rank].name}</div><div class="pt">${sorted[rank].score} pts</div>`;
+    pod.appendChild(d);
+  });
+  const fs=$('final-scores'); fs.innerHTML='';
+  sorted.forEach(p=>{ const s=document.createElement('span'); s.innerHTML=`${p.name}: <b>${p.score}</b>`; fs.appendChild(s); });
+  show('scr-end');
+  sFanfare(); confetti();
+}
+function confetti(){
+  const glyphs=['🎉','✨','⭐','🎊','💛'];
+  for(let i=0;i<40;i++){
+    const e=document.createElement('div'); e.className='confetti';
+    e.textContent=glyphs[Math.floor(Math.random()*glyphs.length)];
+    e.style.left=Math.random()*100+'vw';
+    e.style.animationDuration=(2.2+Math.random()*2.5)+'s';
+    e.style.animationDelay=(Math.random()*0.8)+'s';
+    document.body.appendChild(e);
+    setTimeout(()=>e.remove(),6000);
+  }
+}
+$('btn-again').onclick=()=>{ startGame(); };
+$('btn-new').onclick=()=>{ players=[]; renderChips(); show('scr-setup'); };
+</script>
+</body>
+</html>
