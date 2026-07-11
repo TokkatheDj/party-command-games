@@ -1,0 +1,305 @@
+<!-- CONCEPT: Animal Orchestra — tap colorful animal buttons to play musical notes with sparkles and bounce; hit Play Song to watch the animals light up while Twinkle Twinkle plays. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Animal Orchestra 🎵</title>
+<style>
+:root { --radius: 20px; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%; overflow: hidden;
+  font-family: "Comic Sans MS", "Trebuchet MS", system-ui;
+  background: #0d0a2e;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+}
+
+/* Starfield */
+#stars {
+  position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0;
+}
+.star {
+  position: absolute; background: #fff; border-radius: 50%;
+  animation: twinkle var(--d) ease-in-out infinite alternate;
+}
+@keyframes twinkle {
+  from { opacity: .1; transform: scale(.8); }
+  to   { opacity: .85; transform: scale(1.2); }
+}
+
+#app { position: relative; z-index: 1; display: flex; flex-direction: column; height: 100vh; padding: 10px 12px 12px; gap: 10px; }
+
+/* ── Header ── */
+#header { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+#header h1 {
+  flex: 1; font-size: clamp(18px, 5vw, 26px); font-weight: 900;
+  background: linear-gradient(90deg, #f9a8d4, #fde68a, #86efac, #7dd3fc);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  letter-spacing: .5px;
+}
+
+#play-btn, #record-btn {
+  height: 44px; padding: 0 14px; border-radius: 22px; border: none;
+  font-family: inherit; font-size: 13px; font-weight: 900;
+  cursor: pointer; transition: transform .12s, box-shadow .12s;
+  white-space: nowrap;
+}
+
+#play-btn {
+  background: linear-gradient(135deg, #a78bfa, #7c6ff7);
+  color: #fff; box-shadow: 0 3px 12px rgba(167,139,250,.5);
+}
+
+#play-btn:hover  { transform: scale(1.05); }
+#play-btn:active { transform: scale(.93); }
+#play-btn:disabled { opacity: .55; cursor: default; transform: none; }
+
+/* ── Grid ── */
+#grid {
+  flex: 1; display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(4, 1fr);
+  gap: 10px;
+}
+
+/* ── Animal button ── */
+.ani-btn {
+  border-radius: var(--radius); border: none; cursor: pointer;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+  position: relative; overflow: visible;
+  transition: transform .1s, box-shadow .15s;
+  padding: 10px 6px;
+}
+
+.ani-btn:active { transform: scale(.91); }
+
+@keyframes btn-pop {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(.88); }
+  65%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+
+.ani-btn.popping { animation: btn-pop .28s ease; }
+
+.ani-btn.lit {
+  filter: brightness(1.3);
+  box-shadow: 0 0 28px 8px var(--glow) !important;
+  transform: scale(1.07);
+}
+
+.ani-emoji { font-size: clamp(36px, 9vw, 56px); line-height: 1; }
+
+.ani-name {
+  font-size: clamp(12px, 3vw, 16px); font-weight: 900;
+  color: rgba(255,255,255,.95); letter-spacing: .3px;
+  text-shadow: 0 1px 4px rgba(0,0,0,.4);
+}
+
+.ani-note {
+  position: absolute; top: 8px; right: 10px;
+  font-size: 11px; font-weight: 900;
+  background: rgba(255,255,255,.22); color: #fff;
+  border-radius: 8px; padding: 1px 6px;
+}
+
+/* ── Sparkles (DOM-based) ── */
+@keyframes sparkle-fly {
+  0%   { transform: translate(0,0) scale(1.2); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+}
+
+.sparkle {
+  position: fixed; pointer-events: none; z-index: 200;
+  animation: sparkle-fly .65s ease forwards;
+}
+</style>
+</head>
+<body>
+
+<div id="stars"></div>
+
+<div id="app">
+  <div id="header">
+    <h1>🎵 Animal Orchestra</h1>
+    <button id="play-btn">▶ Play Song</button>
+  </div>
+  <div id="grid"></div>
+</div>
+
+<script>
+const ANIMALS = [
+  { emoji: '🐘', name: 'Elephant', note: 'C',  freq: 261.6, bg: 'linear-gradient(135deg,#7c3aed,#a78bfa)', glow: '#a78bfa' },
+  { emoji: '🐊', name: 'Croc',     note: 'D',  freq: 293.7, bg: 'linear-gradient(135deg,#065f46,#34d399)', glow: '#34d399' },
+  { emoji: '🦁', name: 'Lion',     note: 'E',  freq: 329.6, bg: 'linear-gradient(135deg,#c2410c,#fb923c)', glow: '#fb923c' },
+  { emoji: '🐮', name: 'Cow',      note: 'F',  freq: 349.2, bg: 'linear-gradient(135deg,#b45309,#fbbf24)', glow: '#fbbf24' },
+  { emoji: '🐸', name: 'Frog',     note: 'G',  freq: 392.0, bg: 'linear-gradient(135deg,#166534,#4ade80)', glow: '#4ade80' },
+  { emoji: '🐬', name: 'Dolphin',  note: 'A',  freq: 440.0, bg: 'linear-gradient(135deg,#0369a1,#38bdf8)', glow: '#38bdf8' },
+  { emoji: '🐱', name: 'Cat',      note: 'B',  freq: 493.9, bg: 'linear-gradient(135deg,#9d174d,#f472b6)', glow: '#f472b6' },
+  { emoji: '🦜', name: 'Parrot',   note: 'C♪', freq: 523.3, bg: 'linear-gradient(135deg,#991b1b,#f87171)', glow: '#f87171' },
+];
+
+// Twinkle Twinkle first verse (indices into ANIMALS)
+const TWINKLE = [0,0,4,4,5,5,4, 3,3,2,2,1,1,0, 4,4,3,3,2,2,1, 4,4,3,3,2,2,1, 0,0,4,4,5,5,4, 3,3,2,2,1,1,0];
+
+let audioCtx = null;
+let playing  = false;
+
+// ── Starfield ─────────────────────────────────────────────────────────────
+(function makeStars() {
+  const cont = document.getElementById('stars');
+  for (let i = 0; i < 60; i++) {
+    const s = document.createElement('div');
+    const sz = 1 + Math.random() * 2.5;
+    s.className = 'star';
+    s.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${Math.random()*100}%;
+      top:${Math.random()*100}%;
+      --d:${1.5 + Math.random()*3}s;
+      animation-delay:${Math.random()*3}s;
+    `;
+    cont.appendChild(s);
+  }
+})();
+
+// ── Build grid ────────────────────────────────────────────────────────────
+const grid    = document.getElementById('grid');
+const btnEls  = [];
+
+ANIMALS.forEach((a, i) => {
+  const btn = document.createElement('button');
+  btn.className = 'ani-btn';
+  btn.style.background = a.bg;
+  btn.style.setProperty('--glow', a.glow);
+  btn.style.boxShadow = `0 4px 16px rgba(0,0,0,.35)`;
+  btn.innerHTML = `
+    <span class="ani-emoji">${a.emoji}</span>
+    <span class="ani-name">${a.name}</span>
+    <span class="ani-note">${a.note}</span>
+  `;
+  btn.addEventListener('click', () => { if (!playing) tapAnimal(i, btn); });
+  btn.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (!playing) tapAnimal(i, btn);
+  }, { passive: false });
+  grid.appendChild(btn);
+  btnEls.push(btn);
+});
+
+// ── Audio ─────────────────────────────────────────────────────────────────
+function getAC() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playNote(freq, duration = 1.0) {
+  try {
+    const ac  = getAC();
+    const now = ac.currentTime;
+
+    // Fundamental (triangle — warm)
+    const osc1 = ac.createOscillator(), g1 = ac.createGain();
+    osc1.type = 'triangle'; osc1.frequency.value = freq;
+    g1.gain.setValueAtTime(0.42, now);
+    g1.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    osc1.connect(g1); g1.connect(ac.destination);
+    osc1.start(now); osc1.stop(now + duration);
+
+    // 2nd harmonic (sine — sparkle)
+    const osc2 = ac.createOscillator(), g2 = ac.createGain();
+    osc2.type = 'sine'; osc2.frequency.value = freq * 2.01;
+    g2.gain.setValueAtTime(0.14, now);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.55);
+    osc2.connect(g2); g2.connect(ac.destination);
+    osc2.start(now); osc2.stop(now + duration * 0.6);
+
+    // 3rd harmonic (very soft shimmer)
+    const osc3 = ac.createOscillator(), g3 = ac.createGain();
+    osc3.type = 'sine'; osc3.frequency.value = freq * 3.0;
+    g3.gain.setValueAtTime(0.05, now);
+    g3.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.3);
+    osc3.connect(g3); g3.connect(ac.destination);
+    osc3.start(now); osc3.stop(now + duration * 0.35);
+  } catch(e) {}
+}
+
+// ── Sparkles ──────────────────────────────────────────────────────────────
+const SPARKS = ['⭐','✨','🌟','💫','🎵','🎶'];
+
+function spawnSparkles(btn) {
+  const rect = btn.getBoundingClientRect();
+  const cx = rect.left + rect.width  / 2;
+  const cy = rect.top  + rect.height / 2;
+  for (let i = 0; i < 7; i++) {
+    const el = document.createElement('div');
+    el.className = 'sparkle';
+    const dx = (Math.random() - 0.5) * 140;
+    const dy = (Math.random() - 1.1) * 110;
+    el.style.cssText = `left:${cx}px; top:${cy}px; font-size:${14+Math.random()*12}px; --dx:${dx}px; --dy:${dy}px; animation-delay:${Math.random()*0.08}s;`;
+    el.textContent = SPARKS[Math.floor(Math.random() * SPARKS.length)];
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 750);
+  }
+}
+
+// ── Tap animal ────────────────────────────────────────────────────────────
+function tapAnimal(i, btn) {
+  playNote(ANIMALS[i].freq);
+  spawnSparkles(btn);
+  btn.classList.remove('popping');
+  void btn.offsetWidth;
+  btn.classList.add('popping');
+  btn.addEventListener('animationend', () => btn.classList.remove('popping'), { once: true });
+}
+
+// ── Light up button ───────────────────────────────────────────────────────
+function lightUp(i) {
+  const btn = btnEls[i];
+  btn.classList.add('lit');
+  spawnSparkles(btn);
+  setTimeout(() => btn.classList.remove('lit'), 340);
+}
+
+// ── Play Song ────────────────────────────────────────────────────────────
+const playBtn = document.getElementById('play-btn');
+
+playBtn.addEventListener('click', () => {
+  if (playing) return;
+  playing = true;
+  playBtn.disabled = true;
+  playBtn.textContent = '🎵 Playing…';
+  try { getAC(); } catch(e) {
+    playing = false; playBtn.disabled = false; playBtn.textContent = '▶ Play Song'; return;
+  }
+
+  const BPM = 108;
+  const beat = 60000 / BPM;
+
+  TWINKLE.forEach((idx, step) => {
+    setTimeout(() => {
+      playNote(ANIMALS[idx].freq, 0.55);
+      lightUp(idx);
+      if (step === TWINKLE.length - 1) {
+        setTimeout(() => {
+          playing = false;
+          playBtn.disabled = false;
+          playBtn.textContent = '▶ Play Song';
+        }, beat + 200);
+      }
+    }, step * beat);
+  });
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+// Unlock audio on first touch anywhere
+document.addEventListener('touchstart', () => { try { getAC(); } catch(e) {} }, { once: true });
+</script>
+</body>
+</html>

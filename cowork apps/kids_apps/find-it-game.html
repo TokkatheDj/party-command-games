@@ -1,0 +1,1207 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Hidden World Explorer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700&display=swap" rel="stylesheet">
+    <style>:root {
+    --primary: #FF6B6B;
+    --secondary: #4ECDC4;
+    --accent: #FFE66D;
+    --dark: #2C3E50;
+    --light: #F7FFF7;
+    --success: #6BCB77;
+    --font-heading: 'Fredoka One', cursive;
+    --font-body: 'Nunito', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none; /* Prevent selection */
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    font-family: var(--font-body);
+    background-color: var(--dark);
+    color: var(--dark);
+    overflow: hidden;
+}
+
+#app {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    background: #a8e6cf;
+}
+
+/* Screens */
+.screen {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: none;
+    flex-direction: column;
+}
+.screen.active {
+    display: flex;
+}
+
+/* Splash Screen */
+#splash-screen {
+    background: linear-gradient(135deg, var(--secondary), var(--primary));
+    align-items: center;
+    justify-content: center;
+    color: white;
+    text-align: center;
+}
+
+.logo-title {
+    font-family: var(--font-heading);
+    font-size: 4rem;
+    margin-bottom: 2rem;
+    text-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+    animation: float 3s ease-in-out infinite;
+}
+
+/* Buttons */
+.btn-primary {
+    background: var(--accent);
+    color: var(--dark);
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    padding: 1rem 3rem;
+    border: 4px solid var(--dark);
+    border-radius: 50px;
+    cursor: pointer;
+    box-shadow: 0 8px 0 var(--dark);
+    transition: all 0.1s;
+}
+.btn-primary:active {
+    transform: translateY(8px);
+    box-shadow: 0 0 0 var(--dark);
+}
+
+.btn-icon {
+    background: white;
+    border: 3px solid var(--dark);
+    border-radius: 50%;
+    width: 50px; height: 50px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    box-shadow: 0 4px 0 var(--dark);
+}
+.btn-icon:active {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 var(--dark);
+}
+
+.btn-action {
+    background: var(--accent);
+    border: 3px solid var(--dark);
+    border-radius: 20px;
+    padding: 0.5rem 1rem;
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    cursor: pointer;
+    box-shadow: 0 4px 0 var(--dark);
+}
+.btn-action:active {
+    transform: translateY(4px);
+    box-shadow: 0 0 0 var(--dark);
+}
+.btn-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: 0 4px 0 var(--dark);
+}
+
+/* Level Select */
+.header {
+    background: white;
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 4px solid var(--dark);
+}
+.header h2 {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    color: var(--primary);
+}
+
+.map-wrapper {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #8de2f3;
+    padding: 10px;
+}
+.map-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-width: min(100vw - 20px, 100vh - 120px);
+    max-height: min(100vw - 20px, 100vh - 120px);
+    aspect-ratio: 1 / 1;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    border-radius: 20px;
+    overflow: hidden;
+}
+.map-bg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Mutes the busy illustrated map (which has its own decorative, non-clickable
+   numbers painted into the art) so the real interactive nodes read clearly
+   as buttons by contrast. */
+.map-dim {
+    display: none;
+}
+
+.level-nodes {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+}
+
+.level-path {
+    display: none !important;
+}
+.path-line-outline {
+    fill: none;
+    stroke: var(--dark);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+}
+.path-line {
+    fill: none;
+    stroke: white;
+    stroke-width: 1.1;
+    stroke-linecap: round;
+    stroke-dasharray: 2.5 2.5;
+}
+
+.level-node {
+    position: absolute;
+    width: 74px;
+    min-height: 74px;
+    background: white;
+    border: 3px solid var(--dark);
+    border-radius: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 5px 3px;
+    cursor: pointer;
+    box-shadow: 0 5px 0 var(--dark);
+    transform: translate(-50%, -50%);
+    transition: transform 0.2s;
+    z-index: 5;
+}
+.level-node:hover:not(.locked) {
+    transform: translate(-50%, -55%) scale(1.08);
+}
+.level-node.locked {
+    background: #ccc;
+    cursor: not-allowed;
+    opacity: 0.75;
+}
+.level-node.completed {
+    border-color: var(--success);
+}
+.level-node.next-up {
+    border-color: var(--accent);
+    animation: glowPulse 1s ease-in-out infinite;
+}
+.node-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+.node-label {
+    font-family: var(--font-heading);
+    font-size: 0.5rem;
+    color: var(--dark);
+    text-align: center;
+    line-height: 1.05;
+    max-width: 68px;
+}
+.level-node.locked .node-label {
+    color: #777;
+}
+.node-stars {
+    font-size: 0.75rem;
+    position: absolute;
+    bottom: -18px;
+    white-space: nowrap;
+}
+.node-pointer {
+    position: absolute;
+    top: -26px;
+    font-family: var(--font-heading);
+    font-size: 0.85rem;
+    background: var(--accent);
+    border: 3px solid var(--dark);
+    border-radius: 12px;
+    padding: 2px 8px;
+    white-space: nowrap;
+    animation: pointerBob 1s ease-in-out infinite;
+}
+@keyframes glowPulse {
+    0%, 100% { box-shadow: 0 5px 0 var(--dark), 0 0 0 2px rgba(255, 230, 109, 0.5); }
+    50% { box-shadow: 0 5px 0 var(--dark), 0 0 0 7px rgba(255, 230, 109, 0.85); }
+}
+@keyframes pointerBob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+/* Game Screen */
+.game-hud {
+    background: white;
+    padding: 6px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 3px solid var(--dark);
+    z-index: 10;
+}
+.game-hud .btn-action {
+    font-size: 1rem;
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+.timer-container {
+    font-family: var(--font-heading);
+    font-size: 1.1rem;
+    background: var(--dark);
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+}
+
+.game-area-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    background: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.game-area {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-width: min(100vw - 20px, 100vh - 120px);
+    max-height: min(100vw - 20px, 100vh - 120px);
+    aspect-ratio: 1 / 1;
+    container-type: size;
+}
+.game-area img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+}
+#objects-layer, #hint-layer {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+}
+.hidden-object {
+    position: absolute;
+    pointer-events: auto;
+    cursor: pointer;
+    opacity: 0.58;
+    transform: translate(-50%, -50%);
+    transition: transform 0.2s, opacity 0.2s;
+}
+.hidden-object svg {
+    width: 100%; height: 100%;
+    filter: drop-shadow(1px 1px 0px rgba(0,0,0,0.12));
+}
+.hidden-object:hover {
+    transform: translate(-50%, -50%) scale(1.04);
+}
+
+.checklist-panel {
+    background: white;
+    padding: 6px 12px;
+    border-top: 3px solid var(--dark);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    overflow: hidden;
+}
+.checklist-panel h3 {
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    margin: 0;
+    color: var(--dark);
+    white-space: nowrap;
+}
+.checklist {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    flex: 1;
+    padding: 2px 0;
+    scrollbar-width: none;
+}
+.checklist::-webkit-scrollbar {
+    display: none;
+}
+.checklist-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    background: var(--dark);
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    padding: 4px 10px;
+    opacity: 1;
+    transition: opacity 0.5s;
+    white-space: nowrap;
+}
+.checklist-item.found {
+    opacity: 0.3;
+    filter: grayscale(100%);
+    text-decoration: line-through;
+}
+.checklist-item svg {
+    width: 20px;
+    height: 20px;
+    margin-bottom: 0;
+    filter: drop-shadow(1px 1px 0px rgba(255,255,255,0.15));
+}
+.checklist-item span {
+    font-weight: bold;
+    font-size: 0.8rem;
+    color: white;
+}
+
+/* Modals */
+.modal {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+.modal.hidden {
+    display: none;
+}
+.modal-content {
+    background: white;
+    padding: 3rem;
+    border-radius: 30px;
+    text-align: center;
+    border: 6px solid var(--primary);
+    animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.modal-content h2 {
+    font-family: var(--font-heading);
+    font-size: 3rem;
+    color: var(--primary);
+    margin-bottom: 1rem;
+}
+.stars {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+.modal-content p {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+/* Animations */
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+@keyframes popIn {
+    0% { transform: scale(0.5); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-10px); }
+    40%, 80% { transform: translateX(10px); }
+}
+.shake {
+    animation: shake 0.4s ease-in-out;
+}
+
+.particle {
+    position: absolute;
+    width: 20px; height: 20px;
+    background: var(--accent);
+    border-radius: 50%;
+    pointer-events: none;
+    animation: explode 0.8s ease-out forwards;
+}
+@keyframes explode {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}
+
+.hint-glow {
+    position: absolute;
+    border: 6px dashed var(--accent);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulseGlow 1.5s infinite;
+    pointer-events: none;
+}
+@keyframes pulseGlow {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+    50% { transform: translate(-50%, -50%) scale(1.5); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+}
+
+.penalty-indicator {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    color: #ff3333;
+    font-family: var(--font-heading);
+    font-size: 1.3rem;
+    font-weight: bold;
+    text-shadow: 2px 2px 0px #000;
+    pointer-events: none;
+    animation: floatUpAndFade 1s ease-out forwards;
+    z-index: 15;
+}
+
+@keyframes floatUpAndFade {
+    0% {
+        transform: translate(-50%, -50%) translateY(0) scale(0.8);
+        opacity: 0;
+    }
+    20% {
+        transform: translate(-50%, -50%) translateY(-10px) scale(1.15);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, -50%) translateY(-45px) scale(0.9);
+        opacity: 0;
+    }
+}
+</style>
+
+  
+  <meta name="theme-color" content="#16a34a">
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .catch(e => console.warn('SW registration failed:', e));
+      });
+    }
+  </script>
+</head>
+<body>
+    <div id="app">
+        <!-- Splash Screen -->
+        <section id="splash-screen" class="screen active">
+            <div class="splash-content">
+                <h1 class="logo-title">Hidden World Explorer</h1>
+                <button id="btn-play" class="btn-primary">Play Now!</button>
+            </div>
+        </section>
+
+        <!-- Level Select Screen -->
+        <section id="level-select-screen" class="screen">
+            <div class="header">
+                <h2>Choose a World</h2>
+                <button id="btn-back-splash" class="btn-icon">🏠</button>
+            </div>
+            <div class="map-wrapper">
+                <div class="map-container">
+                    <img src="assets/map_bg.png" alt="World Map" class="map-bg">
+                    <div class="map-dim"></div>
+                    <div class="level-nodes">
+                        <!-- Path and nodes injected by JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Game Screen -->
+        <section id="game-screen" class="screen">
+            <div class="game-hud">
+                <button id="btn-back-map" class="btn-action">⬅️ Map</button>
+                <div class="timer-container">
+                    <span id="timer-display">00:00</span>
+                </div>
+                <button id="btn-hint" class="btn-action">
+                    💡 Hint (<span id="hint-count">3</span>)
+                </button>
+            </div>
+
+            <div class="game-area-container">
+                <div id="game-area" class="game-area">
+                    <img id="game-bg" src="" alt="Level Background">
+                    <div id="hint-layer"></div>
+                    <div id="objects-layer"></div>
+                </div>
+            </div>
+
+            <div class="checklist-panel">
+                <h3>Find these:</h3>
+                <div id="checklist" class="checklist">
+                    <!-- Items injected by JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Level Complete Modal -->
+        <div id="level-complete-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>Level Complete!</h2>
+                <div class="stars" id="level-stars">
+                    <!-- Stars injected -->
+                </div>
+                <p id="level-time-msg">Great job finding everything!</p>
+                <button id="btn-next-level" class="btn-primary">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio elements -->
+    <audio id="sfx-correct" src="https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3" preload="auto"></audio>
+    <audio id="sfx-wrong" src="https://assets.mixkit.co/active_storage/sfx/2832/2832-preview.mp3" preload="auto"></audio>
+    <audio id="sfx-win" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3" preload="auto"></audio>
+
+    <script>const LEVELS = [
+    {
+        id: 1,
+        name: "Busy Farmyard",
+        icon: "🌾",
+        bg: "assets/farmyard_bg.png",
+        mapPos: { x: 10, y: 80 }, // Farmyard bottom left
+        pathWaypoints: [{ x: 32, y: 95 }, { x: 50, y: 92 }, { x: 70, y: 93 }],
+        objects: [
+            // Easy
+            { id: "apple", difficulty: "easy", name: "Apple", x: 15, y: 80, size: 24, color: "#ff3333", sceneColor: "#e0a699", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="55" r="40" fill="currentColor"/><path d="M50 15 Q60 5 70 20" stroke="green" stroke-width="8" fill="none"/></svg>` },
+            { id: "pitchfork", difficulty: "easy", name: "Pitchfork", x: 75, y: 70, size: 28, color: "#8B4513", sceneColor: "#523c1a", svg: `<svg viewBox="0 0 100 100"><rect x="45" y="40" width="10" height="60" fill="currentColor"/><path d="M30 20 L30 40 L70 40 L70 20 M50 10 L50 40" stroke="silver" stroke-width="8" fill="none"/></svg>` },
+            { id: "egg", difficulty: "easy", name: "Egg", x: 45, y: 90, size: 18, color: "#fffacd", sceneColor: "#d1de9f", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="50" rx="30" ry="40" fill="currentColor"/></svg>` },
+            // Medium
+            { id: "bucket", difficulty: "medium", name: "Bucket", x: 85, y: 85, size: 21, color: "#a9a9a9", sceneColor: "#b69585", svg: `<svg viewBox="0 0 100 100"><path d="M20 30 L80 30 L70 90 L30 90 Z" fill="currentColor"/><path d="M20 30 Q50 0 80 30" stroke="black" stroke-width="5" fill="none"/></svg>` },
+            { id: "horseshoe", difficulty: "medium", name: "Horseshoe", x: 30, y: 40, size: 15, color: "#696969", sceneColor: "#7c5a4a", svg: `<svg viewBox="0 0 100 100"><path d="M30 80 A35 35 0 1 1 70 80" stroke="currentColor" stroke-width="15" fill="none" stroke-linecap="round"/></svg>` },
+            // Hard
+            { id: "chick", difficulty: "hard", name: "Chick", x: 60, y: 50, size: 12, color: "#ffd700", sceneColor: "#d1a958", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="60" r="25" fill="currentColor"/><circle cx="50" cy="30" r="15" fill="currentColor"/><polygon points="65,30 75,25 65,35" fill="orange"/></svg>` },
+            { id: "mouse", difficulty: "hard", name: "Mouse", x: 10, y: 95, size: 12, color: "#808080", sceneColor: "#867a51", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="60" rx="30" ry="20" fill="currentColor"/><circle cx="70" cy="40" r="10" fill="currentColor"/><path d="M20 60 Q0 60 10 40" stroke="currentColor" stroke-width="3" fill="none"/></svg>` },
+            // New
+            { id: "sunflower", difficulty: "easy", name: "Sunflower", x: 95, y: 40, size: 21, color: "#ffd700", sceneColor: "#ce9f3a", svg: `<svg viewBox="0 0 100 100"><g fill="currentColor"><ellipse cx="50" cy="15" rx="10" ry="20"/><ellipse cx="50" cy="85" rx="10" ry="20"/><ellipse cx="15" cy="50" rx="20" ry="10"/><ellipse cx="85" cy="50" rx="20" ry="10"/><ellipse cx="25" cy="25" rx="10" ry="18" transform="rotate(45 25 25)"/><ellipse cx="75" cy="75" rx="10" ry="18" transform="rotate(45 75 75)"/><ellipse cx="75" cy="25" rx="10" ry="18" transform="rotate(-45 75 25)"/><ellipse cx="25" cy="75" rx="10" ry="18" transform="rotate(-45 25 75)"/></g><circle cx="50" cy="50" r="18" fill="#8b4513"/></svg>` },
+            { id: "duck", difficulty: "easy", name: "Duck", x: 50, y: 65, size: 18, color: "#fffaf0", sceneColor: "#eee1bd", svg: `<svg viewBox="0 0 100 100"><ellipse cx="45" cy="60" rx="35" ry="25" fill="currentColor"/><circle cx="75" cy="35" r="18" fill="currentColor"/><polygon points="90,35 100,30 100,40" fill="orange"/></svg>` },
+            { id: "ladybug", difficulty: "medium", name: "Ladybug", x: 20, y: 55, size: 12, color: "#ff0000", sceneColor: "#deb98b", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="55" r="35" fill="currentColor"/><line x1="50" y1="20" x2="50" y2="90" stroke="black" stroke-width="4"/><circle cx="35" cy="45" r="6" fill="black"/><circle cx="65" cy="45" r="6" fill="black"/><circle cx="40" cy="70" r="6" fill="black"/><circle cx="60" cy="70" r="6" fill="black"/><circle cx="50" cy="18" r="10" fill="black"/></svg>` },
+            { id: "carrot", difficulty: "easy", name: "Carrot", x: 95, y: 60, size: 18, color: "#ff8c00", sceneColor: "#cda442", svg: `<svg viewBox="0 0 100 100"><polygon points="50,20 30,90 70,90" fill="currentColor"/><path d="M50 20 Q40 5 30 15 M50 20 Q60 5 70 15 M50 20 Q50 0 50 15" stroke="green" stroke-width="6" fill="none"/></svg>` },
+            { id: "wateringcan", difficulty: "easy", name: "Watering Can", x: 5, y: 55, size: 21, color: "#4682b4", sceneColor: "#77c9a8", svg: `<svg viewBox="0 0 100 100"><rect x="25" y="40" width="40" height="45" rx="8" fill="currentColor"/><rect x="15" y="30" width="20" height="12" rx="4" fill="currentColor"/><path d="M65 50 L95 35" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>` }
+        ]
+    },
+    {
+        id: 2,
+        name: "Underwater",
+        icon: "🌊",
+        bg: "assets/underwater_bg.png",
+        mapPos: { x: 40, y: 80 }, // Underwater bottom center
+        pathWaypoints: [{ x: 80, y: 80 }, { x: 65, y: 78 }],
+        objects: [
+            { id: "starfish", difficulty: "easy", name: "Starfish", x: 20, y: 85, size: 24, color: "#ff8c00", sceneColor: "#c4966d", svg: `<svg viewBox="0 0 100 100"><polygon points="50,10 60,40 90,40 65,60 75,90 50,70 25,90 35,60 10,40 40,40" fill="currentColor"/></svg>` },
+            { id: "shell", difficulty: "easy", name: "Shell", x: 80, y: 90, size: 21, color: "#ffb6c1", sceneColor: "#dca697", svg: `<svg viewBox="0 0 100 100"><path d="M10 80 Q50 10 90 80 Z" fill="currentColor"/><circle cx="50" cy="80" r="15" fill="currentColor"/></svg>` },
+            { id: "pearl", difficulty: "medium", name: "Pearl", x: 50, y: 85, size: 15, color: "#ffffff", sceneColor: "#d3c7b6", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="30" fill="currentColor"/><circle cx="40" cy="40" r="10" fill="white"/></svg>` },
+            { id: "anchor", difficulty: "easy", name: "Anchor", x: 15, y: 40, size: 28, color: "#454545", sceneColor: "#442847", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="20" r="10" stroke="currentColor" stroke-width="8" fill="none"/><rect x="45" y="30" width="10" height="60" fill="currentColor"/><path d="M20 60 A40 40 0 0 0 80 60" stroke="currentColor" stroke-width="10" fill="none"/></svg>` },
+            { id: "coin", difficulty: "medium", name: "Gold Coin", x: 75, y: 55, size: 12, color: "#ffd700", sceneColor: "#55c66c", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor"/><circle cx="50" cy="50" r="30" stroke="#daa520" stroke-width="4" fill="none"/></svg>` },
+            { id: "trident", difficulty: "easy", name: "Trident", x: 90, y: 30, size: 28, color: "#d4af37", sceneColor: "#87cd6f", svg: `<svg viewBox="0 0 100 100"><rect x="45" y="30" width="10" height="70" fill="currentColor"/><path d="M20 20 L20 40 Q50 60 80 40 L80 20 M50 10 L50 40" stroke="currentColor" stroke-width="8" fill="none"/></svg>` },
+            { id: "crab", difficulty: "easy", name: "Crab", x: 40, y: 95, size: 18, color: "#dc143c", sceneColor: "#994537", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="60" rx="30" ry="20" fill="currentColor"/><circle cx="30" cy="30" r="8" fill="currentColor"/><circle cx="70" cy="30" r="8" fill="currentColor"/></svg>` },
+            // New
+            { id: "jellyfish", difficulty: "easy", name: "Jellyfish", x: 15, y: 15, size: 21, color: "#dda0dd", sceneColor: "#c0b0da", svg: `<svg viewBox="0 0 100 100"><path d="M20 40 Q50 0 80 40 Q80 60 50 60 Q20 60 20 40 Z" fill="currentColor"/><path d="M30 60 Q30 90 25 95 M45 60 Q45 90 40 95 M55 60 Q55 90 60 95 M70 60 Q70 90 75 95" stroke="currentColor" stroke-width="4" fill="none"/></svg>` },
+            { id: "seahorse", difficulty: "easy", name: "Seahorse", x: 60, y: 20, size: 18, color: "#ffa500", sceneColor: "#5a992d", svg: `<svg viewBox="0 0 100 100"><path d="M40 10 Q60 10 60 30 Q60 45 45 50 Q70 55 65 75 Q60 95 40 90 Q30 88 30 75" stroke="currentColor" stroke-width="10" fill="none" stroke-linecap="round"/><circle cx="48" cy="20" r="4" fill="black"/></svg>` },
+            { id: "chest", difficulty: "easy", name: "Treasure Chest", x: 60, y: 75, size: 21, color: "#8b4513", sceneColor: "#443a21", svg: `<svg viewBox="0 0 100 100"><rect x="15" y="45" width="70" height="40" fill="currentColor"/><path d="M15 45 Q50 20 85 45" fill="currentColor"/><rect x="40" y="45" width="20" height="15" fill="#ffd700"/></svg>` },
+            { id: "clownfish", difficulty: "medium", name: "Clownfish", x: 35, y: 55, size: 15, color: "#ff6347", sceneColor: "#abc678", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="50" rx="35" ry="25" fill="currentColor"/><polygon points="15,50 0,30 0,70" fill="currentColor"/><rect x="35" y="25" width="10" height="50" fill="white"/><rect x="60" y="25" width="10" height="50" fill="white"/></svg>` }
+        ]
+    },
+    {
+        id: 3,
+        name: "Forest",
+        icon: "🌲",
+        bg: "assets/forest_bg.png",
+        mapPos: { x: 23, y: 58 }, // Forest cabin middle-left
+        pathWaypoints: [{ x: 35, y: 74 }, { x: 22, y: 68 }],
+        objects: [
+            { id: "mushroom", difficulty: "easy", name: "Mushroom", x: 15, y: 85, size: 24, color: "#ff4500", sceneColor: "#8e9a3f", svg: `<svg viewBox="0 0 100 100"><path d="M10 50 Q50 0 90 50 Z" fill="currentColor"/><rect x="40" y="50" width="20" height="40" fill="#f5deb3"/></svg>` },
+            { id: "acorn", difficulty: "medium", name: "Acorn", x: 85, y: 90, size: 15, color: "#8b4513", sceneColor: "#93643c", svg: `<svg viewBox="0 0 100 100"><path d="M20 40 Q50 100 80 40 Z" fill="#cd853f"/><path d="M10 40 Q50 10 90 40 Z" fill="currentColor"/></svg>` },
+            { id: "lantern", difficulty: "easy", name: "Lantern", x: 50, y: 40, size: 21, color: "#ffd700", sceneColor: "#afa242", svg: `<svg viewBox="0 0 100 100"><rect x="30" y="30" width="40" height="50" fill="currentColor" rx="5"/><rect x="20" y="20" width="60" height="10" fill="#333"/><rect x="20" y="80" width="60" height="10" fill="#333"/></svg>` },
+            { id: "wand", difficulty: "easy", name: "Magic Wand", x: 30, y: 60, size: 28, color: "#dda0dd", sceneColor: "#b97a8d", svg: `<svg viewBox="0 0 100 100"><line x1="20" y1="80" x2="80" y2="20" stroke="#8b4513" stroke-width="8"/><polygon points="80,5 90,20 100,20 90,30 95,45 80,35 65,45 70,30 60,20 70,20" fill="currentColor"/></svg>` },
+            { id: "potion", difficulty: "easy", name: "Potion", x: 75, y: 70, size: 18, color: "#00fa9a", sceneColor: "#3ba054", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="70" r="25" fill="currentColor"/><rect x="40" y="20" width="20" height="30" fill="currentColor"/><rect x="35" y="10" width="30" height="10" fill="#8b4513"/></svg>` },
+            { id: "owl", difficulty: "easy", name: "Owl", x: 80, y: 20, size: 21, color: "#a0522d", sceneColor: "#8da362", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="50" rx="30" ry="40" fill="currentColor"/><circle cx="40" cy="40" r="10" fill="white"/><circle cx="60" cy="40" r="10" fill="white"/></svg>` },
+            { id: "key", difficulty: "medium", name: "Key", x: 10, y: 30, size: 15, color: "#c0c0c0", sceneColor: "#8368a4", svg: `<svg viewBox="0 0 100 100"><circle cx="20" cy="50" r="15" stroke="currentColor" stroke-width="8" fill="none"/><line x1="35" y1="50" x2="90" y2="50" stroke="currentColor" stroke-width="8"/><line x1="70" y1="50" x2="70" y2="70" stroke="currentColor" stroke-width="8"/><line x1="85" y1="50" x2="85" y2="70" stroke="currentColor" stroke-width="8"/></svg>` },
+            // New
+            { id: "compass", difficulty: "easy", name: "Compass", x: 60, y: 25, size: 18, color: "#f5deb3", sceneColor: "#9ccb72", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor" stroke="#8b4513" stroke-width="6"/><polygon points="50,20 58,50 50,80 42,50" fill="red"/></svg>` },
+            { id: "map", difficulty: "easy", name: "Map", x: 40, y: 85, size: 21, color: "#f5deb3", sceneColor: "#c7ba7d", svg: `<svg viewBox="0 0 100 100"><rect x="15" y="20" width="70" height="60" fill="currentColor" stroke="#8b4513" stroke-width="3" transform="rotate(-5 50 50)"/><path d="M30 35 L45 45 L60 30 L75 50" stroke="red" stroke-width="3" fill="none"/></svg>` },
+            { id: "magnifyingglass", difficulty: "medium", name: "Magnifying Glass", x: 8, y: 60, size: 18, color: "#c0c0c0", sceneColor: "#9d8bb9", svg: `<svg viewBox="0 0 100 100"><circle cx="40" cy="40" r="28" fill="none" stroke="currentColor" stroke-width="10"/><line x1="60" y1="60" x2="90" y2="90" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>` },
+            { id: "basket", difficulty: "easy", name: "Mushroom Basket", x: 60, y: 90, size: 21, color: "#cd853f", sceneColor: "#b39e67", svg: `<svg viewBox="0 0 100 100"><path d="M20 50 L80 50 L70 90 L30 90 Z" fill="currentColor"/><path d="M20 50 Q50 30 80 50" stroke="currentColor" stroke-width="6" fill="none"/><circle cx="40" cy="45" r="10" fill="red"/><circle cx="60" cy="40" r="8" fill="red"/></svg>` }
+        ]
+    },
+    {
+        id: 4,
+        name: "Desert Oasis",
+        icon: "🏜️",
+        bg: "assets/desert_bg.png",
+        mapPos: { x: 54, y: 55 }, // Desert middle center
+        pathWaypoints: [{ x: 20, y: 48 }],
+        objects: [
+            { id: "telescope", difficulty: "medium", name: "Telescope", x: 5, y: 62, size: 18, color: "#34495e", sceneColor: "#519d4b", svg: `<svg viewBox="0 0 100 100"><rect x="20" y="30" width="50" height="14" rx="6" fill="currentColor" transform="rotate(-25 45 37)"/><line x1="35" y1="55" x2="20" y2="90" stroke="currentColor" stroke-width="6"/><line x1="35" y1="55" x2="50" y2="90" stroke="currentColor" stroke-width="6"/><line x1="35" y1="55" x2="35" y2="92" stroke="currentColor" stroke-width="6"/></svg>` },
+            { id: "lantern2", difficulty: "medium", name: "Oil Lantern", x: 88, y: 28, size: 15, color: "#e63946", sceneColor: "#bd8956", svg: `<svg viewBox="0 0 100 100"><path d="M20 70 Q20 40 50 40 Q80 40 80 70 Q80 85 50 85 Q20 85 20 70 Z" fill="currentColor"/><rect x="75" y="55" width="20" height="8" rx="4" fill="currentColor"/><circle cx="50" cy="30" r="8" fill="currentColor"/></svg>` },
+            { id: "map2", difficulty: "easy", name: "Treasure Map", x: 50, y: 95, size: 21, color: "#fdf3e7", sceneColor: "#f4e7d4", svg: `<svg viewBox="0 0 100 100"><rect x="15" y="20" width="70" height="60" fill="currentColor" stroke="#8b4513" stroke-width="3" transform="rotate(-5 50 50)"/><path d="M30 35 L45 45 L60 30 L75 50" stroke="red" stroke-width="3" fill="none"/></svg>` },
+            { id: "hat", difficulty: "easy", name: "Explorer Hat", x: 10, y: 60, size: 21, color: "#e74c3c", sceneColor: "#af5630", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="65" rx="45" ry="12" fill="currentColor"/><path d="M25 65 Q25 30 50 30 Q75 30 75 65" fill="currentColor"/><line x1="50" y1="30" x2="50" y2="10" stroke="currentColor" stroke-width="4"/><polygon points="50,10 70,15 50,20" fill="white"/></svg>` },
+            { id: "backpack", difficulty: "easy", name: "Backpack", x: 40, y: 90, size: 21, color: "#556b2f", sceneColor: "#7f843a", svg: `<svg viewBox="0 0 100 100"><rect x="25" y="30" width="50" height="60" rx="12" fill="currentColor"/><rect x="35" y="15" width="30" height="20" rx="8" fill="currentColor"/><rect x="35" y="50" width="30" height="20" rx="4" fill="#8b4513"/></svg>` },
+            { id: "beetle", difficulty: "hard", name: "Scarab Beetle", x: 97, y: 75, size: 12, color: "#2e8b57", sceneColor: "#839447", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="55" rx="30" ry="35" fill="currentColor"/><line x1="50" y1="20" x2="50" y2="90" stroke="black" stroke-width="3"/><circle cx="50" cy="20" r="8" fill="currentColor"/></svg>` },
+            { id: "vase", difficulty: "hard", name: "Clay Vase", x: 3, y: 80, size: 15, color: "#1e88e5", sceneColor: "#629e3a", svg: `<svg viewBox="0 0 100 100"><path d="M35 20 L65 20 L70 40 Q80 55 70 75 Q65 90 50 90 Q35 90 30 75 Q20 55 30 40 Z" fill="currentColor"/></svg>` },
+            { id: "canteen", difficulty: "medium", name: "Canteen", x: 50, y: 30, size: 18, color: "#4a90d9", sceneColor: "#75c3c2", svg: `<svg viewBox="0 0 100 100"><rect x="30" y="35" width="40" height="50" rx="10" fill="currentColor"/><rect x="40" y="20" width="20" height="18" fill="currentColor"/><rect x="35" y="15" width="30" height="8" rx="3" fill="#8b4513"/></svg>` },
+            { id: "key", difficulty: "medium", name: "Key", x: 80, y: 80, size: 15, color: "#c0c0c0", sceneColor: "#8368a4", svg: `<svg viewBox="0 0 100 100"><circle cx="20" cy="50" r="15" stroke="currentColor" stroke-width="8" fill="none"/><line x1="35" y1="50" x2="90" y2="50" stroke="currentColor" stroke-width="8"/><line x1="70" y1="50" x2="70" y2="70" stroke="currentColor" stroke-width="8"/><line x1="85" y1="50" x2="85" y2="70" stroke="currentColor" stroke-width="8"/></svg>` },
+            { id: "compass", difficulty: "easy", name: "Compass", x: 15, y: 20, size: 18, color: "#f5deb3", sceneColor: "#9ccb72", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor" stroke="#8b4513" stroke-width="6"/><polygon points="50,20 58,50 50,80 42,50" fill="red"/></svg>` },
+            { id: "magnifyingglass", difficulty: "medium", name: "Magnifying Glass", x: 70, y: 15, size: 18, color: "#c0c0c0", sceneColor: "#9d8bb9", svg: `<svg viewBox="0 0 100 100"><circle cx="40" cy="40" r="28" fill="none" stroke="currentColor" stroke-width="10"/><line x1="60" y1="60" x2="90" y2="90" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>` },
+            { id: "acorn", difficulty: "medium", name: "Acorn", x: 90, y: 70, size: 15, color: "#8b4513", sceneColor: "#93643c", svg: `<svg viewBox="0 0 100 100"><path d="M20 40 Q50 100 80 40 Z" fill="#cd853f"/><path d="M10 40 Q50 10 90 40 Z" fill="currentColor"/></svg>` }
+        ]
+    },
+    {
+        id: 5,
+        name: "Galactic Outpost",
+        icon: "🚀",
+        bg: "assets/space_bg.png",
+        mapPos: { x: 24, y: 28 }, // Galactic Outpost space dome top-left
+        pathWaypoints: [{ x: 22, y: 38 }, { x: 33, y: 42 }, { x: 42, y: 47 }],
+        objects: [
+            { id: "wrench", difficulty: "hard", name: "Wrench", x: 3, y: 14, size: 15, color: "#ffd700", sceneColor: "#80316c", svg: `<svg viewBox="0 0 100 100"><path d="M30 70 L60 40" stroke="currentColor" stroke-width="14" stroke-linecap="round"/><circle cx="25" cy="75" r="18" fill="none" stroke="currentColor" stroke-width="10"/><circle cx="70" cy="30" r="14" fill="none" stroke="currentColor" stroke-width="10"/></svg>` },
+            { id: "helmet", difficulty: "easy", name: "Space Helmet", x: 95, y: 45, size: 18, color: "#f5f5f5", sceneColor: "#c59ebb", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor"/><circle cx="50" cy="50" r="28" fill="#87ceeb"/><rect x="20" y="65" width="60" height="15" rx="6" fill="currentColor"/></svg>` },
+            { id: "saturnplanet", difficulty: "easy", name: "Ringed Planet", x: 50, y: 5, size: 21, color: "#ff7f50", sceneColor: "#b63a90", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="28" fill="currentColor"/><ellipse cx="50" cy="50" rx="48" ry="12" fill="none" stroke="#d4af37" stroke-width="6"/></svg>` },
+            { id: "moon", difficulty: "easy", name: "Cratered Moon", x: 10, y: 28, size: 21, color: "#d3d3d3", sceneColor: "#b48291", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor"/><circle cx="35" cy="35" r="8" fill="#a9a9a9"/><circle cx="60" cy="55" r="10" fill="#a9a9a9"/><circle cx="45" cy="65" r="5" fill="#a9a9a9"/></svg>` },
+            { id: "bluealien", difficulty: "medium", name: "Blue Alien", x: 18, y: 88, size: 18, color: "#00bcd4", sceneColor: "#4daabd", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="55" rx="28" ry="32" fill="currentColor"/><circle cx="38" cy="50" r="10" fill="black"/><circle cx="62" cy="50" r="10" fill="black"/><path d="M30 20 Q50 0 70 20" stroke="currentColor" stroke-width="8" fill="none"/></svg>` },
+            { id: "astronaut", difficulty: "medium", name: "Astronaut", x: 5, y: 55, size: 18, color: "#ff8c00", sceneColor: "#9d3374", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="30" r="20" fill="#f0f0f0"/><circle cx="50" cy="30" r="14" fill="#87ceeb"/><rect x="30" y="48" width="40" height="40" rx="12" fill="currentColor"/></svg>` },
+            { id: "ufo", difficulty: "medium", name: "UFO", x: 90, y: 30, size: 18, color: "#9aa5b1", sceneColor: "#586f92", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="55" rx="45" ry="15" fill="currentColor"/><ellipse cx="50" cy="40" rx="20" ry="15" fill="#87ceeb"/><circle cx="25" cy="60" r="5" fill="yellow"/><circle cx="50" cy="65" r="5" fill="yellow"/><circle cx="75" cy="60" r="5" fill="yellow"/></svg>` },
+            { id: "greenalien", difficulty: "hard", name: "Green Alien", x: 62, y: 15, size: 15, color: "#32cd32", sceneColor: "#466f88", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="55" rx="26" ry="30" fill="currentColor"/><circle cx="38" cy="48" r="9" fill="black"/><circle cx="62" cy="48" r="9" fill="black"/><path d="M40 20 Q40 5 35 0 M60 20 Q60 5 65 0" stroke="currentColor" stroke-width="5" fill="none"/></svg>` },
+            { id: "wrench2", difficulty: "hard", name: "Wrench", x: 70, y: 85, size: 15, color: "#ffd700", sceneColor: "#80316c", svg: `<svg viewBox="0 0 100 100"><path d="M30 70 L60 40" stroke="currentColor" stroke-width="14" stroke-linecap="round"/><circle cx="25" cy="75" r="18" fill="none" stroke="currentColor" stroke-width="10"/><circle cx="70" cy="30" r="14" fill="none" stroke="currentColor" stroke-width="10"/></svg>` },
+            { id: "spacecompass", difficulty: "easy", name: "Compass", x: 45, y: 65, size: 18, color: "#f5deb3", sceneColor: "#9ccb72", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor" stroke="#8b4513" stroke-width="6"/><polygon points="50,20 58,50 50,80 42,50" fill="red"/></svg>` },
+            { id: "spacelantern", difficulty: "easy", name: "Lantern", x: 35, y: 25, size: 21, color: "#ffd700", sceneColor: "#afa242", svg: `<svg viewBox="0 0 100 100"><rect x="30" y="30" width="40" height="50" fill="currentColor" rx="5"/><rect x="20" y="20" width="60" height="10" fill="#333"/><rect x="20" y="80" width="60" height="10" fill="#333"/></svg>` },
+            { id: "spacekey", difficulty: "medium", name: "Key", x: 90, y: 75, size: 15, color: "#c0c0c0", sceneColor: "#8368a4", svg: `<svg viewBox="0 0 100 100"><circle cx="20" cy="50" r="15" stroke="currentColor" stroke-width="8" fill="none"/><line x1="35" y1="50" x2="90" y2="50" stroke="currentColor" stroke-width="8"/><line x1="70" y1="50" x2="70" y2="70" stroke="currentColor" stroke-width="8"/><line x1="85" y1="50" x2="85" y2="70" stroke="currentColor" stroke-width="8"/></svg>` }
+        ]
+    },
+    {
+        id: 6,
+        name: "Jungle Ruins",
+        icon: "🐒",
+        bg: "assets/jungle_bg.png",
+        mapPos: { x: 82, y: 64 }, // Jungle waterfall middle-right
+        pathWaypoints: [{ x: 58, y: 58 }, { x: 70, y: 62 }],
+        objects: [
+            { id: "fedora", difficulty: "easy", name: "Explorer Hat", x: 30, y: 28, size: 18, color: "#8b5a2b", sceneColor: "#9c8552", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="70" rx="45" ry="10" fill="currentColor"/><path d="M30 70 Q30 40 50 35 Q70 40 70 70" fill="currentColor"/><rect x="25" y="55" width="50" height="10" fill="#5a3a22"/></svg>` },
+            { id: "machete", difficulty: "easy", name: "Machete", x: 40, y: 62, size: 18, color: "#b0b0b0", sceneColor: "#cfc1ae", svg: `<svg viewBox="0 0 100 100"><path d="M20 80 L75 25 Q85 15 90 25 L40 85 Z" fill="currentColor"/><rect x="10" y="75" width="20" height="15" rx="4" fill="#5a3a22"/></svg>` },
+            { id: "idol", difficulty: "easy", name: "Golden Idol", x: 70, y: 85, size: 18, color: "#d4af37", sceneColor: "#b9a661", svg: `<svg viewBox="0 0 100 100"><rect x="35" y="50" width="30" height="40" fill="currentColor"/><circle cx="50" cy="35" r="18" fill="currentColor"/><rect x="30" y="85" width="40" height="10" fill="currentColor"/></svg>` },
+            { id: "snake", difficulty: "medium", name: "Jungle Snake", x: 55, y: 92, size: 15, color: "#3cb043", sceneColor: "#4b8256", svg: `<svg viewBox="0 0 100 100"><path d="M20 80 Q20 50 50 50 Q80 50 80 30 Q80 15 65 15" stroke="currentColor" stroke-width="14" fill="none" stroke-linecap="round"/><circle cx="65" cy="15" r="10" fill="currentColor"/></svg>` },
+            { id: "scroll", difficulty: "hard", name: "Ancient Scroll", x: 78, y: 5, size: 15, color: "#e8d3a0", sceneColor: "#95c18d", svg: `<svg viewBox="0 0 100 100"><rect x="20" y="35" width="60" height="30" rx="15" fill="currentColor"/><circle cx="20" cy="50" r="15" fill="currentColor"/><circle cx="80" cy="50" r="15" fill="currentColor"/></svg>` },
+            { id: "lantern3", difficulty: "medium", name: "Jungle Lantern", x: 58, y: 48, size: 18, color: "#ff9f1c", sceneColor: "#c1ba4a", svg: `<svg viewBox="0 0 100 100"><rect x="30" y="35" width="40" height="45" rx="8" fill="currentColor"/><path d="M40 35 L40 20 L60 20 L60 35" stroke="currentColor" stroke-width="6" fill="none"/><circle cx="50" cy="15" r="6" fill="currentColor"/></svg>` },
+            { id: "binoculars", difficulty: "hard", name: "Binoculars", x: 8, y: 82, size: 15, color: "#2f4f2f", sceneColor: "#415432", svg: `<svg viewBox="0 0 100 100"><rect x="20" y="35" width="25" height="30" rx="8" fill="currentColor"/><rect x="55" y="35" width="25" height="30" rx="8" fill="currentColor"/><rect x="42" y="40" width="16" height="10" fill="currentColor"/></svg>` },
+            { id: "vinerope", difficulty: "medium", name: "Vine Rope", x: 75, y: 55, size: 18, color: "#6b8e23", sceneColor: "#586436", svg: `<svg viewBox="0 0 100 100"><path d="M50 20 Q20 30 50 45 Q80 60 50 75 Q20 90 50 95" stroke="currentColor" stroke-width="12" fill="none" stroke-linecap="round"/></svg>` },
+            { id: "binoculars2", difficulty: "hard", name: "Binoculars", x: 88, y: 35, size: 15, color: "#2f4f2f", sceneColor: "#415432", svg: `<svg viewBox="0 0 100 100"><rect x="20" y="35" width="25" height="30" rx="8" fill="currentColor"/><rect x="55" y="35" width="25" height="30" rx="8" fill="currentColor"/><rect x="42" y="40" width="16" height="10" fill="currentColor"/></svg>` },
+            { id: "junglecompass", difficulty: "easy", name: "Compass", x: 12, y: 55, size: 18, color: "#f5deb3", sceneColor: "#9ccb72", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor" stroke="#8b4513" stroke-width="6"/><polygon points="50,20 58,50 50,80 42,50" fill="red"/></svg>` },
+            { id: "junglepotion", difficulty: "easy", name: "Potion", x: 25, y: 85, size: 18, color: "#00fa9a", sceneColor: "#3ba054", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="70" r="25" fill="currentColor"/><rect x="40" y="20" width="20" height="30" fill="currentColor"/><rect x="35" y="10" width="30" height="10" fill="#8b4513"/></svg>` },
+            { id: "jungleacorn", difficulty: "medium", name: "Acorn", x: 45, y: 20, size: 15, color: "#8b4513", sceneColor: "#93643c", svg: `<svg viewBox="0 0 100 100"><path d="M20 40 Q50 100 80 40 Z" fill="#cd853f"/><path d="M10 40 Q50 10 90 40 Z" fill="currentColor"/></svg>` }
+        ]
+    },
+    {
+        id: 7,
+        name: "Pirate Cove",
+        icon: "🏴‍☠️",
+        bg: "assets/pirate_bg.png",
+        mapPos: { x: 77, y: 43 }, // Pirate Cove ship right
+        pathWaypoints: [{ x: 78, y: 53 }, { x: 82, y: 45 }],
+        objects: [
+            { id: "jollyroger", difficulty: "medium", name: "Jolly Roger", x: 50, y: 5, size: 18, color: "#1a1a1a", sceneColor: "#67428b", svg: `<svg viewBox="0 0 100 100"><rect x="20" y="10" width="8" height="80" fill="#3a2a1a"/><rect x="28" y="15" width="55" height="35" fill="currentColor"/><circle cx="55" cy="32" r="10" fill="white"/></svg>` },
+            { id: "skeletonkey", difficulty: "hard", name: "Skeleton Key", x: 45, y: 15, size: 15, color: "#d4af37", sceneColor: "#4fd490", svg: `<svg viewBox="0 0 100 100"><circle cx="25" cy="50" r="18" stroke="currentColor" stroke-width="9" fill="none"/><line x1="40" y1="50" x2="90" y2="50" stroke="currentColor" stroke-width="9"/><line x1="75" y1="50" x2="75" y2="65" stroke="currentColor" stroke-width="9"/><line x1="88" y1="50" x2="88" y2="62" stroke="currentColor" stroke-width="9"/></svg>` },
+            { id: "doubloon", difficulty: "hard", name: "Gold Doubloon", x: 72, y: 10, size: 15, color: "#ffd700", sceneColor: "#51af3a", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="38" fill="currentColor" stroke="#a67c00" stroke-width="5"/><circle cx="50" cy="50" r="22" fill="none" stroke="#a67c00" stroke-width="4"/></svg>` },
+            { id: "dagger", difficulty: "medium", name: "Dagger", x: 8, y: 45, size: 15, color: "#c0c0c0", sceneColor: "#b3b180", svg: `<svg viewBox="0 0 100 100"><polygon points="50,10 60,55 40,55" fill="currentColor"/><rect x="44" y="55" width="12" height="25" fill="#5a3a22"/><rect x="35" y="78" width="30" height="8" fill="#5a3a22"/></svg>` },
+            { id: "shiplantern", difficulty: "hard", name: "Ship Lantern", x: 50, y: 55, size: 15, color: "#ffb627", sceneColor: "#37cb5a", svg: `<svg viewBox="0 0 100 100"><rect x="32" y="30" width="36" height="45" rx="6" fill="currentColor"/><path d="M40 30 L40 18 L60 18 L60 30" stroke="currentColor" stroke-width="5" fill="none"/><circle cx="50" cy="12" r="5" fill="currentColor"/></svg>` },
+            { id: "rumbarrel", difficulty: "medium", name: "Rum Barrel", x: 30, y: 68, size: 18, color: "#a0522d", sceneColor: "#b4a168", svg: `<svg viewBox="0 0 100 100"><rect x="25" y="20" width="50" height="65" rx="14" fill="currentColor"/><rect x="25" y="35" width="50" height="6" fill="#5a3a22"/><rect x="25" y="60" width="50" height="6" fill="#5a3a22"/></svg>` },
+            { id: "crab2", difficulty: "hard", name: "Beach Crab", x: 20, y: 75, size: 15, color: "#ff6347", sceneColor: "#68c857", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="60" rx="30" ry="20" fill="currentColor"/><circle cx="30" cy="30" r="8" fill="currentColor"/><circle cx="70" cy="30" r="8" fill="currentColor"/></svg>` },
+            { id: "starfish2", difficulty: "hard", name: "Purple Starfish", x: 35, y: 90, size: 15, color: "#9b59b6", sceneColor: "#4b79b7", svg: `<svg viewBox="0 0 100 100"><polygon points="50,10 60,40 90,40 65,60 75,90 50,70 25,90 35,60 10,40 40,40" fill="currentColor"/></svg>` },
+            { id: "dagger2", difficulty: "medium", name: "Dagger", x: 60, y: 85, size: 18, color: "#c0c0c0", sceneColor: "#b3b180", svg: `<svg viewBox="0 0 100 100"><polygon points="50,10 60,55 40,55" fill="currentColor"/><rect x="44" y="55" width="12" height="25" fill="#5a3a22"/><rect x="35" y="78" width="30" height="8" fill="#5a3a22"/></svg>` },
+            { id: "beachshell", difficulty: "easy", name: "Shell", x: 95, y: 80, size: 21, color: "#ffb6c1", sceneColor: "#dca697", svg: `<svg viewBox="0 0 100 100"><path d="M10 80 Q50 10 90 80 Z" fill="currentColor"/><circle cx="50" cy="80" r="15" fill="currentColor"/></svg>` },
+            { id: "piratecompass", difficulty: "easy", name: "Compass", x: 12, y: 15, size: 18, color: "#f5deb3", sceneColor: "#9ccb72", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor" stroke="#8b4513" stroke-width="6"/><polygon points="50,20 58,50 50,80 42,50" fill="red"/></svg>` },
+            { id: "piratekey", difficulty: "medium", name: "Key", x: 45, y: 92, size: 15, color: "#c0c0c0", sceneColor: "#8368a4", svg: `<svg viewBox="0 0 100 100"><circle cx="20" cy="50" r="15" stroke="currentColor" stroke-width="8" fill="none"/><line x1="35" y1="50" x2="90" y2="50" stroke="currentColor" stroke-width="8"/><line x1="70" y1="50" x2="70" y2="70" stroke="currentColor" stroke-width="8"/><line x1="85" y1="50" x2="85" y2="70" stroke="currentColor" stroke-width="8"/></svg>` }
+        ]
+    },
+    {
+        id: 8,
+        name: "Cloud Kingdom",
+        icon: "🌈",
+        bg: "assets/sky_bg.png",
+        mapPos: { x: 44, y: 9 }, // Cloud Kingdom castle top-center
+        pathWaypoints: [{ x: 68, y: 35 }, { x: 50, y: 31 }, { x: 32, y: 27 }, { x: 24, y: 25 }, { x: 28, y: 20 }, { x: 38, y: 20 }, { x: 50, y: 23 }],
+        objects: [
+            { id: "bluebird", difficulty: "medium", name: "Bluebird", x: 50, y: 40, size: 15, color: "#4a90d9", sceneColor: "#98cfce", svg: `<svg viewBox="0 0 100 100"><ellipse cx="55" cy="55" rx="30" ry="22" fill="currentColor"/><circle cx="80" cy="45" r="14" fill="currentColor"/><polygon points="92,45 100,42 92,50" fill="orange"/><polygon points="25,55 10,45 10,65" fill="currentColor"/></svg>` },
+            { id: "pinwheel", difficulty: "medium", name: "Pinwheel", x: 25, y: 55, size: 18, color: "#ff6fa5", sceneColor: "#d3c18d", svg: `<svg viewBox="0 0 100 100"><g fill="currentColor"><polygon points="50,50 50,10 70,30"/><polygon points="50,50 90,50 70,70"/><polygon points="50,50 50,90 30,70"/><polygon points="50,50 10,50 30,30"/></g><circle cx="50" cy="50" r="8" fill="#5a3a22"/></svg>` },
+            { id: "sparklestar", difficulty: "hard", name: "Sparkle Star", x: 32, y: 15, size: 15, color: "#ffd700", sceneColor: "#d5b564", svg: `<svg viewBox="0 0 100 100"><polygon points="50,5 60,40 95,50 60,60 50,95 40,60 5,50 40,40" fill="currentColor"/></svg>` },
+            { id: "crescentmoon", difficulty: "hard", name: "Daytime Moon", x: 5, y: 45, size: 15, color: "#fff2a8", sceneColor: "#8fdbc2", svg: `<svg viewBox="0 0 100 100"><path d="M65 10 A40 40 0 1 0 65 90 A32 32 0 1 1 65 10 Z" fill="currentColor"/></svg>` },
+            { id: "skybutterfly", difficulty: "hard", name: "Sky Butterfly", x: 62, y: 78, size: 15, color: "#b07cc6", sceneColor: "#d2bcb5", svg: `<svg viewBox="0 0 100 100"><path d="M50 50 Q20 10 10 30 Q5 50 50 50 Q95 50 90 30 Q80 10 50 50" fill="currentColor"/><path d="M50 50 Q20 90 10 70 Q5 50 50 50 Q95 50 90 70 Q80 90 50 50" fill="currentColor"/><line x1="50" y1="20" x2="50" y2="80" stroke="black" stroke-width="3"/></svg>` },
+            { id: "goggles", difficulty: "medium", name: "Aviator Goggles", x: 40, y: 75, size: 18, color: "#8b5a2b", sceneColor: "#8dbc8b", svg: `<svg viewBox="0 0 100 100"><circle cx="30" cy="50" r="22" fill="none" stroke="currentColor" stroke-width="10"/><circle cx="70" cy="50" r="22" fill="none" stroke="currentColor" stroke-width="10"/><line x1="52" y1="50" x2="48" y2="50" stroke="currentColor" stroke-width="10"/></svg>` },
+            { id: "feather", difficulty: "hard", name: "Feather", x: 95, y: 45, size: 15, color: "#2ec4b6", sceneColor: "#afd0d6", svg: `<svg viewBox="0 0 100 100"><path d="M50 90 Q40 60 50 10 Q60 60 50 90 Z" fill="currentColor"/><line x1="50" y1="20" x2="50" y2="85" stroke="#8b5a2b" stroke-width="3"/></svg>` },
+            { id: "skycompass", difficulty: "hard", name: "Sky Compass", x: 10, y: 72, size: 15, color: "#87ceeb", sceneColor: "#b7d6dc", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor" stroke="#8b4513" stroke-width="6"/><polygon points="50,20 58,50 50,80 42,50" fill="red"/></svg>` },
+            { id: "cloudpotion", difficulty: "easy", name: "Potion", x: 90, y: 25, size: 18, color: "#00fa9a", sceneColor: "#3ba054", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="70" r="25" fill="currentColor"/><rect x="40" y="20" width="20" height="30" fill="currentColor"/><rect x="35" y="10" width="30" height="10" fill="#8b4513"/></svg>` },
+            { id: "cloudwand", difficulty: "easy", name: "Magic Wand", x: 15, y: 85, size: 28, color: "#dda0dd", sceneColor: "#b97a8d", svg: `<svg viewBox="0 0 100 100"><line x1="20" y1="80" x2="80" y2="20" stroke="#8b4513" stroke-width="8"/><polygon points="80,5 90,20 100,20 90,30 95,45 80,35 65,45 70,30 60,20 70,20" fill="currentColor"/></svg>` },
+            { id: "cloudfeather", difficulty: "hard", name: "Feather", x: 50, y: 85, size: 15, color: "#2ec4b6", sceneColor: "#afd0d6", svg: `<svg viewBox="0 0 100 100"><path d="M50 90 Q40 60 50 10 Q60 60 50 90 Z" fill="currentColor"/><line x1="50" y1="20" x2="50" y2="85" stroke="#8b5a2b" stroke-width="3"/></svg>` },
+            { id: "cloudkey", difficulty: "medium", name: "Key", x: 65, y: 60, size: 15, color: "#c0c0c0", sceneColor: "#8368a4", svg: `<svg viewBox="0 0 100 100"><circle cx="20" cy="50" r="15" stroke="currentColor" stroke-width="8" fill="none"/><line x1="35" y1="50" x2="90" y2="50" stroke="currentColor" stroke-width="8"/><line x1="70" y1="50" x2="70" y2="70" stroke="currentColor" stroke-width="8"/><line x1="85" y1="50" x2="85" y2="70" stroke="currentColor" stroke-width="8"/></svg>` }
+        ]
+    },
+    {
+        id: 9,
+        name: "City Adventure",
+        icon: "🏙️",
+        bg: "assets/city_bg.png",
+        mapPos: { x: 60, y: 22 }, // City skyscrapers top center-right
+        pathWaypoints: [{ x: 70, y: 24 }],
+        objects: [
+            { id: "rainumbrella", difficulty: "medium", name: "Rain Umbrella", x: 15, y: 65, size: 15, color: "#e63946", sceneColor: "#a15065", svg: `<svg viewBox="0 0 100 100"><path d="M10 55 Q50 5 90 55 Q70 45 50 55 Q30 45 10 55 Z" fill="currentColor"/><line x1="50" y1="55" x2="50" y2="90" stroke="#5a3a22" stroke-width="5"/><path d="M50 90 Q40 95 35 88" stroke="#5a3a22" stroke-width="5" fill="none"/></svg>` },
+            { id: "camera", difficulty: "medium", name: "Camera", x: 35, y: 55, size: 15, color: "#2b2b2b", sceneColor: "#794970", svg: `<svg viewBox="0 0 100 100"><rect x="15" y="35" width="70" height="45" rx="8" fill="currentColor"/><rect x="35" y="20" width="30" height="18" rx="4" fill="currentColor"/><circle cx="50" cy="58" r="16" fill="#333"/><circle cx="50" cy="58" r="9" fill="#87ceeb"/></svg>` },
+            { id: "sunglasses", difficulty: "medium", name: "Sunglasses", x: 15, y: 90, size: 15, color: "#3a2a5a", sceneColor: "#804f83", svg: `<svg viewBox="0 0 100 100"><circle cx="28" cy="55" r="20" fill="currentColor"/><circle cx="72" cy="55" r="20" fill="currentColor"/><line x1="48" y1="55" x2="52" y2="55" stroke="currentColor" stroke-width="8"/><line x1="8" y1="50" x2="0" y2="45" stroke="currentColor" stroke-width="5"/><line x1="92" y1="50" x2="100" y2="45" stroke="currentColor" stroke-width="5"/></svg>` },
+            { id: "donut", difficulty: "hard", name: "Donut", x: 55, y: 90, size: 15, color: "#e8a87c", sceneColor: "#cda0b0", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="38" fill="currentColor"/><circle cx="50" cy="50" r="14" fill="white"/><circle cx="35" cy="35" r="4" fill="red"/><circle cx="60" cy="30" r="4" fill="yellow"/><circle cx="65" cy="55" r="4" fill="blue"/></svg>` },
+            { id: "coffeecup", difficulty: "hard", name: "Coffee Cup", x: 78, y: 92, size: 15, color: "#d62828", sceneColor: "#914f6a", svg: `<svg viewBox="0 0 100 100"><rect x="25" y="35" width="45" height="50" rx="6" fill="currentColor"/><path d="M70 45 Q90 45 90 60 Q90 75 70 72" stroke="currentColor" stroke-width="6" fill="none"/><rect x="25" y="25" width="45" height="10" fill="#5a3a22"/></svg>` },
+            { id: "citymap", difficulty: "hard", name: "City Map", x: 90, y: 15, size: 15, color: "#a8dadc", sceneColor: "#b3b76e", svg: `<svg viewBox="0 0 100 100"><rect x="15" y="20" width="70" height="60" fill="currentColor" stroke="#333" stroke-width="3" transform="rotate(-4 50 50)"/><path d="M30 35 L45 45 L60 30 L75 50" stroke="red" stroke-width="3" fill="none"/></svg>` },
+            { id: "puppy", difficulty: "hard", name: "Puppy", x: 5, y: 15, size: 15, color: "#c68642", sceneColor: "#a48267", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="60" rx="28" ry="24" fill="currentColor"/><circle cx="50" cy="35" r="20" fill="currentColor"/><ellipse cx="35" cy="25" rx="8" ry="14" fill="currentColor" transform="rotate(-20 35 25)"/><ellipse cx="65" cy="25" rx="8" ry="14" fill="currentColor" transform="rotate(20 65 25)"/></svg>` },
+            { id: "trafficcone", difficulty: "hard", name: "Traffic Cone", x: 65, y: 55, size: 15, color: "#ff7f11", sceneColor: "#c8778b", svg: `<svg viewBox="0 0 100 100"><polygon points="50,10 75,85 25,85" fill="currentColor"/><rect x="20" y="85" width="60" height="10" rx="3" fill="currentColor"/><rect x="32" y="55" width="36" height="10" fill="white"/></svg>` },
+            { id: "camera2", difficulty: "medium", name: "Camera", x: 50, y: 15, size: 18, color: "#2b2b2b", sceneColor: "#794970", svg: `<svg viewBox="0 0 100 100"><rect x="15" y="35" width="70" height="45" rx="8" fill="currentColor"/><rect x="35" y="20" width="30" height="18" rx="4" fill="currentColor"/><circle cx="50" cy="58" r="16" fill="#333"/><circle cx="50" cy="58" r="9" fill="#87ceeb"/></svg>` },
+            { id: "sunglasses2", difficulty: "medium", name: "Sunglasses", x: 85, y: 50, size: 18, color: "#3a2a5a", sceneColor: "#804f83", svg: `<svg viewBox="0 0 100 100"><circle cx="28" cy="55" r="20" fill="currentColor"/><circle cx="72" cy="55" r="20" fill="currentColor"/><line x1="48" y1="55" x2="52" y2="55" stroke="currentColor" stroke-width="8"/><line x1="8" y1="50" x2="0" y2="45" stroke="currentColor" stroke-width="5"/><line x1="92" y1="50" x2="100" y2="45" stroke="currentColor" stroke-width="5"/></svg>` },
+            { id: "citycompass", difficulty: "easy", name: "Compass", x: 25, y: 35, size: 18, color: "#f5deb3", sceneColor: "#9ccb72", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor" stroke="#8b4513" stroke-width="6"/><polygon points="50,20 58,50 50,80 42,50" fill="red"/></svg>` },
+            { id: "citykey", difficulty: "medium", name: "Key", x: 95, y: 85, size: 15, color: "#c0c0c0", sceneColor: "#8368a4", svg: `<svg viewBox="0 0 100 100"><circle cx="20" cy="50" r="15" stroke="currentColor" stroke-width="8" fill="none"/><line x1="35" y1="50" x2="90" y2="50" stroke="currentColor" stroke-width="8"/><line x1="70" y1="50" x2="70" y2="70" stroke="currentColor" stroke-width="8"/><line x1="85" y1="50" x2="85" y2="70" stroke="currentColor" stroke-width="8"/></svg>` }
+        ]
+    },
+    {
+        id: 10,
+        name: "Moon Base",
+        icon: "🌙",
+        bg: "assets/moon_bg.png",
+        mapPos: { x: 88, y: 10 }, // Moon Base domes top-right
+        objects: [
+            { id: "glove", difficulty: "medium", name: "Astronaut Glove", x: 15, y: 12, size: 15, color: "#e8e8e8", sceneColor: "#8849a4", svg: `<svg viewBox="0 0 100 100"><ellipse cx="50" cy="55" rx="25" ry="30" fill="currentColor"/><rect x="35" y="15" width="12" height="30" rx="6" fill="currentColor"/><rect x="50" y="15" width="12" height="30" rx="6" fill="currentColor"/></svg>` },
+            { id: "moonboot", difficulty: "hard", name: "Moon Boot", x: 85, y: 12, size: 15, color: "#d8d8d8", sceneColor: "#483372", svg: `<svg viewBox="0 0 100 100"><path d="M25 30 L25 65 Q25 80 45 80 L85 80 L85 65 L55 65 L55 30 Z" fill="currentColor"/></svg>` },
+            { id: "solarpanel", difficulty: "medium", name: "Solar Panel", x: 8, y: 35, size: 18, color: "#4d96ff", sceneColor: "#6997c5", svg: `<svg viewBox="0 0 100 100"><rect x="15" y="30" width="70" height="45" fill="currentColor" stroke="#2255aa" stroke-width="3"/><line x1="15" y1="45" x2="85" y2="45" stroke="#2255aa" stroke-width="3"/><line x1="15" y1="60" x2="85" y2="60" stroke="#2255aa" stroke-width="3"/><line x1="38" y1="30" x2="38" y2="75" stroke="#2255aa" stroke-width="3"/><line x1="62" y1="30" x2="62" y2="75" stroke="#2255aa" stroke-width="3"/></svg>` },
+            { id: "satdish", difficulty: "hard", name: "Satellite Dish", x: 92, y: 45, size: 15, color: "#b0b0b0", sceneColor: "#918ab9", svg: `<svg viewBox="0 0 100 100"><path d="M15 60 A40 40 0 0 1 85 60" fill="none" stroke="currentColor" stroke-width="10"/><line x1="50" y1="60" x2="50" y2="90" stroke="currentColor" stroke-width="8"/><circle cx="50" cy="35" r="6" fill="currentColor"/></svg>` },
+            { id: "oxygentank", difficulty: "hard", name: "Oxygen Tank", x: 20, y: 28, size: 15, color: "#ffd23f", sceneColor: "#1a7b63", svg: `<svg viewBox="0 0 100 100"><rect x="35" y="25" width="30" height="60" rx="14" fill="currentColor"/><rect x="42" y="12" width="16" height="15" fill="currentColor"/><circle cx="50" cy="50" r="8" fill="#2255aa"/></svg>` },
+            { id: "moontelescope", difficulty: "medium", name: "Moon Telescope", x: 70, y: 28, size: 18, color: "#2ec4b6", sceneColor: "#36758a", svg: `<svg viewBox="0 0 100 100"><rect x="20" y="30" width="50" height="14" rx="6" fill="currentColor" transform="rotate(-25 45 37)"/><line x1="35" y1="55" x2="20" y2="90" stroke="currentColor" stroke-width="6"/><line x1="35" y1="55" x2="50" y2="90" stroke="currentColor" stroke-width="6"/><line x1="35" y1="55" x2="35" y2="92" stroke="currentColor" stroke-width="6"/></svg>` },
+            { id: "aliencrystal", difficulty: "hard", name: "Alien Crystal", x: 90, y: 75, size: 15, color: "#c364e8", sceneColor: "#8b9cc4", svg: `<svg viewBox="0 0 100 100"><polygon points="50,5 70,40 60,95 40,95 30,40" fill="currentColor"/></svg>` },
+            { id: "meteorfragment", difficulty: "hard", name: "Meteor Fragment", x: 30, y: 42, size: 15, color: "#a0522d", sceneColor: "#625391", svg: `<svg viewBox="0 0 100 100"><polygon points="30,30 70,20 85,50 65,85 30,80 15,50" fill="currentColor"/></svg>` },
+            { id: "moonwrench", difficulty: "hard", name: "Wrench", x: 45, y: 55, size: 15, color: "#ffd700", sceneColor: "#80316c", svg: `<svg viewBox="0 0 100 100"><path d="M30 70 L60 40" stroke="currentColor" stroke-width="14" stroke-linecap="round"/><circle cx="25" cy="75" r="18" fill="none" stroke="currentColor" stroke-width="10"/><circle cx="70" cy="30" r="14" fill="none" stroke="currentColor" stroke-width="10"/></svg>` },
+            { id: "moonkey", difficulty: "medium", name: "Key", x: 60, y: 85, size: 15, color: "#c0c0c0", sceneColor: "#8368a4", svg: `<svg viewBox="0 0 100 100"><circle cx="20" cy="50" r="15" stroke="currentColor" stroke-width="8" fill="none"/><line x1="35" y1="50" x2="90" y2="50" stroke="currentColor" stroke-width="8"/><line x1="70" y1="50" x2="70" y2="70" stroke="currentColor" stroke-width="8"/><line x1="85" y1="50" x2="85" y2="70" stroke="currentColor" stroke-width="8"/></svg>` },
+            { id: "mooncompass", difficulty: "easy", name: "Compass", x: 15, y: 85, size: 18, color: "#f5deb3", sceneColor: "#9ccb72", svg: `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="currentColor" stroke="#8b4513" stroke-width="6"/><polygon points="50,20 58,50 50,80 42,50" fill="red"/></svg>` },
+            { id: "moonglass", difficulty: "medium", name: "Magnifying Glass", x: 5, y: 65, size: 18, color: "#c0c0c0", sceneColor: "#9d8bb9", svg: `<svg viewBox="0 0 100 100"><circle cx="40" cy="40" r="28" fill="none" stroke="currentColor" stroke-width="10"/><line x1="60" y1="60" x2="90" y2="90" stroke="currentColor" stroke-width="10" stroke-linecap="round"/></svg>` }
+        ]
+    }
+];
+</script>
+    <script>class GameManager {
+    constructor() {
+        this.currentLevel = null;
+        this.foundItems = [];
+        this.hintsRemaining = 3;
+        this.timer = 0;
+        this.timerInterval = null;
+        this.isGameActive = false;
+
+        this.sfxCorrect = document.getElementById('sfx-correct');
+        this.sfxWrong = document.getElementById('sfx-wrong');
+        this.sfxWin = document.getElementById('sfx-win');
+        
+        // Lower volume
+        [this.sfxCorrect, this.sfxWrong, this.sfxWin].forEach(audio => audio.volume = 0.5);
+
+        this.bindEvents();
+    }
+
+    bindEvents() {
+        document.getElementById('btn-hint').addEventListener('click', () => this.useHint());
+        document.getElementById('game-bg').addEventListener('click', (e) => {
+            const rect = e.target.getBoundingClientRect();
+            const xPercent = ((e.clientX - rect.left) / rect.width) * 100;
+            const yPercent = ((e.clientY - rect.top) / rect.height) * 100;
+            this.wrongTap(xPercent, yPercent);
+        });
+    }
+
+    startLevel(levelData) {
+        this.currentLevel = levelData;
+        this.foundItems = [];
+        this.hintsRemaining = 3;
+        this.timer = 0;
+        this.isGameActive = true;
+
+        // Shuffle and partition objects into active checklist and decoys
+        const shuffled = [...levelData.objects].sort(() => Math.random() - 0.5);
+        const maxChecklistSize = Math.min(8, shuffled.length);
+        this.checklistObjects = shuffled.slice(0, maxChecklistSize);
+        this.decoyObjects = shuffled.slice(maxChecklistSize);
+
+        this.updateHUD();
+        this.renderChecklist();
+        this.renderObjects();
+        this.startTimer();
+
+        // Load background
+        document.getElementById('game-bg').src = levelData.bg;
+        document.getElementById('hint-layer').innerHTML = ''; // clear hints
+    }
+
+    renderChecklist() {
+        const checklist = document.getElementById('checklist');
+        checklist.innerHTML = '';
+        this.checklistObjects.forEach(obj => {
+            const div = document.createElement('div');
+            div.className = 'checklist-item';
+            div.id = `check-${obj.id}`;
+            // Use SVG with currentColor for checklist to match but standard color
+            const svgWithColor = obj.svg.replace(/currentColor/g, obj.color);
+            div.innerHTML = `
+                ${svgWithColor}
+                <span>${obj.name}</span>
+            `;
+            checklist.appendChild(div);
+        });
+    }
+
+    renderObjects() {
+        const layer = document.getElementById('objects-layer');
+        layer.innerHTML = '';
+        
+        this.currentLevel.objects.forEach(obj => {
+            const div = document.createElement('div');
+            div.className = 'hidden-object';
+            div.id = `obj-${obj.id}`;
+            div.style.left = `${obj.x}%`;
+            div.style.top = `${obj.y}%`;
+            
+            const sizePercent = obj.size / 10.24;
+            // Larger touch hitbox: minimum 48px square or 8% of the board
+            div.style.width = `max(${sizePercent}cqw, 8cqw, 48px)`;
+            div.style.height = `max(${sizePercent}cqw, 8cqw, 48px)`;
+            div.style.color = obj.sceneColor || obj.color;
+
+            // Apply random or defined orthogonal rotation to make visual search harder
+            const rotation = obj.rotation !== undefined ? obj.rotation : (Math.floor(Math.random() * 4) * 90);
+            
+            // Decoupled visual presentation: centered inside hitbox, minimum 14px size for visibility
+            div.innerHTML = `
+                <div style="
+                    position: absolute;
+                    top: 50%; left: 50%;
+                    transform: translate(-50%, -50%) rotate(${rotation}deg);
+                    width: max(${sizePercent}cqw, 14px);
+                    height: max(${sizePercent}cqw, 14px);
+                ">
+                    ${obj.svg}
+                </div>
+            `;
+
+            const isDecoy = this.decoyObjects.includes(obj);
+            div.addEventListener('click', (e) => {
+                e.stopPropagation(); // prevent wrong tap
+                if (isDecoy) {
+                    this.wrongTap(obj.x, obj.y);
+                } else {
+                    this.correctTap(obj, div);
+                }
+            });
+
+            layer.appendChild(div);
+        });
+    }
+
+    correctTap(obj, element) {
+        if (!this.isGameActive || this.foundItems.includes(obj.id)) return;
+
+        this.foundItems.push(obj.id);
+        
+        // Play sound
+        this.sfxCorrect.currentTime = 0;
+        this.sfxCorrect.play();
+
+        // Particles
+        this.createParticles(obj.x, obj.y);
+
+        // Hide object
+        element.style.pointerEvents = 'none';
+        element.style.opacity = '0';
+        element.style.transform = 'scale(0)';
+
+        // Remove element from DOM after transition
+        setTimeout(() => {
+            if (element.parentNode) {
+                element.parentNode.removeChild(element);
+            }
+        }, 200);
+
+        // Update checklist
+        const checkItem = document.getElementById(`check-${obj.id}`);
+        if (checkItem) checkItem.classList.add('found');
+
+        // Clear hint if active
+        document.getElementById('hint-layer').innerHTML = '';
+
+        if (this.foundItems.length === this.checklistObjects.length) {
+            this.levelComplete();
+        }
+    }
+
+    wrongTap(xPercent, yPercent) {
+        if (!this.isGameActive) return;
+        
+        this.timer += 5; // 5-second penalty!
+        this.updateHUD();
+        
+        this.sfxWrong.currentTime = 0;
+        this.sfxWrong.play().catch(() => {});
+
+        const gameScreen = document.getElementById('game-screen');
+        gameScreen.classList.remove('shake');
+        void gameScreen.offsetWidth; // trigger reflow
+        gameScreen.classList.add('shake');
+
+        // Create floating penalty indicator
+        if (xPercent !== undefined && yPercent !== undefined) {
+            this.createPenaltyIndicator(xPercent, yPercent);
+        }
+    }
+
+    createPenaltyIndicator(xPercent, yPercent) {
+        const layer = document.getElementById('hint-layer');
+        if (!layer) return;
+
+        const indicator = document.createElement('div');
+        indicator.className = 'penalty-indicator';
+        indicator.innerText = '+5s ❌';
+        indicator.style.left = `${xPercent}%`;
+        indicator.style.top = `${yPercent}%`;
+        layer.appendChild(indicator);
+
+        setTimeout(() => {
+            if (indicator.parentNode) {
+                indicator.parentNode.removeChild(indicator);
+            }
+        }, 1000);
+    }
+
+    useHint() {
+        if (this.hintsRemaining <= 0 || !this.isGameActive) return;
+
+        const missingObjects = this.checklistObjects.filter(obj => !this.foundItems.includes(obj.id));
+        if (missingObjects.length === 0) return;
+
+        this.hintsRemaining--;
+        this.updateHUD();
+
+        // Pick random missing object
+        const target = missingObjects[Math.floor(Math.random() * missingObjects.length)];
+
+        const hintLayer = document.getElementById('hint-layer');
+        hintLayer.innerHTML = '';
+        
+        const glow = document.createElement('div');
+        glow.className = 'hint-glow';
+        glow.style.left = `${target.x}%`;
+        glow.style.top = `${target.y}%`;
+        
+        // Make the hint circle scale responsively as a percentage of the board
+        const hintSizePercent = (target.size * 3) / 10.24; 
+        glow.style.width = `${hintSizePercent}cqw`;
+        glow.style.height = `${hintSizePercent}cqw`;
+
+        hintLayer.appendChild(glow);
+        
+        // Remove hint after 3 seconds
+        setTimeout(() => {
+            if (glow.parentNode) glow.parentNode.removeChild(glow);
+        }, 3000);
+    }
+
+    createParticles(xPercent, yPercent) {
+        const layer = document.getElementById('hint-layer');
+        for (let i = 0; i < 8; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.left = `${xPercent}%`;
+            p.style.top = `${yPercent}%`;
+            
+            // Random explosion direction
+            const angle = (Math.PI * 2 / 8) * i;
+            const distance = 100 + Math.random() * 50;
+            const tx = Math.cos(angle) * distance + 'px';
+            const ty = Math.sin(angle) * distance + 'px';
+            
+            p.style.setProperty('--tx', tx);
+            p.style.setProperty('--ty', ty);
+            
+            layer.appendChild(p);
+            
+            setTimeout(() => {
+                if (p.parentNode) p.parentNode.removeChild(p);
+            }, 800);
+        }
+    }
+
+    startTimer() {
+        clearInterval(this.timerInterval);
+        this.timerInterval = setInterval(() => {
+            this.timer++;
+            this.updateHUD();
+        }, 1000);
+    }
+
+    updateHUD() {
+        const mins = Math.floor(this.timer / 60).toString().padStart(2, '0');
+        const secs = (this.timer % 60).toString().padStart(2, '0');
+        document.getElementById('timer-display').innerText = `${mins}:${secs}`;
+
+        const hintBtn = document.getElementById('btn-hint');
+        document.getElementById('hint-count').innerText = this.hintsRemaining;
+        if (this.hintsRemaining <= 0) {
+            hintBtn.disabled = true;
+        } else {
+            hintBtn.disabled = false;
+        }
+    }
+
+    levelComplete() {
+        this.isGameActive = false;
+        clearInterval(this.timerInterval);
+        
+        this.sfxWin.play();
+
+        // Calculate stars strictly based on time and hints
+        let stars = 3;
+        if (this.timer >= 30 || this.hintsRemaining < 2) stars = 2;
+        if (this.timer >= 60) stars = 1;
+        stars = Math.max(1, stars);
+
+        // Save progress
+        const progress = JSON.parse(localStorage.getItem('hw_progress') || '{}');
+        progress[this.currentLevel.id] = { stars: stars, time: this.timer };
+        localStorage.setItem('hw_progress', JSON.stringify(progress));
+
+        // Show modal
+        const starHtml = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+        document.getElementById('level-stars').innerHTML = starHtml;
+        
+        const mins = Math.floor(this.timer / 60);
+        const secs = this.timer % 60;
+        document.getElementById('level-time-msg').innerText = `You found everything in ${mins > 0 ? mins + 'm ' : ''}${secs}s!`;
+        
+        document.getElementById('level-complete-modal').classList.remove('hidden');
+    }
+}
+</script>
+    <script>document.addEventListener('DOMContentLoaded', () => {
+    const game = new GameManager();
+
+    // DOM Elements
+    const screenSplash = document.getElementById('splash-screen');
+    const screenMap = document.getElementById('level-select-screen');
+    const screenGame = document.getElementById('game-screen');
+    const modalComplete = document.getElementById('level-complete-modal');
+
+    function showScreen(screen) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        screen.classList.add('active');
+    }
+
+    // Navigation
+    document.getElementById('btn-play').addEventListener('click', () => {
+        renderMap();
+        showScreen(screenMap);
+    });
+
+    document.getElementById('btn-back-splash').addEventListener('click', () => {
+        showScreen(screenSplash);
+    });
+
+    document.getElementById('btn-back-map').addEventListener('click', () => {
+        game.isGameActive = false;
+        clearInterval(game.timerInterval);
+        renderMap();
+        showScreen(screenMap);
+    });
+
+    document.getElementById('btn-next-level').addEventListener('click', () => {
+        modalComplete.classList.add('hidden');
+        renderMap();
+        showScreen(screenMap);
+    });
+
+    function renderMap() {
+        const nodesContainer = document.querySelector('.level-nodes');
+        nodesContainer.innerHTML = '';
+
+        const progress = JSON.parse(localStorage.getItem('hw_progress') || '{}');
+
+
+
+        let nextUpAssigned = false;
+
+        LEVELS.forEach((level, index) => {
+            const node = document.createElement('div');
+            node.className = 'level-node';
+            node.style.left = `${level.mapPos.x}%`;
+            node.style.top = `${level.mapPos.y}%`;
+
+            // Check if locked
+            // Level 1 is always unlocked. Others unlock if previous level is in progress dict
+            const isLocked = index > 0 && !progress[LEVELS[index - 1].id];
+            const isCompleted = !!progress[level.id];
+
+            if (isLocked) {
+                node.classList.add('locked');
+                node.innerHTML = `
+                    <span class="node-icon">🔒</span>
+                    <span class="node-label">Locked</span>
+                `;
+            } else {
+                node.innerHTML = `
+                    <span class="node-icon">${level.icon}</span>
+                    <span class="node-label">${level.name}</span>
+                `;
+
+                if (isCompleted) {
+                    node.classList.add('completed');
+                    const stars = progress[level.id].stars;
+                    node.innerHTML += `<div class="node-stars">${'⭐'.repeat(stars)}</div>`;
+                } else if (!nextUpAssigned) {
+                    // Draw the eye straight to the next world to play.
+                    node.classList.add('next-up');
+                    node.innerHTML += `<span class="node-pointer">👉 Tap!</span>`;
+                    nextUpAssigned = true;
+                }
+
+                node.addEventListener('click', () => {
+                    game.startLevel(level);
+                    showScreen(screenGame);
+                });
+            }
+
+            nodesContainer.appendChild(node);
+        });
+    }
+});
+</script>
+</body>
+</html>

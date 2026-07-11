@@ -1,0 +1,445 @@
+<!-- CONCEPT: Critter Chorus — a Simon-says memory game; watch the animals light up and make their real animal sounds, then tap them back in the same order. Pick from animal packs (Backyard, Farm, Pets, Forest). Reaction/memory game for ages 4-10. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Critter Chorus</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+    background: radial-gradient(circle at 50% 18%, #4fd1ff 0%, #4a7bd6 55%, #2d4ea8 100%);
+    touch-action: manipulation; user-select: none; -webkit-user-select: none;
+    color: #fff;
+  }
+  #wrap {
+    height: 100%; display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-start; padding: 8px 12px; text-align: center;
+  }
+  h1 {
+    margin: 2px 0 0; font-size: clamp(26px, 6.4vw, 44px);
+    text-shadow: 0 3px 0 #1f3a82, 0 6px 10px rgba(0,0,0,.25); letter-spacing: 1px;
+  }
+  #desc { margin: 1px 0 4px; font-size: clamp(12px, 3.2vw, 16px); color: #eaf4ff; max-width: 520px; }
+  #packs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin: 2px 0 4px; }
+  .packBtn {
+    font-family: inherit; font-size: clamp(12px, 3vw, 15px); font-weight: bold;
+    color: #2d4ea8; background: rgba(255,255,255,.85); border: 3px solid transparent;
+    border-radius: 16px; padding: 6px 12px; cursor: pointer; line-height: 1.1;
+    display: flex; flex-direction: column; align-items: center; min-width: 64px;
+    box-shadow: 0 4px 0 rgba(0,0,0,.18); transition: transform .08s ease;
+  }
+  .packBtn span { font-size: .8em; }
+  .packBtn .pe { font-size: 1.5em; }
+  .packBtn:active { transform: translateY(2px); }
+  .packBtn.sel { border-color: #fff; background: #fff; box-shadow: 0 4px 0 #b7c6e8, 0 0 0 4px rgba(255,255,255,.4); }
+  #status { font-size: clamp(17px, 4.6vw, 25px); font-weight: bold; min-height: 1.3em; text-shadow: 0 2px 0 rgba(0,0,0,.2); margin: 2px 0; }
+  #level { font-size: clamp(13px, 3.4vw, 17px); background: rgba(255,255,255,.18); padding: 3px 14px; border-radius: 999px; display: inline-block; margin-bottom: 4px; }
+  #board {
+    width: min(82vw, 340px); height: min(82vw, 340px); max-height: 44vh; aspect-ratio: 1/1;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px auto; touch-action: manipulation;
+  }
+  .pad {
+    border: none; border-radius: 24px; cursor: pointer; font-size: clamp(38px, 13vw, 80px); position: relative;
+    box-shadow: 0 8px 0 rgba(0,0,0,.22), inset 0 4px 12px rgba(255,255,255,.35);
+    transition: transform .07s ease, filter .12s ease, box-shadow .07s ease;
+    display: flex; align-items: center; justify-content: center; filter: brightness(.82) saturate(.9);
+  }
+  .pad:active { transform: translateY(4px); box-shadow: 0 4px 0 rgba(0,0,0,.22), inset 0 4px 12px rgba(255,255,255,.35); }
+  .pad.lit { filter: brightness(1.4) saturate(1.35); transform: scale(1.07); }
+  #board.locked .pad { cursor: default; }
+  #bigBtn {
+    margin-top: 6px; font-family: inherit; font-size: clamp(19px, 5.2vw, 27px); font-weight: bold;
+    color: #2d4ea8; background: #fff; border: none; border-radius: 999px; padding: 13px 38px; cursor: pointer;
+    box-shadow: 0 6px 0 #c9d6ef; transition: transform .08s ease;
+  }
+  #bigBtn:active { transform: translateY(3px); box-shadow: 0 3px 0 #c9d6ef; }
+  #stars { font-size: clamp(20px, 6vw, 30px); min-height: 1.2em; margin-top: 4px; letter-spacing: 4px; }
+  .confetti { position: fixed; top: -20px; font-size: 28px; pointer-events: none; will-change: transform; z-index: 50; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(540deg); opacity: .9; } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>🎵 Critter Chorus 🎵</h1>
+  <div id="desc">Listen to the animals, then tap them back in the same order!</div>
+  <div id="packs"></div>
+  <div id="level">Round 1</div>
+  <div id="status">Press Start to play!</div>
+  <div id="board" class="locked">
+    <button class="pad" id="p0"></button>
+    <button class="pad" id="p1"></button>
+    <button class="pad" id="p2"></button>
+    <button class="pad" id="p3"></button>
+  </div>
+  <div id="stars"></div>
+  <button id="bigBtn">▶ Start</button>
+</div>
+
+<script>
+(function(){
+  const board = document.getElementById('board');
+  const pads = [0,1,2,3].map(i => document.getElementById('p'+i));
+  const statusEl = document.getElementById('status');
+  const levelEl = document.getElementById('level');
+  const starsEl = document.getElementById('stars');
+  const bigBtn = document.getElementById('bigBtn');
+  const packsEl = document.getElementById('packs');
+
+  // ---------- Web Audio ----------
+  let actx = null;
+  function audio(){
+    if(!actx){ actx = new (window.AudioContext || window.webkitAudioContext)(); }
+    if(actx.state === 'suspended') actx.resume();
+    return actx;
+  }
+  function mkOsc(type, freq){ const o = audio().createOscillator(); o.type = type; o.frequency.value = freq; return o; }
+  function mkGain(v){ const g = audio().createGain(); g.gain.value = (v==null?0:v); return g; }
+  function vibrato(osc, rate, depth, t, dur){
+    const lfo = mkOsc('sine', rate); const lg = mkGain(depth);
+    lfo.connect(lg); lg.connect(osc.frequency); lfo.start(t); lfo.stop(t + dur + 0.05);
+  }
+  function out(){ return audio().destination; }
+
+  // ---------- Animal sound synths (return approximate duration in seconds) ----------
+  function frog(){ // ribbit
+    const a = audio(), t = a.currentTime;
+    [0,0.22].forEach(off=>{
+      const o = mkOsc('sawtooth',150);
+      o.frequency.setValueAtTime(140, t+off);
+      o.frequency.linearRampToValueAtTime(235, t+off+0.12);
+      const f = a.createBiquadFilter(); f.type='lowpass'; f.frequency.value=900;
+      const g = mkGain(0);
+      g.gain.setValueAtTime(0.0001, t+off);
+      g.gain.exponentialRampToValueAtTime(0.4, t+off+0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+off+0.17);
+      o.connect(f); f.connect(g); g.connect(out());
+      o.start(t+off); o.stop(t+off+0.2);
+    });
+    return 0.5;
+  }
+  function quack(){
+    const a = audio(), t = a.currentTime;
+    [0,0.2].forEach(off=>{
+      const o = mkOsc('sawtooth',420);
+      o.frequency.setValueAtTime(520, t+off);
+      o.frequency.exponentialRampToValueAtTime(300, t+off+0.13);
+      const f = a.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1100; f.Q.value=6;
+      const g = mkGain(0);
+      g.gain.setValueAtTime(0.0001, t+off);
+      g.gain.exponentialRampToValueAtTime(0.5, t+off+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+off+0.15);
+      o.connect(f); f.connect(g); g.connect(out());
+      o.start(t+off); o.stop(t+off+0.18);
+    });
+    return 0.45;
+  }
+  function meow(){
+    const a = audio(), t = a.currentTime, dur = 0.6;
+    const o = mkOsc('sawtooth',600);
+    o.frequency.setValueAtTime(560, t);
+    o.frequency.linearRampToValueAtTime(770, t+0.18);
+    o.frequency.linearRampToValueAtTime(620, t+0.5);
+    const f = a.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1300; f.Q.value=5;
+    const g = mkGain(0);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.4, t+0.06);
+    g.gain.setValueAtTime(0.4, t+0.4);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.58);
+    vibrato(o,12,18,t,dur);
+    o.connect(f); f.connect(g); g.connect(out());
+    o.start(t); o.stop(t+dur);
+    return dur;
+  }
+  function hoot(){
+    const a = audio(), t = a.currentTime;
+    [0,0.32].forEach(off=>{
+      const o = mkOsc('sine',360);
+      o.frequency.setValueAtTime(372, t+off);
+      o.frequency.linearRampToValueAtTime(330, t+off+0.05);
+      const g = mkGain(0);
+      g.gain.setValueAtTime(0.0001, t+off);
+      g.gain.exponentialRampToValueAtTime(0.4, t+off+0.06);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+off+0.26);
+      vibrato(o,6,8,t+off,0.28);
+      o.connect(g); g.connect(out());
+      o.start(t+off); o.stop(t+off+0.3);
+    });
+    return 0.7;
+  }
+  function moo(){
+    const a = audio(), t = a.currentTime, dur = 0.85;
+    const o = mkOsc('sawtooth',150);
+    o.frequency.setValueAtTime(165, t);
+    o.frequency.linearRampToValueAtTime(140, t+0.2);
+    o.frequency.linearRampToValueAtTime(118, t+0.8);
+    const f = a.createBiquadFilter(); f.type='lowpass'; f.frequency.value=700;
+    const g = mkGain(0);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.45, t+0.12);
+    g.gain.setValueAtTime(0.45, t+0.55);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.82);
+    o.connect(f); f.connect(g); g.connect(out());
+    o.start(t); o.stop(t+dur);
+    return dur;
+  }
+  function baa(){
+    const a = audio(), t = a.currentTime, dur = 0.6;
+    const o = mkOsc('sawtooth',330);
+    const f = a.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1400;
+    const g = mkGain(0);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.4, t+0.05);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.58);
+    const lfo = mkOsc('sine',15); const lg = mkGain(0.16);
+    lfo.connect(lg); lg.connect(g.gain); lfo.start(t); lfo.stop(t+dur);
+    vibrato(o,15,13,t,dur);
+    o.connect(f); f.connect(g); g.connect(out());
+    o.start(t); o.stop(t+dur);
+    return dur;
+  }
+  function oink(){
+    const a = audio(), t = a.currentTime;
+    [0,0.16,0.32].forEach(off=>{
+      const o = mkOsc('sawtooth',200);
+      o.frequency.setValueAtTime(230, t+off);
+      o.frequency.exponentialRampToValueAtTime(170, t+off+0.1);
+      const f = a.createBiquadFilter(); f.type='bandpass'; f.frequency.value=800; f.Q.value=4;
+      const g = mkGain(0);
+      g.gain.setValueAtTime(0.0001, t+off);
+      g.gain.exponentialRampToValueAtTime(0.45, t+off+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+off+0.12);
+      o.connect(f); f.connect(g); g.connect(out());
+      o.start(t+off); o.stop(t+off+0.14);
+    });
+    return 0.5;
+  }
+  function woof(){
+    const a = audio(), t = a.currentTime;
+    [0,0.2].forEach(off=>{
+      const o = mkOsc('sawtooth',200);
+      o.frequency.setValueAtTime(260, t+off);
+      o.frequency.exponentialRampToValueAtTime(120, t+off+0.12);
+      const f = a.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1000;
+      const g = mkGain(0);
+      g.gain.setValueAtTime(0.0001, t+off);
+      g.gain.exponentialRampToValueAtTime(0.5, t+off+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+off+0.16);
+      o.connect(f); f.connect(g); g.connect(out());
+      o.start(t+off); o.stop(t+off+0.18);
+    });
+    return 0.4;
+  }
+  function tweet(){
+    const a = audio(), t = a.currentTime;
+    [0,0.16,0.32].forEach(off=>{
+      const o = mkOsc('triangle',2200);
+      o.frequency.setValueAtTime(2000, t+off);
+      o.frequency.exponentialRampToValueAtTime(3000, t+off+0.08);
+      const g = mkGain(0);
+      g.gain.setValueAtTime(0.0001, t+off);
+      g.gain.exponentialRampToValueAtTime(0.25, t+off+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+off+0.1);
+      o.connect(g); g.connect(out());
+      o.start(t+off); o.stop(t+off+0.12);
+    });
+    return 0.5;
+  }
+  function peep(){
+    const a = audio(), t = a.currentTime;
+    [0,0.18].forEach(off=>{
+      const o = mkOsc('triangle',1800);
+      o.frequency.setValueAtTime(1600, t+off);
+      o.frequency.exponentialRampToValueAtTime(2400, t+off+0.06);
+      o.frequency.exponentialRampToValueAtTime(1900, t+off+0.12);
+      const g = mkGain(0);
+      g.gain.setValueAtTime(0.0001, t+off);
+      g.gain.exponentialRampToValueAtTime(0.22, t+off+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+off+0.13);
+      o.connect(g); g.connect(out());
+      o.start(t+off); o.stop(t+off+0.15);
+    });
+    return 0.4;
+  }
+
+  // ---------- Animal & pack definitions ----------
+  const ANIMALS = {
+    frog:  { emoji:'🐸', color:'#6bc36b', dur:0.5,  play:frog  },
+    duck:  { emoji:'🦆', color:'#ffd93d', dur:0.45, play:quack },
+    cat:   { emoji:'🐱', color:'#ff9f6b', dur:0.6,  play:meow  },
+    owl:   { emoji:'🦉', color:'#9b7bd6', dur:0.7,  play:hoot  },
+    cow:   { emoji:'🐮', color:'#ff8fa3', dur:0.85, play:moo   },
+    sheep: { emoji:'🐑', color:'#dfe6ef', dur:0.6,  play:baa   },
+    pig:   { emoji:'🐷', color:'#ff9ec2', dur:0.5,  play:oink  },
+    dog:   { emoji:'🐶', color:'#d2a679', dur:0.4,  play:woof  },
+    bird:  { emoji:'🐦', color:'#6bb8ff', dur:0.5,  play:tweet },
+    chick: { emoji:'🐤', color:'#ffe066', dur:0.4,  play:peep  }
+  };
+  const PACKS = {
+    backyard: { label:'Backyard', pe:'🌿', keys:['frog','duck','cat','owl'] },
+    farm:     { label:'Farm',     pe:'🚜', keys:['cow','duck','sheep','pig'] },
+    pets:     { label:'Pets',     pe:'🐶', keys:['cat','dog','bird','chick'] },
+    forest:   { label:'Forest',   pe:'🌳', keys:['owl','frog','bird','cat'] }
+  };
+  let currentPack = PACKS.backyard.keys.slice();
+
+  function applyPack(keys){
+    currentPack = keys.slice();
+    pads.forEach((pad,i)=>{
+      const a = ANIMALS[keys[i]];
+      pad.textContent = a.emoji;
+      pad.style.background = a.color;
+      pad.setAttribute('aria-label', keys[i]);
+    });
+  }
+
+  // build pack buttons
+  Object.entries(PACKS).forEach(([id,p])=>{
+    const b = document.createElement('button');
+    b.className = 'packBtn'; b.dataset.pack = id;
+    b.innerHTML = '<span class="pe">'+p.pe+'</span><span>'+p.label+'</span>';
+    b.addEventListener('click', ()=>{
+      audio();
+      document.querySelectorAll('.packBtn').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel');
+      applyPack(p.keys);
+      // play a quick preview of the four new animals
+      previewPack();
+    });
+    packsEl.appendChild(b);
+  });
+  packsEl.firstChild.classList.add('sel');
+  applyPack(currentPack);
+
+  function previewPack(){
+    if(running) return; // don't interrupt a game
+    currentPack.forEach((k,i)=>{
+      setTimeout(()=>{ flashTap(i); }, i*ANIMALS[k].dur*1000*0 + i*420);
+    });
+  }
+
+  // ---------- celebration / oops sounds ----------
+  function happyJingle(){
+    const seq = [523.25,659.25,783.99,1046.5];
+    seq.forEach((f,i)=> setTimeout(()=>{
+      const a=audio(), t=a.currentTime, o=mkOsc('triangle',f), g=mkGain(0);
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.3,t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.3);
+      o.connect(g); g.connect(out()); o.start(t); o.stop(t+0.35);
+    }, i*120));
+  }
+  function gentleBoop(){
+    const a=audio(), t=a.currentTime;
+    [196,165].forEach((f,i)=>{
+      const o=mkOsc('sine',f), g=mkGain(0);
+      g.gain.setValueAtTime(0.0001,t+i*0.12); g.gain.exponentialRampToValueAtTime(0.22,t+i*0.12+0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+i*0.12+0.28);
+      o.connect(g); g.connect(out()); o.start(t+i*0.12); o.stop(t+i*0.12+0.32);
+    });
+  }
+
+  // ---------- game logic ----------
+  let sequence = [];
+  let playerStep = 0;
+  let round = 0;
+  let acceptingInput = false;
+  let running = false;
+
+  function wait(ms){ return new Promise(r=> setTimeout(r, ms)); }
+
+  function lightPad(i, gap){
+    return new Promise(res=>{
+      const key = currentPack[i];
+      pads[i].classList.add('lit');
+      ANIMALS[key].play();
+      const litMs = ANIMALS[key].dur*1000;
+      setTimeout(()=>{ pads[i].classList.remove('lit'); setTimeout(res, gap); }, litMs);
+    });
+  }
+  function flashTap(i){
+    const key = currentPack[i];
+    pads[i].classList.add('lit');
+    ANIMALS[key].play();
+    setTimeout(()=> pads[i].classList.remove('lit'), 220);
+  }
+
+  async function playSequence(){
+    acceptingInput = false;
+    board.classList.add('locked');
+    statusEl.textContent = 'Listen... 🎧';
+    await wait(500);
+    const gap = Math.max(120, 320 - round*18);
+    for(const i of sequence){ await lightPad(i, gap); }
+    statusEl.textContent = 'Your turn! 🎶';
+    playerStep = 0;
+    acceptingInput = true;
+    board.classList.remove('locked');
+  }
+
+  function nextRound(){
+    round++;
+    levelEl.textContent = 'Round ' + round;
+    sequence.push(Math.floor(Math.random()*4));
+    playSequence();
+  }
+
+  function startGame(){
+    audio();
+    running = true;
+    sequence = [];
+    round = 0;
+    starsEl.textContent = '';
+    bigBtn.textContent = '↻ Restart';
+    nextRound();
+  }
+
+  function handlePress(i){
+    if(!acceptingInput) return;
+    flashTap(i);
+    if(i === sequence[playerStep]){
+      playerStep++;
+      if(playerStep === sequence.length){
+        acceptingInput = false;
+        board.classList.add('locked');
+        starsEl.textContent = '⭐'.repeat(Math.min(round,8));
+        const cheers = ['Yay! 🎉','Great job! 🌟','You did it! 🥳','Awesome! ✨','Wonderful! 🎈'];
+        statusEl.textContent = cheers[Math.floor(Math.random()*cheers.length)];
+        happyJingle(); confetti();
+        setTimeout(nextRound, 1100);
+      }
+    } else {
+      acceptingInput = false;
+      board.classList.add('locked');
+      statusEl.textContent = "Oops — let's try that one again! 😊";
+      gentleBoop();
+      setTimeout(playSequence, 1200);
+    }
+  }
+
+  pads.forEach((pad,i)=> pad.addEventListener('click', ()=> handlePress(i)));
+  bigBtn.addEventListener('click', startGame);
+
+  const keyMap = {ArrowUp:0,ArrowLeft:1,ArrowRight:2,ArrowDown:3,'1':0,'2':1,'3':2,'4':3};
+  window.addEventListener('keydown', e=>{
+    if(e.key in keyMap){ e.preventDefault(); handlePress(keyMap[e.key]); }
+  });
+
+  function confetti(){
+    const emojis = ['⭐','🎉','✨','🎈','🌟','💫'];
+    for(let n=0;n<26;n++){
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      c.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+      c.style.left = Math.random()*100 + 'vw';
+      c.style.animation = 'fall ' + (1.6+Math.random()*1.4) + 's linear forwards';
+      c.style.fontSize = (20+Math.random()*22) + 'px';
+      document.body.appendChild(c);
+      setTimeout(()=> c.remove(), 3200);
+    }
+  }
+})();
+</script>
+</body>
+</html>

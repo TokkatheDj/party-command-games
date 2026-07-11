@@ -1,0 +1,373 @@
+<!-- CONCEPT: Cookie Café — a counting & beginning-math game; a hungry monster orders a number of cookies (or a simple "2 + 3" at higher levels), tap the tray to bake that many cookies counting up, then Serve. Right number = happy munch + confetti. Sneaky-educational counting game for ages 4-9. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cookie Café 🍪</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: 'Comic Sans MS', 'Baloo', 'Trebuchet MS', system-ui, sans-serif;
+    background: linear-gradient(160deg, #ffe3a3 0%, #ffc7d9 55%, #c8e8ff 100%);
+    overflow: hidden; user-select: none; touch-action: manipulation;
+  }
+  #app {
+    position: relative; width: 100%; height: 100%;
+    display: flex; flex-direction: column; align-items: center;
+    max-width: 760px; margin: 0 auto;
+  }
+
+  /* Top bar */
+  #topbar {
+    width: 100%; display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px; gap: 10px;
+  }
+  .pill {
+    background: #fff; border-radius: 999px; padding: 8px 16px;
+    font-size: clamp(16px, 4vw, 22px); font-weight: bold; color: #b5651d;
+    box-shadow: 0 4px 0 #e0a96d; display: flex; align-items: center; gap: 6px;
+    white-space: nowrap;
+  }
+  h1 {
+    margin: 0; font-size: clamp(22px, 6vw, 38px); color: #8a4b1a;
+    text-shadow: 2px 2px 0 #fff; text-align: center;
+  }
+
+  /* Stage */
+  #stage {
+    flex: 1; width: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: flex-start; padding: 4px 12px 0;
+    overflow: hidden;
+  }
+
+  /* Monster */
+  #monsterWrap { text-align: center; position: relative; }
+  #monster {
+    font-size: clamp(70px, 20vw, 130px); line-height: 1;
+    display: inline-block; transition: transform .15s;
+  }
+  #speech {
+    background: #fff; border: 4px solid #ffb74d; border-radius: 24px;
+    padding: 10px 18px; margin: 6px auto 2px; display: inline-block;
+    font-size: clamp(18px, 4.6vw, 26px); font-weight: bold; color: #6d4c1b;
+    box-shadow: 0 5px 0 rgba(0,0,0,.08); max-width: 90%;
+  }
+  #order { font-size: clamp(30px, 8vw, 52px); color: #e2552b; }
+
+  /* Tray */
+  #trayLabel { font-size: clamp(15px, 3.6vw, 20px); color: #7a5a2e; margin: 6px 0 2px; font-weight: bold;}
+  #tray {
+    width: 92%; max-width: 560px; min-height: 120px;
+    background: #d98c4a; border: 6px solid #b56b2e; border-radius: 18px;
+    box-shadow: inset 0 6px 14px rgba(0,0,0,.18), 0 6px 0 #8f521f;
+    display: flex; flex-wrap: wrap; align-content: flex-start; justify-content: center;
+    gap: 6px; padding: 12px; margin: 0 auto;
+  }
+  .cookie {
+    font-size: clamp(28px, 7vw, 42px); line-height: 1;
+    animation: pop .3s cubic-bezier(.2,1.5,.4,1);
+  }
+  @keyframes pop { 0%{transform: scale(0) rotate(-40deg);} 100%{transform: scale(1) rotate(0);} }
+  .cookie.leaving { animation: leave .35s forwards; }
+  @keyframes leave { to { transform: scale(0) translateY(-30px); opacity: 0; } }
+
+  #countNow {
+    font-size: clamp(20px, 5vw, 30px); font-weight: bold; color: #8a4b1a;
+    margin: 8px 0 2px;
+  }
+
+  /* Controls */
+  #controls {
+    width: 100%; display: flex; flex-direction: column; align-items: center;
+    gap: 10px; padding: 8px 12px 16px;
+  }
+  .row { display: flex; gap: 12px; justify-content: center; width: 100%; flex-wrap: wrap; }
+  button {
+    font-family: inherit; cursor: pointer; border: none; border-radius: 18px;
+    font-weight: bold; color: #fff; padding: 16px 22px;
+    font-size: clamp(17px, 4.4vw, 24px); transition: transform .08s;
+    box-shadow: 0 6px 0 rgba(0,0,0,.25); touch-action: manipulation;
+  }
+  button:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+  #addBtn { background: #43b97f; flex: 2 1 220px; font-size: clamp(20px, 5vw, 28px); padding: 20px; }
+  #removeBtn { background: #f0a83c; flex: 1 1 120px; }
+  #serveBtn { background: #4a90e2; flex: 1 1 100%; font-size: clamp(20px, 5.2vw, 30px); padding: 18px; }
+  #restartBtn { background: #b56bd6; }
+
+  /* Celebration overlay */
+  #overlay {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    background: rgba(255,255,255,.55); backdrop-filter: blur(2px); z-index: 20;
+  }
+  #overlay.show { display: flex; }
+  #overlayCard {
+    background: #fff; border-radius: 28px; padding: 26px 30px;
+    box-shadow: 0 12px 0 rgba(0,0,0,.15); max-width: 86%;
+    animation: pop .4s cubic-bezier(.2,1.5,.4,1);
+  }
+  #overlayCard h2 { margin: 0 0 8px; font-size: clamp(26px, 7vw, 44px); color: #e2552b; }
+  #overlayCard p { margin: 0 0 16px; font-size: clamp(18px, 4.6vw, 24px); color: #6d4c1b; }
+
+  /* confetti */
+  .confetti { position: absolute; width: 12px; height: 12px; border-radius: 3px; top: -20px; z-index: 30; }
+
+  .shake { animation: shake .4s; }
+  @keyframes shake { 0%,100%{transform:translateX(0);} 25%{transform:translateX(-8px);} 75%{transform:translateX(8px);} }
+  .bounce { animation: bounce .5s; }
+  @keyframes bounce { 0%,100%{transform:translateY(0);} 40%{transform:translateY(-22px);} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <div class="pill">😋 Happy: <span id="score">0</span></div>
+    <div class="pill">⭐ Level <span id="level">1</span></div>
+  </div>
+  <h1>Cookie Café 🍪</h1>
+
+  <div id="stage">
+    <div id="monsterWrap">
+      <div id="monster">🐵</div>
+      <div id="speech">I want <span id="order">3</span> cookies, please!</div>
+    </div>
+    <div id="trayLabel">Your Baking Tray</div>
+    <div id="tray"></div>
+    <div id="countNow">Cookies on tray: 0</div>
+  </div>
+
+  <div id="controls">
+    <div class="row">
+      <button id="addBtn">🍪 Bake a Cookie</button>
+      <button id="removeBtn">↩ Take one back</button>
+    </div>
+    <div class="row">
+      <button id="serveBtn">🍽️ Serve!</button>
+    </div>
+  </div>
+
+  <div id="overlay">
+    <div id="overlayCard">
+      <h2 id="ovTitle">Yay!</h2>
+      <p id="ovText">The monster loved it!</p>
+      <button id="ovBtn" style="background:#43b97f;">Next Customer ➜</button>
+      <div style="height:10px"></div>
+      <button id="restartBtn">🔄 Start Over</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  // ---------- Web Audio ----------
+  var actx = null;
+  function AC(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return actx; }
+  function tone(freq, dur, type, vol, when){
+    var a = AC(); if(!a) return;
+    when = when || 0;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type||'sine'; o.frequency.value = freq;
+    var t = a.currentTime + when;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol||0.18, t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(t); o.stop(t+dur+0.02);
+  }
+  // bakery "pop" rising with the count
+  function popSound(n){
+    var base = 380 + n*40;
+    tone(base, 0.16, 'square', 0.16);
+    tone(base*1.5, 0.12, 'sine', 0.10, 0.02);
+  }
+  function takeBackSound(){ tone(300,0.14,'triangle',0.14); tone(220,0.14,'triangle',0.12,0.05); }
+  function munchSound(){
+    tone(160,0.1,'sawtooth',0.16);
+    tone(140,0.1,'sawtooth',0.14,0.12);
+    tone(180,0.1,'sawtooth',0.14,0.24);
+  }
+  function winJingle(){
+    var notes=[523,659,784,1047];
+    notes.forEach(function(f,i){ tone(f,0.22,'triangle',0.18, i*0.13); });
+  }
+  function tryAgainSound(){ tone(330,0.18,'sine',0.14); tone(262,0.22,'sine',0.13,0.12); }
+
+  // ---------- Game State ----------
+  var monsters = ['🐵','🐸','🐶','🐱','🐰','🐻','🐼','🦊','🐨','🐯','🐷','🐮','🦁','🐹','🐧'];
+  var score = 0, level = 1, current = 0, target = 0, busy = false;
+  var trayCount = 0;
+
+  var el = function(id){ return document.getElementById(id); };
+  var tray = el('tray'), monster = el('monster'), order = el('order'),
+      speech = el('speech'), countNow = el('countNow'),
+      scoreEl = el('score'), levelEl = el('level'),
+      overlay = el('overlay'), ovTitle = el('ovTitle'), ovText = el('ovText');
+
+  function maxCookies(){ return Math.min(10, 9 + Math.floor(level/3)); } // cap tray nicely
+
+  function newCustomer(){
+    busy = false;
+    trayCount = 0;
+    tray.innerHTML = '';
+    updateCount();
+    monster.textContent = monsters[Math.floor(Math.random()*monsters.length)];
+    monster.classList.remove('bounce'); void monster.offsetWidth; monster.classList.add('bounce');
+
+    // Levels 1-3: plain counting. Level 4+: occasional simple addition.
+    if(level >= 4 && Math.random() < 0.5){
+      var a = 1 + Math.floor(Math.random()*4);
+      var b = 1 + Math.floor(Math.random()*4);
+      target = a + b;
+      order.textContent = a + ' + ' + b;
+      speech.innerHTML = 'I want <span id="order">'+a+' + '+b+'</span> cookies!';
+    } else {
+      var hi = Math.min(10, 4 + level); // grows a little
+      target = 1 + Math.floor(Math.random()*hi);
+      speech.innerHTML = 'I want <span id="order">'+target+'</span> cookies, please!';
+    }
+  }
+
+  function updateCount(){
+    countNow.textContent = 'Cookies on tray: ' + trayCount;
+  }
+
+  function addCookie(){
+    if(busy) return;
+    if(trayCount >= 12){ // safety cap
+      tray.classList.add('shake'); setTimeout(function(){tray.classList.remove('shake');},400);
+      return;
+    }
+    trayCount++;
+    var c = document.createElement('span');
+    c.className = 'cookie'; c.textContent = '🍪';
+    tray.appendChild(c);
+    popSound(trayCount);
+    updateCount();
+  }
+
+  function removeCookie(){
+    if(busy || trayCount === 0) return;
+    trayCount--;
+    var last = tray.lastElementChild;
+    if(last){ last.classList.add('leaving'); setTimeout(function(){ if(last.parentNode) last.parentNode.removeChild(last); },340); }
+    takeBackSound();
+    updateCount();
+  }
+
+  function serve(){
+    if(busy) return;
+    if(trayCount === 0){
+      speech.classList.add('shake'); setTimeout(function(){speech.classList.remove('shake');},400);
+      return;
+    }
+    busy = true;
+    if(trayCount === target){
+      // success!
+      score++; scoreEl.textContent = score;
+      monster.textContent = '😋';
+      munchSound();
+      // empty the tray into the monster
+      var cs = tray.querySelectorAll('.cookie');
+      cs.forEach(function(c,i){ setTimeout(function(){ c.classList.add('leaving'); }, i*70); });
+      setTimeout(function(){
+        winJingle();
+        confettiBurst();
+        ovTitle.textContent = pick(['Yummy!','Delicious!','Perfect!','Hooray!','So good!']);
+        ovText.textContent = 'You baked exactly ' + target + '! ' + monster.textContent;
+        // level up every 4 happy customers
+        var newLevel = 1 + Math.floor(score/4);
+        if(newLevel > level){ level = newLevel; levelEl.textContent = level; ovText.textContent += '  ⭐ Level ' + level + '!'; }
+        showOverlay(true);
+      }, 450);
+    } else {
+      // gentle try-again, no fail shaming
+      tryAgainSound();
+      monster.textContent = '🤔';
+      monster.classList.add('shake'); setTimeout(function(){monster.classList.remove('shake');},400);
+      var hint = trayCount < target ? 'A few more cookies!' : 'That\'s a little too many!';
+      var orderText = document.getElementById('order').textContent;
+      ovTitle.textContent = 'Almost!';
+      ovText.textContent = hint + ' The order was ' + orderText + '. Try again — you\'ve got this!';
+      showOverlay(false);
+    }
+  }
+
+  function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+
+  // overlay with custom button behavior
+  function showOverlay(success){
+    var btn = el('ovBtn');
+    if(success){
+      btn.textContent = 'Next Customer ➜';
+      btn.style.background = '#43b97f';
+      btn.onclick = function(){ hideOverlay(); newCustomer(); };
+    } else {
+      btn.textContent = 'Keep Baking 🍪';
+      btn.style.background = '#f0a83c';
+      btn.onclick = function(){
+        hideOverlay();
+        busy = false;
+        // keep their cookies on the tray so they can adjust
+        monster.textContent = monster.textContent; // unchanged
+        // restore the thinking monster to a friendly face
+        // pick a friendly face again
+      };
+    }
+    overlay.classList.add('show');
+  }
+  function hideOverlay(){ overlay.classList.remove('show'); }
+
+  // restart
+  el('restartBtn').onclick = function(){
+    score = 0; level = 1; scoreEl.textContent = 0; levelEl.textContent = 1;
+    hideOverlay(); newCustomer();
+  };
+
+  function confettiBurst(){
+    var colors = ['#ff5a5f','#ffb400','#43b97f','#4a90e2','#b56bd6','#ff8fab'];
+    var app = el('app');
+    for(var i=0;i<40;i++){
+      (function(){
+        var d = document.createElement('div');
+        d.className = 'confetti';
+        d.style.background = colors[Math.floor(Math.random()*colors.length)];
+        d.style.left = (10 + Math.random()*80) + '%';
+        d.style.transform = 'rotate('+(Math.random()*360)+'deg)';
+        app.appendChild(d);
+        var fall = 300 + Math.random()*300;
+        var drift = (Math.random()*120-60);
+        var dur = 900 + Math.random()*900;
+        d.animate([
+          { transform: d.style.transform + ' translateY(0)', opacity: 1 },
+          { transform: 'translate('+drift+'px,'+fall+'px) rotate('+(Math.random()*720)+'deg)', opacity: 0 }
+        ], { duration: dur, easing: 'cubic-bezier(.3,.7,.5,1)' });
+        setTimeout(function(){ if(d.parentNode) d.parentNode.removeChild(d); }, dur);
+      })();
+    }
+  }
+
+  // ---------- Wire up (mouse + touch) ----------
+  function bind(id, fn){
+    var b = el(id);
+    b.addEventListener('click', function(e){ e.preventDefault(); AC(); fn(); });
+  }
+  bind('addBtn', addCookie);
+  bind('removeBtn', removeCookie);
+  bind('serveBtn', serve);
+
+  // keyboard: space/up = add, down = remove, enter = serve
+  document.addEventListener('keydown', function(e){
+    if(overlay.classList.contains('show')) return;
+    if(e.code==='Space' || e.code==='ArrowUp'){ e.preventDefault(); AC(); addCookie(); }
+    else if(e.code==='ArrowDown'){ e.preventDefault(); AC(); removeCookie(); }
+    else if(e.code==='Enter'){ e.preventDefault(); AC(); serve(); }
+  });
+
+  newCustomer();
+})();
+</script>
+</body>
+</html>
