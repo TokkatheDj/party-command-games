@@ -69,6 +69,19 @@
   @keyframes hopin { 0%{transform: translateY(-30px) scale(.4); opacity:0} 60%{transform: translateY(6px) scale(1.15)} 100%{transform: translateY(0) scale(1); opacity:1} }
   .zoo-label { color:#5a3a7a; font-weight:bold; font-size: clamp(12px,3.2vw,15px); width:100%; text-align:center; opacity:.7;}
 
+  /* Match praise toast */
+  #praise { position: fixed; top: 18%; left: 50%; transform: translateX(-50%) scale(0);
+    background: #fff; color: #6a3a9a; font-weight: bold; font-size: clamp(18px,5vw,28px);
+    padding: 8px 22px; border-radius: 999px; box-shadow: 0 6px 0 #d7c4ff, 0 8px 14px rgba(0,0,0,.2);
+    pointer-events: none; z-index: 20; white-space: nowrap; }
+  #praise.show { animation: praisePop .8s ease forwards; }
+  @keyframes praisePop {
+    0% { transform: translateX(-50%) scale(0); opacity: 0; }
+    30% { transform: translateX(-50%) scale(1.1); opacity: 1; }
+    70% { transform: translateX(-50%) scale(1); opacity: 1; }
+    100% { transform: translateX(-50%) scale(1); opacity: 0; }
+  }
+
   /* Win overlay */
   #win { position: fixed; inset: 0; background: rgba(70,30,110,.5); display: none; flex-direction: column;
          align-items: center; justify-content: center; z-index: 30; padding: 16px; text-align:center; }
@@ -111,6 +124,7 @@
     <div id="board"></div>
     <div id="zoo"><div class="zoo-label">Your Zoo</div></div>
   </div>
+  <div id="praise"></div>
 </div>
 
 <div class="foot">A cozy little memory game — have fun!</div>
@@ -176,6 +190,19 @@ const sizeCfg = {
   big:    {pairs:8, cols:4}
 };
 const encourage = ["Nice!","Yay!","Great find!","Woohoo!","You got it!","Super!","Lovely!","Match!"];
+let encourageUsed = [];
+function pickEncourage(){
+  if(encourageUsed.length >= encourage.length) encourageUsed = [];
+  let idx;
+  do{ idx = Math.floor(Math.random()*encourage.length); }while(encourage.length>1 && encourageUsed.includes(idx));
+  encourageUsed.push(idx);
+  return encourage[idx];
+}
+function showPraise(){
+  const el = document.getElementById('praise');
+  el.textContent = pickEncourage();
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
 
 function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on')); document.getElementById(id).classList.add('on'); }
 
@@ -190,6 +217,7 @@ function stopTimer(){ if(timerInterval){ clearInterval(timerInterval); timerInte
 function startGame(size){
   ac(); // unlock audio on user tap
   curSize = size;
+  encourageUsed = [];
   const cfg = sizeCfg[size];
   totalPairs = cfg.pairs; foundPairs=0; moves=0; first=null; lock=false;
   // pick animals
@@ -236,6 +264,7 @@ function flip(i){
       [first,i].forEach(k=>{ const c=document.querySelector(`.card[data-idx="${k}"]`); c.classList.add('matched'); });
       matchSound(a.m);
       addToZoo(a.e);
+      showPraise();
       foundPairs++; updateHud();
       first=null; busy=false;
       if(foundPairs===totalPairs) setTimeout(winGame, 600);
