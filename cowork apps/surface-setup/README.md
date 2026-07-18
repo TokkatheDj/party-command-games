@@ -31,6 +31,28 @@ often fails to reach the interactive desktop.
 | `Set-BackupTaskS4U.ps1` | Switches the existing `Backup Cowork Content` task from Interactive to **S4U** (run whether logged on or not), preserving its daily 14:00 trigger and action. |
 | `Add-BackupTestTrigger.ps1` | **Test helper.** Adds a temporary **AtLogon** trigger (3-min delay) to the backup task so a reboot exercises it. Undo with `-Remove`. Not part of the steady state. |
 | `Verify-BootTask.ps1` | **Read-only** post-reboot check. Confirms a real reboot happened, the boot task fired (server on 8080 from **SessionId 0** = pre-login), and a fresh backup snapshot appeared. No admin needed. |
+| `Backup-CoworkContent.ps1` | The daily backup job itself (run by the `Backup Cowork Content` task). Zips the app tree and copies it to Google Drive, verifies the archive, prunes to 14 snapshots. Deploys to `C:\Users\tokka\bin\`, **not** `AppData`. |
+
+## Deploying (repo → live)
+
+This repo is the source of truth. After editing/pulling, copy each script to where it
+actually runs from — note the **two different targets**:
+
+```powershell
+# provisioning + verify scripts -> %LOCALAPPDATA%\CoworkApps
+Copy-Item "C:\Users\tokka\Claude Local\cowork apps\surface-setup\Setup-ServerBootTask.ps1",`
+          "C:\Users\tokka\Claude Local\cowork apps\surface-setup\Set-BackupTaskS4U.ps1",`
+          "C:\Users\tokka\Claude Local\cowork apps\surface-setup\Add-BackupTestTrigger.ps1",`
+          "C:\Users\tokka\Claude Local\cowork apps\surface-setup\Verify-BootTask.ps1" `
+          "$env:LOCALAPPDATA\CoworkApps\" -Force
+
+# backup job -> bin (this is the path the scheduled task invokes)
+Copy-Item "C:\Users\tokka\Claude Local\cowork apps\surface-setup\Backup-CoworkContent.ps1" `
+          "C:\Users\tokka\bin\" -Force
+```
+
+`serve_apps.py` (run by the boot task and login VBS) already lives in the repo at
+`cowork apps/serve_apps.py`, so it needs no sync — those run repo-tracked code directly.
 
 ## The steady-state setup these produce
 
