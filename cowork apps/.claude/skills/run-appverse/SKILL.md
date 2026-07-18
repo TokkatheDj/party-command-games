@@ -11,7 +11,7 @@ no pip install needed) that serves a hand-rolled SPA at `/` and a standalone
 downloaded — no `npx playwright install` needed if `node_modules/` is present).
 
 All paths below are relative to `cowork apps/` (the repo root is one level up,
-`D:\Documents\Claude Local`, and contains other unrelated projects).
+`C:\Users\tokka\Claude Local`, and contains other unrelated projects).
 
 ## Prerequisites
 
