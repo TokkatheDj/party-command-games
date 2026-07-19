@@ -1,0 +1,451 @@
+<!-- CONCEPT: Unified Games Arcade — one catalog merging Party Command Games (19 games), Carnival Games, and the Kids apps into a single searchable menu. Each card opens its game in a full-screen same-origin iframe, so the Phaser Carnival build and the vanilla party/kids apps stay isolated (no global-scope or CSS collisions). Party games deep-link by calling the loaded app's own showScreen() — no edits to the source apps. Hash routing (#play/<id>) makes every game deep-linkable and the Back button work. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Games Arcade — All Games</title>
+<meta name="theme-color" content="#0d0b1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Games Arcade">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕹️</text></svg>">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0b1a;
+    --bg2: #141126;
+    --ink: #ffffff;
+    --muted: rgba(255,255,255,0.5);
+  }
+
+  body {
+    background:
+      radial-gradient(circle at 15% 0%, rgba(124,58,237,0.18), transparent 45%),
+      radial-gradient(circle at 85% 10%, rgba(236,72,153,0.15), transparent 45%),
+      var(--bg);
+    color: var(--ink);
+    font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    min-height: 100dvh;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+
+  /* ── HEADER ── */
+  header {
+    padding: max(env(safe-area-inset-top), 26px) 20px 6px;
+    text-align: center;
+  }
+  header h1 {
+    font-size: clamp(26px, 6vw, 44px);
+    font-weight: 900;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #fff 0%, #d9b8ff 45%, #ff8fc7 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(0 2px 18px rgba(160,80,255,0.35));
+  }
+  header p {
+    color: var(--muted);
+    font-size: clamp(12px, 3vw, 15px);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
+  /* ── SEARCH ── */
+  .search-wrap {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 12px 14px;
+    background: linear-gradient(to bottom, var(--bg) 55%, transparent);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .search-inner { max-width: 640px; margin: 0 auto; position: relative; }
+  #search {
+    width: 100%;
+    background: rgba(255,255,255,0.08);
+    border: 1.5px solid rgba(255,255,255,0.16);
+    color: #fff;
+    border-radius: 50px;
+    padding: 13px 44px 13px 46px;
+    font: inherit;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  #search::placeholder { color: rgba(255,255,255,0.4); }
+  #search:focus { border-color: rgba(180,120,255,0.6); background: rgba(255,255,255,0.12); }
+  .search-inner::before {
+    content: '🔍';
+    position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+    font-size: 15px; opacity: 0.6; pointer-events: none;
+  }
+  #search-clear {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: rgba(255,255,255,0.5);
+    font-size: 18px; cursor: pointer; width: 34px; height: 34px; border-radius: 50%;
+    display: none; align-items: center; justify-content: center;
+  }
+  #search-clear:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+  /* ── SECTIONS ── */
+  main { max-width: 980px; margin: 0 auto; padding: 4px 12px 40px; }
+  .section { margin-top: 22px; }
+  .section-head {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 0 6px 12px;
+  }
+  .section-head .s-emoji { font-size: 22px; }
+  .section-head h2 {
+    font-size: clamp(17px, 4.5vw, 22px);
+    font-weight: 900; letter-spacing: 0.4px;
+  }
+  .section-head .count {
+    font-size: 12px; color: var(--muted); font-weight: 700;
+    background: rgba(255,255,255,0.08); padding: 3px 9px; border-radius: 50px;
+  }
+  .section.empty { display: none; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+    gap: 11px;
+  }
+  @media (min-width: 560px) { .grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 13px; } }
+
+  .card {
+    position: relative;
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: 18px;
+    padding: 18px 10px 15px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px;
+    cursor: pointer; text-align: center;
+    aspect-ratio: 1;
+    overflow: hidden;
+    transition: transform 0.14s cubic-bezier(0.175,0.885,0.32,1.275), box-shadow 0.14s, opacity 0.14s;
+    color: #fff;
+  }
+  .card::before {
+    content: '';
+    position: absolute; inset: 0 0 auto 0; height: 46%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.16), transparent);
+    pointer-events: none;
+  }
+  .card:hover { transform: translateY(-4px) scale(1.02); }
+  .card:active { transform: scale(0.95); opacity: 0.9; }
+  .card .c-emoji { font-size: clamp(38px, 11vw, 50px); line-height: 1; }
+  .card .c-name {
+    font-size: clamp(11.5px, 3vw, 13.5px); font-weight: 800; line-height: 1.2;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.35);
+  }
+  .card.hidden { display: none; }
+
+  #no-results {
+    display: none; text-align: center; color: var(--muted);
+    padding: 50px 20px; font-size: 15px; font-weight: 600;
+  }
+
+  footer {
+    text-align: center; color: rgba(255,255,255,0.28);
+    font-size: 11.5px; padding: 8px 20px 30px;
+  }
+
+  /* ── PLAYER OVERLAY ── */
+  #player {
+    position: fixed; inset: 0; z-index: 100;
+    background: #000; display: none; flex-direction: column;
+  }
+  #player.open { display: flex; }
+  #player-bar {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 10px;
+    padding: max(env(safe-area-inset-top), 8px) 12px 8px;
+    background: #0d0b1a;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+  #back-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; font: inherit; font-weight: 800; font-size: 14px;
+    padding: 9px 16px; border-radius: 50px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  #back-btn:hover { background: rgba(255,255,255,0.2); }
+  #player-title { font-weight: 800; font-size: 14px; color: rgba(255,255,255,0.75); }
+  #player-frame { flex: 1 1 auto; width: 100%; border: 0; background: #000; }
+  #player-loading {
+    position: absolute; inset: 52px 0 0 0; display: none;
+    align-items: center; justify-content: center; flex-direction: column; gap: 14px;
+    color: rgba(255,255,255,0.6); font-weight: 700; pointer-events: none;
+  }
+  #player-loading.show { display: flex; }
+  .spinner {
+    width: 42px; height: 42px; border-radius: 50%;
+    border: 4px solid rgba(255,255,255,0.15); border-top-color: #b478ff;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* section accent colors applied inline per card via data attr */
+</style>
+</head>
+<body>
+  <header>
+    <h1>🕹️ Games Arcade</h1>
+    <p>Party games, carnival &amp; kids apps — all in one place</p>
+  </header>
+
+  <div class="search-wrap">
+    <div class="search-inner">
+      <input id="search" type="search" placeholder="Search all games…" autocomplete="off" autocorrect="off" spellcheck="false">
+      <button id="search-clear" aria-label="Clear search">✕</button>
+    </div>
+  </div>
+
+  <main id="catalog"></main>
+  <div id="no-results">No games match your search.</div>
+  <footer>One catalog · <span id="total-count"></span> games · tap any card to play</footer>
+
+  <!-- Full-screen player -->
+  <div id="player">
+    <div id="player-bar">
+      <button id="back-btn">← All Games</button>
+      <span id="player-title"></span>
+    </div>
+    <iframe id="player-frame"
+            allow="fullscreen; autoplay; microphone; camera; gamepad; accelerometer; gyroscope"
+            allowfullscreen></iframe>
+    <div id="player-loading"><div class="spinner"></div><div>Loading…</div></div>
+  </div>
+
+<script>
+/* ─────────────────────────────────────────────
+   GAME REGISTRY
+   type 'party'  → load party app, then call its showScreen(screen)
+   type 'plain'  → load the file directly
+   ───────────────────────────────────────────── */
+// Resolve where the game files live relative to THIS page, so one identical file
+// works in both deploy contexts:
+//   • served as .../all-games-hub.html  → web-root is the "cowork apps" folder,
+//     so the game folders are siblings (base '').
+//   • served as .../index.html (or a bare directory, e.g. GitHub Pages root)
+//     → web-root is the repo root, so games live under "cowork apps/".
+const GAMES_BASE = location.pathname.endsWith('/all-games-hub.html') ? '' : 'cowork apps/';
+
+const PARTY_SRC = 'party_apps/2026-06-26-party-command-games.html';
+
+const SECTIONS = [
+  {
+    key: 'party', title: 'Party Games', emoji: '🎉',
+    grad: ['#f97316', '#c2410c'],   // orange
+    games: [
+      { id: 'party-lava',     name: 'Floor is Lava',     emoji: '🔥', type: 'party', screen: 'lava-screen' },
+      { id: 'party-simon',    name: 'Simon Says',        emoji: '👆', type: 'party', screen: 'simon-screen' },
+      { id: 'party-rglg',     name: 'Red / Green Light', emoji: '🚦', type: 'party', screen: 'rglg-screen' },
+      { id: 'party-hp',       name: 'Hot Potato',        emoji: '🥔', type: 'party', screen: 'hp-screen' },
+      { id: 'party-mc',       name: 'Musical Chairs',    emoji: '🪑', type: 'party', screen: 'mc-screen' },
+      { id: 'party-fd',       name: 'Freeze Dance',      emoji: '🕺', type: 'party', screen: 'fd-screen' },
+      { id: 'party-wyr',      name: 'Would You Rather',  emoji: '🤔', type: 'party', screen: 'wyr-screen' },
+      { id: 'party-dice',     name: 'Dice & Coins',      emoji: '🎲', type: 'party', screen: 'dice-screen' },
+      { id: 'party-mem',      name: 'Memory Match',      emoji: '🃏', type: 'party', screen: 'mem-screen' },
+      { id: 'party-qmatch',   name: 'Quick Match',       emoji: '🔗', type: 'party', screen: 'qmatch-screen' },
+      { id: 'party-charades', name: 'Charades',          emoji: '🎭', type: 'party', screen: 'charades-screen' },
+      { id: 'party-tod',      name: 'Truth or Dare',     emoji: '⚡', type: 'party', screen: 'tod-screen' },
+      { id: 'party-nihe',     name: 'Never Have I Ever', emoji: '🤚', type: 'party', screen: 'nihe-screen' },
+      { id: 'party-hunt',     name: 'Scavenger Hunt',    emoji: '🔍', type: 'party', screen: 'hunt-screen' },
+      { id: 'party-vbox',     name: 'Voice Box',         emoji: '🎙️', type: 'party', screen: 'vbox-screen' },
+      { id: 'party-wheel',    name: 'Spin the Wheel',    emoji: '🎡', type: 'party', screen: 'wheel-screen' },
+      { id: 'party-tp',       name: 'Team Picker',       emoji: '👥', type: 'party', screen: 'tp-screen' },
+      { id: 'party-shell',    name: 'Shell Game',        emoji: '🎩', type: 'party', screen: 'shell-screen' },
+      { id: 'party-fp',       name: 'Follow the Pattern',emoji: '🧠', type: 'party', screen: 'fp-screen' },
+    ],
+  },
+  {
+    key: 'carnival', title: 'Carnival', emoji: '🎡',
+    grad: ['#a855f7', '#6d28d9'],   // purple
+    games: [
+      { id: 'carnival', name: 'Carnival Games', emoji: '🎪', type: 'plain', src: 'kids_apps/play-carnival.html' },
+    ],
+  },
+  {
+    key: 'kids', title: 'Kids Games', emoji: '🧒',
+    grad: ['#0ea5e9', '#0369a1'],   // blue
+    games: [
+      { id: 'kids-draw',      name: 'Drawing & Colors',  emoji: '🎨', type: 'plain', src: 'art_apps/draw-and-color.html' },
+      { id: 'kids-math',      name: 'Math Play',         emoji: '🔢', type: 'plain', src: 'Educational Apps/kids-math-play.html' },
+      { id: 'kids-hidden',    name: 'Hidden Objects',    emoji: '🔍', type: 'plain', src: 'kids_apps/find-it-game.html' },
+      { id: 'kids-splashy',   name: 'Splashy Bubbles',   emoji: '💧', type: 'plain', src: 'kids_apps/2026-06-26-splashy-bubbles.html' },
+      { id: 'kids-cartoon',   name: 'Cartoon Coach',     emoji: '🎮', type: 'plain', src: 'kids_apps/2026-06-26-cartoon-coach.html' },
+      { id: 'kids-song',      name: 'Song Maker',        emoji: '🎵', type: 'plain', src: 'music_apps/song-maker.html' },
+      { id: 'kids-rmem',      name: 'Memory Match',      emoji: '🧠', type: 'plain', src: 'kids_apps/2026-06-26-ranked-memory-match.html' },
+      { id: 'kids-bubble',    name: 'Bubble Pop',        emoji: '🫧', type: 'plain', src: 'kids_apps/2026-06-25-bubble-pop.html' },
+      { id: 'kids-star',      name: 'Star Catcher',      emoji: '⭐', type: 'plain', src: 'kids_apps/2026-06-24-star-catcher.html' },
+      { id: 'kids-critter',   name: 'Critter Chorus',    emoji: '🐸', type: 'plain', src: 'kids_apps/2026-06-24-critter-chorus.html' },
+      { id: 'kids-orchestra', name: 'Animal Orchestra',  emoji: '🎹', type: 'plain', src: 'kids_apps/2026-06-25-animal-orchestra.html' },
+      { id: 'kids-cookie',    name: 'Cookie Café Count', emoji: '🍪', type: 'plain', src: 'kids_apps/2026-06-25-cookie-cafe-counting.html' },
+      { id: 'kids-zoo',       name: 'Memory Zoo Match',  emoji: '🦁', type: 'plain', src: 'kids_apps/2026-06-25-memory-zoo-match.html' },
+      { id: 'kids-monster',   name: 'Monster Maker Lab', emoji: '👾', type: 'plain', src: 'kids_apps/2026-06-25-monster-maker-lab.html' },
+      { id: 'kids-bunny',     name: 'Bunny Carrot Maze', emoji: '🐰', type: 'plain', src: 'kids_apps/2026-06-26-bunny-carrot-maze.html' },
+      { id: 'kids-makeit',    name: 'Make It Lab',       emoji: '🛠️', type: 'plain', src: 'kids_apps/2026-06-26-make-it-lab.html' },
+      { id: 'kids-songbox',   name: 'SongBox Studio',    emoji: '🎶', type: 'plain', src: 'kids_apps/2026-06-26-songbox-studio.html' },
+      { id: 'kids-beat',      name: 'Beat Buddy Boogie', emoji: '🕺', type: 'plain', src: 'kids_apps/2026-06-27-beat-buddy-boogie.html' },
+      { id: 'kids-feed',      name: 'Feed the Monster',  emoji: '👹', type: 'plain', src: 'kids_apps/2026-06-28-feed-the-monster.html' },
+      { id: 'kids-twinkle',   name: 'Twinkle Repeat',    emoji: '✨', type: 'plain', src: 'kids_apps/2026-06-30-twinkle-repeat-pattern.html' },
+      { id: 'kids-abc',       name: 'ABC Barnyard',      emoji: '🔤', type: 'plain', src: 'kids_apps/2026-07-01-abc-barnyard-spelling.html' },
+      { id: 'kids-garden',    name: 'Garden Pop Pals',   emoji: '🌱', type: 'plain', src: 'kids_apps/2026-07-02-garden-pop-pals.html' },
+      { id: 'kids-cardmatch', name: 'Card Match',        emoji: '🃏', type: 'plain', src: 'kids_apps/card-match-play.html' },
+      { id: 'kids-monster3d', name: 'Monster Maker 3D',  emoji: '🧟', type: 'plain', src: 'kids_apps/2026-07-09-monster-maker-lab-3d.html' },
+    ],
+  },
+];
+
+// Flat lookup by id
+const REGISTRY = {};
+SECTIONS.forEach(sec => sec.games.forEach(g => { g._section = sec; REGISTRY[g.id] = g; }));
+const TOTAL = Object.keys(REGISTRY).length;
+
+/* ── RENDER CATALOG ── */
+const catalog = document.getElementById('catalog');
+document.getElementById('total-count').textContent = TOTAL;
+
+SECTIONS.forEach(sec => {
+  const section = document.createElement('section');
+  section.className = 'section';
+  section.dataset.section = sec.key;
+
+  const head = document.createElement('div');
+  head.className = 'section-head';
+  head.innerHTML = `<span class="s-emoji">${sec.emoji}</span>
+                    <h2>${sec.title}</h2>
+                    <span class="count">${sec.games.length}</span>`;
+  section.appendChild(head);
+
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  sec.games.forEach(g => {
+    const [c1, c2] = sec.grad;
+    const card = document.createElement('button');
+    card.className = 'card';
+    card.dataset.id = g.id;
+    card.dataset.search = (g.name + ' ' + sec.title).toLowerCase();
+    card.style.background = `linear-gradient(150deg, ${c1}, ${c2})`;
+    card.style.boxShadow = `0 6px 22px ${hexA(c1, 0.38)}`;
+    card.innerHTML = `<span class="c-emoji">${g.emoji}</span><span class="c-name">${g.name}</span>`;
+    card.addEventListener('click', () => { location.hash = 'play/' + g.id; });
+    grid.appendChild(card);
+  });
+  section.appendChild(grid);
+  catalog.appendChild(section);
+});
+
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255}, ${(n>>8)&255}, ${n&255}, ${a})`;
+}
+
+/* ── SEARCH FILTER ── */
+const search = document.getElementById('search');
+const searchClear = document.getElementById('search-clear');
+const noResults = document.getElementById('no-results');
+
+function applyFilter() {
+  const q = search.value.trim().toLowerCase();
+  searchClear.style.display = q ? 'flex' : 'none';
+  let anyVisible = false;
+  document.querySelectorAll('.section').forEach(sec => {
+    let secVisible = 0;
+    sec.querySelectorAll('.card').forEach(card => {
+      const match = !q || card.dataset.search.includes(q);
+      card.classList.toggle('hidden', !match);
+      if (match) secVisible++;
+    });
+    sec.classList.toggle('empty', secVisible === 0);
+    if (secVisible) anyVisible = true;
+  });
+  noResults.style.display = anyVisible ? 'none' : 'block';
+}
+search.addEventListener('input', applyFilter);
+searchClear.addEventListener('click', () => { search.value = ''; applyFilter(); search.focus(); });
+
+/* ── PLAYER (iframe overlay) ── */
+const player = document.getElementById('player');
+const frame = document.getElementById('player-frame');
+const playerTitle = document.getElementById('player-title');
+const playerLoading = document.getElementById('player-loading');
+let loadWatch = null;
+
+function openGame(g) {
+  playerTitle.textContent = g.name;
+  playerLoading.classList.add('show');
+  player.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  const src = GAMES_BASE + (g.type === 'party' ? PARTY_SRC : g.src);
+
+  // reset handlers before setting src
+  frame.onload = null;
+  if (loadWatch) { clearInterval(loadWatch); loadWatch = null; }
+
+  frame.onload = () => {
+    playerLoading.classList.remove('show');
+    if (g.type === 'party') deepLinkParty(g.screen);
+  };
+  frame.src = src;
+}
+
+// After the party app loads, call its own showScreen() to jump straight into the game.
+function deepLinkParty(screen) {
+  let tries = 0;
+  loadWatch = setInterval(() => {
+    tries++;
+    try {
+      const win = frame.contentWindow;
+      if (win && typeof win.showScreen === 'function') {
+        win.showScreen(screen);
+        clearInterval(loadWatch); loadWatch = null;
+      }
+    } catch (e) {
+      // cross-origin (shouldn't happen — same origin); stop trying
+      clearInterval(loadWatch); loadWatch = null;
+    }
+    if (tries > 60) { clearInterval(loadWatch); loadWatch = null; }
+  }, 50);
+}
+
+function closeGame() {
+  player.classList.remove('open');
+  playerLoading.classList.remove('show');
+  if (loadWatch) { clearInterval(loadWatch); loadWatch = null; }
+  frame.onload = null;
+  frame.src = 'about:blank';   // stop audio / free the game
+  playerTitle.textContent = '';
+  document.body.style.overflow = '';
+}
+
+document.getElementById('back-btn').addEventListener('click', () => {
+  // Deterministic: clearing the hash fires hashchange -> route() -> closeGame().
+  // Works even on a direct deep-link (no prior catalog entry in history).
+  if (location.hash) location.hash = '';
+  else closeGame();
+});
+
+/* ── HASH ROUTING ── */
+function route() {
+  const m = location.hash.match(/^#play\/(.+)$/);
+  if (m && REGISTRY[m[1]]) {
+    openGame(REGISTRY[m[1]]);
+  } else {
+    if (player.classList.contains('open')) closeGame();
+  }
+}
+window.addEventListener('hashchange', route);
+route(); // handle deep-link on first load
+</script>
+</body>
+</html>
