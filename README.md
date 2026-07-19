@@ -9,7 +9,7 @@ One catalog for everything — **Party games**, **Carnival**, and **Kids apps** 
 ## What's inside
 
 - **🎉 Party Games (19)** — Floor is Lava, Simon Says, Red/Green Light, Hot Potato, Musical Chairs, Freeze Dance, Would You Rather, Dice & Coins, Memory Match, Quick Match, Charades, Truth or Dare, Never Have I Ever, Scavenger Hunt, Voice Box, Spin the Wheel, Team Picker, Shell Game, Follow the Pattern
-- **🎡 Carnival** — the full carnival arcade (ring toss, balloon pop, shooting gallery, and more)
+- **🎠 Carnival (8)** — each carnival game as its own card (Basketball Hoops, Spin Reels, Guess the Number, Ring Toss, Critter Boop, Prize Wheel, Duck Gallery), plus **Carnival Midway** for the full hub
 - **🧒 Kids Games (24)** — drawing & colors, math play, hidden objects, bubble pop, song maker, memory games, monster makers, and lots more
 
 ## How it works
