@@ -12,10 +12,17 @@ $PS       = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
 
 $items = Get-Content -Raw -LiteralPath $Manifest | ConvertFrom-Json
 
-# Wee-hours jobs need the machine to wake; all get StartWhenAvailable so a missed
-# run (PC off/asleep) fires as soon as it can rather than silently skipping.
+# NO -StartWhenAvailable, deliberately. It used to be here so a run missed while
+# the PC was off would fire "as soon as it can" -- but Windows fires EVERY missed
+# task at once, with no stagger. Combined with a 01:00-06:30 schedule and a machine
+# that gets shut down overnight, that meant every boot opened one console window per
+# missed routine: seven of them on 2026-08-08, all stamped 09:45:09 in their logs,
+# and the same pile-up on 07-30 and 08-06. A missed run is now simply skipped.
+#
+# The routines moved to 09:30-17:30 in the same change, so they run when the machine
+# is actually on and there is little left to miss. WakeToRun is kept, but note it
+# now means a SLEEPING machine wakes during the day to generate an app.
 $Settings = New-ScheduledTaskSettingsSet `
-    -StartWhenAvailable `
     -WakeToRun `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
@@ -23,7 +30,19 @@ $Settings = New-ScheduledTaskSettingsSet `
     -MultipleInstances IgnoreNew
 
 $ok = 0
+$skipped = @()
 foreach ($m in $items) {
+    # Never replace a task that is mid-run. -Force swaps the definition out from
+    # under the live instance and kills the routine partway through, losing
+    # whatever it was generating. Skipping is safe because registration is
+    # idempotent: re-run this script once the routine finishes.
+    $live = Get-ScheduledTask -TaskName $m.taskName -ErrorAction SilentlyContinue
+    if ($live -and $live.State -eq 'Running') {
+        Write-Host ("  SKIPPED    {0,-34} running right now" -f $m.taskName)
+        $skipped += $m.taskName
+        continue
+    }
+
     $arg = "-NoProfile -ExecutionPolicy Bypass -File `"$Wrapper`" -Name `"$($m.safeName)`""
     $Action = New-ScheduledTaskAction -Execute $PS -Argument $arg -WorkingDirectory $Root
 
@@ -48,3 +67,9 @@ foreach ($m in $items) {
 }
 Write-Host ""
 Write-Host "Registered $ok / $($items.Count) tasks."
+if ($skipped.Count -gt 0) {
+    Write-Host ""
+    Write-Host "$($skipped.Count) task(s) were mid-run and still carry the OLD schedule:"
+    $skipped | ForEach-Object { Write-Host "  $_" }
+    Write-Host "Re-run this script once they finish to pick up the new times."
+}
