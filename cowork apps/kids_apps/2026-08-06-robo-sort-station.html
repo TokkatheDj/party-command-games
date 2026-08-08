@@ -1,0 +1,1301 @@
+<!-- CONCEPT: Robo Sort Station — Bolt the robot runs a conveyor belt; drag (or tap) each item into the matching glowing chute. The sorting rule changes every level — by color, shape, how many dots, what kind of thing it is, where it lives, big-or-small, alive-or-not — with sparkles, happy chimes and confetti. Sneaky-educational sorting & categorizing puzzle for ages 4-10. No timer, no losing, wrong chutes just bounce back. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Robo Sort Station</title>
+<style>
+  /* ---------- reset ---------- */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0; padding: 0;
+    touch-action: manipulation;
+    user-select: none; -webkit-user-select: none;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  :root {
+    --sky-1:      #6ec6ff;
+    --sky-2:      #a685ff;
+    --panel:      #ffffff;
+    --ink:        #2b2350;
+    --ink-soft:   #6b6392;
+    --belt-dark:  #4a4468;
+    --belt-light: #6f688f;
+    --accent:     #ff8f3d;
+    --accent-2:   #ffd23f;
+    --good:       #46d97e;
+    --shadow:     0 6px 0 rgba(0,0,0,.14);
+    --radius:     18px;
+    --font:       "Comic Sans MS", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  }
+
+  body {
+    font-family: var(--font);
+    color: var(--ink);
+    background: linear-gradient(170deg, var(--sky-1) 0%, var(--sky-2) 100%);
+  }
+
+  #app {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    width: 100%;
+    max-width: 820px;
+    margin: 0 auto;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 7px;
+    flex: 0 0 auto;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(12px, 3.5vw, 24px);
+    line-height: 1.1;
+    letter-spacing: .3px;
+    background: linear-gradient(90deg, #fff6a8, #ffffff 55%, #c9f5ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 2px 6px rgba(0,0,0,.18);
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .chip {
+    background: rgba(255,255,255,.92);
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: clamp(10px, 2.7vw, 15px);
+    font-weight: bold;
+    color: var(--ink);
+    white-space: nowrap;
+    box-shadow: 0 3px 0 rgba(0,0,0,.13);
+  }
+
+  .iconbtn {
+    flex: 0 0 auto;
+    width: 44px; height: 44px;   /* stays a full tap target */
+    border: none;
+    border-radius: 50%;
+    background: rgba(255,255,255,.92);
+    box-shadow: 0 4px 0 rgba(0,0,0,.16);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    padding: 0;
+  }
+  .iconbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,.16); }
+
+  /* ---------- stage ---------- */
+  #stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    /* dragging needs the gesture — the house rule stays on html/body */
+    touch-action: none;
+    overflow: hidden;
+  }
+
+  /* --- robot + speech --- */
+  #robotRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px 10px 4px;
+  }
+
+  #robot {
+    flex: 0 0 auto;
+    font-size: clamp(38px, 11vw, 58px);
+    line-height: 1;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,.25));
+    transform-origin: 50% 90%;
+    animation: bob 2.4s ease-in-out infinite;
+  }
+  #robot.cheer { animation: cheer .5s ease-in-out 2; }
+  #robot.think { animation: think .4s ease-in-out 2; }
+
+  @keyframes bob   { 0%,100% { transform: translateY(0) rotate(-2deg);} 50% { transform: translateY(-6px) rotate(2deg);} }
+  @keyframes cheer { 0%,100% { transform: translateY(0) scale(1);} 40% { transform: translateY(-14px) scale(1.18) rotate(8deg);} }
+  @keyframes think { 0%,100% { transform: rotate(0);} 25% { transform: rotate(-9deg);} 75% { transform: rotate(9deg);} }
+
+  #bubble {
+    flex: 1 1 auto;
+    min-width: 0;
+    position: relative;
+    background: var(--panel);
+    border-radius: var(--radius);
+    padding: 7px 12px;
+    box-shadow: var(--shadow);
+  }
+  #bubble::before {
+    content: '';
+    position: absolute;
+    left: -9px; top: 50%;
+    margin-top: -8px;
+    border: 9px solid transparent;
+    border-right-color: var(--panel);
+    border-left: 0;
+  }
+  #ruleTitle {
+    font-size: clamp(14px, 4.2vw, 21px);
+    font-weight: bold;
+    line-height: 1.15;
+    background: linear-gradient(90deg, var(--accent), #e0509a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  #ruleHint {
+    font-size: clamp(10px, 2.9vw, 14px);
+    color: var(--ink-soft);
+    line-height: 1.2;
+    margin-top: 1px;
+  }
+
+  /* --- progress --- */
+  #progressWrap {
+    margin: 0 10px 2px;
+    height: 14px;
+    background: rgba(255,255,255,.45);
+    border-radius: 999px;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,.14);
+  }
+  #progressBar {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--good), var(--accent-2));
+    transition: width .3s cubic-bezier(.3,1.4,.5,1);
+  }
+
+  /* --- belt --- */
+  /* belt sits high, leaving one clear open lane down to the chutes */
+  #beltRow {
+    position: relative;
+    display: grid;
+    place-items: start center;
+    padding-top: clamp(6px, 3vh, 30px);
+  }
+
+  #beltTrack {
+    position: relative;
+    width: 100%;
+    height: clamp(84px, 15vh, 118px);
+    background:
+      repeating-linear-gradient(115deg,
+        var(--belt-dark) 0 16px,
+        var(--belt-light) 16px 32px);
+    background-size: 37px 100%;
+    border-top: 5px solid #3a3555;
+    border-bottom: 5px solid #3a3555;
+    box-shadow: inset 0 10px 18px rgba(0,0,0,.32), 0 8px 16px rgba(0,0,0,.22);
+    animation: rollBelt 1.1s linear infinite;
+  }
+  @keyframes rollBelt { from { background-position: 0 0; } to { background-position: -37px 0; } }
+  #beltTrack.paused { animation-play-state: paused; }
+
+  #beltTrack::before, #beltTrack::after {
+    content: '';
+    position: absolute;
+    top: -5px; bottom: -5px;
+    width: 26px;
+    background: linear-gradient(180deg, #59527d, #322d4d);
+  }
+  #beltTrack::before { left: -13px;  border-radius: 999px; }
+  #beltTrack::after  { right: -13px; border-radius: 999px; }
+
+  /* --- items --- */
+  #itemLayer { position: absolute; inset: 0; pointer-events: none; }
+
+  .item {
+    position: absolute;
+    left: 0; top: 0;
+    display: grid;
+    place-items: center;
+    pointer-events: auto;
+    cursor: pointer;
+    will-change: transform;
+    filter: drop-shadow(0 5px 5px rgba(0,0,0,.32));
+  }
+  .item.held  { filter: drop-shadow(0 14px 12px rgba(0,0,0,.4)); z-index: 40; }
+  .item.picked {
+    z-index: 40;
+    animation: hover .85s ease-in-out infinite;
+    filter: drop-shadow(0 12px 10px rgba(0,0,0,.38)) drop-shadow(0 0 12px rgba(255,255,255,.95));
+  }
+  .item.shake { animation: shake .42s ease-in-out; }
+  .item.flying { pointer-events: none; z-index: 40; }
+
+  @keyframes hover { 0%,100% { margin-top: -4px; } 50% { margin-top: -20px; } }
+  @keyframes shake { 0%,100%{margin-left:0} 20%{margin-left:-10px} 40%{margin-left:10px} 60%{margin-left:-7px} 80%{margin-left:7px} }
+
+  .glyph { width: 100%; height: 100%; display: grid; place-items: center; }
+  .sh { width: 84%; height: 84%; box-shadow: inset 0 -7px 0 rgba(0,0,0,.16); }
+  .sh.circle   { border-radius: 50%; }
+  .sh.square   { border-radius: 18%; }
+  .sh.triangle { clip-path: polygon(50% 3%, 97% 95%, 3% 95%); box-shadow: none; }
+  .sh.star     { clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); box-shadow: none; }
+
+  .emo { line-height: 1; }
+
+  .dots {
+    width: 88%; height: 88%;
+    border-radius: 26%;
+    background: #fff;
+    border: 4px solid #3c3560;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9%;
+    padding: 8%;
+  }
+  .dots i {
+    display: block;
+    width: 21%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: #3c3560;
+  }
+
+  /* --- bins --- */
+  #binRow {
+    display: flex;
+    gap: 7px;
+    padding: 6px 8px max(8px, env(safe-area-inset-bottom));
+    align-items: flex-end;
+  }
+
+  .bin {
+    flex: 1 1 0;
+    min-width: 0;
+    position: relative;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    cursor: pointer;
+    background: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform .14s ease;
+  }
+  /* the funnel above each chute — fills the gap and widens the drop zone,
+     so a small finger only has to land in the right column */
+  .bin .guide {
+    width: 100%;
+    height: clamp(34px, 13vh, 96px);
+    position: relative;
+    border-radius: 14px 14px 0 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.14) 45%, rgba(255,255,255,.32) 100%);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+  .bin .guide::after {
+    content: '';
+    width: 26%;
+    aspect-ratio: 1;
+    border-right: 5px solid rgba(255,255,255,.7);
+    border-bottom: 5px solid rgba(255,255,255,.7);
+    border-radius: 0 0 6px 0;
+    transform: rotate(45deg) translate(-4%, -4%);
+  }
+  .bin.armed .guide::after { animation: chevron 1.1s ease-in-out infinite; }
+  @keyframes chevron {
+    0%,100% { opacity: .55; margin-top: -8px; }
+    50%     { opacity: 1;   margin-top:  8px; }
+  }
+
+  .bin .mouth {
+    width: 100%;
+    height: 15px;
+    border-radius: 10px 10px 3px 3px;
+    background: #2f2a4a;
+    box-shadow: inset 0 5px 8px rgba(0,0,0,.65);
+  }
+  .bin .body {
+    width: 100%;
+    border-radius: 6px 6px 16px 16px;
+    background: linear-gradient(180deg, #fffdf6, #e7e2f7);
+    box-shadow: 0 5px 0 rgba(0,0,0,.18), inset 0 -8px 0 rgba(0,0,0,.06);
+    padding: 7px 4px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .bin .icon {
+    width: clamp(38px, 12vw, 56px);
+    height: clamp(38px, 12vw, 56px);
+    display: grid;
+    place-items: center;
+  }
+  .bin .icon .emo { font-size: clamp(26px, 8.5vw, 40px); }
+  .bin .label {
+    font-size: clamp(10px, 3vw, 14px);
+    font-weight: bold;
+    color: var(--ink);
+    line-height: 1.05;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  /* glow only — the chute must not move out from under a small finger */
+  .bin.armed .body {
+    box-shadow: 0 5px 0 rgba(0,0,0,.18), 0 0 0 4px var(--accent-2), 0 0 22px 5px rgba(255,210,63,.85);
+    animation: binPulse 1.1s ease-in-out infinite;
+  }
+  @keyframes binPulse {
+    0%,100% { box-shadow: 0 5px 0 rgba(0,0,0,.18), 0 0 0 4px var(--accent-2), 0 0 12px 2px rgba(255,210,63,.55); }
+    50%     { box-shadow: 0 5px 0 rgba(0,0,0,.18), 0 0 0 4px var(--accent-2), 0 0 26px 8px rgba(255,210,63,.95); }
+  }
+  .bin.over { transform: translateY(-10px) scale(1.06); }
+  .bin.over .body { box-shadow: 0 5px 0 rgba(0,0,0,.18), 0 0 0 5px #fff, 0 0 26px 8px rgba(255,255,255,.9); }
+  .bin.yum .mouth { height: 22px; }
+  .bin.nope { animation: shake .42s ease-in-out; }
+
+  /* ---------- fx canvas ---------- */
+  #fx {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 60;
+  }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 80;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(35,26,72,.62);
+    backdrop-filter: blur(3px);
+  }
+  .overlay[hidden] { display: none; }
+
+  .card {
+    background: var(--panel);
+    border-radius: 26px;
+    padding: 20px 18px;
+    text-align: center;
+    max-width: 380px;
+    width: 100%;
+    box-shadow: 0 12px 0 rgba(0,0,0,.2);
+    animation: popIn .35s cubic-bezier(.2,1.5,.5,1);
+  }
+  @keyframes popIn { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .card .big { font-size: clamp(46px, 16vw, 76px); line-height: 1; }
+  .card h2 {
+    margin: 6px 0 4px;
+    font-size: clamp(21px, 6.5vw, 32px);
+    background: linear-gradient(90deg, var(--accent), #e0509a);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .card p {
+    margin: 0 0 14px;
+    font-size: clamp(13px, 3.8vw, 17px);
+    color: var(--ink-soft);
+    line-height: 1.35;
+  }
+  .stars { font-size: clamp(26px, 9vw, 40px); letter-spacing: 4px; margin-bottom: 8px; }
+
+  .bigbtn {
+    display: block;
+    width: 100%;
+    min-height: 62px;
+    border: none;
+    border-radius: 20px;
+    font-family: inherit;
+    font-size: clamp(19px, 5.6vw, 26px);
+    font-weight: bold;
+    color: #fff;
+    cursor: pointer;
+    background: linear-gradient(180deg, #ffa24d, #f2622c);
+    box-shadow: 0 6px 0 #c14a1f;
+    margin-top: 10px;
+  }
+  .bigbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #c14a1f; }
+  .bigbtn.alt {
+    background: linear-gradient(180deg, #8fd8ff, #4aa8ff);
+    box-shadow: 0 6px 0 #2f7ec4;
+    min-height: 52px;
+    font-size: clamp(15px, 4.4vw, 19px);
+  }
+  .bigbtn.alt:active { box-shadow: 0 2px 0 #2f7ec4; }
+
+  .howto {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin: 10px 0 2px;
+    font-size: clamp(11px, 3.2vw, 14px);
+    color: var(--ink-soft);
+    flex-wrap: wrap;
+  }
+  .howto span { display: flex; align-items: center; gap: 4px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <header>
+    <h1>🤖 Robo Sort Station</h1>
+    <div class="chip" id="levelChip">Level 1</div>
+    <div class="chip" id="scoreChip">⭐ 0</div>
+    <button class="iconbtn" id="soundBtn" aria-label="Sound on or off">🔊</button>
+    <button class="iconbtn" id="restartBtn" aria-label="Start over">↺</button>
+  </header>
+
+  <div id="stage">
+
+    <div>
+      <div id="robotRow">
+        <div id="robot">🤖</div>
+        <div id="bubble">
+          <div id="ruleTitle">Sort by COLOR!</div>
+          <div id="ruleHint">Drag each thing into the right chute.</div>
+        </div>
+      </div>
+      <div id="progressWrap"><div id="progressBar"></div></div>
+    </div>
+
+    <div id="beltRow">
+      <div id="beltTrack"></div>
+    </div>
+
+    <div id="binRow"></div>
+
+    <div id="itemLayer"></div>
+    <canvas id="fx"></canvas>
+
+    <!-- start screen -->
+    <div class="overlay" id="startOverlay">
+      <div class="card">
+        <div class="big">🤖📦</div>
+        <h2>Robo Sort Station</h2>
+        <p>Bolt needs help! Things are rolling down the belt.<br>Put each one in the chute where it belongs.</p>
+        <div class="howto">
+          <span>👉 Drag it</span>
+          <span>👆 or tap it, then tap a chute</span>
+        </div>
+        <button class="bigbtn" id="playBtn">▶ Let's Sort!</button>
+        <div class="howto" id="bestLine"></div>
+      </div>
+    </div>
+
+    <!-- level complete -->
+    <div class="overlay" id="winOverlay" hidden>
+      <div class="card">
+        <div class="big" id="winEmoji">🎉</div>
+        <div class="stars" id="winStars">⭐⭐⭐</div>
+        <h2 id="winTitle">Level Done!</h2>
+        <p id="winText">Bolt is so proud of you!</p>
+        <button class="bigbtn" id="nextBtn">Next Level ▶</button>
+        <button class="bigbtn alt" id="againBtn">↺ Start Over</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ============================================================
+     Audio — created inside the first real tap so mobile allows it
+     ============================================================ */
+  let actx = null;
+  let soundOn = true;
+
+  function ensureAudio() {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      actx = new AC();
+    }
+    if (actx.state === 'suspended') actx.resume();
+  }
+
+  function tone(freq, dur, type = 'sine', vol = 0.16, delay = 0) {
+    if (!soundOn || !actx) return;
+    const t0 = actx.currentTime + delay;
+    const osc = actx.createOscillator();
+    const gain = actx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(actx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.03);
+  }
+
+  function slide(fromF, toF, dur, type = 'sine', vol = 0.14) {
+    if (!soundOn || !actx) return;
+    const t0 = actx.currentTime;
+    const osc = actx.createOscillator();
+    const gain = actx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(fromF, t0);
+    osc.frequency.exponentialRampToValueAtTime(toF, t0 + dur);
+    gain.gain.setValueAtTime(vol, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(actx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.03);
+  }
+
+  const sfx = {
+    pick:  () => { tone(720, 0.07, 'triangle', 0.12); },
+    drop:  () => { tone(300, 0.08, 'sine', 0.10); },
+    good:  () => {
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, 0.16, 'triangle', 0.15, i * 0.055));
+      tone(2100, 0.10, 'sine', 0.05, 0.16);
+    },
+    nope:  () => { tone(240, 0.13, 'sine', 0.13); tone(190, 0.17, 'sine', 0.12, 0.10); },
+    level: () => {
+      [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => tone(f, 0.26, 'triangle', 0.16, i * 0.10));
+      slide(400, 1600, 0.5, 'sine', 0.07);
+    }
+  };
+
+  /* ============================================================
+     Content — the sorting rules
+     ============================================================ */
+  const COLORS = {
+    red:    { name: 'Red',    hex: '#ff5d6c' },
+    blue:   { name: 'Blue',   hex: '#4aa8ff' },
+    yellow: { name: 'Yellow', hex: '#ffcf2e' },
+    green:  { name: 'Green',  hex: '#46d97e' },
+    purple: { name: 'Purple', hex: '#b57bff' }
+  };
+
+  const pick = arr => arr[(Math.random() * arr.length) | 0];
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  // Every rule: bins[] describe the chutes, make(binKey) builds one item for that chute.
+  const RULES = [
+    {
+      title: 'Sort by COLOR!',
+      hint: 'Match each shape to its color chute.',
+      bins: [
+        { key: 'red',    label: 'Red',    icon: { type: 'shape', shape: 'circle', color: COLORS.red.hex } },
+        { key: 'blue',   label: 'Blue',   icon: { type: 'shape', shape: 'circle', color: COLORS.blue.hex } },
+        { key: 'yellow', label: 'Yellow', icon: { type: 'shape', shape: 'circle', color: COLORS.yellow.hex } }
+      ],
+      make: key => ({ type: 'shape', shape: pick(['circle', 'square', 'star', 'triangle']), color: COLORS[key].hex })
+    },
+    {
+      title: 'Sort by SHAPE!',
+      hint: 'Round, boxy or pointy — find the right chute.',
+      bins: [
+        { key: 'circle', label: 'Circles', icon: { type: 'shape', shape: 'circle', color: '#9d95c7' } },
+        { key: 'square', label: 'Squares', icon: { type: 'shape', shape: 'square', color: '#9d95c7' } },
+        { key: 'star',   label: 'Stars',   icon: { type: 'shape', shape: 'star',   color: '#9d95c7' } }
+      ],
+      make: key => ({ type: 'shape', shape: key, color: pick(Object.values(COLORS)).hex })
+    },
+    {
+      title: 'Count the DOTS!',
+      hint: 'How many dots? Pop it in that number.',
+      bins: [
+        { key: '1', label: 'One',   icon: { type: 'dots', n: 1 } },
+        { key: '2', label: 'Two',   icon: { type: 'dots', n: 2 } },
+        { key: '3', label: 'Three', icon: { type: 'dots', n: 3 } }
+      ],
+      make: key => ({ type: 'dots', n: +key })
+    },
+    {
+      title: 'What KIND is it?',
+      hint: 'Animals, snacks or toys?',
+      bins: [
+        { key: 'animal', label: 'Animals', icon: { type: 'emoji', emoji: '🐾' } },
+        { key: 'food',   label: 'Snacks',  icon: { type: 'emoji', emoji: '🍎' } },
+        { key: 'toy',    label: 'Toys',    icon: { type: 'emoji', emoji: '🧸' } }
+      ],
+      pools: {
+        animal: ['🐶', '🐱', '🐰', '🐼', '🦊', '🐸', '🐷', '🐵'],
+        food:   ['🍕', '🍌', '🥕', '🍪', '🧀', '🍇', '🌽', '🍦'],
+        toy:    ['🧸', '🪀', '🎈', '🪁', '🎨', '🚂', '🪃', '🎲']
+      },
+      make(key) { return { type: 'emoji', emoji: pick(this.pools[key]) }; }
+    },
+    {
+      title: 'Where does it LIVE?',
+      hint: 'In the sky, in the water, or on the land?',
+      bins: [
+        { key: 'sky',   label: 'Sky',   icon: { type: 'emoji', emoji: '☁️' } },
+        { key: 'water', label: 'Water', icon: { type: 'emoji', emoji: '🌊' } },
+        { key: 'land',  label: 'Land',  icon: { type: 'emoji', emoji: '🌳' } }
+      ],
+      pools: {
+        sky:   ['🦅', '🦋', '🐝', '🦜', '🕊️', '🦇', '🪰', '🦢'],
+        water: ['🐟', '🐙', '🦀', '🐬', '🐳', '🦑', '🐠', '🦈'],
+        land:  ['🦁', '🐘', '🐿️', '🦒', '🐄', '🐎', '🐫', '🦓']
+      },
+      make(key) { return { type: 'emoji', emoji: pick(this.pools[key]) }; }
+    },
+    {
+      title: 'Big or Small?',
+      hint: 'Teeny things left, giant things right.',
+      bins: [
+        { key: 'small', label: 'Small', icon: { type: 'emoji', emoji: '🔹' } },
+        { key: 'big',   label: 'Big',   icon: { type: 'emoji', emoji: '🔷' } }
+      ],
+      pool: ['⭐', '🍎', '🐞', '🎈', '🌸', '🦋', '🍄', '💎', '🐠', '🧁'],
+      make(key) { return { type: 'emoji', emoji: pick(this.pool), size: key === 'small' ? 0.55 : 1.18 }; }
+    },
+    {
+      title: 'Alive or Not?',
+      hint: 'Living things grow — the rest are things!',
+      bins: [
+        { key: 'alive', label: 'Alive',    icon: { type: 'emoji', emoji: '🌱' } },
+        { key: 'thing', label: 'Not Alive', icon: { type: 'emoji', emoji: '🪑' } }
+      ],
+      pools: {
+        alive: ['🐶', '🌻', '🐟', '🦋', '🌳', '🐝', '🐴', '🌷', '🐢', '🍀'],
+        thing: ['🪑', '🚗', '📚', '⚽', '🥄', '🧦', '🔑', '🎩', '🪣', '📷']
+      },
+      make(key) { return { type: 'emoji', emoji: pick(this.pools[key]) }; }
+    }
+  ];
+
+  const CHEERS   = ['Nice one!', 'You got it!', 'Perfect!', 'Beep boop, yes!', 'Super sorting!', 'Wow!', 'That fits!'];
+  const RETRIES  = ['Hmm, try another chute!', 'Not that one — keep going!', 'Almost! Try again.', 'Give another chute a go!'];
+
+  /* ============================================================
+     DOM
+     ============================================================ */
+  const $ = id => document.getElementById(id);
+  const stage      = $('stage');
+  const itemLayer  = $('itemLayer');
+  const beltTrack  = $('beltTrack');
+  const binRow     = $('binRow');
+  const robot      = $('robot');
+  const ruleTitle  = $('ruleTitle');
+  const ruleHint   = $('ruleHint');
+  const levelChip  = $('levelChip');
+  const scoreChip  = $('scoreChip');
+  const progressBar = $('progressBar');
+  const fx         = $('fx');
+  const fxc        = fx.getContext('2d');
+
+  const startOverlay = $('startOverlay');
+  const winOverlay   = $('winOverlay');
+
+  /* ============================================================
+     Game state
+     ============================================================ */
+  const BEST_KEY = 'cowork-robosort-best';
+
+  const state = {
+    running: false,
+    level: 1,
+    score: 0,
+    rule: RULES[0],
+    goal: 5,
+    sorted: 0,
+    speed: 26,          // px per second
+    queue: [],          // bin keys still to spawn
+    items: [],
+    picked: null,       // tap-selected item
+    beltY: 200,
+    stageW: 375,
+    stageH: 600,
+    onBelt: 4          // how many items ride the belt at once (set by measure)
+  };
+
+  const BASE_SIZE   = 62;
+  const TAP_SLOP    = 10;   // px of movement below which a pointerup counts as a tap
+
+  /* ============================================================
+     Visual builders
+     ============================================================ */
+  function glyphHTML(v, px) {
+    if (v.type === 'shape') {
+      return `<div class="glyph"><div class="sh ${v.shape}" style="background:${v.color}"></div></div>`;
+    }
+    if (v.type === 'dots') {
+      return `<div class="glyph"><div class="dots">${'<i></i>'.repeat(v.n)}</div></div>`;
+    }
+    return `<div class="glyph"><span class="emo" style="font-size:${Math.round(px * 0.78)}px">${v.emoji}</span></div>`;
+  }
+
+  function buildBins() {
+    binRow.innerHTML = '';
+    state.rule.bins.forEach(bin => {
+      const el = document.createElement('button');
+      el.className = 'bin';
+      el.type = 'button';
+      el.dataset.key = bin.key;
+      el.setAttribute('aria-label', bin.label + ' chute');
+      const iconPx = 46;
+      el.innerHTML =
+        `<div class="guide"></div>
+         <div class="mouth"></div>
+         <div class="body">
+           <div class="icon">${glyphHTML(bin.icon, iconPx)}</div>
+           <div class="label">${bin.label}</div>
+         </div>`;
+      el.addEventListener('click', () => onBinTap(bin.key, el));
+      binRow.appendChild(el);
+    });
+  }
+
+  function binEl(key) { return binRow.querySelector(`.bin[data-key="${key}"]`); }
+
+  /* ============================================================
+     Layout
+     ============================================================ */
+  function measure() {
+    const r = stage.getBoundingClientRect();
+    state.stageW = r.width;
+    state.stageH = r.height;
+    // measured from rects, not offsetTop — #beltRow is positioned, so it would
+    // otherwise be beltTrack's offsetParent and the belt line would sit too high
+    const b = beltTrack.getBoundingClientRect();
+    state.beltY = (b.top - r.top) + b.height / 2;
+    state.onBelt = Math.max(3, Math.min(6, Math.round(r.width / 130)));
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    fx.width  = Math.round(r.width * dpr);
+    fx.height = Math.round(r.height * dpr);
+    fx.style.width  = r.width + 'px';
+    fx.style.height = r.height + 'px';
+    fxc.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  window.addEventListener('resize', () => {
+    measure();
+    state.items.forEach(it => { if (it.state === 'belt') it.cy = state.beltY; });
+  });
+
+  /* ============================================================
+     Items
+     ============================================================ */
+  function makeItem(binKey) {
+    const v = state.rule.make(binKey);
+    const size = Math.round(BASE_SIZE * (v.size || 1));
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.dataset.bin = binKey;
+    el.style.width = size + 'px';
+    el.style.height = size + 'px';
+    el.innerHTML = glyphHTML(v, size);
+
+    const item = {
+      el, size, binKey,
+      cx: state.stageW + size,
+      cy: state.beltY,
+      state: 'belt',
+      fly: null
+    };
+
+    el.addEventListener('pointerdown', e => onPointerDown(e, item));
+    el.addEventListener('pointermove', e => onPointerMove(e, item));
+    el.addEventListener('pointerup', e => onPointerUp(e, item));
+    el.addEventListener('pointercancel', () => releaseToBelt(item));
+
+    itemLayer.appendChild(el);
+    state.items.push(item);
+    draw(item);
+    return item;
+  }
+
+  function draw(it) {
+    const s = it.scale || 1;
+    it.el.style.transform =
+      `translate(${(it.cx - it.size / 2).toFixed(1)}px, ${(it.cy - it.size / 2).toFixed(1)}px) scale(${s})`;
+  }
+
+  // the open lane between the belt and the tops of the funnels
+  function holdY() {
+    const guide = binRow.querySelector('.guide');
+    const r = stage.getBoundingClientRect();
+    if (!guide) return state.beltY + 90;
+    const g = guide.getBoundingClientRect();
+    return state.beltY + ((g.top - r.top) - state.beltY) * 0.45;
+  }
+
+  function removeItem(it) {
+    it.el.remove();
+    const i = state.items.indexOf(it);
+    if (i >= 0) state.items.splice(i, 1);
+    if (state.picked === it) setPicked(null);
+  }
+
+  function spawnIfRoom() {
+    if (!state.queue.length) return;
+    if (state.items.length >= state.onBelt) return;
+
+    // never leave the belt bare — if nothing is left to sort, bring one straight in
+    if (!state.items.length) {
+      const it = makeItem(state.queue.shift());
+      it.cx = state.stageW * 0.8;
+      draw(it);
+      return;
+    }
+
+    // otherwise keep a comfy gap behind the right-most item
+    const gap = BASE_SIZE + 34;
+    let rightMost = -Infinity;
+    state.items.forEach(it => { if (it.cx > rightMost) rightMost = it.cx; });
+    if (rightMost > state.stageW - gap) return;
+
+    makeItem(state.queue.shift());
+  }
+
+  /* ============================================================
+     Pointer handling — drag, or tap-to-select
+     ============================================================ */
+  function onPointerDown(e, it) {
+    if (!state.running) return;
+    if (it.state === 'flying') return;
+    e.preventDefault();
+    it.el.setPointerCapture(e.pointerId);
+    it.pointerId = e.pointerId;
+    it.dragStart = { x: e.clientX, y: e.clientY };
+    it.moved = 0;
+    it.wasPicked = (it.state === 'picked');
+    it.state = 'held';
+    it.el.classList.add('held');
+    it.el.classList.remove('picked');
+
+    const r = stage.getBoundingClientRect();
+    it.grabDX = it.cx - (e.clientX - r.left);
+    it.grabDY = it.cy - (e.clientY - r.top);
+
+    ensureAudio();
+    sfx.pick();
+    armBins(true);
+  }
+
+  function onPointerMove(e, it) {
+    if (it.state !== 'held' || it.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    const r = stage.getBoundingClientRect();
+    it.cx = (e.clientX - r.left) + it.grabDX;
+    it.cy = (e.clientY - r.top) + it.grabDY;
+    it.moved = Math.max(it.moved, Math.hypot(e.clientX - it.dragStart.x, e.clientY - it.dragStart.y));
+    draw(it);
+    highlightBinUnder(e.clientX, e.clientY);
+  }
+
+  function onPointerUp(e, it) {
+    if (it.state !== 'held' || it.pointerId !== e.pointerId) return;
+    e.preventDefault();
+    it.el.classList.remove('held');
+    clearBinHighlights();
+
+    const bin = binUnder(e.clientX, e.clientY);
+
+    if (bin) {
+      armBins(false);
+      resolve(it, bin.dataset.key, bin);
+      return;
+    }
+
+    // barely moved => this was a tap, so select (or de-select) the item
+    if (it.moved < TAP_SLOP) {
+      if (it.wasPicked) { releaseToBelt(it); armBins(false); }
+      else              { setPicked(it); }
+      return;
+    }
+
+    releaseToBelt(it);
+    armBins(false);
+    sfx.drop();
+  }
+
+  function setPicked(it) {
+    if (state.picked && state.picked !== it) releaseToBelt(state.picked);
+    state.picked = it;
+    if (it) {
+      it.state = 'picked';
+      it.el.classList.add('picked');
+      armBins(true);
+      restIdle();
+    } else {
+      armBins(false);
+    }
+  }
+
+  function releaseToBelt(it) {
+    it.el.classList.remove('held', 'picked');
+    it.state = 'belt';
+    it.cy = state.beltY;
+    it.cx = Math.max(it.size / 2, Math.min(state.stageW - it.size / 2, it.cx));
+    draw(it);
+    if (state.picked === it) { state.picked = null; armBins(false); restIdle(); }
+  }
+
+  function binUnder(clientX, clientY) {
+    let found = null;
+    binRow.querySelectorAll('.bin').forEach(b => {
+      const r = b.getBoundingClientRect();
+      if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) found = b;
+    });
+    return found;
+  }
+
+  function highlightBinUnder(x, y) {
+    const hit = binUnder(x, y);
+    binRow.querySelectorAll('.bin').forEach(b => b.classList.toggle('over', b === hit));
+  }
+
+  function clearBinHighlights() {
+    binRow.querySelectorAll('.bin').forEach(b => b.classList.remove('over'));
+  }
+
+  function armBins(on) {
+    binRow.querySelectorAll('.bin').forEach(b => b.classList.toggle('armed', on));
+  }
+
+  function onBinTap(key, el) {
+    if (!state.running) return;
+    const it = state.picked;
+    if (!it) return;
+    state.picked = null;
+    armBins(false);
+    resolve(it, key, el);
+  }
+
+  /* ============================================================
+     Resolving a drop
+     ============================================================ */
+  function resolve(it, key, el) {
+    ensureAudio();
+    if (key === it.binKey) {
+      const r = el.getBoundingClientRect();
+      const s = stage.getBoundingClientRect();
+      flyTo(it, r.left - s.left + r.width / 2, r.top - s.top + 26, () => {
+        removeItem(it);
+        el.classList.add('yum');
+        setTimeout(() => el.classList.remove('yum'), 240);
+        sparkle(r.left - s.left + r.width / 2, r.top - s.top + 18, 22);
+        sfx.good();
+        state.score++;
+        state.sorted++;
+        updateHud();
+        say('cheer', pick(CHEERS));
+        if (state.sorted >= state.goal) winLevel();
+        else spawnIfRoom();
+      });
+    } else {
+      sfx.nope();
+      el.classList.add('nope');
+      setTimeout(() => el.classList.remove('nope'), 440);
+      it.el.classList.add('shake');
+      setTimeout(() => it.el.classList.remove('shake'), 440);
+      say('think', pick(RETRIES));
+      // gently float it back onto the belt — nothing is lost
+      flyTo(it, Math.min(state.stageW - it.size, Math.max(it.size, it.cx)), state.beltY, () => releaseToBelt(it));
+    }
+  }
+
+  function flyTo(it, tx, ty, done) {
+    it.state = 'flying';
+    it.el.classList.remove('held', 'picked');
+    it.el.classList.add('flying');
+    it.fly = { fx: it.cx, fy: it.cy, tx, ty, t: 0, dur: 0.26, done };
+  }
+
+  /* ============================================================
+     Speech / HUD
+     ============================================================ */
+  let sayTimer = null;
+  function say(mood, text) {
+    if (text) ruleHint.textContent = text;
+    robot.classList.remove('cheer', 'think');
+    if (mood) {
+      void robot.offsetWidth;   // restart the animation
+      robot.classList.add(mood);
+      robot.textContent = mood === 'cheer' ? '🥳' : '🤔';
+    }
+    clearTimeout(sayTimer);
+    sayTimer = setTimeout(restIdle, 1500);
+  }
+
+  // back to the neutral robot; the "tap a chute" nudge stays while something is held
+  function restIdle() {
+    clearTimeout(sayTimer);
+    robot.classList.remove('cheer', 'think');
+    robot.textContent = '🤖';
+    ruleHint.textContent = state.picked ? 'Now tap a chute!' : state.rule.hint;
+  }
+
+  function updateHud() {
+    levelChip.textContent = 'Level ' + state.level;
+    scoreChip.textContent = '⭐ ' + state.score;
+    progressBar.style.width = Math.min(100, (state.sorted / state.goal) * 100) + '%';
+  }
+
+  /* ============================================================
+     Levels
+     ============================================================ */
+  function startLevel(n) {
+    state.level = n;
+    state.rule = RULES[(n - 1) % RULES.length];
+    const lap = Math.floor((n - 1) / RULES.length);           // how many times we've been round
+    state.goal = Math.min(10, 5 + Math.floor(n / 2));
+    state.speed = Math.min(62, 24 + (n - 1) * 3 + lap * 4);
+    state.sorted = 0;
+    state.picked = null;
+
+    state.items.slice().forEach(removeItem);
+    itemLayer.innerHTML = '';
+    state.items.length = 0;
+
+    // a balanced, shuffled queue so every chute gets used
+    const keys = state.rule.bins.map(b => b.key);
+    const q = [];
+    for (let i = 0; i < state.goal; i++) q.push(keys[i % keys.length]);
+    state.queue = shuffle(q);
+
+    buildBins();
+    ruleTitle.textContent = state.rule.title;
+    ruleHint.textContent = state.rule.hint;
+    robot.textContent = '🤖';
+    beltTrack.classList.remove('paused');
+    updateHud();
+    measure();
+
+    state.running = true;
+    // start with the belt already full and on-screen — no waiting for the first item
+    const seed = Math.min(state.onBelt, state.queue.length);
+    const step = state.stageW / seed;
+    for (let i = 0; i < seed; i++) {
+      const it = makeItem(state.queue.shift());
+      it.cx = step * (i + 0.5);
+      draw(it);
+    }
+
+    const best = +(localStorage.getItem(BEST_KEY) || 0);
+    if (n > best) localStorage.setItem(BEST_KEY, String(n));
+  }
+
+  function winLevel() {
+    state.running = false;
+    beltTrack.classList.add('paused');
+    sfx.level();
+    confetti(120);
+    robot.textContent = '🥳';
+    setTimeout(() => {
+      $('winEmoji').textContent = pick(['🎉', '🏆', '🌟', '🎊', '🥇']);
+      $('winStars').textContent = '⭐'.repeat(3);
+      $('winTitle').textContent = 'Level ' + state.level + ' Done!';
+      $('winText').textContent = pick([
+        'Bolt says beep-boop-BRAVO!',
+        'Everything is in the right place!',
+        'You are an amazing sorter!',
+        'The whole station is cheering!'
+      ]);
+      winOverlay.hidden = false;
+    }, 850);
+  }
+
+  /* ============================================================
+     Particles (confetti + sparkles)
+     ============================================================ */
+  const parts = [];
+  const CONFETTI_COLORS = ['#ff5d6c', '#4aa8ff', '#ffcf2e', '#46d97e', '#b57bff', '#ff8f3d', '#ffffff'];
+
+  function confetti(n) {
+    for (let i = 0; i < n; i++) {
+      parts.push({
+        x: Math.random() * state.stageW,
+        y: -20 - Math.random() * state.stageH * 0.4,
+        vx: (Math.random() - 0.5) * 90,
+        vy: 90 + Math.random() * 190,
+        w: 6 + Math.random() * 7,
+        h: 8 + Math.random() * 9,
+        rot: Math.random() * Math.PI,
+        vr: (Math.random() - 0.5) * 9,
+        color: pick(CONFETTI_COLORS),
+        life: 3.4,
+        kind: 'flake'
+      });
+    }
+  }
+
+  function sparkle(x, y, n) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 70 + Math.random() * 190;
+      parts.push({
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 70,
+        w: 5 + Math.random() * 5,
+        h: 5 + Math.random() * 5,
+        rot: 0, vr: 0,
+        color: pick(CONFETTI_COLORS),
+        life: 0.75,
+        kind: 'spark'
+      });
+    }
+  }
+
+  function stepParticles(dt) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.life -= dt;
+      if (p.life <= 0 || p.y > state.stageH + 60) { parts.splice(i, 1); continue; }
+      p.vy += (p.kind === 'spark' ? 460 : 240) * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.rot += p.vr * dt;
+    }
+  }
+
+  function drawParticles() {
+    fxc.clearRect(0, 0, state.stageW, state.stageH);
+    parts.forEach(p => {
+      fxc.save();
+      fxc.globalAlpha = Math.max(0, Math.min(1, p.life * 1.6));
+      fxc.translate(p.x, p.y);
+      fxc.rotate(p.rot);
+      fxc.fillStyle = p.color;
+      if (p.kind === 'spark') {
+        fxc.beginPath();
+        fxc.arc(0, 0, p.w / 2, 0, Math.PI * 2);
+        fxc.fill();
+      } else {
+        fxc.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      }
+      fxc.restore();
+    });
+  }
+
+  /* ============================================================
+     Main loop
+     ============================================================ */
+  let last = 0;
+  function loop(ts) {
+    requestAnimationFrame(loop);
+    if (!last) last = ts;
+    const dt = Math.min(0.05, (ts - last) / 1000);
+    last = ts;
+
+    state.items.forEach(it => {
+      if (it.state === 'belt') {
+        it.cx -= state.speed * dt;
+        it.cy = state.beltY;
+        // the belt loops forever — an item can never be missed
+        if (it.cx < -it.size) it.cx = state.stageW + it.size * 0.6;
+        draw(it);
+      } else if (it.state === 'flying' && it.fly) {
+        const f = it.fly;
+        f.t += dt;
+        const k = Math.min(1, f.t / f.dur);
+        const e = 1 - Math.pow(1 - k, 3);
+        it.cx = f.fx + (f.tx - f.fx) * e;
+        it.cy = f.fy + (f.ty - f.fy) * e;
+        it.el.style.opacity = String(1 - 0.15 * k);
+        draw(it);
+        if (k >= 1) {
+          it.el.style.opacity = '1';
+          it.el.classList.remove('flying');
+          it.fly = null;
+          f.done();
+        }
+      }
+    });
+
+    if (state.running) spawnIfRoom();
+
+    stepParticles(dt);
+    drawParticles();
+  }
+  requestAnimationFrame(loop);
+
+  /* ============================================================
+     Buttons
+     ============================================================ */
+  $('playBtn').addEventListener('click', () => {
+    ensureAudio();
+    startOverlay.hidden = true;
+    startLevel(1);
+    tone(880, 0.12, 'triangle', 0.14);
+  });
+
+  $('nextBtn').addEventListener('click', () => {
+    ensureAudio();
+    winOverlay.hidden = true;
+    startLevel(state.level + 1);
+  });
+
+  $('againBtn').addEventListener('click', () => {
+    ensureAudio();
+    winOverlay.hidden = true;
+    state.score = 0;
+    startLevel(1);
+  });
+
+  $('restartBtn').addEventListener('click', () => {
+    ensureAudio();
+    winOverlay.hidden = true;
+    startOverlay.hidden = true;
+    state.score = 0;
+    parts.length = 0;
+    startLevel(1);
+  });
+
+  $('soundBtn').addEventListener('click', () => {
+    soundOn = !soundOn;
+    $('soundBtn').textContent = soundOn ? '🔊' : '🔇';
+    if (soundOn) { ensureAudio(); tone(700, 0.1, 'triangle', 0.14); }
+  });
+
+  // tapping empty stage space puts a selected item back down
+  stage.addEventListener('pointerdown', e => {
+    if (e.target === stage || e.target.id === 'beltTrack' || e.target.id === 'itemLayer') {
+      if (state.picked) { releaseToBelt(state.picked); sfx.drop(); }
+    }
+  });
+
+  /* ============================================================
+     Boot
+     ============================================================ */
+  buildBins();
+  measure();
+
+  const best = +(localStorage.getItem(BEST_KEY) || 0);
+  if (best > 1) $('bestLine').innerHTML = `<span>🏅 Best so far: Level ${best}</span>`;
+})();
+</script>
+</body>
+</html>
