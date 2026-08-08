@@ -1,0 +1,836 @@
+<!-- CONCEPT: DJ GAME / CHALLENGE - Time the bass drop at the peak of the buildup to keep the crowd hype | Audience: Music Lovers / All Ages -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Beat Drop Timing Game</title>
+<style>
+  :root{
+    --neon-pink:#ff2fb0;
+    --neon-cyan:#20e8ff;
+    --neon-yellow:#fdf148;
+    --neon-purple:#9b5cff;
+    --bg-deep:#07040f;
+    --panel:#120a24;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:radial-gradient(circle at 50% 0%, #1c0f38 0%, var(--bg-deep) 65%);
+    font-family:'Segoe UI',Arial,sans-serif;
+    color:#eae6ff;
+    overflow:hidden;
+    -webkit-user-select:none;user-select:none;
+    touch-action:manipulation;
+  }
+  #app{
+    display:flex;flex-direction:column;
+    align-items:center;justify-content:flex-start;
+    width:100vw;height:100vh;
+    padding:10px 12px 16px;
+  }
+  header{
+    text-align:center;margin-bottom:6px;
+    max-width:720px;
+  }
+  h1{
+    margin:0;font-size:clamp(20px,4vw,32px);
+    letter-spacing:2px;
+    color:var(--neon-cyan);
+    text-shadow:0 0 8px var(--neon-cyan),0 0 22px rgba(32,232,255,.5);
+  }
+  p.sub{
+    margin:4px 0 0;font-size:12px;color:#b6acdb;letter-spacing:.5px;
+  }
+  #stage{
+    position:relative;
+    width:min(720px,96vw);
+    background:linear-gradient(180deg,var(--panel) 0%,#0c0620 100%);
+    border:2px solid #2c1b52;
+    border-radius:18px;
+    box-shadow:0 0 30px rgba(155,92,255,.25) inset, 0 8px 30px rgba(0,0,0,.6);
+    padding:14px;
+    margin-top:8px;
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
+  #hud{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:8px;flex-wrap:wrap;gap:6px;
+  }
+  .led{
+    background:#050212;
+    border:1px solid #2c1b52;
+    border-radius:8px;
+    padding:6px 12px;
+    font-family:'Courier New',monospace;
+    text-align:center;
+    min-width:78px;
+  }
+  .led .label{font-size:9px;color:#8a7fb0;letter-spacing:1px;}
+  .led .val{font-size:20px;font-weight:bold;color:var(--neon-yellow);text-shadow:0 0 8px var(--neon-yellow);}
+  #energyWrap{
+    flex:1;min-width:140px;margin:0 8px;
+  }
+  #energyLabel{font-size:9px;color:#8a7fb0;letter-spacing:1px;margin-bottom:3px;}
+  #energyBarBg{
+    height:16px;border-radius:8px;
+    background:#050212;border:1px solid #2c1b52;
+    overflow:hidden;
+  }
+  #energyBarFill{
+    height:100%;
+    width:70%;
+    background:linear-gradient(90deg,var(--neon-pink),var(--neon-purple),var(--neon-cyan));
+    box-shadow:0 0 12px var(--neon-cyan);
+    transition:width .25s ease;
+  }
+  #canvasWrap{
+    position:relative;
+    flex:1;
+    min-height:160px;
+    border-radius:12px;
+    overflow:hidden;
+    background:#04010a;
+    border:1px solid #241546;
+  }
+  canvas{display:block;width:100%;height:100%;}
+  #timingWrap{
+    margin-top:10px;
+  }
+  #timingLabel{
+    font-size:10px;color:#8a7fb0;letter-spacing:1px;margin-bottom:4px;
+    display:flex;justify-content:space-between;
+  }
+  #timingTrack{
+    position:relative;
+    height:36px;
+    background:#050212;
+    border:1px solid #2c1b52;
+    border-radius:8px;
+    overflow:hidden;
+  }
+  #targetZone{
+    position:absolute;top:0;bottom:0;
+    background:linear-gradient(180deg,rgba(253,241,72,.35),rgba(253,241,72,.15));
+    border-left:2px solid var(--neon-yellow);
+    border-right:2px solid var(--neon-yellow);
+  }
+  #playhead{
+    position:absolute;top:-2px;bottom:-2px;width:4px;
+    background:var(--neon-cyan);
+    box-shadow:0 0 12px var(--neon-cyan),0 0 24px var(--neon-cyan);
+    left:0%;
+  }
+  #controls{
+    display:flex;align-items:center;justify-content:center;gap:18px;
+    margin-top:14px;
+  }
+  #dropBtn{
+    width:150px;height:150px;border-radius:50%;
+    border:4px solid var(--neon-pink);
+    background:radial-gradient(circle at 35% 30%, #ff6fd0, #b3106f 70%, #5c0937 100%);
+    color:#fff;font-size:22px;font-weight:800;letter-spacing:2px;
+    box-shadow:0 0 25px rgba(255,47,176,.6),0 0 60px rgba(255,47,176,.25);
+    cursor:pointer;
+    transition:transform .06s ease, box-shadow .15s ease;
+    touch-action:manipulation;
+  }
+  #dropBtn:active{transform:scale(.93);box-shadow:0 0 45px rgba(255,47,176,.9);}
+  #dropBtn.disabled{
+    opacity:.35;filter:grayscale(.5);cursor:default;
+  }
+  #sideControls{
+    display:flex;flex-direction:column;gap:10px;align-items:center;
+  }
+  .knob-btn{
+    background:var(--panel);
+    border:1px solid #3a2566;
+    color:#dcd4ff;
+    font-size:12px;
+    padding:9px 16px;
+    border-radius:20px;
+    cursor:pointer;
+    letter-spacing:.5px;
+    box-shadow:0 0 10px rgba(155,92,255,.15) inset;
+  }
+  .knob-btn:hover{border-color:var(--neon-cyan);color:var(--neon-cyan);}
+  #startOverlay,#gameOverOverlay{
+    position:absolute;inset:0;
+    background:rgba(4,1,10,.92);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;padding:20px;border-radius:12px;
+    z-index:5;gap:14px;
+  }
+  #gameOverOverlay{display:none;}
+  .bigTitle{
+    font-size:clamp(22px,5vw,34px);
+    color:var(--neon-pink);
+    text-shadow:0 0 10px var(--neon-pink),0 0 26px rgba(255,47,176,.5);
+    letter-spacing:2px;
+    margin:0;
+  }
+  .startBtn{
+    padding:14px 34px;
+    font-size:16px;font-weight:700;letter-spacing:1px;
+    background:linear-gradient(90deg,var(--neon-cyan),var(--neon-purple));
+    color:#04010a;border:none;border-radius:30px;
+    cursor:pointer;box-shadow:0 0 20px rgba(32,232,255,.5);
+  }
+  .startBtn:active{transform:scale(.96);}
+  #instructions{
+    font-size:12.5px;color:#b6acdb;max-width:440px;line-height:1.5;
+  }
+  footer{
+    margin-top:8px;font-size:10px;color:#5c4f86;text-align:center;
+  }
+  #feedbackText{
+    position:absolute;top:8px;left:50%;transform:translateX(-50%);
+    font-size:14px;font-weight:800;letter-spacing:2px;
+    padding:4px 14px;border-radius:20px;
+    opacity:0;pointer-events:none;
+    transition:opacity .15s ease, transform .15s ease;
+    z-index:4;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>⚡ BEAT DROP TIMING ⚡</h1>
+    <p class="sub">Ride the buildup, slam the DROP at the peak, and keep the crowd screaming. | For music lovers of all ages.</p>
+  </header>
+
+  <div id="stage">
+    <div id="hud">
+      <div class="led"><div class="label">SCORE</div><div class="val" id="scoreVal">0</div></div>
+      <div id="energyWrap">
+        <div id="energyLabel">CROWD ENERGY</div>
+        <div id="energyBarBg"><div id="energyBarFill"></div></div>
+      </div>
+      <div class="led"><div class="label">ROUND</div><div class="val" id="roundVal">1</div></div>
+      <div class="led"><div class="label">BEST</div><div class="val" id="bestVal">0</div></div>
+    </div>
+
+    <div id="canvasWrap">
+      <canvas id="viz"></canvas>
+      <div id="feedbackText"></div>
+      <div id="startOverlay">
+        <p class="bigTitle">DROP THE BASS<br>AT THE RIGHT MOMENT</p>
+        <p id="instructions">
+          Each round, a buildup rises — riser sweep + snare roll gaining speed. A cyan
+          playhead races across the bar below. Hit the glowing <strong>DROP</strong> pad
+          while the playhead is inside the yellow target zone to unleash the bass and
+          pump crowd energy. Miss it and the crowd cools off. The target zone shrinks
+          and the buildup speeds up every round. Keep energy above zero to survive!
+        </p>
+        <button class="startBtn" id="startBtn">TAP TO START</button>
+      </div>
+      <div id="gameOverOverlay">
+        <p class="bigTitle" id="gameOverTitle">CROWD WALKED OUT</p>
+        <p id="finalScoreText" style="font-size:15px;color:#dcd4ff;">Final Score: 0</p>
+        <button class="startBtn" id="replayBtn">PLAY AGAIN</button>
+      </div>
+    </div>
+
+    <div id="timingWrap">
+      <div id="timingLabel"><span>BUILDUP →</span><span>DROP ZONE</span></div>
+      <div id="timingTrack">
+        <div id="targetZone"></div>
+        <div id="playhead"></div>
+      </div>
+    </div>
+
+    <div id="controls">
+      <div id="sideControls">
+        <button class="knob-btn" id="muteBtn">🔊 SOUND</button>
+      </div>
+      <button id="dropBtn" class="disabled">DROP</button>
+      <div id="sideControls">
+        <button class="knob-btn" id="resetBtn">↺ RESET</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>All sounds synthesized live with the Web Audio API — no samples, no ads, no tracking.</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Audio Engine ----------
+  let actx = null;
+  let masterGain = null;
+  let muted = false;
+
+  function ensureAudio(){
+    if(!actx){
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = actx.createGain();
+      masterGain.gain.value = 0.9;
+      masterGain.connect(actx.destination);
+    }
+    if(actx.state === 'suspended') actx.resume();
+  }
+
+  function now(){ return actx.currentTime; }
+
+  // Simple noise buffer (reused)
+  let noiseBuffer = null;
+  function getNoiseBuffer(){
+    if(noiseBuffer) return noiseBuffer;
+    const len = actx.sampleRate * 2;
+    const buf = actx.createBuffer(1, len, actx.sampleRate);
+    const data = buf.getChannelData(0);
+    for(let i=0;i<len;i++) data[i] = Math.random()*2-1;
+    noiseBuffer = buf;
+    return buf;
+  }
+
+  function kick(t, vol){
+    vol = vol===undefined?1:vol;
+    const osc = actx.createOscillator();
+    const gain = actx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, t);
+    osc.frequency.exponentialRampToValueAtTime(45, t+0.14);
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.exponentialRampToValueAtTime(1.1*vol, t+0.008);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+0.32);
+    osc.connect(gain); gain.connect(masterGain);
+    osc.start(t); osc.stop(t+0.34);
+  }
+
+  function hat(t, vol){
+    vol = vol===undefined?1:vol;
+    const src = actx.createBufferSource();
+    src.buffer = getNoiseBuffer();
+    const hp = actx.createBiquadFilter();
+    hp.type='highpass'; hp.frequency.value = 7000;
+    const gain = actx.createGain();
+    gain.gain.setValueAtTime(0.5*vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+0.045);
+    src.connect(hp); hp.connect(gain); gain.connect(masterGain);
+    src.start(t); src.stop(t+0.05);
+  }
+
+  function snareHit(t, vol){
+    vol = vol===undefined?1:vol;
+    const src = actx.createBufferSource();
+    src.buffer = getNoiseBuffer();
+    const bp = actx.createBiquadFilter();
+    bp.type='bandpass'; bp.frequency.value = 1800; bp.Q.value=0.7;
+    const gain = actx.createGain();
+    gain.gain.setValueAtTime(0.7*vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t+0.12);
+    src.connect(bp); bp.connect(gain); gain.connect(masterGain);
+    src.start(t); src.stop(t+0.13);
+  }
+
+  // Riser: filtered noise + rising sine, swelling in volume and pitch over duration
+  let activeRiserNodes = [];
+  function startRiser(duration){
+    const src = actx.createBufferSource();
+    src.buffer = getNoiseBuffer();
+    src.loop = true;
+    const bp = actx.createBiquadFilter();
+    bp.type='bandpass'; bp.Q.value = 3;
+    bp.frequency.setValueAtTime(300, now());
+    bp.frequency.exponentialRampToValueAtTime(6000, now()+duration);
+
+    const noiseGain = actx.createGain();
+    noiseGain.gain.setValueAtTime(0.0001, now());
+    noiseGain.gain.exponentialRampToValueAtTime(0.55, now()+duration*0.95);
+
+    const osc = actx.createOscillator();
+    osc.type='sawtooth';
+    osc.frequency.setValueAtTime(80, now());
+    osc.frequency.exponentialRampToValueAtTime(900, now()+duration);
+    const oscGain = actx.createGain();
+    oscGain.gain.setValueAtTime(0.0001, now());
+    oscGain.gain.exponentialRampToValueAtTime(0.28, now()+duration*0.9);
+
+    src.connect(bp); bp.connect(noiseGain); noiseGain.connect(masterGain);
+    osc.connect(oscGain); oscGain.connect(masterGain);
+    src.start(); osc.start();
+    activeRiserNodes = [{node:src, gain:noiseGain}, {node:osc, gain:oscGain}];
+  }
+  function stopRiser(){
+    const t = now();
+    activeRiserNodes.forEach(({node,gain})=>{
+      try{
+        gain.gain.cancelScheduledValues(t);
+        gain.gain.setValueAtTime(gain.gain.value, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t+0.08);
+        node.stop(t+0.1);
+      }catch(e){}
+    });
+    activeRiserNodes = [];
+  }
+
+  function bassDrop(t){
+    // Sub bass thump
+    const sub = actx.createOscillator();
+    const subGain = actx.createGain();
+    sub.type='sine';
+    sub.frequency.setValueAtTime(90, t);
+    sub.frequency.exponentialRampToValueAtTime(38, t+0.5);
+    subGain.gain.setValueAtTime(0.001, t);
+    subGain.gain.exponentialRampToValueAtTime(1.3, t+0.02);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t+0.9);
+    sub.connect(subGain); subGain.connect(masterGain);
+    sub.start(t); sub.stop(t+0.95);
+
+    // Noise burst / impact
+    const src = actx.createBufferSource();
+    src.buffer = getNoiseBuffer();
+    const lp = actx.createBiquadFilter();
+    lp.type='lowpass'; lp.frequency.setValueAtTime(4000,t);
+    lp.frequency.exponentialRampToValueAtTime(300, t+0.4);
+    const ngain = actx.createGain();
+    ngain.gain.setValueAtTime(0.9, t);
+    ngain.gain.exponentialRampToValueAtTime(0.001, t+0.4);
+    src.connect(lp); lp.connect(ngain); ngain.connect(masterGain);
+    src.start(t); src.stop(t+0.42);
+
+    // Stab synth chord
+    [220, 277, 330].forEach((f,i)=>{
+      const o = actx.createOscillator();
+      const g = actx.createGain();
+      o.type = i===0?'sawtooth':'square';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.15, t+0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.6);
+      o.connect(g); g.connect(masterGain);
+      o.start(t); o.stop(t+0.65);
+    });
+    kick(t, 1.2);
+  }
+
+  function crowdCheer(t, size){
+    size = size===undefined?1:size;
+    const src = actx.createBufferSource();
+    src.buffer = getNoiseBuffer();
+    const bp = actx.createBiquadFilter();
+    bp.type='bandpass'; bp.frequency.setValueAtTime(900,t); bp.Q.value=0.6;
+    bp.frequency.linearRampToValueAtTime(1600, t+0.6);
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5*size, t+0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+1.1);
+    src.connect(bp); bp.connect(g); g.connect(masterGain);
+    src.start(t); src.stop(t+1.15);
+  }
+
+  function crowdBoo(t){
+    const osc = actx.createOscillator();
+    const g = actx.createGain();
+    osc.type='sawtooth';
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.exponentialRampToValueAtTime(90, t+0.6);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.35, t+0.1);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.7);
+    const lp = actx.createBiquadFilter();
+    lp.type='lowpass'; lp.frequency.value=800;
+    osc.connect(lp); lp.connect(g); g.connect(masterGain);
+    osc.start(t); osc.stop(t+0.75);
+  }
+
+  // ---------- Game State ----------
+  const scoreVal = document.getElementById('scoreVal');
+  const roundVal = document.getElementById('roundVal');
+  const bestVal = document.getElementById('bestVal');
+  const energyFill = document.getElementById('energyBarFill');
+  const dropBtn = document.getElementById('dropBtn');
+  const startOverlay = document.getElementById('startOverlay');
+  const gameOverOverlay = document.getElementById('gameOverOverlay');
+  const startBtn = document.getElementById('startBtn');
+  const replayBtn = document.getElementById('replayBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const muteBtn = document.getElementById('muteBtn');
+  const finalScoreText = document.getElementById('finalScoreText');
+  const gameOverTitle = document.getElementById('gameOverTitle');
+  const targetZone = document.getElementById('targetZone');
+  const playhead = document.getElementById('playhead');
+  const feedbackText = document.getElementById('feedbackText');
+
+  let score = 0;
+  let best = parseInt(localStorageSafeGet(), 10) || 0;
+  bestVal.textContent = best;
+  let energy = 70; // 0-100
+  let round = 1;
+  let playing = false;
+  let roundActive = false;
+  let buildupDuration = 4.2; // seconds, shrinks with rounds
+  let targetStart = 0.72; // fraction of bar
+  let targetWidth = 0.16; // fraction of bar
+  let playStartTime = 0;
+  let rafId = null;
+  let hatIntervalHandles = [];
+  let snareRollTimer = null;
+
+  function localStorageSafeGet(){
+    try{ return null; }catch(e){ return null; }
+  }
+  // We avoid localStorage entirely (sandbox restriction) -- keep best score in-memory only.
+
+  function updateHud(){
+    scoreVal.textContent = score;
+    roundVal.textContent = round;
+    bestVal.textContent = best;
+    energyFill.style.width = Math.max(0,Math.min(100,energy)) + '%';
+    if(energy < 25){
+      energyFill.style.filter = 'hue-rotate(-40deg) saturate(1.4)';
+    } else {
+      energyFill.style.filter = 'none';
+    }
+  }
+
+  function flashFeedback(text, color){
+    feedbackText.textContent = text;
+    feedbackText.style.color = color;
+    feedbackText.style.textShadow = '0 0 10px '+color;
+    feedbackText.style.opacity = '1';
+    feedbackText.style.transform = 'translateX(-50%) translateY(0px)';
+    clearTimeout(flashFeedback._t);
+    flashFeedback._t = setTimeout(()=>{
+      feedbackText.style.opacity='0';
+    }, 650);
+  }
+
+  function clearTimers(){
+    hatIntervalHandles.forEach(h=>clearTimeout(h));
+    hatIntervalHandles = [];
+    if(snareRollTimer) clearTimeout(snareRollTimer);
+  }
+
+  function scheduleBuildupSounds(duration){
+    // Hats on eighth notes accelerating slightly, snare roll near the end
+    const startBpmInterval = 0.32; // seconds between hats initially
+    let t = 0.05;
+    let interval = startBpmInterval;
+    while(t < duration*0.8){
+      const handle = setTimeout(()=>{ if(!muted && actx) hat(now(), 0.6); }, t*1000);
+      hatIntervalHandles.push(handle);
+      t += interval;
+      interval *= 0.985; // slight acceleration
+    }
+    // Kicks on the beat (every ~0.55s) for the first part
+    let kt = 0.1;
+    while(kt < duration*0.75){
+      const handle = setTimeout(()=>{ if(!muted && actx) kick(now(), 0.7); }, kt*1000);
+      hatIntervalHandles.push(handle);
+      kt += 0.55;
+    }
+    // Snare roll ramping up in the last 30% of buildup
+    const rollStart = duration*0.7;
+    const rollEnd = duration*0.98;
+    function scheduleRoll(t){
+      if(t >= rollEnd) return;
+      const progress = (t-rollStart)/(rollEnd-rollStart);
+      const gap = Math.max(0.03, 0.16 - progress*0.13);
+      const handle = setTimeout(()=>{
+        if(!muted && actx) snareHit(now(), 0.5+progress*0.5);
+        scheduleRoll(t+gap);
+      }, t*1000);
+      hatIntervalHandles.push(handle);
+    }
+    snareRollTimer = setTimeout(()=>scheduleRoll(rollStart), 0);
+  }
+
+  function startRound(){
+    roundActive = true;
+    dropBtn.classList.remove('disabled');
+    clearTimers();
+    stopRiser();
+
+    // difficulty scaling
+    buildupDuration = Math.max(1.8, 4.4 - (round-1)*0.18);
+    targetWidth = Math.max(0.05, 0.17 - (round-1)*0.008);
+    targetStart = 0.68 + Math.random()*0.18; // somewhere near the end, varies
+    if(targetStart + targetWidth > 0.97) targetStart = 0.97 - targetWidth;
+
+    targetZone.style.left = (targetStart*100)+'%';
+    targetZone.style.width = (targetWidth*100)+'%';
+    playhead.style.left = '0%';
+
+    if(!muted){
+      startRiser(buildupDuration);
+      scheduleBuildupSounds(buildupDuration);
+    }
+
+    playStartTime = performance.now();
+    missedTimeout = setTimeout(()=>{
+      if(roundActive) handleMiss(true);
+    }, buildupDuration*1000 + 350);
+
+    animatePlayhead();
+  }
+
+  let missedTimeout = null;
+
+  function animatePlayhead(){
+    function step(){
+      if(!roundActive) return;
+      const elapsed = (performance.now() - playStartTime)/1000;
+      const frac = Math.min(1, elapsed / buildupDuration);
+      playhead.style.left = (frac*100)+'%';
+      drawViz(frac);
+      if(frac < 1){
+        rafId = requestAnimationFrame(step);
+      }
+    }
+    rafId = requestAnimationFrame(step);
+  }
+
+  function currentFrac(){
+    const elapsed = (performance.now() - playStartTime)/1000;
+    return Math.min(1, elapsed/buildupDuration);
+  }
+
+  function handleDrop(){
+    if(!playing || !roundActive) return;
+    const frac = currentFrac();
+    roundActive = false;
+    clearTimers();
+    clearTimeout(missedTimeout);
+    if(rafId) cancelAnimationFrame(rafId);
+    dropBtn.classList.add('disabled');
+
+    const inZone = frac >= targetStart && frac <= targetStart+targetWidth;
+    const centerDist = Math.abs(frac - (targetStart+targetWidth/2));
+    const perfect = inZone && centerDist < targetWidth*0.25;
+
+    if(!muted){
+      stopRiser();
+      bassDrop(now());
+    }
+
+    if(inZone){
+      const points = perfect ? 250 : 120;
+      score += points;
+      energy = Math.min(100, energy + (perfect?18:10));
+      if(!muted) crowdCheer(now()+0.15, perfect?1.3:0.9);
+      flashFeedback(perfect ? 'PERFECT DROP! +'+points : 'NICE DROP! +'+points, '#20e8ff');
+      pulseCanvas(perfect?1.4:1.0);
+      round += 1;
+    } else {
+      energy = Math.max(0, energy - 20);
+      if(!muted) crowdBoo(now()+0.15);
+      flashFeedback(frac < targetStart ? 'TOO EARLY!' : 'TOO LATE!', '#ff2fb0');
+      pulseCanvas(0.4);
+    }
+
+    if(score > best) best = score;
+    updateHud();
+
+    if(energy <= 0){
+      setTimeout(()=>endGame(false), 900);
+    } else {
+      setTimeout(()=>{
+        if(playing) startRound();
+      }, 1000);
+    }
+  }
+
+  function handleMiss(){
+    if(!roundActive) return;
+    roundActive = false;
+    clearTimers();
+    if(rafId) cancelAnimationFrame(rafId);
+    dropBtn.classList.add('disabled');
+    if(!muted){ stopRiser(); crowdBoo(now()); }
+    energy = Math.max(0, energy - 25);
+    flashFeedback('MISSED THE DROP!', '#ff2fb0');
+    pulseCanvas(0.3);
+    updateHud();
+    if(energy <= 0){
+      setTimeout(()=>endGame(false), 900);
+    } else {
+      setTimeout(()=>{ if(playing) startRound(); }, 1000);
+    }
+  }
+
+  function endGame(){
+    playing = false;
+    roundActive = false;
+    clearTimers();
+    stopRiser();
+    if(rafId) cancelAnimationFrame(rafId);
+    dropBtn.classList.add('disabled');
+    if(score > best) best = score;
+    finalScoreText.textContent = 'Final Score: ' + score + '   |   Rounds survived: ' + (round-1);
+    gameOverTitle.textContent = score > 0 && round > 4 ? 'LEGENDARY SET! 🔥' : 'CROWD WALKED OUT';
+    gameOverOverlay.style.display = 'flex';
+    updateHud();
+  }
+
+  function resetGame(){
+    playing = true;
+    roundActive = false;
+    score = 0;
+    energy = 70;
+    round = 1;
+    gameOverOverlay.style.display = 'none';
+    startOverlay.style.display = 'none';
+    updateHud();
+    startRound();
+  }
+
+  // ---------- Canvas Visualizer ----------
+  const canvas = document.getElementById('viz');
+  const ctx = canvas.getContext('2d');
+  let dpr = Math.max(1, window.devicePixelRatio || 1);
+  let pulseAmt = 0;
+
+  function resizeCanvas(){
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  function pulseCanvas(amt){
+    pulseAmt = amt;
+  }
+
+  let particles = [];
+  function spawnParticles(n, energyLevel){
+    const rect = canvas.parentElement.getBoundingClientRect();
+    for(let i=0;i<n;i++){
+      particles.push({
+        x: rect.width/2 + (Math.random()-0.5)*40,
+        y: rect.height*0.65,
+        vx: (Math.random()-0.5)*(2+energyLevel*3),
+        vy: -(Math.random()*3+2)*(0.5+energyLevel),
+        life: 1,
+        hue: Math.random()<0.5?320:190
+      });
+    }
+  }
+
+  function drawViz(frac){
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    ctx.clearRect(0,0,w,h);
+
+    // background grid glow
+    const grad = ctx.createRadialGradient(w/2,h*0.7,10,w/2,h*0.7,w*0.7);
+    grad.addColorStop(0, 'rgba(155,92,255,'+(0.18+pulseAmt*0.25)+')');
+    grad.addColorStop(1, 'rgba(4,1,10,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0,0,w,h);
+
+    // "Crowd" bars reacting to energy + frac progress
+    const bars = 28;
+    const barW = w/bars;
+    for(let i=0;i<bars;i++){
+      const base = 6 + (energy/100)*h*0.25;
+      const wobble = Math.sin((i*0.7) + frac*14 + performance.now()/220) * (8 + pulseAmt*18);
+      const bh = Math.max(3, base + wobble + pulseAmt*20);
+      const hue = 300 - (i/bars)*140;
+      ctx.fillStyle = `hsla(${hue},90%,60%,0.85)`;
+      ctx.fillRect(i*barW+1, h - bh, barW-2, bh);
+    }
+
+    // Pulse ring on drop
+    if(pulseAmt > 0.02){
+      ctx.strokeStyle = `rgba(32,232,255,${pulseAmt})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(w/2, h*0.42, 20 + (1-pulseAmt)*0 + (60*(1.5-pulseAmt)), 0, Math.PI*2);
+      ctx.stroke();
+      pulseAmt *= 0.90;
+      if(pulseAmt < 0.02) pulseAmt = 0;
+    }
+
+    // Particles
+    if(Math.random() < 0.15 + energy/400) spawnParticles(1, energy/100);
+    particles.forEach(p=>{
+      p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+    });
+    particles = particles.filter(p=>p.life>0);
+    particles.forEach(p=>{
+      ctx.fillStyle = `hsla(${p.hue},90%,65%,${Math.max(0,p.life)})`;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,2.5,0,Math.PI*2);
+      ctx.fill();
+    });
+
+    requestAnimationFrame(()=>drawViz(frac));
+  }
+  let idleAnimStarted = false;
+  function idleLoop(){
+    if(!idleAnimStarted){
+      idleAnimStarted = true;
+      drawViz(0);
+    }
+  }
+  idleLoop();
+
+  // ---------- Input wiring ----------
+  function handleDropPress(e){
+    e.preventDefault();
+    ensureAudio();
+    if(!playing){
+      resetGame();
+      return;
+    }
+    handleDrop();
+  }
+  dropBtn.addEventListener('pointerdown', handleDropPress);
+
+  startBtn.addEventListener('click', ()=>{
+    ensureAudio();
+    startOverlay.style.display = 'none';
+    resetGame();
+  });
+
+  replayBtn.addEventListener('click', ()=>{
+    ensureAudio();
+    resetGame();
+  });
+
+  resetBtn.addEventListener('click', ()=>{
+    ensureAudio();
+    playing = false;
+    roundActive = false;
+    clearTimers();
+    stopRiser();
+    if(rafId) cancelAnimationFrame(rafId);
+    score = 0; energy = 70; round = 1;
+    gameOverOverlay.style.display = 'none';
+    startOverlay.style.display = 'flex';
+    dropBtn.classList.add('disabled');
+    updateHud();
+  });
+
+  muteBtn.addEventListener('click', ()=>{
+    muted = !muted;
+    muteBtn.textContent = muted ? '🔇 MUTED' : '🔊 SOUND';
+    if(muted) stopRiser();
+  });
+
+  // keyboard support: spacebar to drop
+  window.addEventListener('keydown', (e)=>{
+    if(e.code === 'Space'){
+      e.preventDefault();
+      ensureAudio();
+      if(!playing){ resetGame(); return; }
+      handleDrop();
+    }
+  });
+
+  updateHud();
+})();
+</script>
+</body>
+</html>

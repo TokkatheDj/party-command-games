@@ -1,0 +1,299 @@
+<!-- CONCEPT: SPEED/REACTION - Buzzer race: a category flashes, first to slam their zone must shout an answer before the countdown ends | Players: 3-8 (2-4 buzz at a time, rest judge & rotate) | ~15 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Category Clash</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; overflow:hidden; }
+  body {
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:#0d0d1f; color:#fff; user-select:none;
+    display:flex; flex-direction:column;
+  }
+  .screen { display:none; flex:1; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
+  .screen.active { display:flex; }
+  h1 { font-size:clamp(2.6rem,9vw,4.5rem); font-weight:900;
+       background:linear-gradient(90deg,#4dffa1,#4dc3ff,#c84dff);
+       -webkit-background-clip:text; background-clip:text; color:transparent; text-align:center; }
+  .tagline { color:#b8c4e0; font-size:clamp(1rem,3vw,1.3rem); text-align:center; margin:10px 0 4px; max-width:640px; }
+  .meta { color:#6f7ba0; margin-bottom:20px; text-align:center; }
+  .rules { background:rgba(255,255,255,.06); border:2px solid rgba(255,255,255,.14);
+           border-radius:18px; padding:18px 24px; max-width:640px; margin-bottom:18px; }
+  .rules li { color:#dbe4ff; line-height:1.6; font-size:1.05rem; margin-left:18px; }
+  .label { color:#6f7ba0; font-weight:800; text-transform:uppercase; letter-spacing:1px; margin:12px 0 6px; }
+  .opts { display:flex; gap:10px; }
+  .opt { padding:14px 26px; border-radius:14px; border:2px solid rgba(255,255,255,.2);
+         background:rgba(255,255,255,.05); font-size:1.2rem; font-weight:800; cursor:pointer; }
+  .opt.sel { background:#4dffa1; color:#0d0d1f; border-color:#4dffa1; }
+  .btn { border:none; border-radius:16px; font-weight:900; cursor:pointer; margin-top:22px;
+         font-size:1.4rem; padding:18px 48px; color:#0d0d1f;
+         background:linear-gradient(90deg,#4dffa1,#4dc3ff); }
+  .btn:active { transform:scale(.97); }
+  .btn-ghost { background:rgba(255,255,255,.12); color:#fff; font-size:1rem; padding:12px 24px; }
+
+  /* ===== ARENA ===== */
+  #scr-arena { padding:0; position:relative; }
+  #zones { display:flex; flex:1; width:100%; height:100%; }
+  .zone { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+          cursor:pointer; transition:filter .1s; position:relative; border:4px solid #0d0d1f; }
+  .zone .zname { font-size:clamp(1.2rem,4vw,2rem); font-weight:900; text-shadow:0 2px 6px rgba(0,0,0,.5); }
+  .zone .zscore { font-size:clamp(2.6rem,9vw,5rem); font-weight:900; text-shadow:0 2px 8px rgba(0,0,0,.5); }
+  .zone .zkey { font-size:.95rem; opacity:.75; font-weight:700; }
+  .zone.p0 { background:#e63946; } .zone.p1 { background:#2a7de1; }
+  .zone.p2 { background:#f4a300; } .zone.p3 { background:#7b2fbe; }
+  .zone.dim { filter:brightness(.32); }
+  .zone.winner { animation:flash .3s 3; }
+  @keyframes flash { 50% { filter:brightness(1.7); } }
+
+  /* center overlay */
+  #overlay { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+             width:min(88vw,680px); background:#151530; border:4px solid #fff;
+             border-radius:26px; padding:26px 24px; text-align:center; z-index:10;
+             box-shadow:0 16px 60px rgba(0,0,0,.6); }
+  #ovState { color:#6f7ba0; font-weight:800; letter-spacing:2px; text-transform:uppercase; font-size:1rem; }
+  #ovMain { font-size:clamp(1.7rem,6.5vw,3rem); font-weight:900; margin:12px 0; line-height:1.15; }
+  #ovSub { color:#b8c4e0; font-size:1.1rem; min-height:1.4em; }
+  #ovMain.ready { color:#4dffa1; }
+  #ovCountdown { font-size:clamp(2.6rem,9vw,4.5rem); font-weight:900; color:#ffd54d; display:none; font-variant-numeric:tabular-nums; }
+  .judge { display:none; gap:12px; margin-top:14px; justify-content:center; }
+  .judge button { flex:1; max-width:220px; border:none; border-radius:14px; padding:16px 10px;
+                  font-size:1.15rem; font-weight:900; cursor:pointer; }
+  .j-good { background:#4dffa1; color:#0d0d1f; } .j-bad { background:#e63946; color:#fff; }
+  #hostBtn { display:none; margin:14px auto 0; border:none; border-radius:14px; padding:16px 40px;
+             font-size:1.2rem; font-weight:900; cursor:pointer; background:#ffd54d; color:#0d0d1f; }
+  #exitBtn { position:absolute; top:10px; right:12px; z-index:20; background:rgba(255,255,255,.15);
+             color:#fff; border:none; border-radius:10px; padding:8px 14px; font-weight:800; cursor:pointer; }
+
+  /* winner */
+  #winName { font-size:clamp(2.4rem,10vw,4.5rem); font-weight:900; text-align:center; }
+  .statline { color:#b8c4e0; font-size:1.3rem; margin-top:10px; text-align:center; }
+</style>
+</head>
+<body>
+
+<!-- ===== START ===== -->
+<div class="screen active" id="scr-start">
+  <h1>CATEGORY CLASH</h1>
+  <p class="tagline">A category flashes — SLAM your buzzer first, then shout an answer before the countdown hits zero!</p>
+  <p class="meta">3–8 players (2–4 buzz at a time, everyone else judges &amp; rotates in) · ~15 minutes</p>
+  <div class="rules">
+    <ol>
+      <li>When the screen says <b>GET READY…</b> hands off! Buzzing early locks you out for that round.</li>
+      <li>Category appears → first to tap their color (or press their key) gets 5 seconds to shout an answer.</li>
+      <li>The group judges: <b>Good = +1</b>. Blank or bogus = <b>−1</b>, and everyone else can steal next round.</li>
+      <li>First to the target score wins. Swap seats between games so everyone buzzes!</li>
+    </ol>
+  </div>
+  <div class="label">Buzzer players</div>
+  <div class="opts" id="optPlayers">
+    <div class="opt" data-v="2">2</div>
+    <div class="opt sel" data-v="3">3</div>
+    <div class="opt" data-v="4">4</div>
+  </div>
+  <div class="label">Play to</div>
+  <div class="opts" id="optTarget">
+    <div class="opt" data-v="5">5</div>
+    <div class="opt sel" data-v="7">7</div>
+    <div class="opt" data-v="10">10</div>
+  </div>
+  <button class="btn" onclick="startGame()">START GAME</button>
+</div>
+
+<!-- ===== ARENA ===== -->
+<div class="screen" id="scr-arena">
+  <button id="exitBtn" onclick="quitToStart()">✕ End</button>
+  <div id="zones"></div>
+  <div id="overlay">
+    <div id="ovState">GET READY</div>
+    <div id="ovMain">…</div>
+    <div id="ovCountdown">5</div>
+    <div id="ovSub"></div>
+    <div class="judge" id="judgeBox">
+      <button class="j-good" onclick="judge(true)">✔ GOOD +1</button>
+      <button class="j-bad" onclick="judge(false)">✘ NOPE −1</button>
+    </div>
+    <button id="hostBtn" onclick="armRound()">▶ NEXT ROUND</button>
+  </div>
+</div>
+
+<!-- ===== WINNER ===== -->
+<div class="screen" id="scr-winner">
+  <div style="font-size:3.2rem;text-align:center;">🏆</div>
+  <div id="winName"></div>
+  <div class="statline" id="winLine"></div>
+  <button class="btn" onclick="startGame()">PLAY AGAIN</button>
+  <button class="btn btn-ghost" onclick="quitToStart()">Back to menu</button>
+</div>
+
+<script>
+/* ============ CATEGORIES (95) ============ */
+const CATS = [
+"Pizza toppings","Dog breeds","Things in a kitchen","Olympic sports","Ice cream flavors",
+"Superheroes","Countries in Europe","Things that are red","Breakfast foods","Board games",
+"Animals with four legs","Things at the beach","Cartoon characters","Fruits","Vegetables",
+"School subjects","Musical instruments","Things in a bathroom","Jobs that wear uniforms","Types of weather",
+"Farm animals","Things that fly","Card games","Colors of the rainbow","Zoo animals",
+"Fast food chains","Movie genres","Things in outer space","Sports played with a ball","Kitchen appliances",
+"Famous landmarks","Ocean creatures","Camping gear","Things that are cold","Types of dances",
+"Candy brands","Reptiles","Things in a classroom","Halloween costumes","Modes of transportation",
+"Yellow things","Sandwich fillings","Birds","Winter clothing","Circus acts",
+"Things with wheels","Pasta shapes","Words that rhyme with 'cat'","Famous scientists","Cheese types",
+"Things you plug in","Hobbies","Insects","Playground equipment","Soup flavors",
+"Things in a hospital","Languages","Herbs and spices","Round things","Tools in a toolbox",
+"Baby animals","Things at a birthday party","Flowers","Board game pieces","Salty snacks",
+"Things you wear on your head","Sea vehicles","Mythical creatures","Green foods","Nursery rhymes",
+"Things at an airport","Trees","Video game characters","Things that bounce","Hot drinks",
+"Animals in Africa","Things you find in a wallet","Pie flavors","Loud things","Bathroom items",
+"Things made of metal","Cereal brands","Words that start with 'Q'","Famous mice (real or fictional)","Sticky things",
+"Things in a garden","Shoe types","Songs everyone knows","Things that glow","Museums exhibits",
+"Smelly things","Items in a backpack","Games played outside","Furry animals","Things you can fold"
+];
+
+/* ============ STATE ============ */
+const PDATA = [
+  { name:'RED',    key:'a', cls:'p0' },
+  { name:'BLUE',   key:'l', cls:'p1' },
+  { name:'GOLD',   key:'c', cls:'p2' },
+  { name:'PURPLE', key:'m', cls:'p3' }
+];
+let nPlayers=3, target=7, scores=[], lockedOut=[], phase='idle';
+let buzzWinner=-1, catOrder=[], catPos=0, armTimer=null, cdTimer=null, cdLeft=5;
+
+/* ============ AUDIO ============ */
+let AC=null;
+function audio(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended')AC.resume(); return AC; }
+function beep(f,d,type='sine',v=.3,w=0){ const c=audio(),o=c.createOscillator(),g=c.createGain();
+  o.type=type;o.frequency.value=f;o.connect(g);g.connect(c.destination);
+  const t=c.currentTime+w; g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(.001,t+d);
+  o.start(t);o.stop(t+d+.05); }
+const sndGo=()=>{ beep(880,.15,'square',.35); };
+const sndBuzz=()=>{ beep(330,.25,'sawtooth',.4); beep(392,.25,'sawtooth',.35,.05); };
+const sndGood=()=>{ beep(660,.12); beep(880,.2,'sine',.3,.1); };
+const sndBad=()=>{ beep(160,.4,'sawtooth',.35); };
+const sndTick=()=>{ beep(1100,.05,'square',.15); };
+const sndFalse=()=>{ beep(220,.15,'square',.3); };
+const sndWin=()=>{ [523,659,784,1047,1319].forEach((f,i)=>beep(f,.25,'sine',.3,i*.15)); };
+
+/* ============ HELPERS ============ */
+const $=id=>document.getElementById(id);
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $(id).classList.add('active'); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a; }
+document.querySelectorAll('.opts').forEach(box=>box.addEventListener('click',e=>{
+  const o=e.target.closest('.opt'); if(!o)return;
+  box.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel')); o.classList.add('sel');
+}));
+
+/* ============ SETUP ============ */
+function startGame(){
+  audio();
+  nPlayers=+document.querySelector('#optPlayers .sel').dataset.v;
+  target=+document.querySelector('#optTarget .sel').dataset.v;
+  scores=Array(nPlayers).fill(0);
+  catOrder=shuffle([...Array(CATS.length).keys()]); catPos=0;
+  buildZones(); show('scr-arena'); armRound();
+}
+function buildZones(){
+  const z=$('zones'); z.innerHTML='';
+  for(let i=0;i<nPlayers;i++){
+    const d=document.createElement('div');
+    d.className='zone '+PDATA[i].cls; d.dataset.i=i;
+    d.innerHTML=`<div class="zname">${PDATA[i].name}</div>
+                 <div class="zscore" id="sc${i}">0</div>
+                 <div class="zkey">key: ${PDATA[i].key.toUpperCase()}</div>`;
+    d.addEventListener('pointerdown',()=>buzz(i));
+    z.appendChild(d);
+  }
+}
+function updateZones(){
+  for(let i=0;i<nPlayers;i++){
+    $('sc'+i).textContent=scores[i];
+    const zd=document.querySelector(`.zone[data-i="${i}"]`);
+    zd.classList.toggle('dim', phase==='answer' ? i!==buzzWinner : lockedOut[i]);
+    zd.classList.remove('winner');
+  }
+}
+
+/* ============ ROUND FLOW ============ */
+function armRound(){
+  phase='arming'; buzzWinner=-1; lockedOut=Array(nPlayers).fill(false);
+  $('hostBtn').style.display='none'; $('judgeBox').style.display='none';
+  $('ovCountdown').style.display='none'; $('ovMain').style.display='block';
+  $('ovState').textContent='GET READY';
+  $('ovMain').textContent='Hands off…'; $('ovMain').classList.remove('ready');
+  $('ovSub').textContent='Buzzing now = locked out!';
+  updateZones();
+  const delay=1200+Math.random()*2300;
+  armTimer=setTimeout(showCategory, delay);
+}
+function showCategory(){
+  armTimer=null; phase='buzz';
+  if(catPos>=catOrder.length){ catOrder=shuffle(catOrder); catPos=0; }
+  $('ovState').textContent='NAME ONE…';
+  $('ovMain').textContent=CATS[catOrder[catPos++]];
+  $('ovMain').classList.add('ready');
+  $('ovSub').textContent='BUZZ FIRST!';
+  sndGo(); updateZones();
+}
+function buzz(i){
+  if(phase==='arming'){
+    if(!lockedOut[i]){ lockedOut[i]=true; sndFalse();
+      if(lockedOut.every(Boolean)){ lockedOut=Array(nPlayers).fill(false);
+        $('ovSub').textContent='Everyone jumped the gun — all unlocked!'; }
+      else $('ovSub').textContent=`${PDATA[i].name} buzzed early — locked out!`;
+      updateZones(); }
+    return;
+  }
+  if(phase!=='buzz'||lockedOut[i]) return;
+  phase='answer'; buzzWinner=i; sndBuzz();
+  const zd=document.querySelector(`.zone[data-i="${i}"]`); zd.classList.add('winner');
+  updateZones();
+  $('ovState').textContent=PDATA[i].name+' — ANSWER NOW!';
+  $('ovMain').style.display='block';
+  $('ovSub').textContent='Group: listen up, then judge it.';
+  cdLeft=5; $('ovCountdown').style.display='block'; $('ovCountdown').textContent=cdLeft;
+  cdTimer=setInterval(()=>{
+    cdLeft--; $('ovCountdown').textContent=Math.max(cdLeft,0);
+    if(cdLeft>0) sndTick();
+    if(cdLeft<=0){ clearInterval(cdTimer); cdTimer=null; }
+  },1000);
+  $('judgeBox').style.display='flex';
+}
+function judge(good){
+  if(phase!=='answer') return;
+  if(cdTimer){ clearInterval(cdTimer); cdTimer=null; }
+  phase='judged';
+  if(good){ scores[buzzWinner]++; sndGood(); }
+  else { scores[buzzWinner]=Math.max(-3,scores[buzzWinner]-1); sndBad(); }
+  $('judgeBox').style.display='none'; $('ovCountdown').style.display='none';
+  updateZones();
+  if(scores[buzzWinner]>=target){ setTimeout(showWinner,600); return; }
+  $('ovState').textContent='SCORE UPDATE';
+  $('ovMain').textContent= good ? `+1 for ${PDATA[buzzWinner].name}!` : `−1 for ${PDATA[buzzWinner].name}…`;
+  $('ovMain').classList.remove('ready');
+  $('ovSub').textContent=`First to ${target} wins.`;
+  $('hostBtn').style.display='block';
+}
+function showWinner(){
+  const w=scores.indexOf(Math.max(...scores));
+  $('winName').textContent=PDATA[w].name+' WINS!';
+  $('winName').style.color=getComputedStyle(document.querySelector(`.zone.${PDATA[w].cls}`))?.backgroundColor||'#4dffa1';
+  $('winLine').textContent='Final scores — '+scores.map((s,i)=>`${PDATA[i].name}: ${s}`).join(' · ');
+  sndWin(); show('scr-winner');
+}
+function quitToStart(){
+  if(armTimer)clearTimeout(armTimer); if(cdTimer)clearInterval(cdTimer);
+  phase='idle'; show('scr-start');
+}
+
+/* keyboard buzzers */
+document.addEventListener('keydown',e=>{
+  if(e.repeat) return;
+  const k=e.key.toLowerCase();
+  for(let i=0;i<nPlayers;i++) if(PDATA[i].key===k) buzz(i);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,305 @@
+<!-- CONCEPT: Monster Maker Parade — creative/sandbox build-a-character game: kids mix and match bodies, eyes, mouths, hats and colors to invent silly monsters, then send each one marching into the parade at the bottom. Finish 5 monsters to unlock the Grand Parade celebration. Ages 4-9, creative/sandbox category. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Monster Maker Parade</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body { height:100%; }
+  body {
+    font-family: 'Comic Sans MS','Chalkboard SE','Segoe UI',sans-serif;
+    background: linear-gradient(#7ad7ff 0%, #b9ecff 55%, #8fe28f 55.5%, #6cc96c 100%);
+    overflow:hidden; touch-action:manipulation;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  h1 { color:#fff; text-shadow:0 3px 0 #2b7bb9; font-size:clamp(22px,5vw,40px); margin-top:8px; }
+  #tagline { color:#1b5e8f; font-size:clamp(12px,2.5vw,17px); font-weight:bold; margin-bottom:4px; text-align:center; padding:0 10px;}
+  #stage { position:relative; }
+  canvas#monsterCanvas {
+    background:#fffef2; border:6px solid #ff9b3d; border-radius:24px;
+    box-shadow:0 8px 0 #d97a1e; display:block;
+  }
+  #controls { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin:10px 6px 4px; max-width:640px; }
+  .partBtn {
+    font-family:inherit; font-size:clamp(15px,3vw,20px); font-weight:bold; color:#fff;
+    border:none; border-radius:18px; padding:12px 16px; cursor:pointer;
+    box-shadow:0 5px 0 rgba(0,0,0,.25); transition:transform .08s;
+  }
+  .partBtn:active { transform:translateY(4px); box-shadow:0 1px 0 rgba(0,0,0,.25); }
+  #btnBody { background:#ff6b9d; } #btnEyes { background:#8a5cf5; }
+  #btnMouth { background:#2fb6e8; } #btnHat { background:#43c46a; }
+  #btnColor { background:#ffb020; } #btnShuffle { background:#f25555; }
+  #btnDone {
+    background:#ffd93d; color:#7a4a00; font-size:clamp(18px,4vw,26px);
+    border:none; border-radius:22px; padding:14px 30px; margin-top:6px;
+    font-family:inherit; font-weight:bold; cursor:pointer; box-shadow:0 6px 0 #d9a800;
+  }
+  #btnDone:active { transform:translateY(5px); box-shadow:0 1px 0 #d9a800; }
+  #nameTag {
+    position:absolute; top:8px; left:50%; transform:translateX(-50%);
+    background:#fff; border:3px solid #ff9b3d; border-radius:14px;
+    padding:4px 14px; font-weight:bold; color:#c2661b; font-size:clamp(13px,3vw,18px);
+    white-space:nowrap;
+  }
+  #paradeWrap { width:100%; text-align:center; margin-top:4px; }
+  #paradeLabel { color:#fff; font-weight:bold; text-shadow:0 2px 0 #3a8a3a; font-size:clamp(13px,3vw,17px); }
+  canvas#paradeCanvas { display:block; margin:2px auto 0; }
+  #winOverlay {
+    position:fixed; inset:0; background:rgba(30,20,60,.75); display:none;
+    flex-direction:column; align-items:center; justify-content:center; z-index:50; text-align:center;
+  }
+  #winOverlay h2 { color:#ffd93d; font-size:clamp(30px,7vw,56px); text-shadow:0 4px 0 #a06000; margin-bottom:10px; }
+  #winOverlay p { color:#fff; font-size:clamp(16px,4vw,24px); margin-bottom:20px; padding:0 20px;}
+  #btnRestart {
+    background:#43c46a; color:#fff; font-family:inherit; font-weight:bold;
+    font-size:clamp(18px,4vw,26px); border:none; border-radius:22px;
+    padding:14px 34px; cursor:pointer; box-shadow:0 6px 0 #2a8a47;
+  }
+  #btnRestart:active { transform:translateY(5px); box-shadow:0 1px 0 #2a8a47; }
+  #confettiCanvas { position:fixed; inset:0; pointer-events:none; z-index:60; }
+</style>
+</head>
+<body>
+<h1>🎪 Monster Maker Parade 🎪</h1>
+<div id="tagline">Tap the buttons to build a silly monster, then send it to the parade! Make 5 for the Grand Parade!</div>
+
+<div id="stage">
+  <canvas id="monsterCanvas" width="360" height="300"></canvas>
+  <div id="nameTag">???</div>
+</div>
+
+<div id="controls">
+  <button class="partBtn" id="btnBody">🫧 Body</button>
+  <button class="partBtn" id="btnEyes">👀 Eyes</button>
+  <button class="partBtn" id="btnMouth">👄 Mouth</button>
+  <button class="partBtn" id="btnHat">🎩 Hat</button>
+  <button class="partBtn" id="btnColor">🎨 Color</button>
+  <button class="partBtn" id="btnShuffle">🎲 Surprise!</button>
+</div>
+<button id="btnDone">✅ Join the Parade!</button>
+
+<div id="paradeWrap">
+  <div id="paradeLabel">Parade: 0 / 5 monsters</div>
+  <canvas id="paradeCanvas" width="640" height="110"></canvas>
+</div>
+
+<div id="winOverlay">
+  <h2>🎉 GRAND PARADE! 🎉</h2>
+  <p>WOW! Your 5 monsters are marching!<br>You are a Master Monster Maker!</p>
+  <button id="btnRestart">🔁 Make More Monsters!</button>
+</div>
+<canvas id="confettiCanvas"></canvas>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- audio ---------- */
+let actx = null;
+function audio(){ if(!actx) actx = new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); return actx; }
+function blip(freq, dur, type, vol, when){
+  const a = audio(), o = a.createOscillator(), g = a.createGain();
+  o.type = type||'square'; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol||0.15, a.currentTime+(when||0));
+  g.gain.exponentialRampToValueAtTime(0.001, a.currentTime+(when||0)+dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(a.currentTime+(when||0)); o.stop(a.currentTime+(when||0)+dur+0.05);
+}
+function popSound(){ blip(300+Math.random()*300, .12, 'square', .12); }
+function tadaSound(){ [523,659,784,1047].forEach((f,i)=>blip(f,.25,'triangle',.18,i*.12)); }
+function fanfare(){ [392,523,659,784,659,784,1047].forEach((f,i)=>blip(f,.28,'triangle',.2,i*.15)); }
+
+/* ---------- monster parts ---------- */
+const COLORS = ['#ff6b9d','#8a5cf5','#2fb6e8','#43c46a','#ffb020','#f25555','#26c9a8','#c05cf5'];
+const N_BODY=5, N_EYES=5, N_MOUTH=5, N_HAT=6;
+const NAMES1 = ['Bloopy','Snorkel','Wiggly','Fuzzy','Ziggy','Bumble','Squishy','Giggle','Noodle','Sparky'];
+const NAMES2 = ['McFluff','Bopkins','Sprocket','Wobblebottom','Tickletoes','Von Boing','Snugglepuff','Zoombini','Pickles','Doodle'];
+
+let m = randomMonster();
+let parade = [];       // finished monsters
+const GOAL = 5;
+let won = false;
+
+function randomMonster(){
+  return { body:rnd(N_BODY), eyes:rnd(N_EYES), mouth:rnd(N_MOUTH), hat:rnd(N_HAT),
+           color:COLORS[rnd(COLORS.length)],
+           name: NAMES1[rnd(NAMES1.length)]+' '+NAMES2[rnd(NAMES2.length)] };
+}
+function rnd(n){ return Math.floor(Math.random()*n); }
+
+/* ---------- drawing ---------- */
+const cv = document.getElementById('monsterCanvas'), cx = cv.getContext('2d');
+let bounce = 0;
+
+function drawMonster(ctx, mon, x, y, s, t){
+  // x,y = center of body, s = scale, t = time for wiggle
+  const wob = Math.sin(t*4)*3*s;
+  ctx.save(); ctx.translate(x, y+wob*0.3); ctx.scale(s,s);
+  ctx.lineWidth = 4; ctx.strokeStyle = '#333';
+  ctx.fillStyle = mon.color;
+
+  // BODY
+  ctx.beginPath();
+  switch(mon.body){
+    case 0: ctx.arc(0,0,60,0,7); break;                                  // round
+    case 1: rr(ctx,-55,-55,110,110,25); break;                            // square blob
+    case 2: ctx.ellipse(0,0,45,65,0,0,7); break;                          // tall egg
+    case 3: ctx.moveTo(0,-70); ctx.lineTo(62,50); ctx.lineTo(-62,50); ctx.closePath(); break; // triangle
+    case 4: ctx.ellipse(0,5,68,50,0,0,7); break;                          // wide blob
+  }
+  ctx.fill(); ctx.stroke();
+  // little legs
+  ctx.fillStyle = mon.color;
+  [-25,25].forEach(lx=>{ ctx.beginPath(); ctx.ellipse(lx,62,12,10,0,0,7); ctx.fill(); ctx.stroke(); });
+
+  // EYES
+  ctx.fillStyle='#fff';
+  const eyeY=-18, blink = (Math.sin(t*1.3)>0.97)?0.15:1;
+  function eye(ex,ey,r){
+    ctx.save(); ctx.translate(ex,ey); ctx.scale(1,blink);
+    ctx.beginPath(); ctx.arc(0,0,r,0,7); ctx.fillStyle='#fff'; ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.arc(r*0.15,r*0.1,r*0.45,0,7); ctx.fillStyle='#333'; ctx.fill();
+    ctx.restore();
+  }
+  switch(mon.eyes){
+    case 0: eye(-20,eyeY,13); eye(20,eyeY,13); break;                     // two
+    case 1: eye(0,eyeY-5,20); break;                                      // cyclops
+    case 2: eye(-25,eyeY,10); eye(0,eyeY-8,10); eye(25,eyeY,10); break;   // three
+    case 3: eye(-20,eyeY,16); eye(22,eyeY+2,9); break;                    // big+small
+    case 4: // stalk eyes
+      ctx.strokeStyle='#333';
+      [-18,18].forEach(ex=>{ ctx.beginPath(); ctx.moveTo(ex,eyeY+5); ctx.lineTo(ex*1.4,eyeY-30); ctx.stroke(); eye(ex*1.4,eyeY-35,11); });
+      break;
+  }
+
+  // MOUTH
+  ctx.strokeStyle='#333'; ctx.fillStyle='#7a2f2f';
+  const my=20;
+  ctx.beginPath();
+  switch(mon.mouth){
+    case 0: ctx.arc(0,my,20,0.15*Math.PI,0.85*Math.PI); ctx.stroke(); break;            // smile
+    case 1: ctx.arc(0,my+6,16,0,Math.PI); ctx.closePath(); ctx.fill(); ctx.stroke();    // open laugh
+            ctx.fillStyle='#fff'; ctx.fillRect(-10,my+6,20,5); break;                   // teeth
+    case 2: rr(ctx,-18,my,36,12,6); ctx.fill(); ctx.stroke(); break;                    // goofy rect
+    case 3: ctx.moveTo(-20,my+8); for(let i=-20;i<=20;i+=8){ ctx.lineTo(i+4,my+(i/4%2===0?2:8)); } ctx.stroke(); break; // zigzag
+    case 4: ctx.arc(-10,my+5,8,0,7); ctx.moveTo(18,my+5); ctx.arc(10,my+5,8,0,7); ctx.stroke(); break; // wavy double
+  }
+
+  // HAT
+  ctx.fillStyle='#5a3ec8';
+  const hy = (mon.body===3)?-72:(mon.body===2?-68:-58);
+  switch(mon.hat){
+    case 0: break; // no hat
+    case 1: ctx.fillStyle='#f25555'; ctx.beginPath(); ctx.moveTo(0,hy-38); ctx.lineTo(24,hy); ctx.lineTo(-24,hy); ctx.closePath(); ctx.fill(); ctx.stroke();
+            ctx.fillStyle='#ffd93d'; ctx.beginPath(); ctx.arc(0,hy-40,7,0,7); ctx.fill(); ctx.stroke(); break; // party
+    case 2: ctx.fillStyle='#333'; rr(ctx,-20,hy-40,40,34,4); ctx.fill(); rr(ctx,-32,hy-8,64,8,4); ctx.fill(); break; // top hat
+    case 3: ctx.fillStyle='#ffd93d'; ctx.beginPath(); ctx.moveTo(-28,hy); ctx.lineTo(-28,hy-26); ctx.lineTo(-14,hy-10);
+            ctx.lineTo(0,hy-30); ctx.lineTo(14,hy-10); ctx.lineTo(28,hy-26); ctx.lineTo(28,hy); ctx.closePath(); ctx.fill(); ctx.stroke(); break; // crown
+    case 4: ctx.fillStyle='#43c46a'; ctx.beginPath(); ctx.ellipse(0,hy-6,30,12,0,Math.PI,0); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0,hy-16); ctx.quadraticCurveTo(10,hy-30,4,hy-38); ctx.stroke(); break; // sprout beanie
+    case 5: ctx.strokeStyle='#333'; ctx.beginPath(); ctx.moveTo(0,hy); ctx.lineTo(0,hy-22); ctx.stroke();
+            ctx.fillStyle='#2fb6e8'; ctx.beginPath(); ctx.arc(0,hy-30,9,0,7); ctx.fill(); ctx.stroke(); break; // antenna
+  }
+  ctx.restore();
+}
+function rr(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+
+/* ---------- parade ---------- */
+const pcv = document.getElementById('paradeCanvas'), pcx = pcv.getContext('2d');
+const label = document.getElementById('paradeLabel');
+
+/* ---------- confetti ---------- */
+const ccv = document.getElementById('confettiCanvas'), ccx = ccv.getContext('2d');
+let confetti = [];
+function resizeConfetti(){ ccv.width = innerWidth; ccv.height = innerHeight; }
+resizeConfetti(); addEventListener('resize', resizeConfetti);
+function burstConfetti(n){
+  for(let i=0;i<n;i++) confetti.push({
+    x: Math.random()*ccv.width, y: -20-Math.random()*100,
+    vy: 2+Math.random()*3, vx: (Math.random()-.5)*2,
+    r: 4+Math.random()*6, c: COLORS[rnd(COLORS.length)], a: Math.random()*7
+  });
+}
+
+/* ---------- main loop ---------- */
+let t0 = performance.now();
+function loop(now){
+  const t = (now-t0)/1000;
+  // monster canvas
+  cx.clearRect(0,0,cv.width,cv.height);
+  drawMonster(cx, m, cv.width/2, cv.height/2+20+bounce, 1.15, t);
+  if(bounce<0) bounce = Math.min(0, bounce+2);
+
+  // parade canvas
+  pcx.clearRect(0,0,pcv.width,pcv.height);
+  parade.forEach((pm,i)=>{
+    const px = ((t*40 + i*110) % (pcv.width+120)) - 60;
+    drawMonster(pcx, pm, px, 62, 0.42, t + i);
+  });
+
+  // confetti
+  ccx.clearRect(0,0,ccv.width,ccv.height);
+  confetti.forEach(p=>{
+    p.y += p.vy; p.x += p.vx + Math.sin(p.y/30); p.a += 0.1;
+    ccx.save(); ccx.translate(p.x,p.y); ccx.rotate(p.a);
+    ccx.fillStyle = p.c; ccx.fillRect(-p.r/2,-p.r/2,p.r,p.r); ccx.restore();
+  });
+  confetti = confetti.filter(p=>p.y < ccv.height+20);
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- UI ---------- */
+const nameTag = document.getElementById('nameTag');
+function refreshName(){ nameTag.textContent = m.name; }
+refreshName();
+
+function change(part){
+  popSound(); bounce = -14;
+  if(part==='body')  m.body  = (m.body+1)%N_BODY;
+  if(part==='eyes')  m.eyes  = (m.eyes+1)%N_EYES;
+  if(part==='mouth') m.mouth = (m.mouth+1)%N_MOUTH;
+  if(part==='hat')   m.hat   = (m.hat+1)%N_HAT;
+  if(part==='color') m.color = COLORS[(COLORS.indexOf(m.color)+1)%COLORS.length];
+}
+document.getElementById('btnBody').onclick  = ()=>change('body');
+document.getElementById('btnEyes').onclick  = ()=>change('eyes');
+document.getElementById('btnMouth').onclick = ()=>change('mouth');
+document.getElementById('btnHat').onclick   = ()=>change('hat');
+document.getElementById('btnColor').onclick = ()=>change('color');
+document.getElementById('btnShuffle').onclick = ()=>{ m = randomMonster(); refreshName(); popSound(); blip(700,.1,'square',.12); bounce=-14; };
+
+document.getElementById('btnDone').onclick = ()=>{
+  if(won) return;
+  parade.push(Object.assign({}, m));
+  tadaSound(); burstConfetti(40);
+  label.textContent = 'Parade: '+parade.length+' / '+GOAL+' monsters';
+  if(parade.length >= GOAL){
+    won = true; fanfare(); burstConfetti(200);
+    setTimeout(()=>{ document.getElementById('winOverlay').style.display='flex'; }, 700);
+  } else {
+    m = randomMonster(); refreshName();
+  }
+};
+
+document.getElementById('btnRestart').onclick = ()=>{
+  parade = []; won = false;
+  label.textContent = 'Parade: 0 / '+GOAL+' monsters';
+  document.getElementById('winOverlay').style.display='none';
+  m = randomMonster(); refreshName(); popSound();
+};
+
+/* responsive canvas sizing */
+function fit(){
+  const w = Math.min(innerWidth-30, 420);
+  cv.style.width = w+'px'; cv.style.height = (w*300/360)+'px';
+  pcv.style.width = Math.min(innerWidth-10, 640)+'px';
+}
+fit(); addEventListener('resize', fit);
+})();
+</script>
+</body>
+</html>

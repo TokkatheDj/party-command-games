@@ -1,0 +1,886 @@
+<!-- CONCEPT: SYNTHESIZERS - FM synthesizer with carrier+modulator, filter/amp/mod envelopes, LFO, delay & reverb, playable live | Audience: Producers / Musicians -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Voltaic FM — FM Synthesizer</title>
+<style>
+  :root{
+    --bg:#111316;
+    --panel:#191c20;
+    --panel2:#1f2328;
+    --line:#2a2f36;
+    --accent:#ff8a3d;
+    --accent2:#3ddcff;
+    --text:#e7e9ec;
+    --dim:#8a919b;
+    --good:#5ee89a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:'Segoe UI',Helvetica,Arial,sans-serif;-webkit-tap-highlight-color:transparent;}
+  #app{max-width:1200px;margin:0 auto;padding:14px 14px 40px;}
+
+  header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin-bottom:10px;border-bottom:1px solid var(--line);padding-bottom:10px;}
+  header h1{font-size:20px;margin:0;letter-spacing:1px;color:var(--accent);}
+  header .tagline{font-size:12px;color:var(--dim);}
+  header .audience{margin-left:auto;font-size:11px;color:var(--dim);background:var(--panel2);
+    padding:4px 10px;border-radius:12px;border:1px solid var(--line);}
+
+  .desc{font-size:12px;color:var(--dim);margin:0 0 14px;line-height:1.5;max-width:900px;}
+
+  .rack{display:flex;flex-direction:column;gap:12px;}
+  .row{display:flex;flex-wrap:wrap;gap:12px;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;flex:1 1 220px;
+    box-shadow:0 2px 6px rgba(0,0,0,.3) inset;}
+  .panel h2{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent2);margin:0 0 10px;
+    display:flex;align-items:center;justify-content:space-between;}
+  .panel h2 .hint{color:var(--dim);font-weight:normal;letter-spacing:0;text-transform:none;font-size:10px;}
+
+  .knobs{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;}
+  .knob-unit{width:64px;text-align:center;user-select:none;}
+  .knob{width:52px;height:52px;border-radius:50%;margin:0 auto;position:relative;cursor:ns-resize;
+    background:radial-gradient(circle at 35% 30%, #33383f, #14171a 70%);
+    border:1px solid #383e46;touch-action:none;}
+  .knob:active{border-color:var(--accent);}
+  .knob .tick{position:absolute;left:50%;top:4px;width:2px;height:12px;background:var(--accent);
+    transform-origin:50% 22px;border-radius:1px;}
+  .knob-label{font-size:9px;letter-spacing:.5px;color:var(--dim);margin-top:5px;text-transform:uppercase;}
+  .knob-value{font-size:10px;color:var(--good);font-variant-numeric:tabular-nums;margin-top:1px;}
+
+  select, input[type=text]{background:var(--panel2);color:var(--text);border:1px solid var(--line);
+    border-radius:5px;padding:5px 6px;font-size:11px;}
+  select{width:100%;}
+
+  .subrow{display:flex;gap:8px;margin-bottom:10px;}
+  .subrow > div{flex:1;}
+  .subrow label{display:block;font-size:9px;color:var(--dim);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px;}
+
+  .btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;
+    padding:8px 14px;font-size:12px;cursor:pointer;letter-spacing:.3px;}
+  .btn:hover{border-color:var(--accent2);}
+  .btn.primary{background:linear-gradient(180deg,#ff9a52,#e5722a);border-color:#e5722a;color:#1a0e00;font-weight:600;}
+  .btn.danger{border-color:#7a2b2b;color:#ff9d9d;}
+  .btn.small{padding:5px 9px;font-size:11px;}
+
+  .scope-wrap{position:relative;flex:1 1 260px;}
+  canvas#scope{width:100%;height:90px;background:#0b0d0f;border:1px solid var(--line);border-radius:8px;display:block;}
+
+  .keyboard-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:10px;}
+  #keyboard{position:relative;height:150px;display:flex;min-width:640px;touch-action:none;}
+  .wkey,.bkey{border:1px solid #05070a;border-radius:0 0 4px 4px;box-sizing:border-box;}
+  .wkey{background:linear-gradient(180deg,#f4f2ee,#d9d5cd);width:40px;height:150px;position:relative;z-index:1;flex-shrink:0;}
+  .wkey.active{background:linear-gradient(180deg,var(--accent2),#1f9fbf);}
+  .bkey{background:linear-gradient(180deg,#26292d,#0b0c0e);width:26px;height:92px;position:absolute;z-index:2;top:0;}
+  .bkey.active{background:linear-gradient(180deg,var(--accent),#a3540f);}
+  .keylabel{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9px;color:#555;pointer-events:none;}
+  .bkey .keylabel{color:#999;}
+
+  .controls-strip{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0;}
+  .controls-strip .spacer{flex:1;}
+  #octaveLabel{font-size:12px;color:var(--accent2);min-width:70px;text-align:center;}
+
+  .presets{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  .presets select{width:auto;min-width:150px;}
+  .presets input[type=text]{width:140px;}
+
+  footer{margin-top:18px;font-size:10px;color:var(--dim);text-align:center;}
+  .status{font-size:10px;color:var(--dim);margin-left:8px;}
+  @media(max-width:640px){
+    .panel{flex:1 1 100%;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>VOLTAIC&nbsp;FM</h1>
+    <div class="tagline">2-operator FM synthesizer — play it live, sculpt the sound, save your patch</div>
+    <div class="audience">Producers / Musicians</div>
+  </header>
+  <p class="desc">A frequency-modulation synth voice: a Carrier oscillator gets its pitch warped by a Modulator
+    oscillator to create everything from glassy bells to metallic plucks and deep FM basses. Shape it with a
+    filter, an ADSR envelope that drives amplitude / filter / FM depth together, an LFO, and a delay + reverb
+    send. Play it with the on-screen keys, your computer keyboard (A–; row, Z/X to change octave), or touch.
+    Save patches to your browser's storage and reload them any time.</p>
+
+  <div class="rack">
+    <div class="row">
+      <!-- OPERATORS -->
+      <div class="panel" style="flex-basis:320px;">
+        <h2>Operators <span class="hint">carrier · modulator</span></h2>
+        <div class="subrow">
+          <div>
+            <label>Carrier Wave</label>
+            <select id="carrierWave">
+              <option value="sine">Sine</option>
+              <option value="triangle">Triangle</option>
+              <option value="sawtooth">Saw</option>
+              <option value="square">Square</option>
+            </select>
+          </div>
+          <div>
+            <label>Modulator Wave</label>
+            <select id="modWave">
+              <option value="sine">Sine</option>
+              <option value="triangle">Triangle</option>
+              <option value="sawtooth">Saw</option>
+              <option value="square">Square</option>
+            </select>
+          </div>
+        </div>
+        <div class="knobs">
+          <div class="knob-unit"><div class="knob" id="knob-ratio"><div class="tick"></div></div>
+            <div class="knob-label">Ratio</div><div class="knob-value" id="val-ratio">2.00</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-modDepth"><div class="tick"></div></div>
+            <div class="knob-label">FM Depth</div><div class="knob-value" id="val-modDepth">800</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-modEnvAmount"><div class="tick"></div></div>
+            <div class="knob-label">FM Env Amt</div><div class="knob-value" id="val-modEnvAmount">0.60</div></div>
+        </div>
+      </div>
+
+      <!-- FILTER -->
+      <div class="panel" style="flex-basis:260px;">
+        <h2>Filter <span class="hint">lowpass</span></h2>
+        <div class="knobs">
+          <div class="knob-unit"><div class="knob" id="knob-cutoff"><div class="tick"></div></div>
+            <div class="knob-label">Cutoff</div><div class="knob-value" id="val-cutoff">4000</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-resonance"><div class="tick"></div></div>
+            <div class="knob-label">Reso</div><div class="knob-value" id="val-resonance">1.0</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-filterEnvAmount"><div class="tick"></div></div>
+            <div class="knob-label">Env Amt</div><div class="knob-value" id="val-filterEnvAmount">2000</div></div>
+        </div>
+      </div>
+
+      <!-- SCOPE -->
+      <div class="panel scope-wrap" style="flex-basis:240px;">
+        <h2>Output <span class="hint">live scope</span></h2>
+        <canvas id="scope"></canvas>
+      </div>
+    </div>
+
+    <div class="row">
+      <!-- ENVELOPE -->
+      <div class="panel" style="flex-basis:320px;">
+        <h2>Envelope <span class="hint">shapes amp + filter + FM</span></h2>
+        <div class="knobs">
+          <div class="knob-unit"><div class="knob" id="knob-attack"><div class="tick"></div></div>
+            <div class="knob-label">Attack</div><div class="knob-value" id="val-attack">0.01</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-decay"><div class="tick"></div></div>
+            <div class="knob-label">Decay</div><div class="knob-value" id="val-decay">0.30</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-sustain"><div class="tick"></div></div>
+            <div class="knob-label">Sustain</div><div class="knob-value" id="val-sustain">0.50</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-release"><div class="tick"></div></div>
+            <div class="knob-label">Release</div><div class="knob-value" id="val-release">0.40</div></div>
+        </div>
+      </div>
+
+      <!-- LFO -->
+      <div class="panel" style="flex-basis:260px;">
+        <h2>LFO <span class="hint">modulation</span></h2>
+        <div class="subrow">
+          <div>
+            <label>Wave</label>
+            <select id="lfoWave">
+              <option value="sine">Sine</option>
+              <option value="triangle">Triangle</option>
+              <option value="square">Square</option>
+            </select>
+          </div>
+          <div>
+            <label>Target</label>
+            <select id="lfoTarget">
+              <option value="off">Off</option>
+              <option value="pitch">Pitch (vibrato)</option>
+              <option value="filter">Filter</option>
+              <option value="amp">Amp (tremolo)</option>
+            </select>
+          </div>
+        </div>
+        <div class="knobs">
+          <div class="knob-unit"><div class="knob" id="knob-lfoRate"><div class="tick"></div></div>
+            <div class="knob-label">Rate</div><div class="knob-value" id="val-lfoRate">5.0</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-lfoDepth"><div class="tick"></div></div>
+            <div class="knob-label">Depth</div><div class="knob-value" id="val-lfoDepth">0</div></div>
+        </div>
+      </div>
+
+      <!-- FX -->
+      <div class="panel" style="flex-basis:300px;">
+        <h2>Delay + Reverb <span class="hint">send fx</span></h2>
+        <div class="knobs">
+          <div class="knob-unit"><div class="knob" id="knob-delayTime"><div class="tick"></div></div>
+            <div class="knob-label">D.Time</div><div class="knob-value" id="val-delayTime">0.30</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-delayFeedback"><div class="tick"></div></div>
+            <div class="knob-label">D.Fdbk</div><div class="knob-value" id="val-delayFeedback">0.30</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-delayMix"><div class="tick"></div></div>
+            <div class="knob-label">D.Mix</div><div class="knob-value" id="val-delayMix">0.20</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-reverbSize"><div class="tick"></div></div>
+            <div class="knob-label">R.Size</div><div class="knob-value" id="val-reverbSize">1.50</div></div>
+          <div class="knob-unit"><div class="knob" id="knob-reverbMix"><div class="tick"></div></div>
+            <div class="knob-label">R.Mix</div><div class="knob-value" id="val-reverbMix">0.20</div></div>
+        </div>
+      </div>
+
+      <!-- MASTER -->
+      <div class="panel" style="flex-basis:160px;">
+        <h2>Master</h2>
+        <div class="knobs">
+          <div class="knob-unit"><div class="knob" id="knob-masterVolume"><div class="tick"></div></div>
+            <div class="knob-label">Volume</div><div class="knob-value" id="val-masterVolume">0.70</div></div>
+        </div>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+          <button class="btn danger" id="panicBtn">Panic / Stop All</button>
+          <button class="btn" id="resetBtn">Reset Defaults</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRESETS -->
+    <div class="panel">
+      <h2>Patches <span class="hint">save / load / export</span></h2>
+      <div class="presets">
+        <select id="presetSelect"></select>
+        <button class="btn small" id="loadPresetBtn">Load</button>
+        <button class="btn small danger" id="deletePresetBtn">Delete</button>
+        <input type="text" id="presetName" placeholder="patch name">
+        <button class="btn small primary" id="savePresetBtn">Save Patch</button>
+        <button class="btn small" id="exportPresetBtn">Export JSON</button>
+        <span class="status" id="presetStatus"></span>
+      </div>
+    </div>
+
+    <!-- KEYBOARD -->
+    <div class="controls-strip">
+      <button class="btn" id="octDown">Octave −</button>
+      <div id="octaveLabel">Octave 4</div>
+      <button class="btn" id="octUp">Octave +</button>
+      <div class="spacer"></div>
+      <div class="status">Keys: A W S E D F T G Y H U J K O L P ; &nbsp;·&nbsp; Z / X = octave</div>
+    </div>
+    <div class="keyboard-wrap">
+      <div id="keyboard"></div>
+    </div>
+  </div>
+
+  <footer>Voltaic FM · all sound synthesized live via Web Audio API · nothing recorded, no network, no ads · patches saved locally in your browser</footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------------- Audio context (created on first user gesture) ---------------- */
+let audioCtx = null;
+let masterGain, dryGain, delayNode, delayFeedback, delayWet, convolver, reverbWet, analyser, effectsInput;
+let lfoOsc, lfoGain;
+let audioReady = false;
+
+const activeVoices = {}; // note(midi) -> voice
+
+function midiToFreq(m){ return 440 * Math.pow(2, (m-69)/12); }
+function clamp(v,a,b){ return Math.min(b, Math.max(a,v)); }
+
+/* ---------------- Params (single source of truth) ---------------- */
+const DEFAULTS = {
+  carrierWave:'sine', modWave:'sine',
+  ratio:2, modDepth:800, modEnvAmount:0.6,
+  cutoff:4000, resonance:1.0, filterEnvAmount:2000,
+  attack:0.01, decay:0.3, sustain:0.5, release:0.4,
+  lfoWave:'sine', lfoTarget:'off', lfoRate:5.0, lfoDepth:0,
+  delayTime:0.3, delayFeedback:0.3, delayMix:0.2,
+  reverbSize:1.5, reverbMix:0.2,
+  masterVolume:0.7
+};
+let params = Object.assign({}, DEFAULTS);
+
+const DEFAULT_PRESETS = {
+  "Warm Bell":      {carrierWave:'sine',modWave:'sine',ratio:3.01,modDepth:1400,modEnvAmount:0.85,
+                      cutoff:6000,resonance:0.7,filterEnvAmount:1500,attack:0.005,decay:0.9,sustain:0.15,release:1.4,
+                      lfoWave:'sine',lfoTarget:'off',lfoRate:5,lfoDepth:0,
+                      delayTime:0.35,delayFeedback:0.25,delayMix:0.18,reverbSize:2.2,reverbMix:0.35,masterVolume:0.7},
+  "Deep Sub Bass":  {carrierWave:'sine',modWave:'sine',ratio:1,modDepth:120,modEnvAmount:0.2,
+                      cutoff:900,resonance:1.5,filterEnvAmount:400,attack:0.004,decay:0.25,sustain:0.8,release:0.2,
+                      lfoWave:'sine',lfoTarget:'off',lfoRate:5,lfoDepth:0,
+                      delayTime:0.3,delayFeedback:0.1,delayMix:0.0,reverbSize:0.6,reverbMix:0.08,masterVolume:0.8},
+  "Metallic Pluck": {carrierWave:'triangle',modWave:'square',ratio:3.5,modDepth:2600,modEnvAmount:1.0,
+                      cutoff:5200,resonance:4,filterEnvAmount:3500,attack:0.002,decay:0.35,sustain:0.0,release:0.3,
+                      lfoWave:'sine',lfoTarget:'off',lfoRate:5,lfoDepth:0,
+                      delayTime:0.22,delayFeedback:0.45,delayMix:0.3,reverbSize:1.4,reverbMix:0.25,masterVolume:0.65},
+  "Glass Pad":      {carrierWave:'sine',modWave:'triangle',ratio:4.01,modDepth:600,modEnvAmount:0.4,
+                      cutoff:3200,resonance:0.6,filterEnvAmount:1200,attack:0.6,decay:0.8,sustain:0.7,release:2.2,
+                      lfoWave:'triangle',lfoTarget:'filter',lfoRate:2.2,lfoDepth:22,
+                      delayTime:0.45,delayFeedback:0.35,delayMix:0.28,reverbSize:3.2,reverbMix:0.5,masterVolume:0.6},
+  "Aggro Lead":     {carrierWave:'sawtooth',modWave:'square',ratio:1.5,modDepth:900,modEnvAmount:0.5,
+                      cutoff:2600,resonance:6,filterEnvAmount:2600,attack:0.005,decay:0.15,sustain:0.6,release:0.15,
+                      lfoWave:'sine',lfoTarget:'pitch',lfoRate:6.5,lfoDepth:8,
+                      delayTime:0.18,delayFeedback:0.2,delayMix:0.15,reverbSize:0.9,reverbMix:0.15,masterVolume:0.65}
+};
+
+const KNOB_SPECS = {
+  ratio:{min:0.25,max:8,decimals:2},
+  modDepth:{min:0,max:4000,decimals:0},
+  modEnvAmount:{min:0,max:1,decimals:2},
+  cutoff:{min:100,max:12000,decimals:0},
+  resonance:{min:0.1,max:20,decimals:1},
+  filterEnvAmount:{min:-6000,max:6000,decimals:0},
+  attack:{min:0.001,max:2,decimals:3},
+  decay:{min:0.001,max:2,decimals:3},
+  sustain:{min:0,max:1,decimals:2},
+  release:{min:0.001,max:4,decimals:3},
+  lfoRate:{min:0.1,max:20,decimals:1},
+  lfoDepth:{min:0,max:100,decimals:0},
+  delayTime:{min:0.01,max:1,decimals:2},
+  delayFeedback:{min:0,max:0.9,decimals:2},
+  delayMix:{min:0,max:1,decimals:2},
+  reverbSize:{min:0.1,max:4,decimals:2},
+  reverbMix:{min:0,max:1,decimals:2},
+  masterVolume:{min:0,max:1,decimals:2}
+};
+
+/* ---------------- Audio graph setup ---------------- */
+function initAudio(){
+  if(audioReady) return;
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = params.masterVolume;
+
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+
+  effectsInput = audioCtx.createGain();
+  dryGain = audioCtx.createGain();
+  dryGain.gain.value = 1.0;
+
+  delayNode = audioCtx.createDelay(2.0);
+  delayNode.delayTime.value = params.delayTime;
+  delayFeedback = audioCtx.createGain();
+  delayFeedback.gain.value = params.delayFeedback;
+  delayWet = audioCtx.createGain();
+  delayWet.gain.value = params.delayMix;
+
+  convolver = audioCtx.createConvolver();
+  convolver.buffer = makeImpulse(params.reverbSize, 2.5);
+  reverbWet = audioCtx.createGain();
+  reverbWet.gain.value = params.reverbMix;
+
+  effectsInput.connect(dryGain);
+  dryGain.connect(masterGain);
+
+  effectsInput.connect(delayNode);
+  delayNode.connect(delayFeedback);
+  delayFeedback.connect(delayNode);
+  delayNode.connect(delayWet);
+  delayWet.connect(masterGain);
+
+  effectsInput.connect(convolver);
+  convolver.connect(reverbWet);
+  reverbWet.connect(masterGain);
+
+  masterGain.connect(analyser);
+  analyser.connect(audioCtx.destination);
+
+  lfoOsc = audioCtx.createOscillator();
+  lfoOsc.type = params.lfoWave;
+  lfoOsc.frequency.value = params.lfoRate;
+  lfoGain = audioCtx.createGain();
+  lfoGain.gain.value = lfoDepthToGain();
+  lfoOsc.connect(lfoGain);
+  lfoOsc.start();
+
+  audioReady = true;
+  drawScope();
+}
+
+function lfoDepthToGain(){
+  const pct = params.lfoDepth/100;
+  if(params.lfoTarget==='pitch') return pct*50;      // Hz vibrato
+  if(params.lfoTarget==='filter') return pct*3000;   // Hz filter sweep
+  if(params.lfoTarget==='amp') return pct*0.35;      // gain tremolo
+  return 0;
+}
+
+function makeImpulse(duration, decay){
+  const rate = audioCtx.sampleRate;
+  const length = Math.max(1, Math.floor(rate*duration));
+  const impulse = audioCtx.createBuffer(2, length, rate);
+  for(let ch=0; ch<2; ch++){
+    const data = impulse.getChannelData(ch);
+    for(let i=0;i<length;i++){
+      data[i] = (Math.random()*2-1) * Math.pow(1-i/length, decay);
+    }
+  }
+  return impulse;
+}
+
+/* ---------------- Voice engine ---------------- */
+function noteOn(note){
+  if(!audioReady) initAudio();
+  if(audioCtx.state==='suspended') audioCtx.resume();
+  if(activeVoices[note]) stopVoice(note, true);
+
+  const now = audioCtx.currentTime;
+  const freq = midiToFreq(note);
+
+  const carrier = audioCtx.createOscillator();
+  carrier.type = params.carrierWave;
+  carrier.frequency.value = freq;
+
+  const modOsc = audioCtx.createOscillator();
+  modOsc.type = params.modWave;
+  modOsc.frequency.value = freq * params.ratio;
+
+  const modGain = audioCtx.createGain();
+  const dConst = params.modDepth*(1-params.modEnvAmount);
+  modGain.gain.value = dConst;
+  modOsc.connect(modGain);
+  modGain.connect(carrier.frequency);
+
+  const ampGain = audioCtx.createGain();
+  ampGain.gain.value = 0;
+
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.Q.value = params.resonance;
+  filter.frequency.value = params.cutoff;
+
+  carrier.connect(ampGain);
+  ampGain.connect(filter);
+  filter.connect(effectsInput);
+
+  if(params.lfoTarget==='pitch') lfoGain.connect(carrier.frequency);
+  else if(params.lfoTarget==='filter') lfoGain.connect(filter.frequency);
+  else if(params.lfoTarget==='amp') lfoGain.connect(ampGain.gain);
+
+  const {attack,decay,sustain} = params;
+
+  ampGain.gain.cancelScheduledValues(now);
+  ampGain.gain.setValueAtTime(0, now);
+  ampGain.gain.linearRampToValueAtTime(1, now+attack);
+  ampGain.gain.linearRampToValueAtTime(sustain, now+attack+decay);
+
+  const fBase = params.cutoff;
+  const fPeak = clamp(params.cutoff+params.filterEnvAmount, 20, 20000);
+  const fSus = clamp(params.cutoff+params.filterEnvAmount*sustain, 20, 20000);
+  filter.frequency.cancelScheduledValues(now);
+  filter.frequency.setValueAtTime(fBase, now);
+  filter.frequency.linearRampToValueAtTime(fPeak, now+attack);
+  filter.frequency.linearRampToValueAtTime(fSus, now+attack+decay);
+
+  const dPeak = dConst + params.modDepth*params.modEnvAmount;
+  const dSus = dConst + params.modDepth*params.modEnvAmount*sustain;
+  modGain.gain.cancelScheduledValues(now);
+  modGain.gain.setValueAtTime(dConst, now);
+  modGain.gain.linearRampToValueAtTime(dPeak, now+attack);
+  modGain.gain.linearRampToValueAtTime(dSus, now+attack+decay);
+
+  carrier.start(now);
+  modOsc.start(now);
+
+  activeVoices[note] = {carrier, modOsc, modGain, ampGain, filter, fBase, dConst};
+  setKeyVisual(note, true);
+}
+
+function stopVoice(note, immediate){
+  const v = activeVoices[note];
+  if(!v) return;
+  const now = audioCtx.currentTime;
+  const release = immediate ? 0.02 : params.release;
+
+  const curAmp = v.ampGain.gain.value;
+  v.ampGain.gain.cancelScheduledValues(now);
+  v.ampGain.gain.setValueAtTime(curAmp, now);
+  v.ampGain.gain.linearRampToValueAtTime(0, now+release);
+
+  const curF = v.filter.frequency.value;
+  v.filter.frequency.cancelScheduledValues(now);
+  v.filter.frequency.setValueAtTime(curF, now);
+  v.filter.frequency.linearRampToValueAtTime(v.fBase, now+release);
+
+  const curD = v.modGain.gain.value;
+  v.modGain.gain.cancelScheduledValues(now);
+  v.modGain.gain.setValueAtTime(curD, now);
+  v.modGain.gain.linearRampToValueAtTime(v.dConst, now+release);
+
+  try{ v.carrier.stop(now+release+0.05); }catch(e){}
+  try{ v.modOsc.stop(now+release+0.05); }catch(e){}
+  const nodes = v;
+  setTimeout(()=>{
+    try{
+      nodes.carrier.disconnect(); nodes.modOsc.disconnect();
+      nodes.modGain.disconnect(); nodes.ampGain.disconnect(); nodes.filter.disconnect();
+    }catch(e){}
+  }, (release+0.15)*1000);
+}
+
+function noteOff(note){
+  if(!activeVoices[note]) return;
+  stopVoice(note, false);
+  delete activeVoices[note];
+  setKeyVisual(note, false);
+}
+
+function panic(){
+  Object.keys(activeVoices).forEach(n=>{
+    stopVoice(parseInt(n,10), true);
+    setKeyVisual(parseInt(n,10), false);
+  });
+  Object.keys(activeVoices).forEach(n=> delete activeVoices[n]);
+}
+
+/* ---------------- Scope ---------------- */
+function drawScope(){
+  const canvas = document.getElementById('scope');
+  const ctx2d = canvas.getContext('2d');
+  const buf = new Uint8Array(analyser.fftSize);
+  function resize(){
+    canvas.width = canvas.clientWidth * devicePixelRatio;
+    canvas.height = canvas.clientHeight * devicePixelRatio;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  function frame(){
+    requestAnimationFrame(frame);
+    analyser.getByteTimeDomainData(buf);
+    const w = canvas.width, h = canvas.height;
+    ctx2d.fillStyle = '#0b0d0f';
+    ctx2d.fillRect(0,0,w,h);
+    ctx2d.lineWidth = 2*devicePixelRatio;
+    ctx2d.strokeStyle = '#3ddcff';
+    ctx2d.beginPath();
+    const step = w/buf.length;
+    for(let i=0;i<buf.length;i++){
+      const x = i*step;
+      const y = (buf[i]/255)*h;
+      if(i===0) ctx2d.moveTo(x,y); else ctx2d.lineTo(x,y);
+    }
+    ctx2d.stroke();
+  }
+  frame();
+}
+
+/* ---------------- Knob UI ---------------- */
+function initKnob(param){
+  const spec = KNOB_SPECS[param];
+  const el = document.getElementById('knob-'+param);
+  const tick = el.querySelector('.tick');
+  const valEl = document.getElementById('val-'+param);
+
+  function render(){
+    const frac = clamp((params[param]-spec.min)/(spec.max-spec.min), 0, 1);
+    const deg = -135 + frac*270;
+    tick.style.transform = 'rotate('+deg+'deg)';
+    valEl.textContent = params[param].toFixed(spec.decimals);
+  }
+
+  function setFromFraction(frac){
+    frac = clamp(frac,0,1);
+    params[param] = spec.min + frac*(spec.max-spec.min);
+    render();
+    onParamChange(param);
+  }
+
+  let dragging=false, startY=0, startFrac=0;
+  el.addEventListener('pointerdown', e=>{
+    dragging=true; startY=e.clientY;
+    startFrac = clamp((params[param]-spec.min)/(spec.max-spec.min),0,1);
+    el.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  el.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    const dy = startY - e.clientY;
+    setFromFraction(startFrac + dy/150);
+  });
+  function endDrag(e){ dragging=false; }
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', endDrag);
+  el.addEventListener('dblclick', ()=>{
+    params[param] = DEFAULTS[param];
+    render();
+    onParamChange(param);
+  });
+  el.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const frac = clamp((params[param]-spec.min)/(spec.max-spec.min),0,1);
+    setFromFraction(frac + (e.deltaY<0?1:-1)*0.02);
+  }, {passive:false});
+
+  render();
+  return render;
+}
+
+const knobRenders = {};
+function onParamChange(param){
+  // live-safe updates that should affect the whole mix / lfo immediately
+  if(!audioReady) return;
+  if(param==='masterVolume') masterGain.gain.value = params.masterVolume;
+  if(param==='delayTime') delayNode.delayTime.value = params.delayTime;
+  if(param==='delayFeedback') delayFeedback.gain.value = params.delayFeedback;
+  if(param==='delayMix') delayWet.gain.value = params.delayMix;
+  if(param==='reverbMix') reverbWet.gain.value = params.reverbMix;
+  if(param==='reverbSize') convolver.buffer = makeImpulse(params.reverbSize, 2.5);
+  if(param==='lfoRate') lfoOsc.frequency.value = params.lfoRate;
+  if(param==='lfoDepth') lfoGain.gain.value = lfoDepthToGain();
+}
+
+Object.keys(KNOB_SPECS).forEach(p=>{ knobRenders[p] = initKnob(p); });
+
+function refreshAllKnobs(){ Object.values(knobRenders).forEach(fn=>fn()); }
+
+/* selects */
+const selCarrier = document.getElementById('carrierWave');
+const selMod = document.getElementById('modWave');
+const selLfoWave = document.getElementById('lfoWave');
+const selLfoTarget = document.getElementById('lfoTarget');
+selCarrier.value = params.carrierWave;
+selMod.value = params.modWave;
+selLfoWave.value = params.lfoWave;
+selLfoTarget.value = params.lfoTarget;
+selCarrier.addEventListener('change', ()=>{ params.carrierWave = selCarrier.value; });
+selMod.addEventListener('change', ()=>{ params.modWave = selMod.value; });
+selLfoWave.addEventListener('change', ()=>{
+  params.lfoWave = selLfoWave.value;
+  if(audioReady) lfoOsc.type = params.lfoWave;
+});
+selLfoTarget.addEventListener('change', ()=>{
+  params.lfoTarget = selLfoTarget.value;
+  if(audioReady) lfoGain.gain.value = lfoDepthToGain();
+});
+
+/* ---------------- Keyboard (on-screen) ---------------- */
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const WHITE_OFFSETS = [0,2,4,5,7,9,11];
+const BLACK_OFFSETS = [1,3,null,6,8,10,null]; // aligned to white index gaps (index2 & 6 have no black key after)
+
+let currentOctave = 4;
+const OCTAVES_SHOWN = 2;
+
+function buildKeyboard(){
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  const baseMidi = (currentOctave+1)*12; // C of currentOctave
+  const whiteWidth = 40;
+  let whiteIndex = 0;
+  for(let o=0;o<OCTAVES_SHOWN;o++){
+    for(let wi=0; wi<7; wi++){
+      const midi = baseMidi + o*12 + WHITE_OFFSETS[wi];
+      const key = document.createElement('div');
+      key.className = 'wkey';
+      key.dataset.note = midi;
+      if(WHITE_OFFSETS[wi]===0){
+        const lbl = document.createElement('div');
+        lbl.className='keylabel';
+        lbl.textContent = 'C'+(currentOctave+o);
+        key.appendChild(lbl);
+      }
+      kb.appendChild(key);
+      whiteIndex++;
+    }
+  }
+  // black keys positioned absolutely
+  whiteIndex = 0;
+  for(let o=0;o<OCTAVES_SHOWN;o++){
+    for(let wi=0; wi<7; wi++){
+      const bOff = BLACK_OFFSETS[wi];
+      if(bOff!==null){
+        const midi = baseMidi + o*12 + bOff;
+        const bkey = document.createElement('div');
+        bkey.className='bkey';
+        bkey.dataset.note = midi;
+        bkey.style.left = (whiteIndex*whiteWidth + whiteWidth - 13) + 'px';
+        kb.appendChild(bkey);
+      }
+      whiteIndex++;
+    }
+  }
+  document.getElementById('octaveLabel').textContent = 'Octave '+currentOctave;
+  attachKeyEvents();
+}
+
+function setKeyVisual(note, on){
+  document.querySelectorAll('[data-note="'+note+'"]').forEach(el=>{
+    el.classList.toggle('active', on);
+  });
+}
+
+function attachKeyEvents(){
+  const kb = document.getElementById('keyboard');
+  let pointerDown = false;
+  kb.addEventListener('pointerdown', e=>{
+    pointerDown = true;
+    const t = e.target.closest('[data-note]');
+    if(t){ noteOn(parseInt(t.dataset.note,10)); }
+  });
+  kb.addEventListener('pointerup', ()=>{ pointerDown=false; releaseAllPointerKeys(); });
+  kb.addEventListener('pointercancel', ()=>{ pointerDown=false; releaseAllPointerKeys(); });
+  kb.addEventListener('pointerleave', ()=>{ pointerDown=false; releaseAllPointerKeys(); });
+  kb.addEventListener('pointerover', e=>{
+    if(!pointerDown) return;
+    const t = e.target.closest('[data-note]');
+    if(t) noteOn(parseInt(t.dataset.note,10));
+  });
+  function releaseAllPointerKeys(){
+    Object.keys(activeVoices).forEach(n=> noteOff(parseInt(n,10)));
+  }
+}
+
+/* ---------------- Computer keyboard ---------------- */
+const KEY_MAP = {a:0,w:1,s:2,e:3,d:4,f:5,t:6,g:7,y:8,h:9,u:10,j:11,k:12,o:13,l:14,p:15,';':16};
+const heldKeys = {};
+window.addEventListener('keydown', e=>{
+  const k = e.key.toLowerCase();
+  if(k==='z'){ if(currentOctave>0){currentOctave--; buildKeyboard();} return; }
+  if(k==='x'){ if(currentOctave<7){currentOctave++; buildKeyboard();} return; }
+  if(KEY_MAP.hasOwnProperty(k) && !heldKeys[k] && !e.repeat){
+    heldKeys[k]=true;
+    const midi = (currentOctave+1)*12 + KEY_MAP[k];
+    noteOn(midi);
+  }
+});
+window.addEventListener('keyup', e=>{
+  const k = e.key.toLowerCase();
+  if(KEY_MAP.hasOwnProperty(k) && heldKeys[k]){
+    delete heldKeys[k];
+    const midi = (currentOctave+1)*12 + KEY_MAP[k];
+    noteOff(midi);
+  }
+});
+
+document.getElementById('octDown').addEventListener('click', ()=>{ if(currentOctave>0){currentOctave--; buildKeyboard();} });
+document.getElementById('octUp').addEventListener('click', ()=>{ if(currentOctave<7){currentOctave++; buildKeyboard();} });
+
+/* ---------------- Panic / reset ---------------- */
+document.getElementById('panicBtn').addEventListener('click', panic);
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  params = Object.assign({}, DEFAULTS);
+  selCarrier.value = params.carrierWave;
+  selMod.value = params.modWave;
+  selLfoWave.value = params.lfoWave;
+  selLfoTarget.value = params.lfoTarget;
+  refreshAllKnobs();
+  if(audioReady){
+    masterGain.gain.value = params.masterVolume;
+    delayNode.delayTime.value = params.delayTime;
+    delayFeedback.gain.value = params.delayFeedback;
+    delayWet.gain.value = params.delayMix;
+    reverbWet.gain.value = params.reverbMix;
+    convolver.buffer = makeImpulse(params.reverbSize, 2.5);
+    lfoOsc.type = params.lfoWave;
+    lfoOsc.frequency.value = params.lfoRate;
+    lfoGain.gain.value = lfoDepthToGain();
+  }
+});
+
+/* ---------------- Presets (localStorage) ---------------- */
+const STORAGE_KEY = 'voltaicfm_presets_v1';
+
+function loadUserPresets(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+function saveUserPresets(obj){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+}
+function allPresets(){
+  return Object.assign({}, DEFAULT_PRESETS, loadUserPresets());
+}
+function populatePresetSelect(){
+  const sel = document.getElementById('presetSelect');
+  const all = allPresets();
+  const prev = sel.value;
+  sel.innerHTML = '';
+  Object.keys(all).forEach(name=>{
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    sel.appendChild(opt);
+  });
+  if(all[prev]) sel.value = prev;
+}
+function applyPreset(name){
+  const all = allPresets();
+  const p = all[name];
+  if(!p) return;
+  params = Object.assign({}, DEFAULTS, p);
+  selCarrier.value = params.carrierWave;
+  selMod.value = params.modWave;
+  selLfoWave.value = params.lfoWave;
+  selLfoTarget.value = params.lfoTarget;
+  refreshAllKnobs();
+  if(audioReady){
+    masterGain.gain.value = params.masterVolume;
+    delayNode.delayTime.value = params.delayTime;
+    delayFeedback.gain.value = params.delayFeedback;
+    delayWet.gain.value = params.delayMix;
+    reverbWet.gain.value = params.reverbMix;
+    convolver.buffer = makeImpulse(params.reverbSize, 2.5);
+    lfoOsc.type = params.lfoWave;
+    lfoOsc.frequency.value = params.lfoRate;
+    lfoGain.gain.value = lfoDepthToGain();
+  }
+}
+
+document.getElementById('loadPresetBtn').addEventListener('click', ()=>{
+  const sel = document.getElementById('presetSelect');
+  if(sel.value){ applyPreset(sel.value); setStatus('Loaded "'+sel.value+'"'); }
+});
+document.getElementById('deletePresetBtn').addEventListener('click', ()=>{
+  const sel = document.getElementById('presetSelect');
+  const name = sel.value;
+  if(!name) return;
+  if(DEFAULT_PRESETS[name]){ setStatus('Built-in patches can\'t be deleted'); return; }
+  const user = loadUserPresets();
+  delete user[name];
+  saveUserPresets(user);
+  populatePresetSelect();
+  setStatus('Deleted "'+name+'"');
+});
+document.getElementById('savePresetBtn').addEventListener('click', ()=>{
+  const nameInput = document.getElementById('presetName');
+  const name = nameInput.value.trim();
+  if(!name){ setStatus('Type a name first'); return; }
+  const user = loadUserPresets();
+  user[name] = Object.assign({}, params);
+  saveUserPresets(user);
+  populatePresetSelect();
+  document.getElementById('presetSelect').value = name;
+  setStatus('Saved "'+name+'"');
+  nameInput.value = '';
+});
+document.getElementById('exportPresetBtn').addEventListener('click', ()=>{
+  const sel = document.getElementById('presetSelect');
+  const name = sel.value || 'patch';
+  const data = JSON.stringify(Object.assign({name:name}, params), null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name.replace(/[^a-z0-9\-_]+/gi,'_')+'.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  setStatus('Exported "'+name+'.json"');
+});
+
+let statusTimer;
+function setStatus(msg){
+  const el = document.getElementById('presetStatus');
+  el.textContent = msg;
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(()=>{ el.textContent=''; }, 3000);
+}
+
+/* ---------------- Init ---------------- */
+populatePresetSelect();
+buildKeyboard();
+
+// unlock audio context on first interaction anywhere on the page
+document.body.addEventListener('pointerdown', function unlock(){
+  if(!audioReady) initAudio();
+  if(audioCtx && audioCtx.state==='suspended') audioCtx.resume();
+}, {once:false});
+
+})();
+</script>
+</body>
+</html>

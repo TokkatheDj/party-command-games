@@ -1,5 +1,5 @@
 @echo off
-cd /d "C:\Users\tokka\Claude Local\cowork apps"
+cd /d "%~dp0"
 echo ==== PORT 8080 BEFORE ==== > restart_log.txt
 netstat -ano | findstr ":8080" >> restart_log.txt 2>&1
 echo ==== PYTHON PROCS ==== >> restart_log.txt
@@ -11,5 +11,5 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8080" ^| findstr LISTENING'
 timeout /t 2 >nul
 echo ==== PORT 8080 AFTER KILL ==== >> restart_log.txt
 netstat -ano | findstr ":8080" >> restart_log.txt 2>&1
-start "" /min pwsh -NonInteractive -WindowStyle Minimized -File "C:\Users\tokka\Claude Local\cowork apps\Start-AppServer.ps1"
+start "" /min pwsh -NonInteractive -WindowStyle Minimized -File "%~dp0Start-AppServer.ps1"
 echo ==== STARTED NEW SERVER ==== >> restart_log.txt

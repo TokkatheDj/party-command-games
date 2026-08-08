@@ -1,0 +1,369 @@
+<!-- CONCEPT: VOTING/SOCIAL - "Most likely to..." pass-the-phone secret voting; score by voting with the majority | Players: 3-10 | ~15-20 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Read the Room</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: radial-gradient(circle at 20% 10%, #2b1055 0%, #12082b 60%, #0a0518 100%);
+    color:#fff; min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    padding:16px; overflow-x:hidden;
+  }
+  .screen { display:none; width:100%; max-width:720px; flex-direction:column; align-items:center; gap:18px; animation:pop .25s ease; }
+  .screen.active { display:flex; }
+  @keyframes pop { from { transform:scale(.96); opacity:0; } to { transform:scale(1); opacity:1; } }
+  h1 { font-size:clamp(2.2rem,7vw,3.4rem); text-align:center; letter-spacing:1px;
+       background:linear-gradient(90deg,#ffd86b,#ff6bcb,#6bc7ff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .tagline { text-align:center; font-size:clamp(1rem,3vw,1.2rem); color:#cbb8ff; line-height:1.5; }
+  .meta { font-size:.95rem; color:#8f7fc9; text-align:center; }
+  .card { background:rgba(255,255,255,.07); border:2px solid rgba(255,255,255,.14); border-radius:20px; padding:22px; width:100%; }
+  .prompt-big {
+    font-size:clamp(1.6rem,5.5vw,2.6rem); font-weight:800; text-align:center; line-height:1.3;
+    padding:30px 18px; background:linear-gradient(135deg,rgba(255,216,107,.14),rgba(255,107,203,.12));
+    border:2px solid rgba(255,216,107,.4); border-radius:22px; width:100%;
+  }
+  button {
+    font-family:inherit; font-size:1.25rem; font-weight:700; color:#1b1035;
+    background:linear-gradient(135deg,#ffd86b,#ffb84d); border:none; border-radius:16px;
+    padding:18px 30px; cursor:pointer; min-height:60px; transition:transform .08s;
+  }
+  button:active { transform:scale(.96); }
+  button.secondary { background:rgba(255,255,255,.14); color:#fff; border:2px solid rgba(255,255,255,.3); }
+  button.vote-btn {
+    width:100%; font-size:1.5rem; padding:20px; margin:0;
+    background:linear-gradient(135deg,#6bc7ff,#a06bff); color:#fff;
+  }
+  button:disabled { opacity:.4; cursor:default; }
+  input[type=text] {
+    font-family:inherit; font-size:1.3rem; padding:14px 16px; border-radius:14px;
+    border:2px solid rgba(255,255,255,.3); background:rgba(255,255,255,.1); color:#fff; width:100%;
+  }
+  input[type=text]::placeholder { color:#9d8ecb; }
+  .player-list { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; width:100%; }
+  .chip {
+    background:rgba(107,199,255,.18); border:2px solid #6bc7ff; border-radius:999px;
+    padding:10px 18px; font-size:1.15rem; font-weight:700; display:flex; align-items:center; gap:10px;
+  }
+  .chip span.x { cursor:pointer; color:#ff8fb8; font-weight:900; font-size:1.2rem; padding:0 4px; }
+  .row { display:flex; gap:10px; width:100%; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%; }
+  @media (max-width:480px){ .grid { grid-template-columns:1fr; } }
+  .bar-row { display:flex; align-items:center; gap:12px; width:100%; }
+  .bar-name { width:110px; font-weight:800; font-size:1.1rem; text-align:right; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar-track { flex:1; background:rgba(255,255,255,.08); border-radius:10px; height:38px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:10px; background:linear-gradient(90deg,#6bc7ff,#a06bff); width:0%;
+              transition:width .9s cubic-bezier(.2,.8,.2,1); display:flex; align-items:center; justify-content:flex-end; padding-right:10px; font-weight:900; }
+  .bar-fill.winner { background:linear-gradient(90deg,#ffd86b,#ff8f4d); color:#1b1035; }
+  .score-row { display:flex; justify-content:space-between; padding:10px 16px; border-radius:12px; font-size:1.2rem; font-weight:700; background:rgba(255,255,255,.06); width:100%; }
+  .score-row.leader { background:rgba(255,216,107,.18); border:2px solid #ffd86b; }
+  .badge { font-size:.95rem; background:rgba(160,107,255,.25); border:1px solid #a06bff; padding:6px 14px; border-radius:999px; color:#d8c8ff; }
+  .pass-name { font-size:clamp(2.4rem,9vw,4rem); font-weight:900; color:#ffd86b; text-align:center; }
+  .instructions { font-size:1.05rem; line-height:1.7; color:#d8ccff; }
+  .plusone { color:#7dff9e; font-weight:900; }
+  .round-select { display:flex; gap:10px; justify-content:center; }
+  .round-select button { min-width:80px; }
+  .round-select button.sel { outline:4px solid #ff6bcb; }
+  .footer-note { color:#6f5fa8; font-size:.85rem; text-align:center; margin-top:8px; }
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP ============ -->
+<div class="screen active" id="scr-setup">
+  <h1>🗳️ Read the Room</h1>
+  <p class="tagline">A "most likely to..." voting game. Everyone votes in secret —<br><b>score a point when you vote with the majority.</b></p>
+  <p class="meta">3–10 players · one shared phone/tablet · ~15–20 minutes</p>
+
+  <div class="card">
+    <div class="row">
+      <input type="text" id="name-input" placeholder="Add player name…" maxlength="14" autocomplete="off">
+      <button id="add-btn" style="min-width:90px;">Add</button>
+    </div>
+    <div class="player-list" id="player-list" style="margin-top:14px;"></div>
+  </div>
+
+  <div class="card" style="text-align:center;">
+    <div style="margin-bottom:10px;font-weight:700;color:#cbb8ff;">Rounds</div>
+    <div class="round-select">
+      <button class="secondary" data-r="8">8</button>
+      <button class="secondary sel" data-r="12">12</button>
+      <button class="secondary" data-r="16">16</button>
+    </div>
+  </div>
+
+  <button id="start-btn" disabled>Need 3+ players</button>
+  <p class="instructions" style="text-align:center;">How to play: a prompt appears → pass the device around → everyone secretly taps who fits best → the votes are revealed. Everyone who picked the crowd favourite scores <span class="plusone">+1</span>.</p>
+</div>
+
+<!-- ============ PROMPT ============ -->
+<div class="screen" id="scr-prompt">
+  <div class="badge" id="round-badge">Round 1 of 12</div>
+  <div class="prompt-big" id="prompt-text"></div>
+  <p class="tagline">Read it out loud, then pass the device around to vote in secret!</p>
+  <button id="begin-vote-btn">Start voting ➜</button>
+</div>
+
+<!-- ============ PASS ============ -->
+<div class="screen" id="scr-pass">
+  <p class="tagline">Pass the device to…</p>
+  <div class="pass-name" id="pass-name"></div>
+  <button id="im-ready-btn">I'm holding it — show my ballot</button>
+</div>
+
+<!-- ============ VOTE ============ -->
+<div class="screen" id="scr-vote">
+  <div class="badge" id="vote-badge"></div>
+  <div class="prompt-big" id="vote-prompt" style="font-size:clamp(1.2rem,4vw,1.7rem);padding:18px;"></div>
+  <p class="tagline">Tap your pick (you can't vote for yourself):</p>
+  <div class="grid" id="vote-grid"></div>
+</div>
+
+<!-- ============ REVEAL ============ -->
+<div class="screen" id="scr-reveal">
+  <div class="badge">The room has spoken!</div>
+  <div class="prompt-big" id="reveal-prompt" style="font-size:clamp(1.1rem,4vw,1.6rem);padding:16px;"></div>
+  <div class="card" id="reveal-bars" style="display:flex;flex-direction:column;gap:12px;"></div>
+  <div class="card" style="text-align:center;" id="reveal-scorers"></div>
+  <button id="next-round-btn">Next round ➜</button>
+</div>
+
+<!-- ============ SCOREBOARD / END ============ -->
+<div class="screen" id="scr-end">
+  <h1 id="end-title">🏆 Winner!</h1>
+  <div class="pass-name" id="winner-name"></div>
+  <div class="card" id="final-scores" style="display:flex;flex-direction:column;gap:8px;"></div>
+  <button id="again-btn">Play again (same crew)</button>
+  <button class="secondary" id="reset-btn">New game (new players)</button>
+</div>
+
+<script>
+"use strict";
+/* ================= PROMPTS (64 unique, family-friendly) ================= */
+const PROMPTS = [
+"Most likely to sleep through three alarms",
+"Most likely to become famous by accident",
+"Most likely to talk their way out of a speeding ticket",
+"Most likely to cry during a movie trailer",
+"Most likely to survive a week in the wilderness",
+"Most likely to laugh at the worst possible moment",
+"Most likely to trip over nothing",
+"Most likely to become a game show champion",
+"Most likely to text back three days later",
+"Most likely to adopt five pets 'by accident'",
+"Most likely to eat dessert before dinner",
+"Most likely to get lost with a GPS on",
+"Most likely to start a wildly successful food truck",
+"Most likely to forget their own birthday",
+"Most likely to befriend a celebrity in an elevator",
+"Most likely to win a staring contest",
+"Most likely to sing loudly with the wrong lyrics",
+"Most likely to organize a surprise party and spoil it themselves",
+"Most likely to become a professional napper",
+"Most likely to invent something useless but hilarious",
+"Most likely to bring snacks to every occasion",
+"Most likely to lose their phone while holding it",
+"Most likely to have a secret talent nobody knows about",
+"Most likely to make friends with a stranger in line",
+"Most likely to accidentally join a parade",
+"Most likely to double-dip and deny it",
+"Most likely to win an argument with pure confidence",
+"Most likely to plan the whole vacation on a spreadsheet",
+"Most likely to show up early and wait in the car",
+"Most likely to reply 'LOL' out loud",
+"Most likely to become a quiz night legend",
+"Most likely to burn water while cooking",
+"Most likely to give a toast that makes everyone cry",
+"Most likely to keep a snack drawer at work",
+"Most likely to dance like nobody's watching (everyone is)",
+"Most likely to hit snooze seven times",
+"Most likely to become a self-made millionaire",
+"Most likely to narrate their own life out loud",
+"Most likely to say 'one more episode' at 2 AM",
+"Most likely to win a talent show with a weird skill",
+"Most likely to apologize to furniture after bumping it",
+"Most likely to remember everyone's birthday",
+"Most likely to bring an umbrella on a sunny day",
+"Most likely to accidentally become a meme",
+"Most likely to talk to plants (and get answers)",
+"Most likely to finish other people's sentences",
+"Most likely to volunteer first for anything",
+"Most likely to get a song stuck in everyone's head",
+"Most likely to read the last page of a book first",
+"Most likely to become mayor of a small town",
+"Most likely to lose at a board game and demand a rematch",
+"Most likely to make a wrong turn into an adventure",
+"Most likely to give the best gifts",
+"Most likely to laugh at their own joke before telling it",
+"Most likely to become a morning person overnight",
+"Most likely to name their car",
+"Most likely to write a bestselling cookbook",
+"Most likely to wave back at someone waving at someone else",
+"Most likely to turn a 5-minute story into 30 minutes",
+"Most likely to know a fact about everything",
+"Most likely to befriend every dog in the neighborhood",
+"Most likely to start a new hobby every month",
+"Most likely to survive a zombie movie",
+"Most likely to make the whole room laugh with one word"
+];
+
+/* ================= AUDIO (Web Audio API) ================= */
+let AC = null;
+function ac(){ if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }
+function tone(f, t0, dur, type='sine', vol=0.18){
+  const c = ac(), o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(vol, c.currentTime + t0);
+  g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + t0 + dur);
+  o.connect(g).connect(c.destination);
+  o.start(c.currentTime + t0); o.stop(c.currentTime + t0 + dur + 0.05);
+}
+const sndClick   = () => tone(650, 0, .08, 'triangle', .12);
+const sndVote    = () => { tone(520,0,.09,'triangle',.14); tone(780,.07,.12,'triangle',.12); };
+const sndReveal  = () => { [392,494,587,784].forEach((f,i)=>tone(f, i*.12, .28, 'triangle', .16)); };
+const sndFanfare = () => { [523,659,784,1047,1319].forEach((f,i)=>tone(f, i*.14, .4, 'square', .09)); [523,659,784].forEach(f=>tone(f,.75,.7,'triangle',.1)); };
+
+/* ================= STATE ================= */
+let players = [];            // [{name, score}]
+let totalRounds = 12;
+let round = 0;
+let deck = [];               // shuffled prompt indices
+let currentPrompt = "";
+let voterIdx = 0;            // whose turn to vote
+let votes = {};              // voterName -> targetName
+
+const $ = id => document.getElementById(id);
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $(id).classList.add('active'); window.scrollTo(0,0); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+/* ================= SETUP ================= */
+function renderPlayers(){
+  const list = $('player-list'); list.innerHTML = '';
+  players.forEach((p,i)=>{
+    const c = document.createElement('div'); c.className='chip';
+    c.innerHTML = `${p.name} <span class="x" data-i="${i}">✕</span>`;
+    list.appendChild(c);
+  });
+  list.querySelectorAll('.x').forEach(x=>x.onclick = e=>{ players.splice(+e.target.dataset.i,1); renderPlayers(); });
+  const btn = $('start-btn');
+  btn.disabled = players.length < 3;
+  btn.textContent = players.length < 3 ? `Need ${3-players.length} more player${3-players.length>1?'s':''}` : `Start game (${players.length} players) 🎉`;
+}
+function addPlayer(){
+  const inp = $('name-input'); const n = inp.value.trim();
+  if(!n) return;
+  if(players.length >= 10){ alert('Max 10 players!'); return; }
+  if(players.some(p=>p.name.toLowerCase()===n.toLowerCase())){ alert('Name already taken!'); return; }
+  players.push({name:n, score:0}); inp.value=''; inp.focus(); sndClick(); renderPlayers();
+}
+$('add-btn').onclick = addPlayer;
+$('name-input').addEventListener('keydown', e=>{ if(e.key==='Enter') addPlayer(); });
+document.querySelectorAll('.round-select button').forEach(b=>{
+  b.onclick = ()=>{ document.querySelectorAll('.round-select button').forEach(x=>x.classList.remove('sel')); b.classList.add('sel'); totalRounds = +b.dataset.r; sndClick(); };
+});
+$('start-btn').onclick = ()=>{ ac(); startGame(); };
+
+/* ================= GAME FLOW ================= */
+function startGame(){
+  players.forEach(p=>p.score=0);
+  round = 0;
+  deck = shuffle([...PROMPTS.keys()]);
+  nextRound();
+}
+function nextRound(){
+  if(round >= totalRounds || deck.length===0){ endGame(); return; }
+  round++;
+  currentPrompt = PROMPTS[deck.pop()];
+  votes = {};
+  voterIdx = 0;
+  $('round-badge').textContent = `Round ${round} of ${totalRounds}`;
+  $('prompt-text').textContent = currentPrompt;
+  sndClick();
+  show('scr-prompt');
+}
+$('begin-vote-btn').onclick = ()=>{ sndClick(); showPass(); };
+
+function showPass(){
+  $('pass-name').textContent = players[voterIdx].name;
+  show('scr-pass');
+}
+$('im-ready-btn').onclick = ()=>{ sndClick(); showBallot(); };
+
+function showBallot(){
+  const voter = players[voterIdx];
+  $('vote-badge').textContent = `${voter.name}'s secret ballot`;
+  $('vote-prompt').textContent = currentPrompt;
+  const grid = $('vote-grid'); grid.innerHTML='';
+  players.forEach(p=>{
+    if(p.name === voter.name) return; // no self votes
+    const b = document.createElement('button'); b.className='vote-btn'; b.textContent = p.name;
+    b.onclick = ()=>{
+      votes[voter.name] = p.name; sndVote();
+      voterIdx++;
+      if(voterIdx < players.length) showPass(); else reveal();
+    };
+    grid.appendChild(b);
+  });
+  show('scr-vote');
+}
+
+function reveal(){
+  // tally
+  const tally = {};
+  players.forEach(p=>tally[p.name]=0);
+  Object.values(votes).forEach(t=>tally[t]++);
+  const max = Math.max(...Object.values(tally));
+  const topNames = Object.keys(tally).filter(n=>tally[n]===max && max>0);
+  // scorers: voted for any top name
+  const scorers = Object.keys(votes).filter(v=>topNames.includes(votes[v]));
+  scorers.forEach(v=>{ players.find(p=>p.name===v).score++; });
+
+  $('reveal-prompt').textContent = currentPrompt;
+  const bars = $('reveal-bars'); bars.innerHTML='';
+  const sorted = [...players].sort((a,b)=>tally[b.name]-tally[a.name]);
+  sorted.forEach(p=>{
+    const v = tally[p.name];
+    const row = document.createElement('div'); row.className='bar-row';
+    row.innerHTML = `<div class="bar-name">${p.name}</div>
+      <div class="bar-track"><div class="bar-fill ${topNames.includes(p.name)?'winner':''}" data-w="${Object.keys(votes).length? (v/Object.keys(votes).length*100):0}">${v>0? v:''}</div></div>`;
+    bars.appendChild(row);
+  });
+  const sc = $('reveal-scorers');
+  sc.innerHTML = topNames.length
+    ? `<div style="font-size:1.3rem;margin-bottom:8px;">👑 The room says: <b style="color:#ffd86b;">${topNames.join(' & ')}</b></div>
+       <div style="font-size:1.1rem;">${scorers.length? scorers.map(s=>`${s} <span class="plusone">+1</span>`).join(' · ') : 'Nobody read the room… no points!'}</div>`
+    : `<div>No votes?! No points this round.</div>`;
+  $('next-round-btn').textContent = round >= totalRounds ? 'See final results 🏆' : 'Next round ➜';
+  show('scr-reveal');
+  sndReveal();
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    bars.querySelectorAll('.bar-fill').forEach(f=>f.style.width = Math.max(+f.dataset.w, f.textContent? 12:0) + '%');
+  }));
+}
+$('next-round-btn').onclick = nextRound;
+
+function endGame(){
+  const best = Math.max(...players.map(p=>p.score));
+  const winners = players.filter(p=>p.score===best);
+  $('end-title').textContent = winners.length>1 ? '🏆 It\'s a tie!' : '🏆 Winner!';
+  $('winner-name').textContent = winners.map(w=>w.name).join(' & ');
+  const fs = $('final-scores'); fs.innerHTML='';
+  [...players].sort((a,b)=>b.score-a.score).forEach(p=>{
+    const r = document.createElement('div'); r.className = 'score-row' + (p.score===best?' leader':'');
+    r.innerHTML = `<span>${p.score===best?'👑 ':''}${p.name}</span><span>${p.score} pt${p.score!==1?'s':''}</span>`;
+    fs.appendChild(r);
+  });
+  show('scr-end');
+  sndFanfare();
+}
+$('again-btn').onclick = ()=>{ sndClick(); startGame(); };
+$('reset-btn').onclick = ()=>{ sndClick(); players=[]; renderPlayers(); show('scr-setup'); };
+
+renderPlayers();
+</script>
+</body>
+</html>

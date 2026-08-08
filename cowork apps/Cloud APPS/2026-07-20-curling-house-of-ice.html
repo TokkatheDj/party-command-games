@@ -1,0 +1,819 @@
+<!-- CONCEPT: Curling - Aim, power-meter throw, spin curl, and mash-to-sweep stones into the house | Players: 1 (vs AI) | Controls: Arrow/A-D aim, Q/E spin, Hold+Release Space to throw, mash Space to sweep -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>House of Ice — Curling Showdown</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: #0b1622;
+    overflow: hidden;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    touch-action: none;
+    user-select: none;
+  }
+  #gameCanvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    background: #dff1ff;
+  }
+  #hud {
+    position: fixed; top: 0; left: 0; width: 100%;
+    pointer-events: none;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  }
+  #titleBar {
+    position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
+    text-align: center; pointer-events: none;
+  }
+  #titleBar h1 {
+    margin: 0; font-size: 20px; letter-spacing: 1px;
+    color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.7);
+  }
+  #titleBar p {
+    margin: 2px 0 0; font-size: 12px; color: #cfe8ff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+  }
+  #controlsHint {
+    position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%);
+    font-size: 12px; color: #e8f6ff; text-align: center;
+    background: rgba(10,20,35,0.45); padding: 6px 14px; border-radius: 10px;
+    pointer-events: none;
+  }
+  #scorePanel {
+    position: fixed; top: 8px; right: 10px;
+    background: rgba(10,20,35,0.55); border-radius: 10px;
+    padding: 8px 12px; font-size: 13px; color: #fff; min-width: 160px;
+    pointer-events: none;
+  }
+  #scorePanel div { display: flex; justify-content: space-between; gap: 12px; }
+  #powerWrap {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 46px;
+    width: 260px; height: 16px; background: rgba(0,0,0,0.35);
+    border-radius: 8px; overflow: hidden; border: 2px solid rgba(255,255,255,0.6);
+    display: none;
+  }
+  #powerBar {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #3ad1ff, #ffe23a, #ff4d4d);
+  }
+  #stateMsg {
+    position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+    font-size: 16px; color: #fff; background: rgba(10,20,35,0.5);
+    padding: 5px 14px; border-radius: 8px; pointer-events: none;
+  }
+  #endScreen {
+    position: fixed; inset: 0; background: rgba(5,10,20,0.85);
+    display: none; align-items: center; justify-content: center; flex-direction: column;
+    color: #fff; text-align: center; z-index: 20;
+  }
+  #endScreen h2 { font-size: 34px; margin-bottom: 6px; }
+  #endScreen p { font-size: 16px; margin: 4px 0 20px; color: #cfe8ff; }
+  #playAgainBtn {
+    padding: 12px 28px; font-size: 18px; border: none; border-radius: 10px;
+    background: #3ad1ff; color: #06202f; font-weight: bold; cursor: pointer;
+  }
+  #playAgainBtn:active { transform: scale(0.97); }
+  .touchBtn {
+    position: fixed; z-index: 15; border-radius: 50%; background: rgba(255,255,255,0.18);
+    border: 2px solid rgba(255,255,255,0.6); color: #fff; font-size: 22px;
+    display: flex; align-items: center; justify-content: center;
+    -webkit-user-select: none; user-select: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<div id="hud">
+  <div id="titleBar">
+    <h1>🥌 House of Ice — Curling Showdown</h1>
+    <p>1 Player vs AI · Aim, charge power, add spin, then sweep it home</p>
+  </div>
+  <div id="scorePanel">
+    <div><span>End:</span><span id="endNum">1 / 6</span></div>
+    <div><span>You:</span><span id="scoreYou">0</span></div>
+    <div><span>AI:</span><span id="scoreAI">0</span></div>
+    <div><span>Stones left:</span><span id="stonesLeft">4</span></div>
+  </div>
+  <div id="stateMsg">Aim with ◀ ▶, hold SPACE to charge, release to throw</div>
+  <div id="powerWrap"><div id="powerBar"></div></div>
+  <div id="controlsHint">◀ ▶ / A D: Aim &nbsp;|&nbsp; Q / E: Spin &nbsp;|&nbsp; Hold &amp; Release SPACE: Throw &nbsp;|&nbsp; Mash SPACE while sliding: Sweep</div>
+</div>
+<div id="endScreen">
+  <h2 id="endTitle">Match Result</h2>
+  <p id="endDetail">Final Score</p>
+  <button id="playAgainBtn">New Match</button>
+</div>
+
+<script>
+(function() {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, DPR;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- Audio ----------
+  let actx = null;
+  function ensureAudio() {
+    if (!actx) {
+      try { actx = new (window.AudioContext || window.webkitAudioContext)(); }
+      catch (e) { actx = null; }
+    } else if (actx.state === 'suspended') {
+      actx.resume();
+    }
+  }
+  function beep(freq, dur, type, vol, delay) {
+    if (!actx) return;
+    delay = delay || 0;
+    const t0 = actx.currentTime + delay;
+    const osc = actx.createOscillator();
+    const gain = actx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain).connect(actx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  }
+  function sndWhistle() {
+    if (!actx) return;
+    const t0 = actx.currentTime;
+    const osc = actx.createOscillator();
+    const gain = actx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1800, t0);
+    osc.frequency.linearRampToValueAtTime(2100, t0 + 0.15);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(0.12, t0 + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+    osc.connect(gain).connect(actx.destination);
+    osc.start(t0); osc.stop(t0 + 0.4);
+  }
+  function sndClink() {
+    beep(900, 0.12, 'triangle', 0.25);
+    beep(1400, 0.08, 'sine', 0.15, 0.02);
+  }
+  function sndSweep() {
+    if (!actx) return;
+    const t0 = actx.currentTime;
+    const bufSize = actx.sampleRate * 0.06;
+    const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+    const src = actx.createBufferSource();
+    src.buffer = buf;
+    const gain = actx.createGain();
+    gain.gain.setValueAtTime(0.18, t0);
+    const filt = actx.createBiquadFilter();
+    filt.type = 'highpass';
+    filt.frequency.value = 1200;
+    src.connect(filt).connect(gain).connect(actx.destination);
+    src.start(t0);
+  }
+  function sndCheer() {
+    if (!actx) return;
+    const t0 = actx.currentTime;
+    const bufSize = actx.sampleRate * 1.1;
+    const buf = actx.createBuffer(1, bufSize, actx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) {
+      const decay = 1 - i / bufSize;
+      data[i] = (Math.random() * 2 - 1) * decay * 0.5;
+    }
+    const src = actx.createBufferSource();
+    src.buffer = buf;
+    const filt = actx.createBiquadFilter();
+    filt.type = 'bandpass';
+    filt.frequency.value = 1000;
+    filt.Q.value = 0.6;
+    const gain = actx.createGain();
+    gain.gain.setValueAtTime(0.25, t0);
+    src.connect(filt).connect(gain).connect(actx.destination);
+    src.start(t0);
+    beep(523, 0.2, 'sine', 0.15, 0.05);
+    beep(659, 0.2, 'sine', 0.15, 0.18);
+    beep(784, 0.3, 'sine', 0.18, 0.32);
+  }
+  function sndGroan() {
+    beep(220, 0.3, 'sawtooth', 0.12);
+    beep(180, 0.35, 'sawtooth', 0.1, 0.1);
+  }
+
+  // ---------- Game constants ----------
+  // Sheet is drawn vertically: throw from bottom of screen toward house at top.
+  const SHEET_MARGIN_TOP = 90;
+  const SHEET_MARGIN_BOTTOM = 130;
+  const SHEET_WIDTH_RATIO = 0.34; // fraction of screen width used by sheet
+  const STONES_PER_END_PER_PLAYER = 4;
+  const TOTAL_ENDS = 6;
+  const STONE_RADIUS = 13;
+  const HOUSE_RADII = [70, 47, 26, 8]; // outer to button, scaled later
+  const FRICTION_BASE = 0.0022;
+  const FRICTION_SWEPT = 0.00075;
+  const CURL_STRENGTH = 0.55;
+
+  function sheetGeometry() {
+    const sheetW = Math.max(220, W * SHEET_WIDTH_RATIO);
+    const left = W / 2 - sheetW / 2;
+    const right = W / 2 + sheetW / 2;
+    const top = SHEET_MARGIN_TOP;
+    const bottom = H - SHEET_MARGIN_BOTTOM;
+    const houseY = top + (bottom - top) * 0.16;
+    const hackY = bottom - 18;
+    const teeLineY = houseY;
+    const scale = sheetW / 260; // scale house radii relative to a base sheet width
+    return { sheetW, left, right, top, bottom, houseY, hackY, teeLineY, scale };
+  }
+
+  // ---------- Game state ----------
+  const State = {
+    AIMING: 'aiming',
+    CHARGING: 'charging',
+    SLIDING: 'sliding',
+    SETTLING: 'settling',
+    END_SCORE: 'end_score',
+    GAME_OVER: 'game_over'
+  };
+
+  let game = {
+    state: State.AIMING,
+    aimAngle: 0, // radians, 0 = straight up
+    power: 0,
+    powerCharging: false,
+    powerDir: 1,
+    spin: 0, // -1 left curl, 0 none, 1 right curl
+    end: 1,
+    scoreYou: 0,
+    scoreAI: 0,
+    stonesThrownThisEnd: 0, // total incl AI
+    stonesLeftYou: STONES_PER_END_PER_PLAYER,
+    stonesLeftAI: STONES_PER_END_PER_PLAYER,
+    currentTurn: 'you', // alternate, AI plays last-stone advantage handling simplified: 'you' starts odd ends
+    stones: [], // {x,y,vx,vy,owner:'you'/'ai',spin,settled:false,radius}
+    sweeping: false,
+    lastThrowOwner: null,
+    aiThinkTimer: 0,
+    messageTimer: 0,
+    shakeTime: 0,
+    firstThrowerThisEnd: 'you'
+  };
+
+  function resetStonesLeft() {
+    game.stonesLeftYou = STONES_PER_END_PER_PLAYER;
+    game.stonesLeftAI = STONES_PER_END_PER_PLAYER;
+    game.stonesThrownThisEnd = 0;
+  }
+
+  function newMatch() {
+    game.end = 1;
+    game.scoreYou = 0;
+    game.scoreAI = 0;
+    game.stones = [];
+    resetStonesLeft();
+    game.firstThrowerThisEnd = 'you';
+    game.currentTurn = 'you';
+    game.state = State.AIMING;
+    game.aimAngle = 0;
+    game.power = 0;
+    game.spin = 0;
+    updateHUD();
+    setMessage('Aim with ◀ ▶, hold SPACE to charge, release to throw');
+    document.getElementById('endScreen').style.display = 'none';
+  }
+
+  function setMessage(msg) {
+    document.getElementById('stateMsg').textContent = msg;
+  }
+
+  function updateHUD() {
+    document.getElementById('endNum').textContent = game.end + ' / ' + TOTAL_ENDS;
+    document.getElementById('scoreYou').textContent = game.scoreYou;
+    document.getElementById('scoreAI').textContent = game.scoreAI;
+    const left = game.currentTurn === 'you' ? game.stonesLeftYou : game.stonesLeftAI;
+    document.getElementById('stonesLeft').textContent = (game.currentTurn === 'you' ? 'You: ' : 'AI: ') + left;
+  }
+
+  // ---------- Input ----------
+  const keys = {};
+  window.addEventListener('keydown', (e) => {
+    ensureAudio();
+    if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
+    keys[e.key.toLowerCase()] = true;
+    if (e.key === ' ') handleSpaceDown();
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === ' ') { e.preventDefault(); handleSpaceUp(); }
+    keys[e.key.toLowerCase()] = false;
+  });
+
+  function handleSpaceDown() {
+    if (game.state === State.AIMING && game.currentTurn === 'you') {
+      game.state = State.CHARGING;
+      game.powerCharging = true;
+      game.power = 0;
+      game.powerDir = 1;
+      document.getElementById('powerWrap').style.display = 'block';
+      setMessage('Charging power… release SPACE to throw!');
+    } else if (game.state === State.SLIDING && game.lastThrowOwner === 'you') {
+      game.sweeping = true;
+    }
+  }
+  function handleSpaceUp() {
+    if (game.state === State.CHARGING && game.currentTurn === 'you') {
+      throwStone('you', game.aimAngle, game.power, game.spin);
+      game.powerCharging = false;
+      document.getElementById('powerWrap').style.display = 'none';
+    }
+    game.sweeping = false;
+  }
+
+  // Touch controls
+  function makeTouchBtn(id, label, x, y, size) {
+    const btn = document.createElement('div');
+    btn.className = 'touchBtn';
+    btn.id = id;
+    btn.textContent = label;
+    btn.style.width = size + 'px';
+    btn.style.height = size + 'px';
+    document.body.appendChild(btn);
+    return btn;
+  }
+  function layoutTouchControls() {
+    const size = 56;
+    const margin = 16;
+    aimLeftBtn.style.left = margin + 'px';
+    aimLeftBtn.style.bottom = margin + 'px';
+    aimRightBtn.style.left = (margin + size + 10) + 'px';
+    aimRightBtn.style.bottom = margin + 'px';
+    spinLeftBtn.style.right = (margin + size + 10) + 'px';
+    spinLeftBtn.style.bottom = margin + 'px';
+    spinRightBtn.style.right = margin + 'px';
+    spinRightBtn.style.bottom = margin + 'px';
+    throwBtn.style.left = '50%';
+    throwBtn.style.transform = 'translateX(-50%)';
+    throwBtn.style.bottom = (margin + size + 14) + 'px';
+  }
+  const aimLeftBtn = makeTouchBtn('aimLeft', '◀', 0, 0, 56);
+  const aimRightBtn = makeTouchBtn('aimRight', '▶', 0, 0, 56);
+  const spinLeftBtn = makeTouchBtn('spinLeft', '↺', 0, 0, 56);
+  const spinRightBtn = makeTouchBtn('spinRight', '↻', 0, 0, 56);
+  const throwBtn = makeTouchBtn('throwBtn', 'HOLD', 0, 0, 78);
+  layoutTouchControls();
+  window.addEventListener('resize', layoutTouchControls);
+
+  function bindHold(el, downFn, upFn) {
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); ensureAudio(); downFn(); }, {passive:false});
+    el.addEventListener('touchend', (e) => { e.preventDefault(); upFn(); }, {passive:false});
+    el.addEventListener('mousedown', (e) => { e.preventDefault(); ensureAudio(); downFn(); });
+    window.addEventListener('mouseup', () => { upFn(); });
+  }
+  bindHold(aimLeftBtn, () => keys['touchleft']=true, () => keys['touchleft']=false);
+  bindHold(aimRightBtn, () => keys['touchright']=true, () => keys['touchright']=false);
+  bindHold(spinLeftBtn, () => { game.spin = Math.max(-1, game.spin - 1); }, () => {});
+  bindHold(spinRightBtn, () => { game.spin = Math.min(1, game.spin + 1); }, () => {});
+  bindHold(throwBtn, () => handleSpaceDown(), () => handleSpaceUp());
+
+  document.getElementById('playAgainBtn').addEventListener('click', () => { ensureAudio(); newMatch(); });
+
+  // ---------- Throw / physics ----------
+  function throwStone(owner, angle, power, spin) {
+    const g = sheetGeometry();
+    const startX = W / 2;
+    const startY = g.hackY;
+    const speed = 4.2 + power * 8.2; // power 0..1
+    const vx = Math.sin(angle) * speed;
+    const vy = -Math.cos(angle) * speed;
+    game.stones.push({
+      x: startX, y: startY, vx, vy,
+      owner, spin, settled: false, radius: STONE_RADIUS,
+      swept: false
+    });
+    game.lastThrowOwner = owner;
+    game.state = State.SLIDING;
+    sndWhistle();
+    setMessage(owner === 'you' ? 'Sweep! Mash SPACE to reduce friction' : 'AI stone sliding…');
+  }
+
+  function stoneOutOfBounds(s) {
+    const g = sheetGeometry();
+    const pad = 40;
+    return s.x < g.left - pad || s.x > g.right + pad || s.y < g.top - 60;
+  }
+
+  function settleAllStonesCheck() {
+    return game.stones.every(s => s.settled || stoneOutOfBounds(s));
+  }
+
+  function physicsStep(dt) {
+    const g = sheetGeometry();
+    for (const s of game.stones) {
+      if (s.settled) continue;
+      const speed = Math.hypot(s.vx, s.vy);
+      if (speed < 0.05) {
+        s.settled = true;
+        s.vx = 0; s.vy = 0;
+        sndClink();
+        continue;
+      }
+      const isBeingSwept = game.sweeping && s === lastMovingStoneOf(game.lastThrowOwner);
+      const fric = isBeingSwept ? FRICTION_SWEPT : FRICTION_BASE;
+      // curl: perpendicular force proportional to spin, stronger as speed decreases (like real curling)
+      const dirx = s.vx / speed, diry = s.vy / speed;
+      const perpx = -diry, perpy = dirx;
+      const curlFactor = CURL_STRENGTH * (1 - Math.min(speed / 9, 1)) * 0.02;
+      s.vx += perpx * s.spin * curlFactor * dt * 60;
+      s.vy += perpy * s.spin * curlFactor * dt * 60;
+      // friction deceleration
+      const decel = fric * dt * 60;
+      const newSpeed = Math.max(0, speed - decel);
+      const scale = speed > 0 ? newSpeed / speed : 0;
+      s.vx *= scale;
+      s.vy *= scale;
+      s.x += s.vx * dt * 60;
+      s.y += s.vy * dt * 60;
+
+      // side wall bounce (soft) to keep stones playable within sheet visually
+      if (s.x < g.left + s.radius) { s.x = g.left + s.radius; s.vx *= -0.3; }
+      if (s.x > g.right - s.radius) { s.x = g.right - s.radius; s.vx *= -0.3; }
+
+      if (stoneOutOfBounds(s)) { s.settled = true; s.vx = 0; s.vy = 0; }
+    }
+    // stone-stone collisions
+    for (let i = 0; i < game.stones.length; i++) {
+      for (let j = i + 1; j < game.stones.length; j++) {
+        const a = game.stones[i], b = game.stones[j];
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const dist = Math.hypot(dx, dy);
+        const minDist = a.radius + b.radius;
+        if (dist > 0 && dist < minDist) {
+          const nx = dx / dist, ny = dy / dist;
+          const overlap = minDist - dist;
+          const totalMove = overlap / 2;
+          a.x -= nx * totalMove; a.y -= ny * totalMove;
+          b.x += nx * totalMove; b.y += ny * totalMove;
+          // simple elastic-ish collision exchange along normal
+          const avn = a.vx * nx + a.vy * ny;
+          const bvn = b.vx * nx + b.vy * ny;
+          const exchange = bvn - avn;
+          a.vx += nx * exchange * 0.95; a.vy += ny * exchange * 0.95;
+          b.vx -= nx * exchange * 0.95; b.vy -= ny * exchange * 0.95;
+          a.settled = false; b.settled = false;
+          sndClink();
+        }
+      }
+    }
+  }
+
+  function lastMovingStoneOf(owner) {
+    for (let i = game.stones.length - 1; i >= 0; i--) {
+      if (game.stones[i].owner === owner && !game.stones[i].settled) return game.stones[i];
+    }
+    return null;
+  }
+
+  // ---------- AI ----------
+  function aiTakeTurn() {
+    game.state = State.AIMING;
+    game.currentTurn = 'ai';
+    updateHUD();
+    setMessage('AI is lining up its shot…');
+    game.aiThinkTimer = 0.9 + Math.random() * 0.6;
+  }
+
+  function aiThrow() {
+    const g = sheetGeometry();
+    // AI aims roughly for center, with skill-based noise, and considers guarding sometimes
+    const buttonX = W / 2;
+    const targetX = buttonX + (Math.random() * 2 - 1) * 14; // small aim noise
+    const dx = targetX - W / 2;
+    const dist = g.hackY - g.houseY;
+    let angle = Math.atan2(dx, dist) * 0.35; // gentle angle since curl also pushes it
+    angle += (Math.random() * 2 - 1) * 0.02;
+    // power aims to land around house; add noise for realism
+    let power = 0.52 + (Math.random() * 2 - 1) * 0.06;
+    const stonesThrown = game.stones.filter(s => s.owner === 'ai').length;
+    // occasionally AI plays a takeout (harder, more power) if opponent has a good stone
+    const bestYouDist = closestStoneDistance('you');
+    if (bestYouDist !== null && bestYouDist < HOUSE_RADII[1] * sheetGeometry().scale && Math.random() < 0.5) {
+      power += 0.18;
+    }
+    power = Math.max(0.15, Math.min(0.95, power));
+    const spin = Math.random() < 0.5 ? -1 : 1;
+    throwStone('ai', angle, power, spin);
+  }
+
+  // ---------- Scoring ----------
+  function buttonPos() {
+    const g = sheetGeometry();
+    return { x: W / 2, y: g.houseY };
+  }
+  function distToButton(s) {
+    const b = buttonPos();
+    return Math.hypot(s.x - b.x, s.y - b.y);
+  }
+  function closestStoneDistance(owner) {
+    const arr = game.stones.filter(s => s.owner === owner);
+    if (!arr.length) return null;
+    return Math.min(...arr.map(distToButton));
+  }
+  function inHouse(s) {
+    const g = sheetGeometry();
+    return distToButton(s) <= HOUSE_RADII[0] * g.scale + s.radius * 0.3;
+  }
+
+  function scoreEnd() {
+    const g = sheetGeometry();
+    const youStones = game.stones.filter(s => s.owner === 'you' && inHouse(s));
+    const aiStones = game.stones.filter(s => s.owner === 'ai' && inHouse(s));
+    const youMin = youStones.length ? Math.min(...youStones.map(distToButton)) : Infinity;
+    const aiMin = aiStones.length ? Math.min(...aiStones.map(distToButton)) : Infinity;
+    let winner = null, points = 0;
+    if (youMin < aiMin) {
+      winner = 'you';
+      points = youStones.filter(s => distToButton(s) < aiMin).length;
+    } else if (aiMin < youMin) {
+      winner = 'ai';
+      points = aiStones.filter(s => distToButton(s) < youMin).length;
+    }
+    if (winner === 'you') { game.scoreYou += points; sndCheer(); }
+    else if (winner === 'ai') { game.scoreAI += points; sndGroan(); }
+    return { winner, points };
+  }
+
+  function beginNextEnd(result) {
+    game.end++;
+    game.stones = [];
+    resetStonesLeft();
+    // team that did NOT score (or lost the end) throws first next end (simplified hammer logic)
+    if (result.winner === 'you') game.firstThrowerThisEnd = 'ai';
+    else if (result.winner === 'ai') game.firstThrowerThisEnd = 'you';
+    else game.firstThrowerThisEnd = game.firstThrowerThisEnd === 'you' ? 'ai' : 'you';
+    game.currentTurn = game.firstThrowerThisEnd;
+    if (game.end > TOTAL_ENDS) {
+      endMatch();
+      return;
+    }
+    game.state = State.AIMING;
+    updateHUD();
+    setMessage('End ' + game.end + ' begins! ' + (game.currentTurn === 'you' ? 'Your throw.' : 'AI throws first.'));
+    if (game.currentTurn === 'ai') aiTakeTurn();
+  }
+
+  function endMatch() {
+    game.state = State.GAME_OVER;
+    const scr = document.getElementById('endScreen');
+    const title = document.getElementById('endTitle');
+    const detail = document.getElementById('endDetail');
+    if (game.scoreYou > game.scoreAI) { title.textContent = '🏆 You Win the Match!'; sndCheer(); }
+    else if (game.scoreAI > game.scoreYou) { title.textContent = 'AI Wins the Match'; sndGroan(); }
+    else { title.textContent = "It's a Tie!"; }
+    detail.textContent = 'Final Score — You: ' + game.scoreYou + '  |  AI: ' + game.scoreAI;
+    scr.style.display = 'flex';
+  }
+
+  // ---------- Turn progression ----------
+  function afterStoneSettles() {
+    game.stonesThrownThisEnd++;
+    const totalStonesThisEnd = STONES_PER_END_PER_PLAYER * 2;
+    if (game.lastThrowOwner === 'you') game.stonesLeftYou--;
+    else game.stonesLeftAI--;
+
+    if (game.stonesThrownThisEnd >= totalStonesThisEnd) {
+      game.state = State.END_SCORE;
+      setTimeout(() => {
+        const result = scoreEnd();
+        setMessage(result.winner
+          ? (result.winner === 'you' ? 'You scored ' + result.points + '!' : 'AI scored ' + result.points + '.')
+          : 'End blank — no score.');
+        setTimeout(() => beginNextEnd(result), 1600);
+      }, 400);
+      return;
+    }
+    // alternate turn strictly by count (simplified alternating regardless of hammer within end)
+    game.currentTurn = game.currentTurn === 'you' ? 'ai' : 'you';
+    game.state = State.AIMING;
+    updateHUD();
+    if (game.currentTurn === 'ai') {
+      aiTakeTurn();
+    } else {
+      setMessage('Your throw — aim with ◀ ▶, hold SPACE to charge');
+    }
+  }
+
+  // ---------- Main loop ----------
+  let lastTime = performance.now();
+  function frame(now) {
+    const dt = Math.min((now - lastTime) / 1000, 0.033);
+    lastTime = now;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  function update(dt) {
+    // aim controls
+    if (game.state === State.AIMING && game.currentTurn === 'you') {
+      const left = keys['arrowleft'] || keys['a'] || keys['touchleft'];
+      const right = keys['arrowright'] || keys['d'] || keys['touchright'];
+      if (left) game.aimAngle -= 1.1 * dt;
+      if (right) game.aimAngle += 1.1 * dt;
+      game.aimAngle = Math.max(-0.5, Math.min(0.5, game.aimAngle));
+      if (keys['q']) game.spin = Math.max(-1, game.spin - dt * 3);
+      if (keys['e']) game.spin = Math.min(1, game.spin + dt * 3);
+    }
+    if (game.state === State.CHARGING) {
+      game.power += game.powerDir * dt * 1.1;
+      if (game.power >= 1) { game.power = 1; game.powerDir = -1; }
+      if (game.power <= 0) { game.power = 0; game.powerDir = 1; }
+      document.getElementById('powerBar').style.width = (game.power * 100) + '%';
+    }
+    if (game.state === State.SLIDING) {
+      physicsStep(dt);
+      if (game.sweeping) sweepFxTimer += dt;
+      if (sweepFxTimer > 0.12 && game.sweeping) { sndSweep(); sweepFxTimer = 0; }
+      if (settleAllStonesCheck()) {
+        game.state = State.SETTLING;
+        setTimeout(() => afterStoneSettles(), 250);
+      }
+    }
+    if (game.state === State.AIMING && game.currentTurn === 'ai') {
+      game.aiThinkTimer -= dt;
+      if (game.aiThinkTimer <= 0) {
+        aiThrow();
+      }
+    }
+  }
+  let sweepFxTimer = 0;
+
+  // ---------- Rendering ----------
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    drawSheet();
+    drawStones();
+    drawAimGuide();
+    drawSpinIndicator();
+  }
+
+  function drawSheet() {
+    const g = sheetGeometry();
+    // ice background gradient
+    const iceGrad = ctx.createLinearGradient(0, g.top, 0, g.bottom);
+    iceGrad.addColorStop(0, '#eaf7ff');
+    iceGrad.addColorStop(1, '#cfeaff');
+    ctx.fillStyle = iceGrad;
+    ctx.fillRect(g.left - 30, g.top - 40, g.sheetW + 60, g.bottom - g.top + 80);
+
+    // side boundary lines
+    ctx.strokeStyle = '#8fb9d8';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(g.left, g.top - 30, g.right - g.left, g.bottom - g.top + 60);
+
+    // hog lines / hack
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(g.left, g.hackY - 90);
+    ctx.lineTo(g.right, g.hackY - 90);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#2c3e50';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.moveTo(g.left, g.teeLineY);
+    ctx.lineTo(g.right, g.teeLineY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // house rings
+    const colors = ['#3ad1ff', '#ffffff', '#e74c3c', '#ffffff'];
+    for (let i = 0; i < HOUSE_RADII.length; i++) {
+      ctx.beginPath();
+      ctx.fillStyle = colors[i];
+      ctx.arc(W / 2, g.houseY, HOUSE_RADII[i] * g.scale, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // button center dot
+    ctx.beginPath();
+    ctx.fillStyle = '#2c3e50';
+    ctx.arc(W / 2, g.houseY, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // hack marks
+    ctx.fillStyle = '#2c3e50';
+    ctx.fillRect(W / 2 - 14, g.hackY - 4, 10, 8);
+    ctx.fillRect(W / 2 + 4, g.hackY - 4, 10, 8);
+  }
+
+  function stoneColor(owner) {
+    return owner === 'you' ? '#e74c3c' : '#3498db';
+  }
+
+  function drawStones() {
+    for (const s of game.stones) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y + s.radius * 0.35, s.radius * 0.9, s.radius * 0.35, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+      const grad = ctx.createRadialGradient(s.x - 4, s.y - 4, 2, s.x, s.y, s.radius);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.25, stoneColor(s.owner));
+      grad.addColorStop(1, '#1b1b1b');
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.strokeStyle = '#111';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // handle
+      ctx.beginPath();
+      ctx.fillStyle = s.owner === 'you' ? '#c0392b' : '#2471a3';
+      ctx.arc(s.x, s.y, s.radius * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      if (game.sweeping && s === lastMovingStoneOf(game.lastThrowOwner) && !s.settled) {
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineWidth = 2;
+        for (let k = -1; k <= 1; k += 2) {
+          ctx.moveTo(s.x + k * 18, s.y - 10);
+          ctx.lineTo(s.x + k * 8, s.y + 4);
+        }
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawAimGuide() {
+    if (game.state !== State.AIMING && game.state !== State.CHARGING) return;
+    if (game.currentTurn !== 'you') return;
+    const g = sheetGeometry();
+    const startX = W / 2, startY = g.hackY;
+    const len = 260;
+    const endX = startX + Math.sin(game.aimAngle) * len;
+    const endY = startY - Math.cos(game.aimAngle) * len;
+    ctx.save();
+    ctx.setLineDash([8, 8]);
+    ctx.strokeStyle = 'rgba(231,76,60,0.75)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // stone preview at hack
+    ctx.beginPath();
+    ctx.fillStyle = stoneColor('you');
+    ctx.globalAlpha = 0.85;
+    ctx.arc(startX, startY, STONE_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawSpinIndicator() {
+    if (game.currentTurn !== 'you') return;
+    if (game.state !== State.AIMING && game.state !== State.CHARGING) return;
+    const g = sheetGeometry();
+    ctx.save();
+    ctx.font = '13px Segoe UI';
+    ctx.fillStyle = '#2c3e50';
+    ctx.textAlign = 'center';
+    const spinLabel = game.spin < -0.2 ? '↺ Left curl' : (game.spin > 0.2 ? '↻ Right curl' : 'No spin (Q/E)');
+    ctx.fillText(spinLabel, W / 2, g.hackY + 34);
+    ctx.restore();
+  }
+
+  newMatch();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

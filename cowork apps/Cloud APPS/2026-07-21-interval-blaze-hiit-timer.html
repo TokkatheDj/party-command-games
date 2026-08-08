@@ -1,0 +1,753 @@
+<!-- CONCEPT: Circular-progress HIIT/Tabata interval timer with warm-up/cool-down phases, adjustable work-rest-round settings, and layered Web Audio cues (countdown ticks + phase chimes) -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interval Blaze — HIIT Timer</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --bg-grad-1: #eef2ff;
+    --bg-grad-2: #f4f6fb;
+    --card: #ffffff;
+    --text: #1c2333;
+    --text-dim: #6b7280;
+    --accent: #ff5a5f;
+    --accent-2: #22c55e;
+    --accent-3: #3b82f6;
+    --ring-track: #e5e9f2;
+    --border: #e5e9f2;
+    --shadow: 0 10px 30px rgba(30, 40, 80, 0.08);
+  }
+  [data-theme="dark"] {
+    --bg: #0f1220;
+    --bg-grad-1: #161a2e;
+    --bg-grad-2: #0f1220;
+    --card: #191d30;
+    --text: #eef1fb;
+    --text-dim: #9099b7;
+    --accent: #ff6b6f;
+    --accent-2: #34d399;
+    --accent-3: #60a5fa;
+    --ring-track: #262c46;
+    --border: #262c46;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(circle at top, var(--bg-grad-1), var(--bg-grad-2));
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 60px;
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+  .top-bar {
+    width: 100%;
+    max-width: 520px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  header h1 {
+    font-size: 1.6rem;
+    margin: 0 0 4px;
+    letter-spacing: -0.02em;
+  }
+  header p {
+    margin: 0;
+    color: var(--text-dim);
+    font-size: 0.92rem;
+    max-width: 400px;
+    line-height: 1.4;
+  }
+  .theme-toggle {
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    border-radius: 999px;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    box-shadow: var(--shadow);
+    flex-shrink: 0;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 24px;
+    box-shadow: var(--shadow);
+    padding: 28px;
+    width: 100%;
+    max-width: 520px;
+    margin-top: 20px;
+  }
+  .timer-wrap {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    margin: 0 auto;
+  }
+  svg.ring { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring-track { fill: none; stroke: var(--ring-track); stroke-width: 14; }
+  .ring-progress {
+    fill: none;
+    stroke-width: 14;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.25s linear, stroke 0.4s ease;
+  }
+  .timer-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    pointer-events: none;
+  }
+  .phase-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    padding: 4px 14px;
+    border-radius: 999px;
+    margin-bottom: 10px;
+  }
+  .phase-work { background: rgba(255, 90, 95, 0.15); color: var(--accent); }
+  .phase-rest { background: rgba(59, 130, 246, 0.15); color: var(--accent-3); }
+  .phase-warmup { background: rgba(234, 179, 8, 0.18); color: #d97706; }
+  .phase-cooldown { background: rgba(34, 197, 94, 0.15); color: var(--accent-2); }
+  .phase-idle { background: rgba(107, 114, 128, 0.15); color: var(--text-dim); }
+  .phase-done { background: rgba(34, 197, 94, 0.18); color: var(--accent-2); }
+  .time-display {
+    font-size: 3.4rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+  }
+  .round-display {
+    margin-top: 6px;
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+  .controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 26px;
+  }
+  button {
+    font-family: inherit;
+    border: none;
+    cursor: pointer;
+    font-weight: 700;
+    border-radius: 14px;
+    transition: transform 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
+  }
+  button:active { transform: scale(0.96); }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), #ff8a5c);
+    color: white;
+    padding: 14px 34px;
+    font-size: 1.05rem;
+    box-shadow: 0 8px 20px rgba(255, 90, 95, 0.35);
+  }
+  .btn-secondary {
+    background: var(--ring-track);
+    color: var(--text);
+    padding: 14px 22px;
+    font-size: 1.05rem;
+  }
+  .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .settings {
+    margin-top: 30px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .settings h2 {
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin: 0 0 16px;
+  }
+  .setting-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .setting-item label {
+    display: block;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .stepper {
+    display: flex;
+    align-items: center;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .stepper button {
+    background: transparent;
+    color: var(--text);
+    width: 38px;
+    height: 40px;
+    font-size: 1.2rem;
+    border-radius: 0;
+  }
+  .stepper button:hover { background: var(--ring-track); }
+  .stepper input {
+    flex: 1;
+    text-align: center;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 700;
+    font-family: inherit;
+    width: 40px;
+    -moz-appearance: textfield;
+  }
+  .stepper input::-webkit-outer-spin-button,
+  .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .stats {
+    margin-top: 24px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .stat-box {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    text-align: center;
+  }
+  .stat-box .num {
+    font-size: 1.4rem;
+    font-weight: 800;
+  }
+  .stat-box .lbl {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+  }
+  .session-note {
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin-top: 14px;
+  }
+  .sound-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+  }
+  .sound-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+  footer {
+    margin-top: 26px;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    text-align: center;
+    max-width: 480px;
+  }
+  @media (max-width: 420px) {
+    .timer-wrap { width: 230px; height: 230px; }
+    .time-display { font-size: 2.7rem; }
+    .card { padding: 20px; }
+  }
+</style>
+</head>
+<body data-theme="light">
+  <div class="top-bar">
+    <header>
+      <h1>🔥 Interval Blaze</h1>
+      <p>A HIIT/Tabata interval timer with warm-up and cool-down phases, a satisfying progress ring, and layered audio cues so you never have to glance at the screen mid-set.</p>
+    </header>
+    <button class="theme-toggle" id="themeToggle" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
+  </div>
+
+  <div class="card">
+    <div class="timer-wrap">
+      <svg class="ring" viewBox="0 0 300 300">
+        <circle class="ring-track" cx="150" cy="150" r="130"></circle>
+        <circle class="ring-progress" id="ringProgress" cx="150" cy="150" r="130"
+                stroke="#ff5a5f" stroke-dasharray="816.8" stroke-dashoffset="0"></circle>
+      </svg>
+      <div class="timer-center">
+        <div class="phase-label phase-idle" id="phaseLabel">Ready</div>
+        <div class="time-display" id="timeDisplay">00:30</div>
+        <div class="round-display" id="roundDisplay">Round 1 of 8</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn-primary" id="startBtn">Start</button>
+      <button class="btn-secondary" id="resetBtn" disabled>Reset</button>
+    </div>
+
+    <div class="sound-toggle">
+      <input type="checkbox" id="soundToggle" checked>
+      <label for="soundToggle">Sound cues (ticks + chimes)</label>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="num" id="statRounds">0</div>
+        <div class="lbl">Rounds Done</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" id="statSessions">0</div>
+        <div class="lbl">Sessions Done</div>
+      </div>
+      <div class="stat-box">
+        <div class="num" id="statMinutes">0</div>
+        <div class="lbl">Active Min</div>
+      </div>
+    </div>
+    <div class="session-note">Session stats are kept in memory for this browser tab only — they reset if you reload the page.</div>
+
+    <div class="settings">
+      <h2>Workout Settings</h2>
+      <div class="setting-grid">
+        <div class="setting-item">
+          <label>Work (sec)</label>
+          <div class="stepper">
+            <button data-target="work" data-delta="-5" type="button">−</button>
+            <input type="number" id="workInput" value="30" min="5" max="600">
+            <button data-target="work" data-delta="5" type="button">+</button>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label>Rest (sec)</label>
+          <div class="stepper">
+            <button data-target="rest" data-delta="-5" type="button">−</button>
+            <input type="number" id="restInput" value="15" min="0" max="600">
+            <button data-target="rest" data-delta="5" type="button">+</button>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label>Rounds</label>
+          <div class="stepper">
+            <button data-target="rounds" data-delta="-1" type="button">−</button>
+            <input type="number" id="roundsInput" value="8" min="1" max="50">
+            <button data-target="rounds" data-delta="1" type="button">+</button>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label>Warm-up (sec)</label>
+          <div class="stepper">
+            <button data-target="warmup" data-delta="-5" type="button">−</button>
+            <input type="number" id="warmupInput" value="15" min="0" max="300">
+            <button data-target="warmup" data-delta="5" type="button">+</button>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label>Cool-down (sec)</label>
+          <div class="stepper">
+            <button data-target="cooldown" data-delta="-5" type="button">−</button>
+            <input type="number" id="cooldownInput" value="20" min="0" max="300">
+            <button data-target="cooldown" data-delta="5" type="button">+</button>
+          </div>
+        </div>
+        <div class="setting-item">
+          <label>Preset</label>
+          <div class="stepper" style="justify-content:center;">
+            <select id="presetSelect" style="width:100%; border:none; background:transparent; color:var(--text); font-weight:700; font-family:inherit; padding:8px; text-align:center;">
+              <option value="custom">Custom</option>
+              <option value="tabata">Tabata (20/10 x8)</option>
+              <option value="hiit30">HIIT 30/15 x8</option>
+              <option value="strength">Strength 40/20 x6</option>
+              <option value="beginner">Beginner 20/40 x6</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Tip: keep this tab in the foreground for the most reliable audio cues — some browsers throttle timers in background tabs. Interval Blaze runs entirely offline once loaded; nothing is sent anywhere.</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Theme ----------
+  const themeToggle = document.getElementById('themeToggle');
+  const body = document.body;
+  themeToggle.addEventListener('click', () => {
+    const isDark = body.getAttribute('data-theme') === 'dark';
+    body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    themeToggle.textContent = isDark ? '🌙' : '☀️';
+  });
+
+  // ---------- Elements ----------
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const phaseLabel = document.getElementById('phaseLabel');
+  const timeDisplay = document.getElementById('timeDisplay');
+  const roundDisplay = document.getElementById('roundDisplay');
+  const ringProgress = document.getElementById('ringProgress');
+  const soundToggle = document.getElementById('soundToggle');
+  const presetSelect = document.getElementById('presetSelect');
+
+  const inputs = {
+    work: document.getElementById('workInput'),
+    rest: document.getElementById('restInput'),
+    rounds: document.getElementById('roundsInput'),
+    warmup: document.getElementById('warmupInput'),
+    cooldown: document.getElementById('cooldownInput'),
+  };
+
+  const statRounds = document.getElementById('statRounds');
+  const statSessions = document.getElementById('statSessions');
+  const statMinutes = document.getElementById('statMinutes');
+
+  // ---------- In-memory session stats (resets on reload, by design) ----------
+  let sessionStats = { roundsDone: 0, sessionsDone: 0, activeSeconds: 0 };
+
+  function renderStats() {
+    statRounds.textContent = sessionStats.roundsDone;
+    statSessions.textContent = sessionStats.sessionsDone;
+    statMinutes.textContent = Math.round(sessionStats.activeSeconds / 60 * 10) / 10;
+  }
+
+  // ---------- Stepper buttons ----------
+  document.querySelectorAll('.stepper button[data-target]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.getAttribute('data-target');
+      const delta = parseInt(btn.getAttribute('data-delta'), 10);
+      const input = inputs[target];
+      let val = parseInt(input.value, 10) || 0;
+      val += delta;
+      const min = parseInt(input.min, 10);
+      const max = parseInt(input.max, 10);
+      if (val < min) val = min;
+      if (val > max) val = max;
+      input.value = val;
+      presetSelect.value = 'custom';
+      if (!running) resetVisualToIdle();
+    });
+  });
+  Object.values(inputs).forEach(inp => {
+    inp.addEventListener('change', () => {
+      presetSelect.value = 'custom';
+      if (!running) resetVisualToIdle();
+    });
+  });
+
+  presetSelect.addEventListener('change', () => {
+    const presets = {
+      tabata:   { work: 20, rest: 10, rounds: 8, warmup: 10, cooldown: 15 },
+      hiit30:   { work: 30, rest: 15, rounds: 8, warmup: 15, cooldown: 20 },
+      strength: { work: 40, rest: 20, rounds: 6, warmup: 20, cooldown: 20 },
+      beginner: { work: 20, rest: 40, rounds: 6, warmup: 20, cooldown: 20 },
+    };
+    const p = presets[presetSelect.value];
+    if (p) {
+      inputs.work.value = p.work;
+      inputs.rest.value = p.rest;
+      inputs.rounds.value = p.rounds;
+      inputs.warmup.value = p.warmup;
+      inputs.cooldown.value = p.cooldown;
+      if (!running) resetVisualToIdle();
+    }
+  });
+
+  // ---------- Web Audio ----------
+  let audioCtx = null;
+  function getCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function beep(freq, duration, type, gainVal, when) {
+    if (!soundToggle.checked) return;
+    const ctx = getCtx();
+    const t0 = ctx.currentTime + (when || 0);
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(gainVal || 0.2, t0 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + duration + 0.02);
+  }
+
+  function playTick() { beep(880, 0.08, 'square', 0.12); }
+  function playPhaseChime(kind) {
+    if (kind === 'work') {
+      beep(660, 0.15, 'sine', 0.22);
+      beep(880, 0.18, 'sine', 0.22, 0.12);
+    } else if (kind === 'rest') {
+      beep(520, 0.2, 'sine', 0.2);
+    } else if (kind === 'done') {
+      beep(523.25, 0.18, 'sine', 0.25, 0);
+      beep(659.25, 0.18, 'sine', 0.25, 0.18);
+      beep(783.99, 0.32, 'sine', 0.28, 0.36);
+    } else {
+      beep(440, 0.15, 'sine', 0.2);
+    }
+  }
+
+  // ---------- Timer state machine ----------
+  const RING_CIRC = 2 * Math.PI * 130;
+  ringProgress.setAttribute('stroke-dasharray', RING_CIRC.toFixed(1));
+
+  let running = false;
+  let paused = false;
+  let phaseQueue = [];
+  let phaseIndex = 0;
+  let phaseSecondsTotal = 0;
+  let phaseSecondsLeft = 0;
+  let currentRound = 0;
+  let totalRounds = 0;
+  let rafId = null;
+  let phaseEndTime = 0;
+  let lastTickSecond = null;
+
+  const phaseColors = {
+    warmup: getComputedColor('--accent') || '#d97706',
+    work: '#ff5a5f',
+    rest: '#3b82f6',
+    cooldown: '#22c55e',
+    done: '#22c55e',
+  };
+  function getComputedColor(varName) {
+    return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+  }
+
+  function buildQueue() {
+    const work = clampInt(inputs.work.value, 5, 600);
+    const rest = clampInt(inputs.rest.value, 0, 600);
+    const rounds = clampInt(inputs.rounds.value, 1, 50);
+    const warmup = clampInt(inputs.warmup.value, 0, 300);
+    const cooldown = clampInt(inputs.cooldown.value, 0, 300);
+    totalRounds = rounds;
+
+    const q = [];
+    if (warmup > 0) q.push({ type: 'warmup', duration: warmup, round: 0 });
+    for (let r = 1; r <= rounds; r++) {
+      q.push({ type: 'work', duration: work, round: r });
+      if (rest > 0 && r < rounds) q.push({ type: 'rest', duration: rest, round: r });
+    }
+    if (cooldown > 0) q.push({ type: 'cooldown', duration: cooldown, round: rounds });
+    q.push({ type: 'done', duration: 0, round: rounds });
+    return q;
+  }
+
+  function clampInt(v, min, max) {
+    let n = parseInt(v, 10);
+    if (isNaN(n)) n = min;
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function formatTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function phaseLabelText(type) {
+    switch (type) {
+      case 'warmup': return 'Warm Up';
+      case 'work': return 'Work';
+      case 'rest': return 'Rest';
+      case 'cooldown': return 'Cool Down';
+      case 'done': return 'Complete';
+      default: return 'Ready';
+    }
+  }
+
+  function setPhaseUI(type) {
+    phaseLabel.className = 'phase-label phase-' + type;
+    phaseLabel.textContent = phaseLabelText(type);
+    ringProgress.setAttribute('stroke', phaseColors[type] || '#ff5a5f');
+  }
+
+  function resetVisualToIdle() {
+    setPhaseUI('idle');
+    phaseLabel.textContent = 'Ready';
+    const work = clampInt(inputs.work.value, 5, 600);
+    timeDisplay.textContent = formatTime(work);
+    const rounds = clampInt(inputs.rounds.value, 1, 50);
+    roundDisplay.textContent = 'Round 1 of ' + rounds;
+    ringProgress.style.strokeDashoffset = '0';
+  }
+
+  function lockInputs(lock) {
+    Object.values(inputs).forEach(inp => inp.disabled = lock);
+    presetSelect.disabled = lock;
+  }
+
+  function startWorkout() {
+    if (running) return;
+    getCtx(); // unlock audio on user gesture
+    phaseQueue = buildQueue();
+    phaseIndex = -1;
+    running = true;
+    paused = false;
+    lockInputs(true);
+    startBtn.textContent = 'Pause';
+    resetBtn.disabled = false;
+    advancePhase();
+    tick();
+  }
+
+  function advancePhase() {
+    phaseIndex++;
+    if (phaseIndex >= phaseQueue.length) {
+      finishWorkout();
+      return;
+    }
+    const phase = phaseQueue[phaseIndex];
+    phaseSecondsTotal = phase.duration;
+    phaseSecondsLeft = phase.duration;
+    currentRound = phase.round;
+    lastTickSecond = null;
+
+    if (phase.type === 'done') {
+      setPhaseUI('done');
+      timeDisplay.textContent = 'GO!';
+      roundDisplay.textContent = 'Workout complete';
+      ringProgress.style.strokeDashoffset = '0';
+      playPhaseChime('done');
+      finishWorkout();
+      return;
+    }
+
+    setPhaseUI(phase.type);
+    roundDisplay.textContent = (phase.type === 'work' || phase.type === 'rest')
+      ? 'Round ' + phase.round + ' of ' + totalRounds
+      : (phase.type === 'warmup' ? 'Get ready…' : 'Nice work — cooling down');
+    timeDisplay.textContent = formatTime(phaseSecondsLeft);
+    ringProgress.style.strokeDashoffset = '0';
+
+    if (phase.type === 'work') playPhaseChime('work');
+    else if (phase.type === 'rest') playPhaseChime('rest');
+    else beep(392, 0.15, 'sine', 0.18);
+
+    phaseEndTime = performance.now() + phase.duration * 1000;
+  }
+
+  function tick() {
+    if (!running || paused) return;
+    const now = performance.now();
+    const remainingMs = Math.max(0, phaseEndTime - now);
+    const remainingSec = remainingMs / 1000;
+    phaseSecondsLeft = remainingSec;
+
+    timeDisplay.textContent = formatTime(Math.ceil(remainingSec));
+
+    const frac = phaseSecondsTotal > 0 ? (remainingSec / phaseSecondsTotal) : 0;
+    ringProgress.style.strokeDashoffset = (RING_CIRC * (1 - frac)).toFixed(1);
+
+    const wholeSecLeft = Math.ceil(remainingSec);
+    if (wholeSecLeft <= 3 && wholeSecLeft >= 1 && wholeSecLeft !== lastTickSecond) {
+      playTick();
+      lastTickSecond = wholeSecLeft;
+    }
+
+    if (remainingMs <= 0) {
+      const finishedPhase = phaseQueue[phaseIndex];
+      if (finishedPhase.type === 'work') {
+        sessionStats.roundsDone++;
+        sessionStats.activeSeconds += finishedPhase.duration;
+        renderStats();
+      } else if (finishedPhase.type === 'warmup' || finishedPhase.type === 'cooldown') {
+        sessionStats.activeSeconds += finishedPhase.duration;
+        renderStats();
+      }
+      advancePhase();
+      if (running) rafId = requestAnimationFrame(tick);
+      return;
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function pauseWorkout() {
+    paused = true;
+    startBtn.textContent = 'Resume';
+    if (rafId) cancelAnimationFrame(rafId);
+  }
+
+  function resumeWorkout() {
+    paused = false;
+    startBtn.textContent = 'Pause';
+    phaseEndTime = performance.now() + phaseSecondsLeft * 1000;
+    tick();
+  }
+
+  function finishWorkout() {
+    running = false;
+    paused = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    startBtn.textContent = 'Start';
+    lockInputs(false);
+    sessionStats.sessionsDone++;
+    renderStats();
+  }
+
+  function resetWorkout() {
+    running = false;
+    paused = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    lockInputs(false);
+    startBtn.textContent = 'Start';
+    resetBtn.disabled = true;
+    resetVisualToIdle();
+  }
+
+  startBtn.addEventListener('click', () => {
+    if (!running) {
+      startWorkout();
+    } else if (paused) {
+      resumeWorkout();
+    } else {
+      pauseWorkout();
+    }
+  });
+
+  resetBtn.addEventListener('click', resetWorkout);
+
+  // init
+  resetVisualToIdle();
+  renderStats();
+})();
+</script>
+</body>
+</html>

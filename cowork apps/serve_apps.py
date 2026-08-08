@@ -1799,6 +1799,25 @@ def build_fix_prompt(original, issue_description, target_filename):
     )
 
 
+SESSION_LIMIT_RE = re.compile(r"[^\n]*session limit[^\n]*", re.IGNORECASE)
+
+
+def describe_build_failure(base_message, log_tail):
+    """Turns a bare exit-code message into something a parent can act on.
+
+    The Claude CLI prints a one-line notice straight to stdout/stderr when the
+    account backing headless `claude -p` calls has hit its usage limit -- that
+    line is what actually explains "no file was created", not the exit code.
+    """
+    limit_match = SESSION_LIMIT_RE.search(log_tail or "")
+    if limit_match:
+        return f"AppVerse's builder hit its Claude usage limit: {limit_match.group(0).strip()}. Try the build again after it resets."
+    last_line = next((line.strip() for line in reversed((log_tail or "").splitlines()) if line.strip()), "")
+    if last_line:
+        return f"{base_message} Last output: {last_line}"
+    return base_message
+
+
 def generate_app_worker(request_id):
     data = load_data()
     req = next((r for r in data.get("app_requests", []) if r.get("id") == request_id), None)
@@ -1856,7 +1875,7 @@ def generate_app_worker(request_id):
                     update_app_request(request_id, status="done", finished=finished, log_tail=log_tail)
                     notify_async(requester_name, req.get("requester_email", ""), req.get("target_path", f"custom_apps/{target_filename}"), request_id)
                 else:
-                    err = f"Fix did not modify the file (exit code {result.returncode})."
+                    err = describe_build_failure(f"Fix did not modify the file (exit code {result.returncode}).", log_tail)
                     print(f"[builder] {request_id} error: {err}", flush=True)
                     update_app_request(request_id, status="error", finished=finished, error_message=err, log_tail=log_tail)
                 return
@@ -1885,7 +1904,7 @@ def generate_app_worker(request_id):
                 )
                 notify_async(requester_name, req.get("requester_email", ""), f"custom_apps/{actual_filename}", request_id)
             else:
-                err = f"No file was created (exit code {result.returncode})."
+                err = describe_build_failure(f"No file was created (exit code {result.returncode}).", log_tail)
                 print(f"[builder] {request_id} error: {err}", flush=True)
                 update_app_request(request_id, status="error", finished=finished, error_message=err, log_tail=log_tail)
 
@@ -2368,7 +2387,31 @@ def generate_index(apps, reviews, base_url):
   .cat-search {{ width: 100%; padding: 0.65rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 0.95rem; outline: none; transition: border-color 0.2s; }}
   .cat-search:focus {{ border-color: var(--accent); }}
   .cat-search::placeholder {{ color: var(--muted); }}
+  /* ---- Library View Modes ---- */
+  .view-toggle-group {{ display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px; flex-shrink: 0; }}
+  .view-toggle-btn {{ background: transparent; border: none; color: var(--muted); font-size: 0.82rem; padding: 0.35rem 0.65rem; border-radius: 6px; cursor: pointer; line-height: 1; transition: background 0.15s, color 0.15s; display: inline-flex; align-items: center; gap: 4px; font-weight: 500; }}
+  .view-toggle-btn:hover {{ color: var(--text); background: rgba(255,255,255,0.06); }}
+  .view-toggle-btn.active {{ background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.25); font-weight: 700; }}
+
+  /* Mode 1: List (default) */
   .cat-app-list {{ display: flex; flex-direction: column; gap: 0.4rem; }}
+
+  /* Mode 2: Grid */
+  .cat-app-list.view-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; }}
+  .cat-app-list.view-grid .app-item {{ height: 100%; }}
+  .cat-app-list.view-grid .app-card {{ flex-direction: column; align-items: flex-start; height: 100%; padding: 0.9rem; gap: 0.5rem; justify-content: space-between; }}
+  .cat-app-list.view-grid .app-card:hover, .cat-app-list.view-grid .app-card:active {{ transform: translateY(-3px); }}
+  .cat-app-list.view-grid .app-main {{ width: 100%; }}
+  .cat-app-list.view-grid .app-name {{ font-size: 0.95rem; font-weight: 600; line-height: 1.35; margin-top: 0.2rem; }}
+  .cat-app-list.view-grid .card-meta {{ margin-top: 0.4rem; flex-wrap: wrap; }}
+
+  /* Mode 3: Compact */
+  .cat-app-list.view-compact {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.45rem; }}
+  .cat-app-list.view-compact .app-card {{ padding: 0.5rem 0.7rem; border-radius: 8px; min-height: 52px; gap: 0.4rem; }}
+  .cat-app-list.view-compact .app-name {{ font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+  .cat-app-list.view-compact .card-meta {{ display: none; }}
+  .cat-app-list.view-compact .star-row {{ display: none; }}
+
   #search-global {{ width: 100%; padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 1rem; outline: none; transition: border-color 0.2s; }}
   #search-global:focus {{ border-color: var(--accent); }}
   #search-global::placeholder {{ color: var(--muted); }}
@@ -2438,8 +2481,15 @@ def generate_index(apps, reviews, base_url):
 
 <main>
 <div id="tab-apps">
-  <div class="search-wrap">
-    <input id="search-global" type="search" placeholder="Search all apps..." autocomplete="off">
+  <div class="search-wrap" style="max-width:700px;margin:0 auto;padding:1rem 1.5rem 0.5rem;">
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+      <input id="search-global" type="search" placeholder="Search all apps..." autocomplete="off" style="flex:1;">
+      <div class="view-toggle-group">
+        <button class="view-toggle-btn active" data-view="list" title="List View">&#9776; List</button>
+        <button class="view-toggle-btn" data-view="grid" title="Grid View">&#9638; Grid</button>
+        <button class="view-toggle-btn" data-view="compact" title="Compact View">&#127915; Compact</button>
+      </div>
+    </div>
   </div>
   <div id="view-grid">
     <div class="cat-grid">
@@ -2513,6 +2563,27 @@ let PLAYLISTS = {playlists_json};
 const catCache = {{}};
 const playlistCache = {{}};
 let pickerOpen = null;
+
+let currentViewMode = localStorage.getItem('cowork-appverse-viewmode') || 'list';
+
+function applyViewMode(mode) {{
+  currentViewMode = mode;
+  localStorage.setItem('cowork-appverse-viewmode', mode);
+  document.querySelectorAll('.cat-app-list').forEach(el => {{
+    el.classList.remove('view-list', 'view-grid', 'view-compact');
+    el.classList.add('view-' + mode);
+  }});
+  document.querySelectorAll('.view-toggle-btn').forEach(btn => {{
+    btn.classList.toggle('active', btn.dataset.view === mode);
+  }});
+}}
+
+document.addEventListener('click', e => {{
+  const btn = e.target.closest('.view-toggle-btn');
+  if (btn && btn.dataset.view) {{
+    applyViewMode(btn.dataset.view);
+  }}
+}});
 
 const tabs = document.querySelectorAll('.tab-btn');
 const panels = {{}};
@@ -2595,7 +2666,7 @@ searchGlobal.addEventListener('input', () => {{
 
   let html = '';
   Object.values(bycat).forEach(g => {{
-    html += '<div class="search-result-cat">' + g.title + '</div><div class="cat-app-list">';
+    html += '<div class="search-result-cat">' + g.title + '</div><div class="cat-app-list view-' + currentViewMode + '">';
     g.items.forEach(a => {{
       html += '<a href="/' + a.path + '" class="app-link search-result-link"><div class="app-card"><div class="app-main"><span class="app-name">' + a.name + '</span></div></div></a>';
     }});
@@ -2719,6 +2790,7 @@ function attachRemovedListeners(container) {{
 }}
 
 function attachCatListeners(container) {{
+  applyViewMode(currentViewMode);
   container.querySelector('.back-btn')?.addEventListener('click', showGrid);
 
   const catSearch = container.querySelector('.cat-search');

@@ -1,0 +1,868 @@
+<!-- CONCEPT: Curling - aim, charge a power meter, and slide stones toward the house; closest stones to the button score | Players: 1 (vs AI) | Controls: Left/Right arrows to aim, Hold Space to charge power / release to throw, C to toggle curl direction -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ice House Showdown - Curling</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: #0b1220; overflow: hidden;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    touch-action: none;
+  }
+  #wrap { position: relative; width: 100vw; height: 100vh; }
+  canvas { display: block; background: #0b1220; }
+  .overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; color: #eaf2ff; text-align: center;
+    background: rgba(4, 10, 22, 0.88);
+  }
+  .hidden { display: none !important; }
+  .panel {
+    background: rgba(15, 28, 48, 0.95); border: 2px solid #3a6fd8;
+    border-radius: 16px; padding: 28px 34px; max-width: 520px; width: 86%;
+    box-shadow: 0 0 40px rgba(58,111,216,0.35);
+  }
+  h1 { margin: 0 0 6px; font-size: 1.7em; letter-spacing: 1px; color: #ffd166; }
+  .sub { margin: 0 0 16px; font-size: 0.95em; color: #b9cbe8; line-height: 1.4; }
+  .controls-box {
+    background: rgba(0,0,0,0.25); border-radius: 10px; padding: 10px 14px;
+    font-size: 0.85em; color: #cfe0ff; margin-bottom: 16px; text-align: left;
+  }
+  .controls-box b { color: #ffd166; }
+  .diff-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+  button.opt {
+    background: #16263f; border: 2px solid #3a6fd8; color: #eaf2ff;
+    padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9em;
+  }
+  button.opt.selected { background: #3a6fd8; color: #fff; }
+  button.big {
+    background: linear-gradient(180deg,#ffd166,#f4a300); color: #2a1a00;
+    border: none; padding: 12px 28px; border-radius: 10px; font-size: 1.1em;
+    font-weight: bold; cursor: pointer; margin-top: 6px;
+  }
+  button.big:active { transform: scale(0.97); }
+  #hud {
+    position: absolute; top: 8px; left: 0; width: 100%;
+    display: flex; justify-content: space-between; padding: 0 12px;
+    box-sizing: border-box; pointer-events: none;
+  }
+  .scorecard {
+    background: rgba(8,16,30,0.82); border: 2px solid #3a6fd8; border-radius: 10px;
+    padding: 6px 14px; color: #eaf2ff; font-size: 0.95em; pointer-events: auto;
+  }
+  .scorecard .row { display:flex; gap:10px; align-items:center; }
+  .team-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; }
+  .dot-player { background:#ff5b5b; }
+  .dot-ai { background:#ffd166; }
+  #msgBanner {
+    position: absolute; top: 54px; left: 50%; transform: translateX(-50%);
+    background: rgba(8,16,30,0.85); border: 2px solid #ffd166; border-radius: 8px;
+    padding: 6px 16px; color: #ffd166; font-size: 1em; pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  #powerWrap {
+    position: absolute; bottom: 108px; left: 50%; transform: translateX(-50%);
+    width: 240px; height: 22px; background: rgba(0,0,0,0.4); border: 2px solid #eaf2ff;
+    border-radius: 6px; overflow: hidden; pointer-events: none;
+  }
+  #powerFill { height: 100%; width: 0%; background: linear-gradient(90deg,#5bffb0,#ffd166,#ff5b5b); }
+  #powerZones { position:absolute; top:0; left:0; width:100%; height:100%; }
+  #powerLabel {
+    position: absolute; bottom: 132px; left: 50%; transform: translateX(-50%);
+    color: #eaf2ff; font-size: 0.8em; pointer-events: none;
+  }
+  #touchControls {
+    position: absolute; bottom: 10px; left: 0; width: 100%;
+    display: flex; justify-content: center; gap: 14px; padding: 0 10px; box-sizing: border-box;
+  }
+  .tbtn {
+    background: rgba(58,111,216,0.85); color: #fff; border: 2px solid #eaf2ff;
+    border-radius: 50%; width: 58px; height: 58px; font-size: 1.3em;
+    display:flex; align-items:center; justify-content:center; touch-action: none;
+  }
+  #throwBtn {
+    border-radius: 14px; width: 130px; font-size: 1em; font-weight: bold;
+  }
+  #endBanner, #gameOverBanner {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(4,10,22,0.85);
+  }
+  .resultCard {
+    background: rgba(15,28,48,0.97); border: 2px solid #ffd166; border-radius: 16px;
+    padding: 26px 32px; text-align: center; color: #eaf2ff; max-width: 460px; width: 85%;
+  }
+  .resultCard h2 { color: #ffd166; margin-top:0; }
+  #aimInfo {
+    position: absolute; bottom: 160px; left: 50%; transform: translateX(-50%);
+    color: #cfe0ff; font-size: 0.85em; pointer-events: none; text-align:center;
+  }
+  @media (max-width: 560px) {
+    #powerWrap { width: 180px; bottom: 96px; }
+    #powerLabel { bottom: 118px; }
+    .tbtn { width: 50px; height: 50px; font-size: 1.1em; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div class="scorecard">
+      <div class="row"><span class="team-dot dot-player"></span>You: <span id="scorePlayer">0</span></div>
+      <div class="row"><span class="team-dot dot-ai"></span>AI: <span id="scoreAI">0</span></div>
+    </div>
+    <div class="scorecard" style="text-align:right">
+      <div>End <span id="endNum">1</span>/<span id="endTotal">4</span></div>
+      <div id="hammerLine">Hammer: -</div>
+    </div>
+  </div>
+
+  <div id="msgBanner" class="hidden"></div>
+  <div id="aimInfo" class="hidden"></div>
+  <div id="powerLabel" class="hidden">POWER</div>
+  <div id="powerWrap" class="hidden"><div id="powerFill"></div></div>
+
+  <div id="touchControls" class="hidden">
+    <div class="tbtn" id="btnLeft">&#8592;</div>
+    <div class="tbtn" id="btnCurl">&#8635;</div>
+    <div class="tbtn big" id="throwBtn">HOLD&nbsp;TO&nbsp;THROW</div>
+    <div class="tbtn" id="btnCurl2">&#8634;</div>
+    <div class="tbtn" id="btnRight">&#8594;</div>
+  </div>
+
+  <div id="startScreen" class="overlay">
+    <div class="panel">
+      <h1>🥌 ICE HOUSE SHOWDOWN</h1>
+      <p class="sub">Curling &middot; 1 Player vs AI &middot; 4-End Match<br>Aim your stone, charge the power meter, and curl it into the house. Closest stones to the button win each end!</p>
+      <div class="controls-box">
+        <div><b>Aim:</b> Left / Right arrow keys (or on-screen arrows)</div>
+        <div><b>Power:</b> Hold Space to charge, release to throw (or hold the THROW button)</div>
+        <div><b>Curl:</b> Press C to flip spin direction (or tap the curl buttons)</div>
+      </div>
+      <div class="sub" style="margin-bottom:4px"><b>Choose AI Difficulty</b></div>
+      <div class="diff-row">
+        <button class="opt" data-diff="easy">Easy</button>
+        <button class="opt selected" data-diff="medium">Medium</button>
+        <button class="opt" data-diff="hard">Hard</button>
+      </div>
+      <button class="big" id="startBtn">START MATCH</button>
+    </div>
+  </div>
+
+  <div id="endBanner" class="overlay hidden">
+    <div class="resultCard">
+      <h2 id="endTitle">End Result</h2>
+      <p id="endDetail" class="sub"></p>
+      <button class="big" id="nextEndBtn">CONTINUE</button>
+    </div>
+  </div>
+
+  <div id="gameOverBanner" class="overlay hidden">
+    <div class="resultCard">
+      <h2 id="finalTitle">Match Over</h2>
+      <p id="finalDetail" class="sub"></p>
+      <button class="big" id="playAgainBtn">PLAY AGAIN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ---------- Canvas setup ----------
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, scale = 1, offX = 0, offY = 0;
+
+// Virtual game space (the ice sheet). x: 0..GAME_W (across), y: 0..GAME_H (length).
+const GAME_W = 500;
+const GAME_H = 1150;
+const HACK_Y = 1120;              // where stones are thrown from
+const HOG_Y = 550;                // far hog line - must cross this (y <= HOG_Y) to stay in play
+const TEE_Y = 200;                // button / tee line
+const HOUSE_OUTER = 150, HOUSE_MID = 100, HOUSE_IN = 50, HOUSE_BTN = 15;
+const BACK_LIMIT_Y = 15;          // beyond this (y < this) stone is out the back, removed
+const STONE_R = 17;
+const MAX_DISTANCE = HACK_Y - BACK_LIMIT_Y; // 1105 - total travel distance a 100%-power stone covers
+const MAX_SPEED = 22.1;           // units/frame at 100% power
+const DECEL = MAX_SPEED / 100;    // constant deceleration -> ~100 frames (~1.6s) to stop at full power
+const STOP_SPEED = 0.045;
+const CURL_ACCEL = 0.028;
+const WALL_RESTITUTION = 0.72;
+const STONE_RESTITUTION = 0.9;
+const TOTAL_ENDS = 4;
+const STONES_PER_END = 8;
+
+function resize(){
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W; canvas.height = H;
+  const sx = W / GAME_W, sy = H / GAME_H;
+  scale = Math.min(sx, sy) * 0.96;
+  offX = (W - GAME_W*scale)/2;
+  offY = (H - GAME_H*scale)/2;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function gx(x){ return offX + x*scale; }
+function gy(y){ return offY + y*scale; }
+function gs(v){ return v*scale; }
+
+// ---------- Audio ----------
+let actx = null;
+function audioInit(){
+  if (!actx){
+    try { actx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){ actx=null; }
+  } else if (actx.state === 'suspended'){
+    actx.resume();
+  }
+}
+function noiseBuffer(dur){
+  const n = Math.max(1, Math.floor(actx.sampleRate*dur));
+  const buf = actx.createBuffer(1, n, actx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<n;i++) d[i] = Math.random()*2-1;
+  return buf;
+}
+function playWhoosh(power){
+  if(!actx) return;
+  const src = actx.createBufferSource();
+  src.buffer = noiseBuffer(0.5);
+  const filt = actx.createBiquadFilter();
+  filt.type='bandpass'; filt.frequency.value = 400 + power*500; filt.Q.value=0.7;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, actx.currentTime);
+  g.gain.linearRampToValueAtTime(0.18*(0.4+power), actx.currentTime+0.05);
+  g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime+0.45);
+  src.connect(filt); filt.connect(g); g.connect(actx.destination);
+  src.start(); src.stop(actx.currentTime+0.5);
+}
+function playClack(strength){
+  if(!actx) return;
+  const t = actx.currentTime;
+  const osc = actx.createOscillator();
+  osc.type='triangle';
+  osc.frequency.setValueAtTime(900+strength*400, t);
+  osc.frequency.exponentialRampToValueAtTime(200, t+0.08);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.25*Math.min(1,strength+0.3), t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+0.12);
+  osc.connect(g); g.connect(actx.destination);
+  osc.start(t); osc.stop(t+0.13);
+}
+function playWhistle(){
+  if(!actx) return;
+  const t = actx.currentTime;
+  const osc = actx.createOscillator();
+  osc.type='sine';
+  osc.frequency.setValueAtTime(1500, t);
+  osc.frequency.linearRampToValueAtTime(1100, t+0.35);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(0.2, t+0.03);
+  g.gain.linearRampToValueAtTime(0.0001, t+0.4);
+  osc.connect(g); g.connect(actx.destination);
+  osc.start(t); osc.stop(t+0.42);
+}
+function playCheer(big){
+  if(!actx) return;
+  const t = actx.currentTime;
+  const src = actx.createBufferSource();
+  src.buffer = noiseBuffer(1.4);
+  const filt = actx.createBiquadFilter();
+  filt.type='lowpass'; filt.frequency.value = 1800;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(big?0.3:0.16, t+0.15);
+  g.gain.linearRampToValueAtTime(0.0001, t+(big?1.3:0.9));
+  src.connect(filt); filt.connect(g); g.connect(actx.destination);
+  src.start(t); src.stop(t+1.4);
+  // a couple bright blips for extra cheer flavor
+  for (let i=0;i<(big?4:2);i++){
+    const o = actx.createOscillator();
+    o.type='sine';
+    const freq = 600+Math.random()*500;
+    o.frequency.value = freq;
+    const gg = actx.createGain();
+    const st = t+0.1+i*0.16;
+    gg.gain.setValueAtTime(0.0001, st);
+    gg.gain.linearRampToValueAtTime(0.12, st+0.05);
+    gg.gain.exponentialRampToValueAtTime(0.0001, st+0.3);
+    o.connect(gg); gg.connect(actx.destination);
+    o.start(st); o.stop(st+0.32);
+  }
+}
+
+// ---------- Game state ----------
+const State = { START:'start', AIMING:'aiming', CHARGING:'charging', SETTLING:'settling', SETTLING_WAIT:'settling_wait', END_SUMMARY:'end_summary', GAME_OVER:'game_over' };
+let state = State.START;
+let difficulty = 'medium';
+let stones = [];
+let throwNum = 1; // 1..8 per end
+let endNum = 1;
+let hammer = 'player'; // who has last-stone advantage
+let scores = { player: 0, ai: 0 };
+let aimAngle = 0; // radians, small range
+let curlDir = 1; // 1 or -1
+let power = 0; // 0..1 current meter value
+let powerDir = 1;
+let powerCharging = false;
+let msgTimeout = null;
+let aiThinkTimer = 0;
+let stoneIdCounter = 0;
+
+function currentThrower(){
+  // team WITHOUT hammer throws first each end, alternating, hammer team throws last (8th)
+  const nonHammer = hammer === 'player' ? 'ai' : 'player';
+  return (throwNum % 2 === 1) ? nonHammer : hammer;
+}
+
+function showMsg(text, ms){
+  const el = document.getElementById('msgBanner');
+  el.textContent = text;
+  el.classList.remove('hidden');
+  el.style.opacity = '1';
+  clearTimeout(msgTimeout);
+  msgTimeout = setTimeout(()=>{ el.style.opacity='0'; }, ms||1600);
+}
+
+function updateHud(){
+  document.getElementById('scorePlayer').textContent = scores.player;
+  document.getElementById('scoreAI').textContent = scores.ai;
+  document.getElementById('endNum').textContent = endNum;
+  document.getElementById('endTotal').textContent = TOTAL_ENDS;
+  document.getElementById('hammerLine').textContent = 'Hammer: ' + (hammer==='player'?'You':'AI');
+}
+
+// ---------- Physics helpers ----------
+function stepStone(s){
+  s.x += s.vx; s.y += s.vy;
+  // constant deceleration (ice friction) applied to the velocity vector's magnitude
+  const speed0 = Math.hypot(s.vx, s.vy);
+  if (speed0 > 0){
+    const newSpeed = Math.max(0, speed0 - DECEL);
+    const k = newSpeed/speed0;
+    s.vx *= k; s.vy *= k;
+  }
+  // curl: small lateral acceleration that gently bends the path
+  s.vx += s.curlDir * CURL_ACCEL;
+  s.rotation += 0.12 * s.curlDir;
+  const speed = Math.hypot(s.vx, s.vy);
+  // wall bounce
+  if (s.x < STONE_R){ s.x = STONE_R; s.vx = -s.vx*WALL_RESTITUTION; }
+  if (s.x > GAME_W-STONE_R){ s.x = GAME_W-STONE_R; s.vx = -s.vx*WALL_RESTITUTION; }
+  if (speed < STOP_SPEED){ s.vx = 0; s.vy = 0; s.moving=false; } else { s.moving = true; }
+}
+
+function resolveCollisions(){
+  for (let i=0;i<stones.length;i++){
+    for (let j=i+1;j<stones.length;j++){
+      const a = stones[i], b = stones[j];
+      if (!a.active || !b.active) continue;
+      const dx = b.x-a.x, dy = b.y-a.y;
+      const dist = Math.hypot(dx,dy);
+      const minDist = STONE_R*2;
+      if (dist > 0 && dist < minDist){
+        const nx = dx/dist, ny = dy/dist;
+        const overlap = (minDist-dist)/2;
+        a.x -= nx*overlap; a.y -= ny*overlap;
+        b.x += nx*overlap; b.y += ny*overlap;
+        // relative velocity along normal
+        const rvx = b.vx-a.vx, rvy = b.vy-a.vy;
+        const relVel = rvx*nx + rvy*ny;
+        if (relVel < 0){
+          const imp = -(1+STONE_RESTITUTION)*relVel/2;
+          a.vx -= imp*nx; a.vy -= imp*ny;
+          b.vx += imp*nx; b.vy += imp*ny;
+          const strength = Math.min(1, Math.abs(relVel)/6);
+          if (strength > 0.04) playClack(strength);
+        }
+        a.moving = true; b.moving = true;
+      }
+    }
+  }
+}
+
+function pruneOutOfPlay(){
+  for (const s of stones){
+    if (!s.active) continue;
+    if (s.settledChecked) continue;
+    if (!s.moving && s.thrown){
+      s.settledChecked = true;
+      // hogged: never crossed hog line
+      if (s.y > HOG_Y + STONE_R*0.2){
+        s.active = false;
+      } else if (s.y < BACK_LIMIT_Y){
+        s.active = false;
+      }
+    }
+  }
+  // also continuously remove if it slides out the back or off far edge while moving
+  for (const s of stones){
+    if (s.active && s.thrown && s.y < BACK_LIMIT_Y - 5){
+      s.active = false;
+    }
+  }
+}
+
+function allStonesSettled(){
+  // an inactive (removed) stone is no longer relevant to whether the end is done settling,
+  // even if it left play while its velocity was still nonzero
+  return stones.every(s => !s.thrown || !s.active || !s.moving);
+}
+
+// ---------- Throw execution ----------
+function launchStone(team, angle, pw, curl){
+  const speed = pw * MAX_SPEED;
+  stones.push({
+    id: stoneIdCounter++,
+    team: team,
+    x: GAME_W/2,
+    y: HACK_Y,
+    vx: speed*Math.sin(angle),
+    vy: -speed*Math.cos(angle),
+    curlDir: curl,
+    rotation: 0,
+    moving: true,
+    thrown: true,
+    active: true,
+    settledChecked: false
+  });
+  playWhoosh(pw);
+}
+
+// pure simulation (no collisions) used by AI to predict landing spot
+function simulateLanding(angle, pw, curl){
+  let x = GAME_W/2, y = HACK_Y;
+  let vx = pw*MAX_SPEED*Math.sin(angle), vy = -pw*MAX_SPEED*Math.cos(angle);
+  let steps = 0;
+  while (steps < 4000){
+    x += vx; y += vy;
+    const speed0 = Math.hypot(vx,vy);
+    if (speed0 > 0){
+      const newSpeed = Math.max(0, speed0 - DECEL);
+      const k = newSpeed/speed0;
+      vx *= k; vy *= k;
+    }
+    vx += curl*CURL_ACCEL;
+    if (x < STONE_R){ x = STONE_R; vx = -vx*WALL_RESTITUTION; }
+    if (x > GAME_W-STONE_R){ x = GAME_W-STONE_R; vx = -vx*WALL_RESTITUTION; }
+    const speed = Math.hypot(vx,vy);
+    if (speed < STOP_SPEED) break;
+    if (y < BACK_LIMIT_Y-5) break;
+    steps++;
+  }
+  return {x,y};
+}
+
+function powerForDistance(dist){
+  return Math.max(0.15, Math.min(1.0, Math.sqrt(Math.max(0,dist) / MAX_DISTANCE)));
+}
+
+function findAngleForTargetX(targetX, pw, curl){
+  let lo = -0.32, hi = 0.32;
+  for (let i=0;i<18;i++){
+    const mid = (lo+hi)/2;
+    const land = simulateLanding(mid, pw, curl);
+    if (land.x < targetX) lo = mid; else hi = mid;
+  }
+  return (lo+hi)/2;
+}
+
+// ---------- AI turn ----------
+function difficultyNoise(){
+  if (difficulty==='easy') return {angle:0.10, power:0.10};
+  if (difficulty==='hard') return {angle:0.018, power:0.018};
+  return {angle:0.05, power:0.05};
+}
+
+function aiPlanThrow(){
+  const noise = difficultyNoise();
+  const aiStones = stones.filter(s=>s.active && s.team==='ai');
+  const playerStones = stones.filter(s=>s.active && s.team==='player');
+  const dist = (s)=>Math.hypot(s.x-GAME_W/2, s.y-TEE_Y);
+  let plan;
+  const shotRock = playerStones.slice().sort((a,b)=>dist(a)-dist(b))[0];
+  const bestAiDist = aiStones.length? Math.min(...aiStones.map(dist)) : Infinity;
+
+  if (shotRock && dist(shotRock) < HOUSE_OUTER && dist(shotRock) < bestAiDist){
+    // takeout attempt on the player's best stone
+    const curl = Math.random()<0.5?1:-1;
+    const distToTarget = HACK_Y - shotRock.y;
+    let pw = Math.min(1.0, powerForDistance(distToTarget) + 0.16);
+    const angle = findAngleForTargetX(shotRock.x, pw, curl);
+    plan = {angle, power: pw, curl, label:'takeout'};
+  } else if (aiStones.length > 0 && bestAiDist < HOUSE_OUTER){
+    // guard the existing shot stone: place a stone short, in front of the house
+    const curl = Math.random()<0.5?1:-1;
+    const guardY = TEE_Y + HOUSE_OUTER + 90;
+    const distToTarget = HACK_Y - guardY;
+    let pw = powerForDistance(distToTarget);
+    const angle = findAngleForTargetX(GAME_W/2, pw, curl);
+    plan = {angle, power: pw, curl, label:'guard'};
+  } else {
+    // draw for the button
+    const curl = Math.random()<0.5?1:-1;
+    const distToTarget = HACK_Y - TEE_Y;
+    let pw = powerForDistance(distToTarget) + (Math.random()*0.06-0.03);
+    const angle = findAngleForTargetX(GAME_W/2, pw, curl);
+    plan = {angle, power: pw, curl, label:'draw'};
+  }
+  plan.angle += (Math.random()*2-1)*noise.angle;
+  plan.power = Math.max(0.2, Math.min(1.0, plan.power + (Math.random()*2-1)*noise.power));
+  return plan;
+}
+
+// ---------- Scoring ----------
+function computeEndScore(){
+  const active = stones.filter(s=>s.active);
+  const withDist = active.map(s=>({s, d: Math.hypot(s.x-GAME_W/2, s.y-TEE_Y)})).filter(o=>o.d<=HOUSE_OUTER+STONE_R*0.3);
+  if (withDist.length===0) return {team:null, points:0, detail:'No stones in the house. Blank end.'};
+  withDist.sort((a,b)=>a.d-b.d);
+  const scoringTeam = withDist[0].s.team;
+  const otherBest = withDist.find(o=>o.s.team!==scoringTeam);
+  const cutoff = otherBest ? otherBest.d : Infinity;
+  let points = 0;
+  for (const o of withDist){
+    if (o.s.team===scoringTeam && o.d < cutoff) points++;
+    else break;
+  }
+  return {team: scoringTeam, points, detail: (scoringTeam==='player'?'You':'AI') + ' score' + (points===1?'s':'') + ' ' + points + ' point' + (points===1?'':'s') + '!'};
+}
+
+// ---------- Turn flow ----------
+function beginEnd(){
+  stones = [];
+  throwNum = 1;
+  updateHud();
+  showMsg('End ' + endNum + ' begins! ' + (hammer==='player'?'You have':'AI has') + ' the hammer.', 2200);
+  playWhistle();
+  setTimeout(()=>{ startThrow(); }, 900);
+}
+
+function startThrow(){
+  if (throwNum > STONES_PER_END){
+    finishEnd();
+    return;
+  }
+  const team = currentThrower();
+  updateHud();
+  if (team === 'ai'){
+    state = State.SETTLING; // block input during AI "thinking"
+    hideThrowUI();
+    showMsg('AI is throwing...', 1400);
+    aiThinkTimer = 55;
+  } else {
+    state = State.AIMING;
+    aimAngle = 0;
+    power = 0; powerDir = 1; powerCharging = false;
+    showThrowUI();
+    showMsg('Your throw (' + throwNum + ' of 8) - Aim then charge power!', 1800);
+  }
+}
+
+function showThrowUI(){
+  document.getElementById('powerWrap').classList.remove('hidden');
+  document.getElementById('powerLabel').classList.remove('hidden');
+  document.getElementById('aimInfo').classList.remove('hidden');
+  if (isTouch) document.getElementById('touchControls').classList.remove('hidden');
+}
+function hideThrowUI(){
+  document.getElementById('powerWrap').classList.add('hidden');
+  document.getElementById('powerLabel').classList.add('hidden');
+  document.getElementById('aimInfo').classList.add('hidden');
+  document.getElementById('touchControls').classList.add('hidden');
+}
+
+function playerRelease(){
+  if (state !== State.AIMING && state !== State.CHARGING) return;
+  hideThrowUI();
+  launchStone('player', aimAngle, Math.max(0.18,power), curlDir);
+  state = State.SETTLING;
+  throwNum++;
+}
+
+function finishEnd(){
+  state = State.END_SUMMARY;
+  const result = computeEndScore();
+  if (result.team) scores[result.team] += result.points;
+  if (result.team === 'player') hammer = 'ai';
+  else if (result.team === 'ai') hammer = 'player';
+  // else blank end: hammer stays the same
+  updateHud();
+  if (result.points>0) playCheer(result.points>=3);
+  document.getElementById('endTitle').textContent = 'End ' + endNum + ' Complete';
+  document.getElementById('endDetail').textContent = result.detail + '  (Score: You ' + scores.player + ' - AI ' + scores.ai + ')';
+  document.getElementById('endBanner').classList.remove('hidden');
+}
+
+document.getElementById('nextEndBtn').addEventListener('click', ()=>{
+  document.getElementById('endBanner').classList.add('hidden');
+  endNum++;
+  if (endNum > TOTAL_ENDS){
+    endGame();
+  } else {
+    beginEnd();
+  }
+});
+
+function endGame(){
+  state = State.GAME_OVER;
+  let title, detail;
+  if (scores.player > scores.ai){ title='🏆 You Win!'; }
+  else if (scores.ai > scores.player){ title='AI Wins'; }
+  else { title='It\'s a Tie!'; }
+  detail = 'Final Score - You: ' + scores.player + '  |  AI: ' + scores.ai;
+  document.getElementById('finalTitle').textContent = title;
+  document.getElementById('finalDetail').textContent = detail;
+  document.getElementById('gameOverBanner').classList.remove('hidden');
+  playCheer(scores.player>=scores.ai);
+}
+
+document.getElementById('playAgainBtn').addEventListener('click', ()=>{
+  document.getElementById('gameOverBanner').classList.add('hidden');
+  scores = {player:0, ai:0};
+  endNum = 1;
+  hammer = Math.random()<0.5 ? 'player':'ai';
+  beginEnd();
+});
+
+// ---------- Input ----------
+let isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints>0;
+if (isTouch) document.getElementById('touchControls').classList.remove('hidden');
+
+const keys = {};
+window.addEventListener('keydown', (e)=>{
+  if (['ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  keys[e.key] = true;
+  if (e.key === 'c' || e.key === 'C'){
+    curlDir *= -1;
+  }
+  if (e.key === ' ' && state === State.AIMING){
+    state = State.CHARGING;
+    powerCharging = true;
+  }
+});
+window.addEventListener('keyup', (e)=>{
+  keys[e.key] = false;
+  if (e.key === ' ' && state === State.CHARGING){
+    playerRelease();
+  }
+});
+
+document.getElementById('btnLeft').addEventListener('touchstart', (e)=>{ e.preventDefault(); keys['ArrowLeft']=true; });
+document.getElementById('btnLeft').addEventListener('touchend', (e)=>{ e.preventDefault(); keys['ArrowLeft']=false; });
+document.getElementById('btnRight').addEventListener('touchstart', (e)=>{ e.preventDefault(); keys['ArrowRight']=true; });
+document.getElementById('btnRight').addEventListener('touchend', (e)=>{ e.preventDefault(); keys['ArrowRight']=false; });
+document.getElementById('btnCurl').addEventListener('touchstart', (e)=>{ e.preventDefault(); curlDir=1; });
+document.getElementById('btnCurl2').addEventListener('touchstart', (e)=>{ e.preventDefault(); curlDir=-1; });
+const throwBtn = document.getElementById('throwBtn');
+throwBtn.addEventListener('touchstart', (e)=>{
+  e.preventDefault(); audioInit();
+  if (state===State.AIMING){ state=State.CHARGING; powerCharging=true; }
+});
+throwBtn.addEventListener('touchend', (e)=>{
+  e.preventDefault();
+  if (state===State.CHARGING) playerRelease();
+});
+// mouse fallback for the throw button on non-touch trackpads
+throwBtn.addEventListener('mousedown', (e)=>{
+  audioInit();
+  if (state===State.AIMING){ state=State.CHARGING; powerCharging=true; }
+});
+window.addEventListener('mouseup', ()=>{
+  if (state===State.CHARGING) playerRelease();
+});
+
+document.querySelectorAll('.diff-row .opt').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.diff-row .opt').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    difficulty = btn.getAttribute('data-diff');
+  });
+});
+
+document.getElementById('startBtn').addEventListener('click', ()=>{
+  audioInit();
+  document.getElementById('startScreen').classList.add('hidden');
+  scores = {player:0, ai:0};
+  endNum = 1;
+  hammer = Math.random()<0.5 ? 'player' : 'ai';
+  beginEnd();
+});
+
+// ---------- Update loop ----------
+const AIM_SPEED = 0.018;
+const AIM_LIMIT = 0.30;
+
+function updateAiming(){
+  if (state === State.AIMING || state === State.CHARGING){
+    if (keys['ArrowLeft']) aimAngle -= AIM_SPEED;
+    if (keys['ArrowRight']) aimAngle += AIM_SPEED;
+    aimAngle = Math.max(-AIM_LIMIT, Math.min(AIM_LIMIT, aimAngle));
+  }
+  if (state === State.CHARGING){
+    power += powerDir * 0.018;
+    if (power >= 1){ power = 1; powerDir = -1; }
+    if (power <= 0){ power = 0; powerDir = 1; }
+    document.getElementById('powerFill').style.width = (power*100).toFixed(0)+'%';
+  }
+  const aimInfo = document.getElementById('aimInfo');
+  if (state===State.AIMING || state===State.CHARGING){
+    aimInfo.textContent = 'Curl: ' + (curlDir>0?'Right ↻':'Left ↺') + '   |   Angle: ' + (aimAngle*57.3).toFixed(0) + '°';
+  }
+}
+
+function updateAiTurn(){
+  if (aiThinkTimer > 0){
+    aiThinkTimer--;
+    if (aiThinkTimer === 0){
+      const plan = aiPlanThrow();
+      launchStone('ai', plan.angle, plan.power, plan.curl);
+      throwNum++;
+    }
+  }
+}
+
+function updatePhysics(){
+  let anyMoving = false;
+  for (const s of stones){
+    if (s.thrown && s.active && s.moving){
+      stepStone(s);
+      anyMoving = true;
+    }
+  }
+  resolveCollisions();
+  pruneOutOfPlay();
+  if (state === State.SETTLING && !anyMoving && allStonesSettled() && aiThinkTimer===0){
+    state = State.SETTLING_WAIT;
+    setTimeout(()=>{ if (state===State.SETTLING_WAIT) startThrow(); }, 500);
+  }
+}
+
+// ---------- Rendering ----------
+function drawIce(){
+  ctx.fillStyle = '#eef5ff';
+  ctx.fillRect(gx(0), gy(0), gs(GAME_W), gs(GAME_H));
+  // subtle ice texture bands
+  ctx.strokeStyle = 'rgba(150,190,230,0.25)';
+  ctx.lineWidth = Math.max(1, gs(1));
+  for (let i=0;i<14;i++){
+    const yy = gy(i*(GAME_H/14));
+    ctx.beginPath(); ctx.moveTo(gx(0), yy); ctx.lineTo(gx(GAME_W), yy); ctx.stroke();
+  }
+  // center line
+  ctx.strokeStyle = 'rgba(80,120,170,0.4)';
+  ctx.beginPath(); ctx.moveTo(gx(GAME_W/2), gy(0)); ctx.lineTo(gx(GAME_W/2), gy(GAME_H)); ctx.stroke();
+  // hog line
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = Math.max(2, gs(4));
+  ctx.beginPath(); ctx.moveTo(gx(0), gy(HOG_Y)); ctx.lineTo(gx(GAME_W), gy(HOG_Y)); ctx.stroke();
+  // tee line
+  ctx.strokeStyle = 'rgba(150,150,150,0.6)'; ctx.lineWidth = Math.max(1, gs(2));
+  ctx.beginPath(); ctx.moveTo(gx(0), gy(TEE_Y)); ctx.lineTo(gx(GAME_W), gy(TEE_Y)); ctx.stroke();
+  // back line
+  ctx.strokeStyle = '#c0392b'; ctx.lineWidth = Math.max(2, gs(3));
+  ctx.beginPath(); ctx.moveTo(gx(0), gy(BACK_LIMIT_Y)); ctx.lineTo(gx(GAME_W), gy(BACK_LIMIT_Y)); ctx.stroke();
+  // hack marker
+  ctx.fillStyle = 'rgba(60,60,60,0.5)';
+  ctx.fillRect(gx(GAME_W/2-14), gy(HACK_Y-4), gs(28), gs(8));
+}
+
+function drawHouse(){
+  const cx = gx(GAME_W/2), cy = gy(TEE_Y);
+  const rings = [
+    {r: HOUSE_OUTER, color:'#2f6fd6'},
+    {r: HOUSE_MID, color:'#f4f6fb'},
+    {r: HOUSE_IN, color:'#d6403a'},
+    {r: HOUSE_BTN, color:'#f4f6fb'}
+  ];
+  for (const ring of rings){
+    ctx.beginPath();
+    ctx.arc(cx, cy, gs(ring.r), 0, Math.PI*2);
+    ctx.fillStyle = ring.color;
+    ctx.fill();
+  }
+  ctx.strokeStyle = 'rgba(0,0,0,0.15)'; ctx.lineWidth=1;
+  for (const ring of rings){
+    ctx.beginPath(); ctx.arc(cx,cy,gs(ring.r),0,Math.PI*2); ctx.stroke();
+  }
+}
+
+function drawStone(s){
+  const cx = gx(s.x), cy = gy(s.y);
+  const r = gs(STONE_R);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(s.rotation);
+  const grad = ctx.createRadialGradient(-r*0.3,-r*0.3,r*0.1, 0,0,r);
+  if (s.team==='player'){
+    grad.addColorStop(0, '#ff8a8a'); grad.addColorStop(1, '#a01f1f');
+  } else {
+    grad.addColorStop(0, '#fff0b0'); grad.addColorStop(1, '#b8860b');
+  }
+  ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2);
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.lineWidth = Math.max(1,r*0.12);
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.stroke();
+  // handle marker to show spin
+  ctx.beginPath(); ctx.arc(0,0,r*0.35,0,Math.PI*2);
+  ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0,-r*0.35); ctx.lineTo(0,-r*0.9);
+  ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=Math.max(1,r*0.15); ctx.stroke();
+  ctx.restore();
+}
+
+function drawAimGuide(){
+  if (state !== State.AIMING && state !== State.CHARGING) return;
+  const startX = GAME_W/2, startY = HACK_Y;
+  const len = 260;
+  const ex = startX + Math.sin(aimAngle)*len;
+  const ey = startY - Math.cos(aimAngle)*len;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(58,111,216,0.85)';
+  ctx.lineWidth = Math.max(1, gs(3));
+  ctx.setLineDash([gs(10), gs(8)]);
+  ctx.beginPath(); ctx.moveTo(gx(startX), gy(startY)); ctx.lineTo(gx(ex), gy(ey)); ctx.stroke();
+  ctx.setLineDash([]);
+  // curl arrow
+  const curlX = startX + curlDir*40;
+  ctx.fillStyle = '#ffd166';
+  ctx.beginPath();
+  ctx.arc(gx(curlX), gy(startY-330), gs(10), 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#2a1a00';
+  ctx.font = (gs(13))+'px Arial';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(curlDir>0?'>':'<', gx(curlX), gy(startY-330));
+  ctx.restore();
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  drawIce();
+  drawHouse();
+  for (const s of stones){ if (s.active) drawStone(s); }
+  drawAimGuide();
+}
+
+function loop(){
+  if (state===State.AIMING || state===State.CHARGING) updateAiming();
+  if (state===State.SETTLING) { updateAiTurn(); updatePhysics(); }
+  if (state===State.SETTLING_WAIT) { updatePhysics(); }
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

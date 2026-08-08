@@ -1,0 +1,234 @@
+<!-- CONCEPT: Cookie Critters — a shape & color matching game where kids feed each cookie to the critter whose sign matches it. Learning category (shape/color recognition), ages 4-8. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Cookie Critters!</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body { height:100%; }
+  body {
+    font-family: 'Comic Sans MS', 'Chalkboard SE', 'Segoe UI', sans-serif;
+    background: linear-gradient(180deg,#ffe9c7 0%, #ffd6e8 60%, #d7f3ff 100%);
+    display:flex; flex-direction:column; align-items:center;
+    overflow:hidden; touch-action:manipulation;
+  }
+  h1 { color:#b5541c; font-size:clamp(26px,6vw,44px); margin-top:10px; text-shadow:2px 2px 0 #fff; }
+  .desc { color:#8a5a2b; font-size:clamp(13px,3vw,17px); text-align:center; padding:0 12px; }
+  #hud {
+    display:flex; gap:14px; margin:8px 0; align-items:center;
+    background:#fff8ec; border:4px solid #ffb35c; border-radius:20px; padding:6px 18px;
+    font-size:clamp(16px,4vw,22px); color:#b5541c; font-weight:bold;
+  }
+  #cookieCard {
+    background:#fffdf7; border:6px dashed #ffb35c; border-radius:28px;
+    width:min(320px,80vw); height:min(220px,30vh);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    margin:6px 0; box-shadow:0 8px 0 rgba(181,84,28,.15);
+  }
+  #cookieCard .label { color:#b5541c; font-size:clamp(14px,3vw,18px); font-weight:bold; }
+  #cookieShape { width:110px; height:110px; margin-top:6px; transition:transform .25s; }
+  #critters { display:flex; gap:4vw; margin:14px 0 20px; }
+  .critter {
+    background:none; border:none; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    transition:transform .15s;
+  }
+  .critter:active { transform:scale(.92); }
+  .critter .face { font-size:clamp(52px,13vw,84px); line-height:1; transition:transform .2s; }
+  .critter .sign {
+    background:#fff; border:4px solid #7a4a1e; border-radius:14px;
+    width:clamp(70px,18vw,96px); height:clamp(70px,18vw,96px);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 5px 0 #7a4a1e;
+  }
+  .critter .sign svg { width:70%; height:70%; }
+  .critter.happy .face { animation:bounce .6s; }
+  .critter.nope .sign { animation:wobble .45s; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 30%{transform:translateY(-24px) scale(1.15)} 60%{transform:translateY(0)} 80%{transform:translateY(-8px)} }
+  @keyframes wobble { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-9deg)} 75%{transform:rotate(9deg)} }
+  #msg { min-height:30px; font-size:clamp(16px,4vw,24px); font-weight:bold; color:#2e9e4f; }
+  #bigBtn {
+    font-family:inherit; font-size:clamp(20px,5vw,30px); font-weight:bold; color:#fff;
+    background:linear-gradient(180deg,#ff9f43,#f76b1c); border:none; border-radius:26px;
+    padding:16px 42px; cursor:pointer; box-shadow:0 7px 0 #c14f08; margin-top:10px;
+  }
+  #bigBtn:active { transform:translateY(5px); box-shadow:0 2px 0 #c14f08; }
+  #overlay {
+    position:fixed; inset:0; background:rgba(255,240,220,.96);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+    text-align:center; padding:20px; z-index:10;
+  }
+  #overlay h2 { color:#b5541c; font-size:clamp(30px,8vw,54px); text-shadow:2px 2px 0 #fff; }
+  #overlay p { color:#8a5a2b; font-size:clamp(16px,4vw,22px); max-width:480px; }
+  .hidden { display:none !important; }
+  .confetti { position:fixed; top:-20px; font-size:26px; z-index:9; animation:fall linear forwards; }
+  @keyframes fall { to { transform:translateY(110vh) rotate(720deg); } }
+  #progress { width:min(320px,80vw); height:16px; background:#fff; border:3px solid #ffb35c; border-radius:10px; overflow:hidden; }
+  #progressFill { height:100%; width:0%; background:linear-gradient(90deg,#ffd166,#ff9f43); transition:width .3s; border-radius:6px; }
+</style>
+</head>
+<body>
+  <h1>🍪 Cookie Critters!</h1>
+  <div class="desc">A cookie pops out of the oven — tap the critter whose sign matches it!</div>
+
+  <div id="hud"><span>⭐ <span id="score">0</span></span><span>🔥 <span id="streak">0</span></span></div>
+  <div id="progress"><div id="progressFill"></div></div>
+
+  <div id="cookieCard">
+    <div class="label">Fresh cookie! Who wants it?</div>
+    <svg id="cookieShape" viewBox="0 0 100 100"></svg>
+  </div>
+
+  <div id="msg">&nbsp;</div>
+  <div id="critters"></div>
+
+  <div id="overlay">
+    <div style="font-size:70px">🍪🐻🐸</div>
+    <h2>Cookie Critters!</h2>
+    <p>The critters are hungry! Look at the cookie, then tap the critter holding the <b>matching sign</b>. Feed 15 cookies to win!</p>
+    <button id="bigBtn">▶ Let's Bake!</button>
+  </div>
+
+<script>
+(() => {
+  const GOAL = 15;
+  const SHAPES = ['circle','square','triangle','star','heart','diamond'];
+  const COLORS = ['#f76b1c','#e74c8b','#3aa9e0','#57b846','#9b59d0','#f4c531'];
+  const CRITTERS = ['🐻','🐸','🐰','🦊','🐷','🐨','🐹','🐶'];
+
+  let score=0, streak=0, fed=0, current=null, locked=false, audioCtx=null;
+
+  const $ = id => document.getElementById(id);
+
+  // ---------- Web Audio ----------
+  function ctx(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+  function tone(freq, t0, dur, type='sine', vol=0.18){
+    const c=ctx(), o=c.createOscillator(), g=c.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol, c.currentTime+t0);
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime+t0+dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(c.currentTime+t0); o.stop(c.currentTime+t0+dur+0.05);
+  }
+  function chomp(){ tone(220,0,.08,'square',.15); tone(150,.07,.1,'square',.15); }
+  function yay(){ [523,659,784].forEach((f,i)=>tone(f,i*.09,.18,'triangle',.2)); }
+  function boing(){ tone(200,0,.25,'sine',.12); tone(160,.05,.25,'sine',.1); }
+  function fanfare(){ [523,659,784,1047,784,1047].forEach((f,i)=>tone(f,i*.14,.25,'triangle',.22)); }
+
+  // ---------- Shapes ----------
+  function shapeSVG(shape,color){
+    const s = {
+      circle:   `<circle cx="50" cy="50" r="38" fill="${color}"/>`,
+      square:   `<rect x="14" y="14" width="72" height="72" rx="10" fill="${color}"/>`,
+      triangle: `<polygon points="50,10 92,86 8,86" fill="${color}"/>`,
+      star:     `<polygon points="50,6 61,36 94,38 68,59 77,92 50,73 23,92 32,59 6,38 39,36" fill="${color}"/>`,
+      heart:    `<path d="M50 88 C10 58 12 26 33 22 C45 20 50 32 50 32 C50 32 55 20 67 22 C88 26 90 58 50 88Z" fill="${color}"/>`,
+      diamond:  `<polygon points="50,8 90,50 50,92 10,50" fill="${color}"/>`
+    }[shape];
+    // sprinkle dots to make it cookie-like
+    return s + `<circle cx="42" cy="45" r="3.5" fill="rgba(255,255,255,.7)"/><circle cx="58" cy="55" r="3.5" fill="rgba(255,255,255,.7)"/><circle cx="50" cy="38" r="3" fill="rgba(90,40,0,.35)"/><circle cx="45" cy="62" r="3" fill="rgba(90,40,0,.35)"/>`;
+  }
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const shuffle = a => a.sort(()=>Math.random()-.5);
+
+  // ---------- Round ----------
+  function newRound(){
+    locked=false;
+    $('msg').innerHTML='&nbsp;';
+    const hard = fed >= 7; // later rounds: distractors share the shape, differ only by color
+    const shape = pick(SHAPES), color = pick(COLORS);
+    current = {shape,color};
+    $('cookieShape').innerHTML = shapeSVG(shape,color);
+    $('cookieShape').style.transform='scale(0)';
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      $('cookieShape').style.transform='scale(1)';
+    }));
+
+    const options=[{shape,color,ok:true}];
+    while(options.length<3){
+      let o;
+      if(hard && Math.random()<.6){
+        o={shape, color:pick(COLORS), ok:false};
+      } else {
+        o={shape:pick(SHAPES), color:pick(COLORS), ok:false};
+      }
+      if(!options.some(x=>x.shape===o.shape && x.color===o.color)) options.push(o);
+    }
+    shuffle(options);
+
+    const faces = shuffle([...CRITTERS]).slice(0,3);
+    const box=$('critters'); box.innerHTML='';
+    options.forEach((o,i)=>{
+      const b=document.createElement('button');
+      b.className='critter';
+      b.innerHTML=`<div class="face">${faces[i]}</div>
+        <div class="sign"><svg viewBox="0 0 100 100">${shapeSVG(o.shape,o.color)}</svg></div>`;
+      b.addEventListener('click',()=>choose(b,o));
+      box.appendChild(b);
+    });
+  }
+
+  function choose(btn,o){
+    if(locked) return;
+    if(o.ok){
+      locked=true;
+      chomp(); setTimeout(yay,150);
+      btn.classList.add('happy');
+      btn.querySelector('.face').textContent='😋';
+      score++; streak++; fed++;
+      $('score').textContent=score;
+      $('streak').textContent=streak;
+      $('progressFill').style.width=(fed/GOAL*100)+'%';
+      $('msg').textContent=pick(['Yum yum! 🎉','Perfect match!','Nom nom nom!','Great eyes! ⭐','So tasty!']);
+      $('cookieShape').style.transform='scale(0)';
+      if(fed>=GOAL){ setTimeout(win,900); }
+      else setTimeout(newRound,1000);
+    } else {
+      boing(); streak=0; $('streak').textContent=0;
+      btn.classList.add('nope');
+      setTimeout(()=>btn.classList.remove('nope'),500);
+      $('msg').textContent='Almost! Try again! 💪';
+      $('msg').style.color='#e07b39';
+      setTimeout(()=>$('msg').style.color='#2e9e4f',800);
+    }
+  }
+
+  // ---------- Win / confetti ----------
+  function confettiBurst(n){
+    const em=['🎉','⭐','🍪','💖','✨','🎈'];
+    for(let i=0;i<n;i++){
+      const d=document.createElement('div');
+      d.className='confetti'; d.textContent=pick(em);
+      d.style.left=Math.random()*100+'vw';
+      d.style.animationDuration=(2+Math.random()*2)+'s';
+      document.body.appendChild(d);
+      setTimeout(()=>d.remove(),4200);
+    }
+  }
+  function win(){
+    fanfare(); confettiBurst(40);
+    const ov=$('overlay');
+    ov.classList.remove('hidden');
+    ov.innerHTML=`<div style="font-size:70px">🏆🍪😋</div>
+      <h2>All Critters Fed!</h2>
+      <p>You matched <b>${GOAL}</b> cookies and scored <b>${score}</b> stars! The critters are full and happy!</p>
+      <button id="bigBtn">🔁 Play Again</button>`;
+    ov.querySelector('#bigBtn').addEventListener('click',start);
+  }
+
+  function start(){
+    score=0; streak=0; fed=0;
+    $('score').textContent=0; $('streak').textContent=0;
+    $('progressFill').style.width='0%';
+    $('overlay').classList.add('hidden');
+    if(ctx().state==='suspended') ctx().resume();
+    newRound();
+  }
+
+  $('bigBtn').addEventListener('click',start);
+})();
+</script>
+</body>
+</html>

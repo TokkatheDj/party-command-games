@@ -1,0 +1,185 @@
+<!-- CONCEPT: Animal Band Follow-Along — simon-says memory game: 4 musical animals play a growing melody pattern, kid repeats it by tapping them; win the concert at round 8. Ages 4-10, reaction/memory category. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Animal Band Follow-Along</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body { height:100%; }
+  body {
+    font-family:"Comic Sans MS","Chalkboard SE",-apple-system,sans-serif;
+    background:linear-gradient(180deg,#8ee6ff 0%,#c8f7d0 60%,#ffe9a8 100%);
+    display:flex; flex-direction:column; align-items:center; overflow:hidden;
+    touch-action:manipulation;
+  }
+  h1 { font-size:clamp(1.4rem,5vw,2.4rem); color:#4a2c8f; margin-top:12px;
+       text-shadow:2px 2px 0 #fff; }
+  .subtitle { color:#3a6b35; font-size:clamp(.85rem,3vw,1.1rem); margin:4px 12px 8px; text-align:center; }
+  #hud { display:flex; gap:14px; align-items:center; margin-bottom:6px; flex-wrap:wrap; justify-content:center; }
+  .badge { background:#fff; border-radius:999px; padding:8px 18px; font-size:clamp(1rem,3.5vw,1.3rem);
+           color:#4a2c8f; box-shadow:0 3px 0 rgba(0,0,0,.15); font-weight:bold; }
+  #message { min-height:2.2em; font-size:clamp(1.1rem,4vw,1.6rem); color:#d35400; font-weight:bold;
+             text-align:center; padding:0 10px; }
+  #stage { display:grid; grid-template-columns:1fr 1fr; gap:clamp(10px,3vw,22px);
+           width:min(92vw,480px); margin-top:4px; }
+  .animal {
+    aspect-ratio:1; border:none; border-radius:28px; cursor:pointer;
+    font-size:clamp(3rem,14vw,5.5rem); display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:2px;
+    box-shadow:0 6px 0 rgba(0,0,0,.2); transition:transform .08s, filter .08s;
+    position:relative;
+  }
+  .animal span.name { font-size:clamp(.8rem,2.8vw,1rem); color:rgba(0,0,0,.55); font-weight:bold; }
+  .animal:active { transform:scale(.95); }
+  .animal.lit { transform:scale(1.08); filter:brightness(1.35) saturate(1.4);
+                box-shadow:0 0 30px 10px rgba(255,255,255,.9), 0 6px 0 rgba(0,0,0,.2); }
+  .animal[disabled] { cursor:default; opacity:.85; }
+  #frog { background:#7ed957; } #cat { background:#ffb3c7; }
+  #duck { background:#ffe066; } #owl { background:#a8c6ff; }
+  #bigbtn {
+    margin:14px 0 10px; padding:14px 44px; font-size:clamp(1.2rem,4.5vw,1.6rem);
+    font-family:inherit; font-weight:bold; color:#fff; background:#ff7b39;
+    border:none; border-radius:999px; cursor:pointer; box-shadow:0 5px 0 #c95a20;
+  }
+  #bigbtn:active { transform:translateY(3px); box-shadow:0 2px 0 #c95a20; }
+  .confetti { position:fixed; top:-20px; font-size:1.6rem; pointer-events:none;
+              animation:fall linear forwards; z-index:10; }
+  @keyframes fall { to { transform:translateY(110vh) rotate(720deg); } }
+  #stars { min-height:1.6em; font-size:1.4rem; letter-spacing:4px; }
+</style>
+</head>
+<body>
+  <h1>🎵 Animal Band Follow-Along 🎵</h1>
+  <div class="subtitle">Watch the animals play their song — then tap them in the same order!</div>
+  <div id="hud">
+    <div class="badge">Round: <span id="round">–</span> / 8</div>
+    <div class="badge">Best: <span id="best">0</span></div>
+  </div>
+  <div id="stars"></div>
+  <div id="message">Press START to hear the band! 🎶</div>
+  <div id="stage">
+    <button class="animal" id="frog" data-i="0">🐸<span class="name">Froggy</span></button>
+    <button class="animal" id="cat"  data-i="1">🐱<span class="name">Kitty</span></button>
+    <button class="animal" id="duck" data-i="2">🦆<span class="name">Ducky</span></button>
+    <button class="animal" id="owl"  data-i="3">🦉<span class="name">Hootie</span></button>
+  </div>
+  <button id="bigbtn">START</button>
+
+<script>
+(function(){
+  const animals=[...document.querySelectorAll('.animal')];
+  const msg=document.getElementById('message');
+  const roundEl=document.getElementById('round');
+  const bestEl=document.getElementById('best');
+  const starsEl=document.getElementById('stars');
+  const bigbtn=document.getElementById('bigbtn');
+  const WIN=8;
+  let ac=null, seq=[], pos=0, playing=false, accepting=false, best=0;
+
+  // Each animal = distinct instrument-ish voice via Web Audio
+  const voices=[
+    {f:220,type:'square',dur:.32},   // frog: low croaky
+    {f:392,type:'triangle',dur:.3},  // cat: mid mew
+    {f:523,type:'sawtooth',dur:.28}, // duck: bright quack
+    {f:311,type:'sine',dur:.42}      // owl: soft hoot
+  ];
+  function audio(){ if(!ac) ac=new (window.AudioContext||window.webkitAudioContext)(); if(ac.state==='suspended') ac.resume(); return ac; }
+  function playVoice(i,when=0){
+    const ctx=audio(), t=ctx.currentTime+when, v=voices[i];
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=v.type; o.frequency.setValueAtTime(v.f,t);
+    o.frequency.exponentialRampToValueAtTime(v.f*(i===3?0.8:1.15), t+v.dur);
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.35,t+.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+v.dur);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+v.dur+.05);
+  }
+  function sadSound(){
+    const ctx=audio(), t=ctx.currentTime;
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(300,t);
+    o.frequency.exponentialRampToValueAtTime(140,t+.5);
+    g.gain.setValueAtTime(.3,t); g.gain.exponentialRampToValueAtTime(.0001,t+.55);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+.6);
+  }
+  function fanfare(){
+    [523,659,784,1047].forEach((f,i)=>{
+      const ctx=audio(), t=ctx.currentTime+i*.15;
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='triangle'; o.frequency.value=f;
+      g.gain.setValueAtTime(.3,t); g.gain.exponentialRampToValueAtTime(.0001,t+.4);
+      o.connect(g).connect(ctx.destination); o.start(t); o.stop(t+.45);
+    });
+  }
+  function light(i,ms=420){
+    animals[i].classList.add('lit');
+    setTimeout(()=>animals[i].classList.remove('lit'),ms);
+  }
+  function confetti(n=40){
+    const emo=['🎉','⭐','🎵','💛','🎈','✨'];
+    for(let k=0;k<n;k++){
+      const s=document.createElement('div'); s.className='confetti';
+      s.textContent=emo[Math.floor(Math.random()*emo.length)];
+      s.style.left=Math.random()*100+'vw';
+      s.style.animationDuration=(2+Math.random()*2)+'s';
+      document.body.appendChild(s); setTimeout(()=>s.remove(),4200);
+    }
+  }
+  function setButtons(on){ animals.forEach(a=>a.disabled=!on); }
+  function stars(){ starsEl.textContent='⭐'.repeat(Math.max(0,seq.length-1)); }
+
+  function showSequence(){
+    playing=true; accepting=false; setButtons(false);
+    msg.textContent='👀 Watch and listen...';
+    seq.forEach((idx,k)=>{
+      setTimeout(()=>{ light(idx); playVoice(idx); },600+k*650);
+    });
+    setTimeout(()=>{
+      playing=false; accepting=true; pos=0; setButtons(true);
+      msg.textContent='🎶 Your turn! Tap the animals!';
+    },600+seq.length*650);
+  }
+  function nextRound(){
+    seq.push(Math.floor(Math.random()*4));
+    roundEl.textContent=seq.length; stars();
+    showSequence();
+  }
+  function startGame(){
+    seq=[]; bigbtn.textContent='RESTART';
+    msg.textContent='Here comes the band! 🥁';
+    setTimeout(nextRound,500);
+  }
+  function tapped(i){
+    if(!accepting) return;
+    light(i,250); playVoice(i);
+    if(i===seq[pos]){
+      pos++;
+      if(pos===seq.length){
+        accepting=false; setButtons(false);
+        if(seq.length>best){ best=seq.length; bestEl.textContent=best; }
+        if(seq.length>=WIN){
+          msg.textContent='🏆 YOU WON THE CONCERT! Amazing ears! 🏆';
+          fanfare(); confetti(60); stars();
+          setTimeout(()=>confetti(40),700);
+        } else {
+          msg.textContent='🌟 Great job! Get ready...';
+          setTimeout(nextRound,1000);
+        }
+      }
+    } else {
+      accepting=false; setButtons(false); sadSound();
+      msg.textContent='Oops — so close! Listen again, you can do it! 💪';
+      setTimeout(showSequence,1400);
+    }
+  }
+  animals.forEach(a=>{
+    a.addEventListener('pointerdown',e=>{ e.preventDefault(); audio(); tapped(+a.dataset.i); });
+  });
+  bigbtn.addEventListener('pointerdown',e=>{ e.preventDefault(); audio(); if(!playing) startGame(); });
+  setButtons(false);
+})();
+</script>
+</body>
+</html>

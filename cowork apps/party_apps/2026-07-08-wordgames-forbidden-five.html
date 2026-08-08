@@ -1,0 +1,371 @@
+<!-- CONCEPT: WORD GAMES - Taboo-style team clue-giving: describe the word without saying the 5 forbidden words | Players: 4-10 | ~20 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forbidden Five</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(160deg,#12082b 0%,#1d0f4a 50%,#2a0a3d 100%);
+    color:#fff; min-height:100vh; display:flex; flex-direction:column; align-items:center;
+    user-select:none;
+  }
+  .screen { display:none; width:100%; max-width:760px; padding:24px 20px 40px; flex-direction:column; align-items:center; }
+  .screen.active { display:flex; }
+  h1 { font-size:clamp(2.4rem,8vw,4rem); font-weight:900; letter-spacing:1px;
+       background:linear-gradient(90deg,#ffd54d,#ff5e8a,#8a6bff);
+       -webkit-background-clip:text; background-clip:text; color:transparent; text-align:center; }
+  .tagline { font-size:clamp(1rem,3vw,1.25rem); color:#cfc4ff; text-align:center; margin:8px 0 4px; }
+  .meta { color:#8f83c9; font-size:.95rem; margin-bottom:20px; text-align:center; }
+  .card-box {
+    background:rgba(255,255,255,.07); border:2px solid rgba(255,255,255,.15);
+    border-radius:20px; padding:22px 24px; width:100%; margin-bottom:18px;
+  }
+  .card-box h3 { color:#ffd54d; margin-bottom:10px; font-size:1.15rem; }
+  .card-box p, .card-box li { color:#e6e0ff; line-height:1.55; font-size:1.05rem; }
+  .card-box ol { padding-left:22px; }
+  .btn {
+    border:none; border-radius:16px; font-weight:800; cursor:pointer;
+    font-size:1.3rem; padding:18px 30px; width:100%; margin-top:12px;
+    color:#1a1030; transition:transform .08s;
+  }
+  .btn:active { transform:scale(.97); }
+  .btn-primary { background:linear-gradient(90deg,#ffd54d,#ffb347); }
+  .btn-good { background:linear-gradient(90deg,#4dffa1,#2fd97c); }
+  .btn-bad  { background:linear-gradient(90deg,#ff5e8a,#ff3d6e); color:#fff; }
+  .btn-skip { background:linear-gradient(90deg,#8a6bff,#6b8aff); color:#fff; }
+  .btn-ghost { background:rgba(255,255,255,.12); color:#fff; font-size:1.05rem; padding:14px 20px; }
+  .opts { display:flex; gap:10px; width:100%; margin-top:6px; }
+  .opt {
+    flex:1; padding:14px 6px; border-radius:14px; border:2px solid rgba(255,255,255,.2);
+    background:rgba(255,255,255,.06); color:#fff; font-size:1.1rem; font-weight:700; cursor:pointer; text-align:center;
+  }
+  .opt.sel { background:#ffd54d; color:#1a1030; border-color:#ffd54d; }
+  .label { align-self:flex-start; color:#8f83c9; font-weight:700; margin:14px 0 6px; font-size:1rem; text-transform:uppercase; letter-spacing:1px; }
+  /* scoreboard */
+  .scorebar { display:flex; gap:14px; width:100%; margin-bottom:14px; }
+  .teamscore {
+    flex:1; border-radius:16px; padding:12px; text-align:center;
+    background:rgba(255,255,255,.07); border:3px solid transparent;
+  }
+  .teamscore.turn-a { border-color:#ffd54d; }
+  .teamscore.turn-b { border-color:#8a6bff; }
+  .teamscore .tname { font-size:1rem; font-weight:800; color:#cfc4ff; }
+  .teamscore .tpts { font-size:2.2rem; font-weight:900; }
+  /* round play */
+  #timer { font-size:clamp(3rem,12vw,5rem); font-weight:900; color:#4dffa1; line-height:1; margin:4px 0 10px; font-variant-numeric:tabular-nums; }
+  #timer.low { color:#ff5e8a; animation:pulse .5s infinite alternate; }
+  @keyframes pulse { from{transform:scale(1)} to{transform:scale(1.12)} }
+  .playcard {
+    width:100%; background:#fff; color:#1a1030; border-radius:24px;
+    padding:26px 20px; text-align:center; box-shadow:0 10px 40px rgba(0,0,0,.45);
+  }
+  .word { font-size:clamp(2.2rem,9vw,3.4rem); font-weight:900; letter-spacing:1px; text-transform:uppercase; }
+  .divider { height:3px; background:#ff3d6e; border-radius:2px; margin:16px 30px; }
+  .taboo { font-size:clamp(1.25rem,5vw,1.7rem); font-weight:700; color:#c2185b; padding:4px 0; text-transform:uppercase; }
+  .actions { display:flex; gap:10px; width:100%; margin-top:16px; }
+  .actions .btn { margin-top:0; font-size:1.15rem; padding:16px 8px; }
+  .hint { color:#8f83c9; text-align:center; margin-top:12px; font-size:.95rem; }
+  /* handoff + summary */
+  .bigmsg { font-size:clamp(1.6rem,6vw,2.4rem); font-weight:900; text-align:center; margin:20px 0; }
+  .accent-a { color:#ffd54d; } .accent-b { color:#8a6bff; }
+  .statline { font-size:1.25rem; color:#e6e0ff; margin:6px 0; text-align:center; }
+  #winnerName { font-size:clamp(2.2rem,9vw,3.6rem); font-weight:900; text-align:center; margin:10px 0; }
+  .confetti { font-size:3rem; text-align:center; }
+</style>
+</head>
+<body>
+
+<!-- ============ START SCREEN ============ -->
+<div class="screen active" id="scr-start">
+  <h1>FORBIDDEN FIVE</h1>
+  <p class="tagline">Get your team to guess the word — without saying the 5 forbidden words!</p>
+  <p class="meta">4–10 players &middot; 2 teams &middot; ~20 minutes</p>
+
+  <div class="card-box">
+    <h3>How to play</h3>
+    <ol>
+      <li>Split into two teams. One clue-giver holds the device; a rival player sits beside them to catch violations.</li>
+      <li>Describe the big word. Say any forbidden word (or the word itself) and the rival taps <b>TABOO!</b> (−1).</li>
+      <li>Each guess your team gets right: tap <b>GOT IT</b> (+1). Stuck? <b>SKIP</b> (free, but time burns).</li>
+      <li>When the buzzer sounds, pass the device to the other team. First to the target score after equal turns wins!</li>
+    </ol>
+  </div>
+
+  <div class="label">Round length</div>
+  <div class="opts" id="optTime">
+    <div class="opt" data-v="45">45s</div>
+    <div class="opt sel" data-v="60">60s</div>
+    <div class="opt" data-v="90">90s</div>
+  </div>
+
+  <div class="label">Target score</div>
+  <div class="opts" id="optTarget">
+    <div class="opt" data-v="15">15</div>
+    <div class="opt sel" data-v="20">20</div>
+    <div class="opt" data-v="30">30</div>
+  </div>
+
+  <button class="btn btn-primary" onclick="startGame()">START GAME</button>
+</div>
+
+<!-- ============ HANDOFF SCREEN ============ -->
+<div class="screen" id="scr-handoff">
+  <div class="scorebar">
+    <div class="teamscore" id="hs-a"><div class="tname">TEAM GOLD</div><div class="tpts" id="hs-a-pts">0</div></div>
+    <div class="teamscore" id="hs-b"><div class="tname">TEAM VIOLET</div><div class="tpts" id="hs-b-pts">0</div></div>
+  </div>
+  <div class="bigmsg" id="handoffMsg"></div>
+  <p class="hint" id="handoffHint">Clue-giver takes the device. A rival player watches the screen to catch forbidden words.</p>
+  <button class="btn btn-primary" onclick="beginRound()">▶ START ROUND</button>
+  <button class="btn btn-ghost" onclick="quitToStart()">End game &amp; back to menu</button>
+</div>
+
+<!-- ============ PLAY SCREEN ============ -->
+<div class="screen" id="scr-play">
+  <div class="scorebar">
+    <div class="teamscore" id="ps-a"><div class="tname">TEAM GOLD</div><div class="tpts" id="ps-a-pts">0</div></div>
+    <div class="teamscore" id="ps-b"><div class="tname">TEAM VIOLET</div><div class="tpts" id="ps-b-pts">0</div></div>
+  </div>
+  <div id="timer">60</div>
+  <div class="playcard">
+    <div class="word" id="theWord">WORD</div>
+    <div class="divider"></div>
+    <div id="tabooList"></div>
+  </div>
+  <div class="actions">
+    <button class="btn btn-bad" onclick="hitTaboo()">TABOO!<br>−1</button>
+    <button class="btn btn-skip" onclick="skipCard()">SKIP</button>
+    <button class="btn btn-good" onclick="gotIt()">GOT IT<br>+1</button>
+  </div>
+  <p class="hint">Rival player: tap TABOO! if a forbidden word slips out.</p>
+</div>
+
+<!-- ============ ROUND SUMMARY ============ -->
+<div class="screen" id="scr-summary">
+  <div class="bigmsg">⏰ TIME'S UP!</div>
+  <div class="statline" id="sumLine1"></div>
+  <div class="statline" id="sumLine2"></div>
+  <div class="scorebar" style="margin-top:18px;">
+    <div class="teamscore" id="ss-a"><div class="tname">TEAM GOLD</div><div class="tpts" id="ss-a-pts">0</div></div>
+    <div class="teamscore" id="ss-b"><div class="tname">TEAM VIOLET</div><div class="tpts" id="ss-b-pts">0</div></div>
+  </div>
+  <button class="btn btn-primary" onclick="nextTurn()" id="btnNext">PASS THE DEVICE ➜</button>
+</div>
+
+<!-- ============ WINNER SCREEN ============ -->
+<div class="screen" id="scr-winner">
+  <div class="confetti">🎉🏆🎉</div>
+  <div id="winnerName"></div>
+  <div class="statline" id="finalScoreLine"></div>
+  <button class="btn btn-primary" onclick="playAgain()">PLAY AGAIN</button>
+  <button class="btn btn-ghost" onclick="quitToStart()">Back to menu</button>
+</div>
+
+<script>
+/* ================= CARD DECK (word + 5 forbidden words) ================= */
+const DECK = [
+["Birthday",["Cake","Party","Candles","Age","Celebrate"]],
+["Beach",["Sand","Ocean","Sun","Swim","Towel"]],
+["Pizza",["Cheese","Slice","Pepperoni","Italy","Dough"]],
+["Snowman",["Frosty","Carrot","Winter","Cold","Build"]],
+["Guitar",["Strings","Play","Music","Rock","Strum"]],
+["Library",["Books","Quiet","Read","Borrow","Shelves"]],
+["Camping",["Tent","Fire","Outdoors","Sleep","Woods"]],
+["Dentist",["Teeth","Drill","Cavity","Clean","Mouth"]],
+["Rainbow",["Colors","Rain","Sky","Arc","Pot of gold"]],
+["Astronaut",["Space","NASA","Rocket","Moon","Suit"]],
+["Popcorn",["Movie","Kernel","Butter","Pop","Snack"]],
+["Firefighter",["Fire","Hose","Truck","Ladder","Rescue"]],
+["Homework",["School","Assignment","Teacher","Study","Due"]],
+["Elephant",["Trunk","Big","Gray","Ears","Africa"]],
+["Vampire",["Blood","Fangs","Dracula","Bat","Night"]],
+["Karaoke",["Sing","Microphone","Song","Lyrics","Bar"]],
+["Umbrella",["Rain","Wet","Open","Handle","Cover"]],
+["Sandwich",["Bread","Lunch","Ham","Layers","Eat"]],
+["Volcano",["Lava","Erupt","Mountain","Hot","Ash"]],
+["Wedding",["Bride","Groom","Marriage","Ring","Dress"]],
+["Roller Coaster",["Ride","Amusement park","Fast","Loop","Scream"]],
+["Detective",["Crime","Clues","Sherlock","Mystery","Solve"]],
+["Pancake",["Breakfast","Syrup","Flat","Flip","Batter"]],
+["Pirate",["Ship","Treasure","Eye patch","Parrot","Sea"]],
+["Skeleton",["Bones","Halloween","Skull","Body","Spooky"]],
+["Juggler",["Balls","Circus","Throw","Catch","Three"]],
+["Lighthouse",["Ocean","Ships","Light","Tower","Coast"]],
+["Mermaid",["Fish","Tail","Ocean","Ariel","Swim"]],
+["Chess",["Board","King","Queen","Checkmate","Pieces"]],
+["Tornado",["Wind","Storm","Spin","Twister","Destroy"]],
+["Barber",["Hair","Cut","Scissors","Shave","Shop"]],
+["Igloo",["Ice","Eskimo","Cold","House","Snow"]],
+["Ninja",["Japan","Sword","Stealth","Black","Fight"]],
+["Trampoline",["Jump","Bounce","Backyard","Spring","High"]],
+["Scarecrow",["Field","Birds","Straw","Farm","Corn"]],
+["Submarine",["Underwater","Ocean","Yellow","Navy","Periscope"]],
+["Marshmallow",["Soft","Campfire","White","Roast","S'mores"]],
+["Referee",["Whistle","Sports","Rules","Game","Foul"]],
+["Cactus",["Desert","Spiky","Plant","Green","Needles"]],
+["Magician",["Magic","Trick","Rabbit","Hat","Wand"]],
+["Fireworks",["Explode","Sky","Fourth of July","Colors","Boom"]],
+["Penguin",["Bird","Antarctica","Waddle","Black and white","Cold"]],
+["Recipe",["Cook","Ingredients","Instructions","Food","Bake"]],
+["Treasure Map",["Pirate","X","Gold","Buried","Directions"]],
+["Alarm Clock",["Wake","Morning","Ring","Snooze","Time"]],
+["Waterfall",["River","Fall","Niagara","Cliff","Splash"]],
+["Superhero",["Cape","Powers","Save","Fly","Comic"]],
+["Fortune Cookie",["Chinese","Message","Lucky","Restaurant","Crack"]],
+["Snorkel",["Swim","Breathe","Mask","Underwater","Tube"]],
+["Orchestra",["Music","Instruments","Conductor","Violin","Symphony"]],
+["Hiccups",["Cure","Scare","Water","Breath","Sound"]],
+["Selfie",["Photo","Phone","Camera","Yourself","Pose"]],
+["Bowling",["Pins","Ball","Strike","Alley","Roll"]],
+["Zookeeper",["Animals","Cage","Feed","Zoo","Care"]],
+["Toothbrush",["Teeth","Clean","Paste","Bristles","Morning"]],
+["Hammock",["Sleep","Trees","Swing","Relax","Nap"]],
+["Compass",["North","Direction","Needle","Navigate","Map"]],
+["Milkshake",["Ice cream","Drink","Straw","Blend","Thick"]],
+["Parachute",["Jump","Plane","Fall","Open","Sky"]],
+["Sunburn",["Red","Beach","Lotion","Skin","Hot"]],
+["Robot",["Machine","Metal","Beep","Program","Artificial"]],
+["Campfire",["Wood","Flames","Stories","Marshmallow","Camping"]],
+["Werewolf",["Full moon","Howl","Transform","Hairy","Monster"]],
+["Piñata",["Candy","Hit","Party","Blindfold","Stick"]],
+["Escalator",["Stairs","Moving","Mall","Up","Ride"]],
+["Fingerprint",["Unique","Crime","Ink","Identity","Hand"]],
+["Time Machine",["Travel","Past","Future","Invention","Back"]],
+["Surfboard",["Waves","Ocean","Ride","Balance","Hawaii"]],
+["Ventriloquist",["Puppet","Dummy","Mouth","Voice","Talk"]],
+["Ice Cream Truck",["Music","Summer","Cone","Drive","Kids"]],
+["Photo Booth",["Pictures","Strip","Curtain","Props","Mall"]],
+["Sleepwalking",["Night","Bed","Eyes","Wander","Wake"]],
+["Tug of War",["Rope","Pull","Teams","Strength","Fall"]],
+["Hide and Seek",["Count","Find","Game","Behind","Ready"]],
+["Genie",["Wish","Lamp","Three","Rub","Aladdin"]],
+["Quicksand",["Sink","Sand","Stuck","Jungle","Slow"]],
+["Telescope",["Stars","Look","Space","Lens","Astronomy"]],
+["Snow Globe",["Shake","Winter","Glass","Souvenir","Flakes"]],
+["Drive-Thru",["Fast food","Car","Window","Order","Speaker"]],
+["Yoga",["Stretch","Mat","Pose","Breathe","Namaste"]]
+];
+
+/* ================= STATE ================= */
+let roundSecs = 60, targetScore = 20;
+let scores = { A:0, B:0 };
+let current = 'A';                 // whose turn
+let turnsTaken = { A:0, B:0 };
+let deckOrder = [], deckPos = 0;
+let timerId = null, timeLeft = 0;
+let roundStats = { got:0, taboo:0, skip:0 };
+
+/* ================= AUDIO (Web Audio API) ================= */
+let AC = null;
+function audio() { if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }
+function beep(freq, dur, type='sine', vol=0.25, when=0) {
+  const ctx = audio(), o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type; o.frequency.value = freq; o.connect(g); g.connect(ctx.destination);
+  const t = ctx.currentTime + when;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+  o.start(t); o.stop(t+dur+0.05);
+}
+function sndCorrect(){ beep(660,.12,'sine',.3); beep(880,.18,'sine',.3,.1); }
+function sndTaboo(){ beep(180,.35,'sawtooth',.3); }
+function sndSkip(){ beep(440,.1,'triangle',.2); }
+function sndTick(){ beep(1000,.06,'square',.12); }
+function sndBuzzer(){ beep(140,.9,'sawtooth',.4); beep(110,.9,'sawtooth',.35,.05); }
+function sndFanfare(){ [523,659,784,1047].forEach((f,i)=>beep(f,.25,'sine',.3,i*.16)); }
+
+/* ================= HELPERS ================= */
+const $ = id => document.getElementById(id);
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $(id).classList.add('active'); }
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function teamLabel(t){ return t==='A' ? 'TEAM GOLD' : 'TEAM VIOLET'; }
+function updateScores(){
+  ['hs','ps','ss'].forEach(p=>{ $(p+'-a-pts').textContent=scores.A; $(p+'-b-pts').textContent=scores.B; });
+  ['hs','ps'].forEach(p=>{
+    $(p+'-a').classList.toggle('turn-a', current==='A');
+    $(p+'-a').classList.remove('turn-b');
+    $(p+'-b').classList.toggle('turn-b', current==='B');
+    $(p+'-b').classList.remove('turn-a');
+  });
+}
+
+/* option pickers */
+document.querySelectorAll('.opts').forEach(box=>{
+  box.addEventListener('click', e=>{
+    const o = e.target.closest('.opt'); if(!o) return;
+    box.querySelectorAll('.opt').forEach(x=>x.classList.remove('sel'));
+    o.classList.add('sel');
+  });
+});
+
+/* ================= GAME FLOW ================= */
+function startGame(){
+  audio(); // unlock audio on user gesture
+  roundSecs   = +document.querySelector('#optTime .sel').dataset.v;
+  targetScore = +document.querySelector('#optTarget .sel').dataset.v;
+  scores = {A:0,B:0}; turnsTaken = {A:0,B:0}; current = 'A';
+  deckOrder = shuffle([...Array(DECK.length).keys()]); deckPos = 0;
+  showHandoff();
+}
+function showHandoff(){
+  updateScores();
+  const cls = current==='A' ? 'accent-a' : 'accent-b';
+  $('handoffMsg').innerHTML = `<span class="${cls}">${teamLabel(current)}</span> — you're up!`;
+  show('scr-handoff');
+}
+function nextCard(){
+  if(deckPos >= deckOrder.length){ deckOrder = shuffle(deckOrder); deckPos = 0; }
+  const [word, taboos] = DECK[deckOrder[deckPos++]];
+  $('theWord').textContent = word;
+  $('tabooList').innerHTML = taboos.map(t=>`<div class="taboo">${t}</div>`).join('');
+}
+function beginRound(){
+  roundStats = {got:0,taboo:0,skip:0};
+  timeLeft = roundSecs;
+  $('timer').textContent = timeLeft;
+  $('timer').classList.remove('low');
+  nextCard(); updateScores(); show('scr-play');
+  timerId = setInterval(()=>{
+    timeLeft--;
+    $('timer').textContent = timeLeft;
+    if(timeLeft<=5 && timeLeft>0){ $('timer').classList.add('low'); sndTick(); }
+    if(timeLeft<=0){ endRound(); }
+  },1000);
+}
+function gotIt(){ scores[current]++; roundStats.got++; sndCorrect(); updateScores(); nextCard(); }
+function hitTaboo(){ scores[current]=Math.max(0,scores[current]-1); roundStats.taboo++; sndTaboo(); updateScores(); nextCard(); }
+function skipCard(){ roundStats.skip++; sndSkip(); nextCard(); }
+function endRound(){
+  clearInterval(timerId); timerId=null;
+  sndBuzzer();
+  turnsTaken[current]++;
+  $('sumLine1').textContent = `${teamLabel(current)}: ✅ ${roundStats.got} correct · 🚫 ${roundStats.taboo} taboo · ⏭ ${roundStats.skip} skipped`;
+  const net = roundStats.got - roundStats.taboo;
+  $('sumLine2').textContent = `Net this round: ${net>=0?'+':''}${net} points`;
+  updateScores();
+  // Winner check only after both teams have had equal turns
+  if(turnsTaken.A === turnsTaken.B && (scores.A>=targetScore || scores.B>=targetScore) && scores.A!==scores.B){
+    $('btnNext').textContent = '🏆 SEE THE WINNER';
+    $('btnNext').onclick = showWinner;
+  } else {
+    $('btnNext').textContent = 'PASS THE DEVICE ➜';
+    $('btnNext').onclick = nextTurn;
+  }
+  show('scr-summary');
+}
+function nextTurn(){ current = current==='A' ? 'B' : 'A'; showHandoff(); }
+function showWinner(){
+  const w = scores.A>scores.B ? 'A' : 'B';
+  $('winnerName').innerHTML = `<span class="${w==='A'?'accent-a':'accent-b'}">${teamLabel(w)} WINS!</span>`;
+  $('finalScoreLine').textContent = `Final score — Gold ${scores.A} : Violet ${scores.B}`;
+  sndFanfare();
+  show('scr-winner');
+}
+function playAgain(){ startGame(); }
+function quitToStart(){ if(timerId) clearInterval(timerId); show('scr-start'); }
+</script>
+</body>
+</html>

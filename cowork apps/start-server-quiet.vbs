@@ -3,4 +3,7 @@
 ' It frees port 8080 first (clears any stuck/hung server) then starts a fresh
 ' server minimized to the taskbar. No browser pop-up; the phone/tablet URL is
 ' shown on the index page (http://192.168.0.248:8080).
-CreateObject("WScript.Shell").Run """C:\Users\tokka\Claude Local\cowork apps\restart-server.bat""", 0, False
+Dim fso, here
+Set fso = CreateObject("Scripting.FileSystemObject")
+here = fso.GetParentFolderName(WScript.ScriptFullName)
+CreateObject("WScript.Shell").Run """" & here & "\restart-server.bat""", 0, False
