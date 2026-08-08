@@ -123,6 +123,7 @@ async function smoke() {
 
   // reset back to light so repeated runs start from the default state
   await page.click("#theme-toggle-btn");
+  await page.waitForTimeout(150); // let the /api/theme POST finish before navigating away
 
   // 3. Standalone /build page renders and shares the same theme wiring
   await page.goto(BASE_URL + "/build", { waitUntil: "domcontentloaded" });

@@ -1,0 +1,253 @@
+<!-- CONCEPT: Bloop the Blob Pet Care — cozy virtual-pet game: Bloop shows what it needs in a thought bubble (food, nap, bath, play); tap the matching big button to care for it. Collect 10 hearts to throw Bloop a party. Ages 4-8, cozy/silly category. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Bloop the Blob — Pet Care</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; }
+  html,body { height:100%; }
+  body {
+    font-family: 'Comic Sans MS','Chalkboard SE','Segoe UI',sans-serif;
+    background: linear-gradient(180deg,#aee7ff 0%,#d8f7e8 60%,#b8f0c8 100%);
+    display:flex; flex-direction:column; align-items:center;
+    overflow:hidden; touch-action:manipulation;
+  }
+  h1 { color:#3a6ea5; margin-top:10px; font-size:clamp(24px,5vw,40px); text-shadow:2px 2px 0 #fff; }
+  .desc { color:#4a7a55; font-size:clamp(13px,2.5vw,17px); text-align:center; padding:0 12px; }
+  #hearts { display:flex; gap:4px; margin:8px 0; font-size:clamp(18px,4vw,28px); }
+  #hearts span { filter:grayscale(1) opacity(.35); transition:transform .3s, filter .3s; }
+  #hearts span.full { filter:none; transform:scale(1.15); }
+
+  #stage { position:relative; width:min(92vw,480px); flex:1; max-height:46vh; display:flex; align-items:center; justify-content:center; }
+
+  #bubble {
+    position:absolute; top:0; right:0;
+    background:#fff; border:4px solid #ffd166; border-radius:30px;
+    width:clamp(80px,20vw,110px); height:clamp(80px,20vw,110px);
+    display:flex; align-items:center; justify-content:center;
+    font-size:clamp(44px,11vw,62px);
+    box-shadow:0 6px 0 rgba(0,0,0,.08);
+    animation: floaty 2s ease-in-out infinite;
+  }
+  #bubble::after {
+    content:''; position:absolute; bottom:-16px; left:18px;
+    width:16px; height:16px; background:#fff; border:4px solid #ffd166;
+    border-radius:50%;
+  }
+  @keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+
+  #bloop {
+    width:clamp(150px,40vw,220px); height:clamp(130px,34vw,190px);
+    position:relative; transition:transform .2s;
+  }
+  #bloop.happy { animation:bounce .6s ease; }
+  #bloop.wiggle { animation:wiggle .5s ease; }
+  @keyframes bounce { 0%,100%{transform:scale(1)} 30%{transform:scale(1.15,.85)} 60%{transform:scale(.9,1.15)} }
+  @keyframes wiggle { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-6deg)} 75%{transform:rotate(6deg)} }
+  .body {
+    position:absolute; inset:0;
+    background:radial-gradient(circle at 35% 30%, #b48ef7, #8a5fe0);
+    border-radius:48% 52% 55% 45% / 60% 60% 40% 40%;
+    box-shadow: inset -10px -14px 0 rgba(0,0,0,.08), 0 10px 0 rgba(0,0,0,.08);
+    animation: squish 3s ease-in-out infinite;
+  }
+  @keyframes squish { 0%,100%{border-radius:48% 52% 55% 45%/60% 60% 40% 40%} 50%{border-radius:52% 48% 45% 55%/55% 55% 45% 45%} }
+  .eye { position:absolute; top:34%; width:14%; height:20%; background:#fff; border-radius:50%; }
+  .eye.l{left:24%} .eye.r{right:24%}
+  .eye::after { content:''; position:absolute; left:28%; top:32%; width:46%; height:46%; background:#332244; border-radius:50%; }
+  #bloop.sleepy .eye { height:5%; top:42%; background:#332244; border-radius:4px; }
+  #bloop.sleepy .eye::after { display:none; }
+  .mouth { position:absolute; top:62%; left:50%; transform:translateX(-50%);
+    width:22%; height:12%; border:5px solid #332244; border-top:none; border-radius:0 0 60px 60px; background:#ff8fa3; }
+  .cheek { position:absolute; top:56%; width:11%; height:8%; background:#ff9ec4; border-radius:50%; opacity:.8; }
+  .cheek.l{left:12%} .cheek.r{right:12%}
+
+  #msg { min-height:1.5em; font-size:clamp(18px,4vw,26px); color:#e0559a; font-weight:bold; text-shadow:1px 1px 0 #fff; margin:4px 0; }
+
+  #buttons { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; width:min(94vw,520px); padding:0 8px 14px; }
+  .care {
+    font-size:clamp(34px,9vw,52px); padding:14px 0 8px; border:none; cursor:pointer;
+    background:#fff; border-radius:24px; box-shadow:0 6px 0 #d9c8a0;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    transition:transform .1s;
+  }
+  .care small { font-size:clamp(12px,2.6vw,16px); color:#7a6a45; font-weight:bold; }
+  .care:active { transform:translateY(4px); box-shadow:0 2px 0 #d9c8a0; }
+
+  #overlay {
+    position:fixed; inset:0; background:rgba(255,255,255,.92); z-index:10;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+    text-align:center; padding:20px;
+  }
+  #overlay.hidden { display:none; }
+  #overlay h2 { color:#8a5fe0; font-size:clamp(28px,7vw,48px); }
+  #overlay p { color:#4a7a55; font-size:clamp(16px,3.5vw,22px); max-width:420px; }
+  .big-btn {
+    font-family:inherit; font-size:clamp(20px,5vw,30px); font-weight:bold; color:#fff;
+    background:linear-gradient(180deg,#ffb347,#ff8c42); border:none; border-radius:40px;
+    padding:16px 44px; cursor:pointer; box-shadow:0 8px 0 #d1662a;
+  }
+  .big-btn:active { transform:translateY(5px); box-shadow:0 3px 0 #d1662a; }
+
+  .confetti { position:fixed; top:-20px; font-size:26px; z-index:9; animation:fall linear forwards; pointer-events:none; }
+  @keyframes fall { to { transform:translateY(110vh) rotate(720deg); } }
+</style>
+</head>
+<body>
+  <h1>🫧 Bloop the Blob 🫧</h1>
+  <div class="desc">Bloop shows what it needs in the bubble — tap the matching button! Fill 10 hearts to throw a party.</div>
+  <div id="hearts"></div>
+
+  <div id="stage">
+    <div id="bubble">❔</div>
+    <div id="bloop">
+      <div class="body"></div>
+      <div class="eye l"></div><div class="eye r"></div>
+      <div class="cheek l"></div><div class="cheek r"></div>
+      <div class="mouth"></div>
+    </div>
+  </div>
+
+  <div id="msg">Bloop needs you!</div>
+
+  <div id="buttons">
+    <button class="care" data-need="food">🍓<small>Snack</small></button>
+    <button class="care" data-need="sleep">💤<small>Nap</small></button>
+    <button class="care" data-need="bath">🫧<small>Bath</small></button>
+    <button class="care" data-need="play">⚽<small>Play</small></button>
+  </div>
+
+  <div id="overlay">
+    <h2>Meet Bloop!</h2>
+    <p>Bloop is a squishy little blob who needs your help. Look at the thought bubble and tap the right button to take care of Bloop!</p>
+    <button class="big-btn" id="startBtn">Let's Play! ▶</button>
+  </div>
+
+<script>
+(function(){
+  const NEEDS = {
+    food:  { icon:'🍓', yay:['Yum yum!','So tasty!','Nom nom nom!'] },
+    sleep: { icon:'💤', yay:['Zzz... so cozy!','Sweet dreams!','Best nap ever!'] },
+    bath:  { icon:'🫧', yay:['Squeaky clean!','Bubble time!','So sparkly!'] },
+    play:  { icon:'⚽', yay:['Wheee!','So fun!','Again, again!'] }
+  };
+  const KEYS = Object.keys(NEEDS);
+  const GOAL = 10;
+  const bubble = document.getElementById('bubble');
+  const bloop = document.getElementById('bloop');
+  const msg = document.getElementById('msg');
+  const heartsEl = document.getElementById('hearts');
+  const overlay = document.getElementById('overlay');
+  let need = null, hearts = 0, busy = true, won = false;
+
+  // --- sound (Web Audio only) ---
+  let ac = null;
+  function ctx(){ if(!ac) ac = new (window.AudioContext||window.webkitAudioContext)(); if(ac.state==='suspended') ac.resume(); return ac; }
+  function tone(freq, t0, dur, type='sine', vol=0.18){
+    const a = ctx(), o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, a.currentTime+t0);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime+t0+dur);
+    o.connect(g).connect(a.destination);
+    o.start(a.currentTime+t0); o.stop(a.currentTime+t0+dur+0.05);
+  }
+  const sHappy = ()=>{ [523,659,784].forEach((f,i)=>tone(f, i*0.09, 0.25,'triangle')); };
+  const sBoop  = ()=>{ tone(220,0,0.18,'sine',0.12); };
+  const sWin   = ()=>{ [523,659,784,1047,784,1047,1319].forEach((f,i)=>tone(f, i*0.13, 0.3,'triangle',0.2)); };
+  const sPop   = ()=>{ tone(700+Math.random()*500,0,0.08,'square',0.06); };
+
+  function drawHearts(){
+    heartsEl.innerHTML = '';
+    for(let i=0;i<GOAL;i++){
+      const s = document.createElement('span');
+      s.textContent = '❤️';
+      if(i < hearts) s.classList.add('full');
+      heartsEl.appendChild(s);
+    }
+  }
+
+  function nextNeed(){
+    let n;
+    do { n = KEYS[Math.floor(Math.random()*KEYS.length)]; } while(n === need && Math.random() < 0.8);
+    need = n;
+    bubble.textContent = NEEDS[n].icon;
+    bloop.classList.toggle('sleepy', n === 'sleep');
+    msg.textContent = 'What does Bloop need?';
+    busy = false;
+  }
+
+  function confettiBurst(count){
+    const emo = ['🎉','⭐','💜','🫧','🌈','🎈'];
+    for(let i=0;i<count;i++){
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      c.textContent = emo[Math.floor(Math.random()*emo.length)];
+      c.style.left = Math.random()*100 + 'vw';
+      c.style.animationDuration = (1.6 + Math.random()*1.6) + 's';
+      document.body.appendChild(c);
+      setTimeout(()=>c.remove(), 3500);
+    }
+  }
+
+  function win(){
+    won = true; busy = true;
+    bubble.textContent = '🎉';
+    msg.textContent = 'Bloop is SO happy! Party time!';
+    sWin();
+    confettiBurst(40);
+    const iv = setInterval(()=>{ confettiBurst(10); sPop(); }, 700);
+    setTimeout(()=>{
+      clearInterval(iv);
+      overlay.querySelector('h2').textContent = '🎉 You did it! 🎉';
+      overlay.querySelector('p').textContent = 'You took amazing care of Bloop and earned all 10 hearts! Bloop loves you!';
+      document.getElementById('startBtn').textContent = 'Play Again ▶';
+      overlay.classList.remove('hidden');
+    }, 3200);
+  }
+
+  function care(choice){
+    if(busy || won) return;
+    if(choice === need){
+      busy = true;
+      hearts++;
+      drawHearts();
+      sHappy();
+      bloop.classList.remove('wiggle'); void bloop.offsetWidth;
+      bloop.classList.add('happy');
+      const y = NEEDS[need].yay;
+      msg.textContent = y[Math.floor(Math.random()*y.length)];
+      bubble.textContent = '💖';
+      confettiBurst(4);
+      setTimeout(()=>{
+        bloop.classList.remove('happy');
+        if(hearts >= GOAL) win(); else nextNeed();
+      }, 900);
+    } else {
+      sBoop();
+      bloop.classList.remove('happy'); void bloop.offsetWidth;
+      bloop.classList.add('wiggle');
+      msg.textContent = 'Almost! Try again! 😊';
+      setTimeout(()=>bloop.classList.remove('wiggle'), 500);
+    }
+  }
+
+  document.querySelectorAll('.care').forEach(b=>{
+    b.addEventListener('click', ()=>{ ctx(); care(b.dataset.need); });
+  });
+
+  document.getElementById('startBtn').addEventListener('click', ()=>{
+    ctx();
+    overlay.classList.add('hidden');
+    hearts = 0; won = false;
+    drawHearts();
+    nextNeed();
+    sHappy();
+  });
+
+  drawHearts();
+})();
+</script>
+</body>
+</html>

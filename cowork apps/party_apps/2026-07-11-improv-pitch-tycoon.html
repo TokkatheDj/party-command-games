@@ -1,0 +1,376 @@
+<!-- CONCEPT: IMPROV/CREATIVE - Pitch Tycoon: pitch a randomly generated absurd invention to the room for 60 seconds, then the other players invest coins; richest inventor wins | Players: 3-10 | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pitch Tycoon</title>
+<style>
+  :root{
+    --bg:#12082b; --panel:#231147; --accent:#ffb703; --accent2:#fb5607;
+    --good:#06d6a0; --text:#fff8ec; --dim:#b9a8e0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    background:radial-gradient(circle at 50% 20%, #2a1560 0%, var(--bg) 65%);
+    color:var(--text); font-family:'Segoe UI', 'Arial Black', Arial, sans-serif;
+    display:flex; flex-direction:column; align-items:center; min-height:100vh;
+    padding:16px; text-align:center;
+  }
+  h1{
+    font-size:clamp(2rem,6vw,3.4rem); letter-spacing:2px; margin:10px 0 4px;
+    color:var(--accent); text-shadow:0 4px 0 rgba(0,0,0,.4);
+  }
+  .tag{color:var(--dim); font-size:clamp(.95rem,2.5vw,1.15rem); margin-bottom:4px;}
+  .meta{color:var(--dim); font-size:.9rem; margin-bottom:14px;}
+  .screen{display:none; width:100%; max-width:860px; flex:1; flex-direction:column; align-items:center;}
+  .screen.active{display:flex;}
+  .card{
+    background:var(--panel); border-radius:20px; padding:22px; width:100%;
+    box-shadow:0 8px 24px rgba(0,0,0,.45); margin-bottom:16px;
+  }
+  button{
+    font-family:inherit; font-weight:800; border:none; border-radius:16px;
+    cursor:pointer; color:#1b0f00; background:var(--accent);
+    font-size:clamp(1.1rem,3vw,1.4rem); padding:16px 28px; margin:8px;
+    box-shadow:0 5px 0 #b57e00; transition:transform .06s;
+    min-width:130px; min-height:56px;
+  }
+  button:active{transform:translateY(4px); box-shadow:0 1px 0 #b57e00;}
+  button.secondary{background:#5c4b8a; color:var(--text); box-shadow:0 5px 0 #3a2f5c;}
+  button.secondary:active{box-shadow:0 1px 0 #3a2f5c;}
+  button.danger{background:var(--accent2); color:#fff; box-shadow:0 5px 0 #a83403;}
+  button:disabled{opacity:.4; cursor:default;}
+  input[type=text]{
+    font-size:1.2rem; padding:14px; border-radius:12px; border:3px solid #5c4b8a;
+    background:#170b33; color:var(--text); width:100%; max-width:340px; text-align:center;
+  }
+  .plist{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-top:12px;}
+  .chip{
+    background:#3a2568; padding:10px 16px; border-radius:999px; font-size:1.05rem;
+    display:flex; align-items:center; gap:8px;
+  }
+  .chip b{color:var(--accent);}
+  .chip .x{color:var(--accent2); font-weight:900; cursor:pointer; font-size:1.15rem; padding:0 4px;}
+  .invention{
+    font-size:clamp(1.6rem,5vw,2.6rem); font-weight:900; line-height:1.25;
+    color:var(--accent); margin:10px 0;
+  }
+  .customer{font-size:clamp(1.1rem,3.2vw,1.5rem); color:var(--good); font-weight:700;}
+  .label{font-size:.85rem; letter-spacing:2px; color:var(--dim); text-transform:uppercase; margin-top:10px;}
+  .timer{
+    font-size:clamp(3.5rem,14vw,6.5rem); font-weight:900; font-variant-numeric:tabular-nums;
+    color:var(--good); line-height:1;
+  }
+  .timer.low{color:var(--accent2); animation:pulse .5s infinite alternate;}
+  @keyframes pulse{from{transform:scale(1);}to{transform:scale(1.12);}}
+  .pitcher-name{font-size:clamp(1.4rem,4.5vw,2rem); font-weight:900; color:var(--text);}
+  .coins{display:flex; gap:14px; justify-content:center; margin:14px 0; flex-wrap:wrap;}
+  .coinbtn{
+    background:var(--accent); border-radius:20px; width:110px; height:110px;
+    font-size:2.2rem; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .coinbtn small{font-size:.8rem; font-weight:700;}
+  .board{width:100%; max-width:520px;}
+  .brow{
+    display:flex; justify-content:space-between; align-items:center;
+    background:#3a2568; border-radius:12px; padding:12px 18px; margin:6px 0;
+    font-size:1.2rem; font-weight:700;
+  }
+  .brow .score{color:var(--accent); font-size:1.35rem;}
+  .brow.leader{outline:3px solid var(--accent);}
+  .howto{
+    text-align:left; color:var(--dim); font-size:1.02rem; line-height:1.55; max-width:640px;
+  }
+  .howto b{color:var(--text);}
+  .big{font-size:clamp(1.3rem,4vw,1.8rem); font-weight:800; margin:8px 0;}
+  footer{color:#6d5b9e; font-size:.8rem; margin-top:auto; padding-top:14px;}
+</style>
+</head>
+<body>
+<h1>💰 PITCH TYCOON 💰</h1>
+<div class="tag">Pitch a ridiculous invention. Convince the room. Get rich.</div>
+<div class="meta">3–10 players &nbsp;•&nbsp; ~20–30 min &nbsp;•&nbsp; one shared screen, host taps</div>
+
+<!-- SETUP -->
+<div class="screen active" id="scr-setup">
+  <div class="card">
+    <div class="big">Who's playing?</div>
+    <input type="text" id="pname" placeholder="Player name" maxlength="14" autocomplete="off">
+    <button id="addBtn">Add</button>
+    <div class="plist" id="plist"></div>
+  </div>
+  <div class="card howto">
+    <b>How it works (one sentence):</b> when it's your turn, the screen invents an absurd
+    product and a target customer — you get <b>60 seconds</b> to pitch it, then everyone
+    else invests <b>1, 2, or 3 coins</b> in you, and the richest inventor after
+    everyone has pitched twice wins.
+  </div>
+  <button id="startBtn" disabled>Start Game ▶</button>
+</div>
+
+<!-- HANDOFF -->
+<div class="screen" id="scr-handoff">
+  <div class="card">
+    <div class="label">Next up on stage</div>
+    <div class="pitcher-name" id="handoffName"></div>
+    <p style="color:var(--dim); margin-top:10px;">Stand up! Your invention appears when you hit the button.<br>No takebacks, no re-rolls. Sell it.</p>
+  </div>
+  <button id="revealBtn" class="danger">Reveal My Invention 🎲</button>
+</div>
+
+<!-- PITCH -->
+<div class="screen" id="scr-pitch">
+  <div class="card">
+    <div class="label">Now pitching</div>
+    <div class="pitcher-name" id="pitchName"></div>
+    <div class="label">The invention</div>
+    <div class="invention" id="inventionText"></div>
+    <div class="label">Target customer</div>
+    <div class="customer" id="customerText"></div>
+  </div>
+  <div class="timer" id="timer">60</div>
+  <div>
+    <button id="goBtn">Start the Clock ⏱</button>
+    <button id="doneBtn" class="secondary" style="display:none;">End Pitch Early</button>
+  </div>
+</div>
+
+<!-- INVEST -->
+<div class="screen" id="scr-invest">
+  <div class="card">
+    <div class="label">Time to invest in</div>
+    <div class="pitcher-name" id="investPitcher"></div>
+    <div class="big" id="investWho"></div>
+    <p style="color:var(--dim);">How many coins do you put in? (Tap for the player named above, then pass judgment to the next.)</p>
+    <div class="coins">
+      <button class="coinbtn" data-c="1">🪙<small>1 — meh</small></button>
+      <button class="coinbtn" data-c="2">🪙🪙<small>2 — decent</small></button>
+      <button class="coinbtn" data-c="3">🪙🪙🪙<small>3 — take my money!</small></button>
+    </div>
+  </div>
+</div>
+
+<!-- ROUND RESULT -->
+<div class="screen" id="scr-result">
+  <div class="card">
+    <div class="big" id="resultLine"></div>
+    <div class="label">Scoreboard</div>
+    <div class="board" id="board" style="margin:10px auto 0;"></div>
+  </div>
+  <button id="nextBtn">Next Pitcher ▶</button>
+</div>
+
+<!-- GAME OVER -->
+<div class="screen" id="scr-over">
+  <div class="card">
+    <div class="big">🏆 TYCOON OF THE NIGHT 🏆</div>
+    <div class="invention" id="winnerName"></div>
+    <div class="label">Final fortunes</div>
+    <div class="board" id="finalBoard" style="margin:10px auto 0;"></div>
+  </div>
+  <div>
+    <button id="againBtn">Play Again (same crew)</button>
+    <button id="newBtn" class="secondary">New Game</button>
+  </div>
+</div>
+
+<footer>Pitch Tycoon — self-contained party game. No ads, no tracking, no mercy for bad pitches.</footer>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- CONTENT (combinatorial: thousands of unique inventions) ---------- */
+const ADJ = ["Self-aware","Solar-powered","Invisible","Inflatable","Whispering","Glow-in-the-dark",
+"Voice-activated","Emotional-support","Waterproof","Subscription-based","Artisanal","Haunted",
+"Foldable","Motorized","Scented","Bulletproof","Edible","Levitating","Left-handed","Retractable",
+"Bluetooth-enabled","Extra-crunchy","Judgmental","Reversible","Turbo-charged","Biodegradable",
+"Magnetic","Overly polite","Musical","Freeze-dried","Two-story","Pocket-sized"];
+
+const OBJ = ["umbrella","toaster","sock drawer","yoga mat","lawn gnome","office chair","water bottle",
+"alarm clock","backpack","doormat","shower curtain","stapler","salad spinner","houseplant","pillow",
+"ice cube tray","garden hose","desk lamp","cheese grater","recliner","wallet","hairbrush","mailbox",
+"ceiling fan","cutting board","picture frame","laundry basket","umbrella stand","bird feeder",
+"phone case","travel mug","welcome mat","bookend","spice rack","pool float","toothbrush holder",
+"lint roller","step ladder","fanny pack","napkin dispenser"];
+
+const TWIST = ["that apologizes when you bump into it","that screams the time every hour",
+"that only works on Tuesdays","that translates your dog's barks","that doubles as a smoke machine",
+"that texts your mom automatically","that plays smooth jazz when touched","that judges your outfit",
+"that dispenses ranch dressing","that remembers your enemies","that gets jealous of other appliances",
+"that gives unsolicited life advice","that runs on compliments","that whistles when you walk away",
+"that files your taxes (badly)","that glows when someone is lying","that narrates your life in a movie-trailer voice",
+"that composts your secrets","that high-fives you every morning","that slowly becomes your best friend",
+"that predicts rain with 4% accuracy","that speaks only in rhymes","that hides itself once a week",
+"that keeps score of family arguments","that emits new-car smell on demand","that livestreams to nobody",
+"that grants one tiny wish per year","that heats up when drama is near"];
+
+const CUST = ["retired pirates","competitive dog groomers","teenage wizards","paranoid squirrelwatchers",
+"astronauts on a budget","overwhelmed kindergarten teachers","professional nappers","suburban vampires",
+"extreme couponers","amateur ghost hunters","minor-league mascots","recovering perfectionists",
+"lighthouse keepers","people who peaked in high school","conspiracy podcast hosts","weekend knights",
+"very tall people","chronic plant killers","aspiring supervillains","polite bank robbers",
+"grandmas who lift weights","cat show judges","time travelers with jet lag","introverted cheerleaders",
+"beekeepers with allergies","street mimes on strike","garage band drummers","cruise ship magicians",
+"people afraid of cheese","champion whistlers"];
+
+/* ---------- STATE ---------- */
+let players = [];          // {name, coins}
+let order = [];            // shuffled index order
+let turn = 0;              // index into schedule
+let schedule = [];         // pitcher indexes, everyone twice
+let investors = [];        // player indexes voting this round
+let invIdx = 0;
+let roundEarn = 0;
+let timerId = null, timeLeft = 60;
+
+/* ---------- AUDIO (Web Audio API) ---------- */
+let AC = null;
+function ac(){ if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); return AC; }
+function beep(freq, dur, type, vol, when){
+  const c = ac(), o = c.createOscillator(), g = c.createGain();
+  o.type = type||"square"; o.frequency.value = freq;
+  g.gain.setValueAtTime(vol||0.15, c.currentTime+(when||0));
+  g.gain.exponentialRampToValueAtTime(0.001, c.currentTime+(when||0)+dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(c.currentTime+(when||0)); o.stop(c.currentTime+(when||0)+dur+0.05);
+}
+function tick(){ beep(900,0.05,"square",0.06); }
+function buzzer(){ beep(140,0.7,"sawtooth",0.25); beep(110,0.7,"sawtooth",0.25,0.05); }
+function coinSfx(n){ for(let i=0;i<n;i++) beep(1200+i*250,0.09,"triangle",0.14,i*0.09); }
+function fanfare(){ [523,659,784,1047].forEach((f,i)=>beep(f,0.22,"triangle",0.18,i*0.16)); }
+
+/* ---------- HELPERS ---------- */
+const $ = id => document.getElementById(id);
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  $(id).classList.add("active");
+}
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+/* ---------- SETUP ---------- */
+function renderPlist(){
+  $("plist").innerHTML = players.map((p,i)=>
+    `<span class="chip"><b>${p.name}</b><span class="x" data-i="${i}">✕</span></span>`).join("");
+  $("startBtn").disabled = players.length < 3;
+  $("startBtn").textContent = players.length<3 ? `Start Game (need ${3-players.length} more)` : "Start Game ▶";
+}
+$("addBtn").onclick = addPlayer;
+$("pname").addEventListener("keydown", e=>{ if(e.key==="Enter") addPlayer(); });
+function addPlayer(){
+  const v = $("pname").value.trim();
+  if(!v || players.length>=10) return;
+  if(players.some(p=>p.name.toLowerCase()===v.toLowerCase())) return;
+  players.push({name:v, coins:0});
+  $("pname").value=""; $("pname").focus(); renderPlist();
+}
+$("plist").onclick = e=>{
+  if(e.target.classList.contains("x")){ players.splice(+e.target.dataset.i,1); renderPlist(); }
+};
+
+$("startBtn").onclick = ()=>{ ac(); startGame(); };
+function startGame(){
+  players.forEach(p=>p.coins=0);
+  order = shuffle(players.map((_,i)=>i));
+  schedule = order.concat(shuffle(order.slice()));  // everyone pitches twice
+  turn = 0;
+  nextHandoff();
+}
+
+/* ---------- FLOW ---------- */
+function nextHandoff(){
+  if(turn >= schedule.length){ return gameOver(); }
+  $("handoffName").textContent = players[schedule[turn]].name;
+  show("scr-handoff");
+}
+
+$("revealBtn").onclick = ()=>{
+  const p = players[schedule[turn]];
+  $("pitchName").textContent = p.name;
+  $("inventionText").textContent = "The " + pick(ADJ) + " " + pick(OBJ) + " " + pick(TWIST);
+  $("customerText").textContent = "for " + pick(CUST);
+  timeLeft = 60;
+  $("timer").textContent = timeLeft;
+  $("timer").classList.remove("low");
+  $("goBtn").style.display=""; $("doneBtn").style.display="none";
+  beep(660,0.15,"triangle",0.15);
+  show("scr-pitch");
+};
+
+$("goBtn").onclick = ()=>{
+  $("goBtn").style.display="none"; $("doneBtn").style.display="";
+  beep(880,0.2,"triangle",0.15);
+  timerId = setInterval(()=>{
+    timeLeft--;
+    $("timer").textContent = timeLeft;
+    if(timeLeft<=10){ $("timer").classList.add("low"); tick(); }
+    if(timeLeft<=0){ clearInterval(timerId); buzzer(); startInvesting(); }
+  },1000);
+};
+$("doneBtn").onclick = ()=>{ clearInterval(timerId); startInvesting(); };
+
+function startInvesting(){
+  const pitcherIdx = schedule[turn];
+  investors = players.map((_,i)=>i).filter(i=>i!==pitcherIdx);
+  invIdx = 0; roundEarn = 0;
+  $("investPitcher").textContent = players[pitcherIdx].name + "'s invention";
+  askInvestor();
+}
+function askInvestor(){
+  $("investWho").textContent = "☝️ " + players[investors[invIdx]].name + ", your verdict:";
+  show("scr-invest");
+}
+document.querySelectorAll(".coinbtn").forEach(b=>{
+  b.onclick = ()=>{
+    const c = +b.dataset.c;
+    coinSfx(c);
+    roundEarn += c;
+    invIdx++;
+    if(invIdx < investors.length){ askInvestor(); }
+    else{ finishRound(); }
+  };
+});
+
+function finishRound(){
+  const p = players[schedule[turn]];
+  p.coins += roundEarn;
+  $("resultLine").textContent = `${p.name} raised ${roundEarn} coin${roundEarn===1?"":"s"}! 💸`;
+  renderBoard($("board"));
+  const done = turn+1 >= schedule.length;
+  $("nextBtn").textContent = done ? "See Final Results 🏆" : "Next Pitcher ▶";
+  show("scr-result");
+}
+$("nextBtn").onclick = ()=>{ turn++; nextHandoff(); };
+
+function renderBoard(el){
+  const sorted = players.slice().sort((a,b)=>b.coins-a.coins);
+  const top = sorted[0].coins;
+  el.innerHTML = sorted.map(p=>
+    `<div class="brow ${p.coins===top&&top>0?"leader":""}">
+       <span>${p.coins===top&&top>0?"👑 ":""}${p.name}</span>
+       <span class="score">🪙 ${p.coins}</span></div>`).join("");
+}
+
+function gameOver(){
+  fanfare();
+  const sorted = players.slice().sort((a,b)=>b.coins-a.coins);
+  const top = sorted[0].coins;
+  const winners = sorted.filter(p=>p.coins===top).map(p=>p.name);
+  $("winnerName").textContent = winners.join(" & ");
+  renderBoard($("finalBoard"));
+  show("scr-over");
+}
+
+$("againBtn").onclick = ()=>startGame();
+$("newBtn").onclick = ()=>{ players=[]; renderPlist(); show("scr-setup"); };
+
+})();
+</script>
+</body>
+</html>

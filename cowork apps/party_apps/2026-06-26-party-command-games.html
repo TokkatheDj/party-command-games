@@ -908,6 +908,131 @@
   .vbox-clear-btn:hover:not(:disabled) { background: rgba(255,60,60,0.3); border-color: rgba(255,60,60,0.5); }
   .vbox-play-btn:disabled, .vbox-clear-btn:disabled { opacity: 0.3; cursor: default; }
 
+  /* KEY FOB REMOTE & DSP SETTINGS */
+  .fob-section {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255,255,255,0.12);
+  }
+  .fob-title {
+    font-family: Arial, sans-serif;
+    font-size: 0.78rem;
+    opacity: 0.75;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .fob-indicator-badge {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    background: rgba(255,255,255,0.1);
+    color: #aaa;
+    border: 1px solid rgba(255,255,255,0.15);
+    transition: all 0.2s ease;
+  }
+  .fob-indicator-badge.on {
+    background: rgba(0, 230, 118, 0.2);
+    color: #00e676;
+    border-color: #00e676;
+    box-shadow: 0 0 10px rgba(0, 230, 118, 0.3);
+  }
+  .fob-controls-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .fob-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-family: Arial, sans-serif;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex: 1;
+    text-align: center;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .fob-btn:hover:not(:disabled) {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.4);
+  }
+  .fob-btn.active {
+    background: rgba(255, 102, 0, 0.3);
+    border-color: #ff6600;
+    color: #ffaa66;
+    box-shadow: 0 0 12px rgba(255, 102, 0, 0.3);
+  }
+  .fob-btn.calibrating {
+    background: rgba(255, 40, 40, 0.4);
+    border-color: #ff4444;
+    animation: recPulse 0.8s ease-in-out infinite;
+  }
+  .fob-visualizer-container {
+    background: rgba(8, 6, 16, 0.9);
+    border: 1px solid rgba(255, 102, 0, 0.3);
+    border-radius: 10px;
+    height: 56px;
+    margin-bottom: 10px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+  }
+  .fob-visualizer-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .fob-status-text {
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.85);
+    margin-bottom: 10px;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  /* In-Game HUD Remote Detected Toast Banner */
+  #fob-hud-toast {
+    position: absolute;
+    top: 65px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    z-index: 100;
+    background: linear-gradient(135deg, rgba(255,102,0,0.95), rgba(220,20,0,0.95));
+    color: #fff;
+    border: 2px solid #ffaa00;
+    box-shadow: 0 0 30px rgba(255,102,0,0.8);
+    border-radius: 30px;
+    padding: 10px 22px;
+    font-size: 0.95rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+  #fob-hud-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+
   .setting-row { margin-bottom: 16px; }
   .setting-row:last-child { margin-bottom: 0; }
 
@@ -1836,14 +1961,7 @@
 
   
   
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
-          .catch(e => console.warn('SW registration failed:', e));
-      });
-    }
-  </script>
+
 </head>
 <body>
 
@@ -2115,6 +2233,12 @@
   <canvas id="lava-canvas" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:1;"></canvas>
   <button class="back-btn" onclick="backToMenu('lava')" style="z-index:10;">← Menu</button>
 
+  <!-- In-Game Key Fob Remote Toast Banner -->
+  <div id="fob-hud-toast">
+    <span>🔔</span>
+    <span id="fob-hud-toast-text">FOB REMOTE DETECTED — OVERRIDE ACTIVATED!</span>
+  </div>
+
   <div style="position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; gap:inherit;">
     <div id="lava-icon">🔥</div>
     <div id="lava-status">YOU'RE SAFE!</div>
@@ -2173,6 +2297,45 @@
         </div>
         <input type="range" id="lava-dur-max" min="3" max="60" value="18"
                oninput="lavaSettingUpdate('lava-dur-max','lava-dur-max-val')">
+      </div>
+
+      <!-- Key Fob Remote Control & DSP System (Gemini 3.6 Upgrade) -->
+      <div class="fob-section">
+        <div class="fob-title">
+          <span>🎙 KEY FOB ACOUSTIC REMOTE</span>
+          <span id="fob-indicator" class="fob-indicator-badge">OFF</span>
+        </div>
+        <div class="fob-controls-row">
+          <button id="fob-toggle-btn" class="fob-btn" onclick="toggleFobTrigger()">🎙 Enable Mic</button>
+          <button id="fob-calibrate-btn" class="fob-btn" onclick="startFobCalibration()" disabled>🎯 Calibrate Fob</button>
+          <button id="fob-test-btn" class="fob-btn" onclick="playTestBeep()">🔊 Test Beep</button>
+        </div>
+        
+        <div id="fob-visualizer-wrap" style="display:none;">
+          <div class="fob-visualizer-container">
+            <canvas id="fob-canvas" class="fob-visualizer-canvas"></canvas>
+          </div>
+          
+          <div class="fob-status-text">
+            <span id="fob-status">Status: Microphone inactive</span>
+            <span id="fob-metrics-readout" style="font-size:0.72rem; opacity:0.7;">3200 Hz | -60 dB</span>
+          </div>
+
+          <div class="setting-row" style="margin-bottom:8px; margin-top:10px;">
+            <div class="setting-label">
+              <span>TRIGGER SENSITIVITY</span>
+              <strong><span id="fob-sens-val">75</span>%</strong>
+            </div>
+            <input type="range" id="fob-sens" min="10" max="95" value="75"
+                   oninput="lavaSettingUpdate('fob-sens','fob-sens-val')">
+          </div>
+
+          <div class="fob-controls-row" style="margin-top:10px; margin-bottom:0;">
+            <button class="fob-btn" onclick="triggerFobAction('single')" style="background:rgba(255,102,0,0.25); border-color:#ff6600;">
+              ⚡ Panic Trigger Fob
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Voice Box -->
@@ -3502,6 +3665,436 @@ let lavaCanvasActive = false;
 let lavaEmberAnimationId = null;
 let lavaEmberDensity = 0; // 0 = none, 1 = low (warning), 2 = high (lava)
 
+// ══════════════════════════════════════════════════════════
+// KEY FOB ACOUSTIC REMOTE ENGINE (GEMINI 3.6 CRYSTAL-LOCKED DSP)
+// ══════════════════════════════════════════════════════════
+let fobActive = false;
+let fobCalibrating = false;
+let fobTargetFreq = parseFloat(localStorage.getItem('fob-target-freq')) || 3200;
+let fobTolerance = 160; // Hz tolerance window
+let fobCalibData = [];
+let fobMicStream = null;
+let fobAnalyser = null;
+let fobDataArray = null;
+let fobVisualizerInterval = null;
+let fobLastTriggerTime = 0;
+let fobAudioContext = null;
+
+// 3.6 Crystal-Locked Pitch Stability & Pattern Variables
+let fobPitchHistory = [];    // stores recent peak frequencies across frames
+let fobBeepTimes = [];       // timestamps of recent valid beeps for double-click detection
+let fobLastMetricUpdate = 0;
+let fobNoiseFloorDb = -80;   // adaptive background noise level
+
+async function toggleFobTrigger() {
+  if (fobActive) {
+    stopFobListener();
+  } else {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      fobMicStream = stream;
+      fobAudioContext = getAudioCtx();
+      if (fobAudioContext.state === 'suspended') {
+        await fobAudioContext.resume();
+      }
+      const source = fobAudioContext.createMediaStreamSource(stream);
+      fobAnalyser = fobAudioContext.createAnalyser();
+      fobAnalyser.fftSize = 2048;
+      fobAnalyser.smoothingTimeConstant = 0.35;
+      source.connect(fobAnalyser);
+      
+      const bufferLength = fobAnalyser.frequencyBinCount;
+      fobDataArray = new Float32Array(bufferLength);
+      
+      fobActive = true;
+      fobPitchHistory = [];
+      fobBeepTimes = [];
+      
+      // Update UI Badge & Buttons
+      const badge = document.getElementById('fob-indicator');
+      if (badge) { badge.textContent = '🟢 ACTIVE'; badge.classList.add('on'); }
+      
+      const toggleBtn = document.getElementById('fob-toggle-btn');
+      if (toggleBtn) {
+        toggleBtn.textContent = '🎙 Disable Mic';
+        toggleBtn.classList.add('active');
+      }
+      
+      const calibBtn = document.getElementById('fob-calibrate-btn');
+      if (calibBtn) calibBtn.disabled = false;
+      
+      const visualizerWrap = document.getElementById('fob-visualizer-wrap');
+      if (visualizerWrap) visualizerWrap.style.display = 'block';
+      
+      const statusEl = document.getElementById('fob-status');
+      if (statusEl) statusEl.textContent = 'Status: Listening for key fob remote...';
+      
+      // Bind Hotkey Shortcut (F key or Shift key to simulate fob press)
+      window.addEventListener('keydown', handleFobHotkey);
+
+      // Start DSP Loop
+      fobLoop();
+    } catch (err) {
+      console.error('Error opening microphone for key fob detector:', err);
+      const statusEl = document.getElementById('fob-status');
+      if (statusEl) statusEl.textContent = 'Error: Mic access denied or unavailable.';
+    }
+  }
+}
+
+function handleFobHotkey(e) {
+  if (!fobActive) return;
+  if (e.key === 'f' || e.key === 'F') {
+    triggerFobAction('single');
+  }
+}
+
+function stopFobListener() {
+  fobActive = false;
+  fobCalibrating = false;
+  window.removeEventListener('keydown', handleFobHotkey);
+
+  if (fobMicStream) {
+    fobMicStream.getTracks().forEach(track => track.stop());
+    fobMicStream = null;
+  }
+  if (fobVisualizerInterval) {
+    cancelAnimationFrame(fobVisualizerInterval);
+    fobVisualizerInterval = null;
+  }
+  
+  const badge = document.getElementById('fob-indicator');
+  if (badge) { badge.textContent = 'OFF'; badge.classList.remove('on'); }
+  
+  const toggleBtn = document.getElementById('fob-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.textContent = '🎙 Enable Mic';
+    toggleBtn.classList.remove('active');
+  }
+  
+  const calibBtn = document.getElementById('fob-calibrate-btn');
+  if (calibBtn) calibBtn.disabled = true;
+  
+  const visualizerWrap = document.getElementById('fob-visualizer-wrap');
+  if (visualizerWrap) visualizerWrap.style.display = 'none';
+}
+
+function startFobCalibration() {
+  if (!fobActive || !fobAnalyser) return;
+  fobCalibrating = true;
+  fobCalibData = [];
+  
+  const calibBtn = document.getElementById('fob-calibrate-btn');
+  if (calibBtn) {
+    calibBtn.textContent = '👂 Listening...';
+    calibBtn.classList.add('calibrating');
+    calibBtn.disabled = true;
+  }
+  
+  const statusEl = document.getElementById('fob-status');
+  if (statusEl) {
+    statusEl.textContent = 'Press key fob ringer now! (Keep close to mic)';
+    statusEl.style.color = '#ffcc00';
+  }
+  
+  setTimeout(() => {
+    fobCalibrating = false;
+    if (calibBtn) {
+      calibBtn.classList.remove('calibrating');
+      calibBtn.textContent = '🎯 Calibrate Fob';
+      calibBtn.disabled = false;
+    }
+    
+    if (fobCalibData.length > 0) {
+      fobCalibData.sort((a, b) => b.amp - a.amp);
+      const topSamples = fobCalibData.slice(0, 6);
+      const avgFreq = topSamples.reduce((sum, s) => sum + s.freq, 0) / topSamples.length;
+      
+      if (avgFreq >= 1000 && avgFreq <= 6000) {
+        fobTargetFreq = Math.round(avgFreq);
+        localStorage.setItem('fob-target-freq', fobTargetFreq);
+        if (statusEl) {
+          statusEl.textContent = `Calibrated! Target locked at ${fobTargetFreq} Hz`;
+          statusEl.style.color = '#00e676';
+        }
+        playChime([784, 987, 1175]); // Victory calibration chime
+      } else {
+        if (statusEl) {
+          statusEl.textContent = 'Calibration failed: frequency out of bounds.';
+          statusEl.style.color = '#ff5252';
+        }
+      }
+    } else {
+      if (statusEl) {
+        statusEl.textContent = 'Calibration failed: no key fob tone detected.';
+        statusEl.style.color = '#ff5252';
+      }
+    }
+  }, 2200);
+}
+
+function playTestBeep() {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    const target = fobTargetFreq || 3200;
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(target, ctx.currentTime);
+    
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.26);
+
+    // If mic isn't active, simulate trigger directly for testing
+    if (!fobActive) {
+      setTimeout(() => triggerFobAction('single'), 100);
+    }
+  } catch (e) {
+    console.error('Error generating test beep:', e);
+  }
+}
+
+function fobLoop() {
+  if (!fobActive || !fobAnalyser) return;
+  
+  fobVisualizerInterval = requestAnimationFrame(fobLoop);
+  
+  // 1. Render Audio Spectrum Visualizer
+  drawFobVisualizer();
+  
+  // 2. Perform DSP Frequency Analysis
+  fobAnalyser.getFloatFrequencyData(fobDataArray);
+  
+  const sampleRate = fobAudioContext ? fobAudioContext.sampleRate : 44100;
+  const fftSize = fobAnalyser.fftSize;
+  const binResolution = sampleRate / fftSize;
+  
+  let maxVal = -Infinity;
+  let maxBin = -1;
+  
+  // Scan frequency spectrum between 1200 Hz and 5800 Hz
+  const minBin = Math.floor(1200 / binResolution);
+  const maxBinLimit = Math.floor(5800 / binResolution);
+  
+  for (let i = minBin; i < maxBinLimit; i++) {
+    if (fobDataArray[i] > maxVal) {
+      maxVal = fobDataArray[i];
+      maxBin = i;
+    }
+  }
+  
+  if (maxBin === -1) return;
+  
+  const detectedFreq = maxBin * binResolution;
+  const sensitivityValue = parseFloat(document.getElementById('fob-sens')?.value || 75);
+  
+  // Map sensitivity slider (10% to 95%) -> dB threshold (-25dB to -85dB)
+  const dbThreshold = -85 + (100 - sensitivityValue) * 0.8;
+  
+  // Peak Sharpness Check: compare max bin to adjacent bins 8 positions away
+  const leftVal = fobDataArray[Math.max(0, maxBin - 8)] || -100;
+  const rightVal = fobDataArray[Math.min(fobDataArray.length - 1, maxBin + 8)] || -100;
+  const isSharpPeak = (maxVal - leftVal > 16) && (maxVal - rightVal > 16);
+  
+  // Gemini 3.6 Crystal-Locked Pitch Stability Check:
+  // Key fobs have 0% pitch drift. Human voices drift rapidly across frames.
+  fobPitchHistory.push({ freq: detectedFreq, time: Date.now(), amp: maxVal });
+  if (fobPitchHistory.length > 4) fobPitchHistory.shift();
+  
+  let isStablePitch = false;
+  if (fobPitchHistory.length >= 3) {
+    const recent = fobPitchHistory.slice(-3);
+    const maxDrift = Math.max(...recent.map(r => Math.abs(r.freq - detectedFreq)));
+    isStablePitch = maxDrift < 35; // Pitch must stay within 35 Hz across 3 frames (~70ms)
+  }
+
+  // Update Live Metrics UI Readout every 150ms
+  const now = Date.now();
+  if (now - fobLastMetricUpdate > 150) {
+    fobLastMetricUpdate = now;
+    const metricEl = document.getElementById('fob-metrics-readout');
+    if (metricEl) {
+      metricEl.textContent = `${Math.round(detectedFreq)} Hz | ${Math.round(maxVal)} dBFS`;
+    }
+  }
+
+  if (fobCalibrating) {
+    if (maxVal > -50 && isSharpPeak && isStablePitch) {
+      fobCalibData.push({ freq: detectedFreq, amp: maxVal });
+    }
+  } else {
+    // Detection Logic
+    const isTargetMatch = Math.abs(detectedFreq - fobTargetFreq) <= fobTolerance;
+    
+    if (maxVal > dbThreshold && isSharpPeak && isStablePitch && isTargetMatch) {
+      if (now - fobLastTriggerTime > 1200) {
+        fobLastTriggerTime = now;
+        
+        // Multi-Beep Pattern Recognition (detect single vs double click)
+        fobBeepTimes.push(now);
+        fobBeepTimes = fobBeepTimes.filter(t => now - t < 800);
+        
+        const pattern = fobBeepTimes.length >= 2 ? 'double' : 'single';
+        triggerFobAction(pattern);
+      }
+    }
+  }
+}
+
+function triggerFobAction(pattern = 'single') {
+  console.log(`[FOB REMOTE DETECTED] Pattern: ${pattern}`);
+  
+  // Play Acoustic Confirmation Feedback Tone
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(pattern === 'double' ? 1200 : 880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(pattern === 'double' ? 1600 : 1320, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.16);
+  } catch(e) {}
+  
+  haptic([50, 30, 50]);
+
+  // Update In-Game HUD Toast Banner
+  const hudToast = document.getElementById('fob-hud-toast');
+  const toastText = document.getElementById('fob-hud-toast-text');
+  if (hudToast && toastText) {
+    toastText.textContent = pattern === 'double' ? '⚡ EMERGENCY SAFE OVERRIDE!' : '🔔 FOB REMOTE — OVERRIDE ACTIVATED!';
+    hudToast.classList.add('show');
+    setTimeout(() => hudToast.classList.remove('show'), 2200);
+  }
+  
+  const statusEl = document.getElementById('fob-status');
+  if (statusEl) {
+    statusEl.textContent = `🔔 REMOTE DETECTED! (${pattern.toUpperCase()})`;
+    statusEl.style.color = '#ff6600';
+    setTimeout(() => {
+      if (fobActive) {
+        statusEl.textContent = 'Status: Listening for key fob remote...';
+        statusEl.style.color = 'rgba(255,255,255,0.85)';
+      }
+    }, 1500);
+  }
+  
+  // Game State Action Execution
+  if (pattern === 'double') {
+    // Double beep: Emergency Safe Override!
+    if (lavaRunning && lavaIsActive) {
+      lavaTriggerSafe();
+    } else {
+      lavaSetSafe();
+    }
+    return;
+  }
+
+  // Single beep: Toggle Lava State
+  if (!lavaRunning) {
+    setLavaMode('manual');
+    lavaStart();
+    setTimeout(() => {
+      if (lavaRunning && !lavaIsActive) lavaTrigger();
+    }, 120);
+  } else {
+    if (!lavaIsActive) {
+      lavaTrigger();
+    } else {
+      lavaTriggerSafe();
+    }
+  }
+}
+
+function drawFobVisualizer() {
+  const canvas = document.getElementById('fob-canvas');
+  if (!canvas || !fobAnalyser) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  
+  if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+  }
+  
+  const bufferLength = fobAnalyser.frequencyBinCount;
+  const data = new Uint8Array(bufferLength);
+  fobAnalyser.getByteFrequencyData(data);
+  
+  // Dark cyber background
+  ctx.fillStyle = 'rgba(8, 6, 16, 0.88)';
+  ctx.fillRect(0, 0, w, h);
+  
+  const sampleRate = fobAudioContext ? fobAudioContext.sampleRate : 44100;
+  const binRes = sampleRate / fobAnalyser.fftSize;
+  const startBin = Math.floor(1200 / binRes);
+  const endBin = Math.floor(5800 / binRes);
+  const displayLength = endBin - startBin;
+  const sliceWidth = w / displayLength;
+  
+  // Render Frequency Spectrum Bars
+  let x = 0;
+  ctx.fillStyle = 'rgba(255, 102, 0, 0.65)';
+  for (let i = startBin; i < endBin; i++) {
+    const val = data[i] / 255.0;
+    const barH = val * (h - 4);
+    if (barH > 1) {
+      ctx.fillRect(x, h - barH, Math.max(1, sliceWidth - 0.5), barH);
+    }
+    x += sliceWidth;
+  }
+  
+  // Render Target Frequency Vertical Reticle Line
+  if (fobTargetFreq > 0) {
+    const targetBin = fobTargetFreq / binRes;
+    if (targetBin >= startBin && targetBin <= endBin) {
+      const markerX = ((targetBin - startBin) / displayLength) * w;
+      
+      // Target reticle line
+      ctx.strokeStyle = '#00e676';
+      ctx.lineWidth = 1.8;
+      ctx.shadowColor = '#00e676';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.moveTo(markerX, 0);
+      ctx.lineTo(markerX, h);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Target Label
+      ctx.fillStyle = '#00e676';
+      ctx.font = 'bold 9px system-ui, sans-serif';
+      ctx.fillText(`🎯 ${Math.round(fobTargetFreq)}Hz`, Math.min(w - 55, markerX + 3), 12);
+    }
+  }
+  
+  // Render Sensitivity Threshold Line
+  const sensitivityValue = parseFloat(document.getElementById('fob-sens')?.value || 75);
+  const threshY = h - (sensitivityValue / 100) * (h - 4);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(0, threshY);
+  ctx.lineTo(w, threshY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
 function lavaCanvasInit() {
   lavaCanvas = document.getElementById('lava-canvas');
   if (!lavaCanvas) return;
@@ -3530,6 +4123,7 @@ function lavaCanvasDestroy() {
     lavaEmberAnimationId = null;
   }
   lavaParticles = [];
+  stopFobListener();
   if (lavaCtx && lavaCanvas) {
     lavaCtx.clearRect(0, 0, lavaCanvas.width, lavaCanvas.height);
   }

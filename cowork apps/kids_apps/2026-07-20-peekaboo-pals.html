@@ -1,0 +1,702 @@
+<!-- CONCEPT: Peekaboo Pals is a friendly whack-a-mole-style reflex game where kids tap cute critters that pop from burrows to score combos and golden bonuses — but must let the sleepy nightcap critters snooze. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Peekaboo Pals</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+}
+
+:root {
+  --sky1: #7ed0ff;
+  --sky2: #a7e6ff;
+  --grass1: #8fd94f;
+  --grass2: #6cc23a;
+  --dirt1: #a9702f;
+  --dirt2: #7a4d1c;
+  --hole: #3a2410;
+  --panel: #fffbe9;
+  --ink: #4a3212;
+  --pink: #ff6fae;
+  --gold: #ffcf3f;
+  --blue: #4aa3ff;
+  --font: "Comic Sans MS", "Trebuchet MS", "Baloo", system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  background: linear-gradient(180deg, var(--sky1) 0%, var(--sky2) 45%, var(--grass1) 46%, var(--grass2) 100%);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100dvh;
+}
+
+/* Floating clouds */
+.cloud {
+  position: fixed;
+  background: #ffffff;
+  border-radius: 50%;
+  opacity: .85;
+  filter: blur(.3px);
+  pointer-events: none;
+  z-index: 0;
+}
+.cloud::before, .cloud::after {
+  content: ""; position: absolute; background: #fff; border-radius: 50%;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  z-index: 5;
+}
+
+.title {
+  font-size: clamp(20px, 6.5vw, 34px);
+  font-weight: 900;
+  letter-spacing: .5px;
+  background: linear-gradient(90deg, var(--pink), var(--gold), var(--blue));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: 0 2px 0 rgba(255,255,255,.35);
+  line-height: 1;
+}
+
+.stat {
+  background: var(--panel);
+  border: 3px solid #fff;
+  border-radius: 16px;
+  padding: 6px 12px;
+  min-width: 66px;
+  text-align: center;
+  box-shadow: 0 4px 0 rgba(0,0,0,.12);
+}
+.stat .label { font-size: clamp(9px, 2.6vw, 12px); opacity: .7; font-weight: 700; }
+.stat .value { font-size: clamp(18px, 5.5vw, 26px); font-weight: 900; line-height: 1; }
+#timeStat.low .value { color: #e0483b; }
+
+/* combo banner */
+#comboBar {
+  height: 26px;
+  z-index: 5;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900;
+  font-size: clamp(14px, 4.4vw, 20px);
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0,0,0,.25);
+  transition: transform .15s, opacity .2s;
+  transform: scale(0);
+  opacity: 0;
+}
+#comboBar.show { transform: scale(1); opacity: 1; }
+
+/* ---------- Garden / grid ---------- */
+#garden {
+  flex: 1;
+  width: 100%;
+  max-width: 560px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(6px, 2.2vw, 16px);
+  padding: clamp(8px, 3vw, 20px);
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 2;
+  align-content: center;
+}
+
+.burrow {
+  position: relative;
+  width: 100%;
+  padding-bottom: 96%;
+  cursor: pointer;
+}
+.hole {
+  position: absolute;
+  left: 8%; right: 8%; bottom: 6%;
+  height: 62%;
+  background: radial-gradient(ellipse at 50% 20%, var(--hole) 60%, #241407 100%);
+  border-radius: 50% 50% 46% 46% / 42% 42% 58% 58%;
+  overflow: hidden;
+  box-shadow: inset 0 8px 14px rgba(0,0,0,.55);
+}
+/* critter rises from behind, clipped by hole overflow */
+.critter {
+  position: absolute;
+  left: 50%;
+  bottom: -4%;
+  width: 84%;
+  transform: translate(-50%, 115%);
+  transition: transform .16s cubic-bezier(.2,1.5,.5,1);
+  display: flex; align-items: flex-end; justify-content: center;
+  will-change: transform;
+}
+.burrow.up .critter { transform: translate(-50%, 6%); }
+.critter .face {
+  font-size: clamp(30px, 12vw, 62px);
+  line-height: 1;
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,.25));
+}
+/* golden glow */
+.burrow.golden .critter .face {
+  filter: drop-shadow(0 0 10px var(--gold)) drop-shadow(0 3px 3px rgba(0,0,0,.3));
+}
+/* nightcap for sleepy */
+.cap {
+  position: absolute;
+  top: -6%;
+  right: 8%;
+  font-size: clamp(18px, 7vw, 34px);
+  transform: rotate(18deg);
+}
+.zzz {
+  position: absolute;
+  top: -14%; left: 60%;
+  font-size: clamp(14px, 5vw, 24px);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,.3);
+  animation: floatz 1.6s ease-in-out infinite;
+}
+@keyframes floatz { 0%,100%{transform:translateY(0);opacity:.7} 50%{transform:translateY(-6px);opacity:1} }
+
+/* dirt mound rim in front of hole to sell "behind the mound" */
+.mound {
+  position: absolute;
+  left: 2%; right: 2%; bottom: 0;
+  height: 30%;
+  background: linear-gradient(180deg, var(--dirt1), var(--dirt2));
+  border-radius: 50% 50% 40% 40% / 80% 80% 30% 30%;
+  box-shadow: inset 0 4px 6px rgba(255,255,255,.25), 0 4px 6px rgba(0,0,0,.2);
+  z-index: 3;
+  pointer-events: none;
+}
+.mound::before, .mound::after {
+  content:"";position:absolute;top:34%;width:12%;height:20%;
+  background: #5f3c15; border-radius:50%;
+}
+.mound::before{left:22%}
+.mound::after{right:22%}
+
+/* tap bonk */
+.burrow.bonk .critter { transform: translate(-50%, 55%) scale(.7); transition: transform .12s ease-in; }
+
+/* floating score popup */
+.pop {
+  position: absolute;
+  left: 50%; top: 20%;
+  transform: translateX(-50%);
+  font-weight: 900;
+  font-size: clamp(18px, 6vw, 30px);
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0,0,0,.35);
+  pointer-events: none;
+  z-index: 8;
+  animation: floatUp .8s ease-out forwards;
+}
+@keyframes floatUp {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(.6); }
+  20% { opacity: 1; transform: translate(-50%, -6px) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -46px) scale(1); }
+}
+
+/* ---------- Overlays ---------- */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(30, 20, 40, .55);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 20;
+  padding: 18px;
+}
+.overlay.hidden { display: none; }
+.card {
+  background: var(--panel);
+  border: 5px solid #fff;
+  border-radius: 26px;
+  padding: 22px 20px 26px;
+  width: min(420px, 92vw);
+  text-align: center;
+  box-shadow: 0 12px 0 rgba(0,0,0,.18);
+  animation: pop-in .35s cubic-bezier(.2,1.6,.4,1);
+}
+@keyframes pop-in { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.card h1 {
+  margin: 4px 0 6px;
+  font-size: clamp(26px, 8vw, 42px);
+  background: linear-gradient(90deg, var(--pink), var(--blue));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.card .big-emoji { font-size: clamp(48px, 18vw, 84px); line-height: 1; margin: 2px 0 6px;}
+.card p { font-size: clamp(14px, 4vw, 18px); margin: 6px 0; font-weight: 700; }
+
+.rules {
+  background: #fff6d8;
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  text-align: left;
+  font-size: clamp(13px, 3.8vw, 17px);
+  font-weight: 700;
+  line-height: 1.5;
+}
+.rules span { display:inline-block; width:1.7em; text-align:center; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 8px;
+  min-height: 62px;
+  padding: 0 30px;
+  font-family: var(--font);
+  font-size: clamp(20px, 6vw, 28px);
+  font-weight: 900;
+  color: #fff;
+  background: linear-gradient(180deg, #ff8ec4, var(--pink));
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 6px 0 #d94e8c;
+  cursor: pointer;
+  transition: transform .06s, box-shadow .06s;
+}
+.btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #d94e8c; }
+.btn.green { background: linear-gradient(180deg, #8ee06a, #57c23a); box-shadow: 0 6px 0 #3d9126; }
+.btn.green:active { box-shadow: 0 2px 0 #3d9126; }
+
+#stars { font-size: clamp(34px, 12vw, 56px); letter-spacing: 6px; margin: 4px 0 2px; height: 1.2em;}
+#stars .s { display:inline-block; opacity:.25; transform: scale(.6); transition: all .3s;}
+#stars .s.on { opacity:1; transform: scale(1); }
+
+.mini-btn {
+  position: fixed;
+  top: 10px;
+  z-index: 15;
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: var(--panel);
+  font-size: 22px;
+  display: none;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0,0,0,.12);
+}
+#muteBtn { right: 10px; }
+.mini-btn:active { transform: translateY(2px); }
+
+.confetti {
+  position: fixed; top: -20px;
+  width: 12px; height: 16px;
+  z-index: 25;
+  pointer-events: none;
+  border-radius: 3px;
+}
+</style>
+</head>
+<body>
+
+<!-- clouds -->
+<div class="cloud" style="width:80px;height:34px;top:8%;left:10%"></div>
+<div class="cloud" style="width:110px;height:42px;top:16%;right:8%"></div>
+<div class="cloud" style="width:60px;height:26px;top:26%;left:30%"></div>
+
+<button id="muteBtn" class="mini-btn" aria-label="Toggle sound">🔊</button>
+
+<div id="hud">
+  <div class="stat" id="scoreStat">
+    <div class="label">SCORE</div>
+    <div class="value" id="score">0</div>
+  </div>
+  <div class="title">Peekaboo Pals</div>
+  <div class="stat" id="timeStat">
+    <div class="label">TIME</div>
+    <div class="value" id="time">60</div>
+  </div>
+</div>
+
+<div id="comboBar"></div>
+
+<div id="garden"></div>
+
+<!-- Start overlay -->
+<div class="overlay" id="startScreen">
+  <div class="card">
+    <div class="big-emoji">🐹🐰🦔</div>
+    <h1>Peekaboo Pals</h1>
+    <p>Tap the pals when they peek out!</p>
+    <div class="rules">
+      <span>👆</span> Tap pals to score points!<br>
+      <span>⭐</span> Golden pals = <b>big bonus!</b><br>
+      <span>😴</span> Shhh! Let sleepy pals snooze.
+    </div>
+    <button class="btn green" id="startBtn">▶ Play!</button>
+  </div>
+</div>
+
+<!-- End overlay -->
+<div class="overlay hidden" id="endScreen">
+  <div class="card">
+    <div class="big-emoji" id="endEmoji">🎉</div>
+    <h1 id="endTitle">Great Job!</h1>
+    <div id="stars"><span class="s">★</span><span class="s">★</span><span class="s">★</span></div>
+    <p>You scored</p>
+    <p style="font-size:clamp(30px,10vw,48px);font-weight:900;color:var(--blue)"><span id="finalScore">0</span></p>
+    <p id="bestLine" style="opacity:.75"></p>
+    <button class="btn" id="againBtn">🔁 Play Again</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Config ----------
+  const ROUND_TIME = 60;
+  const CELL_COUNT = 9;
+  const NORMAL_PALS = ["🐹","🐰","🦔","🐿️","🐸","🐣","🐥","🦊","🐨","🐼","🐭"];
+  const GOLD_PAL = "⭐";
+
+  // ---------- State ----------
+  let score = 0, timeLeft = ROUND_TIME, combo = 0, running = false, muted = false;
+  let cells = [];
+  let spawnTimer = null, gameTimer = null, elapsed = 0;
+  let best = 0;
+  try { best = parseInt(localStorage.getItem("cowork-peekaboo-best") || "0", 10) || 0; } catch(e){}
+
+  // ---------- DOM ----------
+  const garden = document.getElementById("garden");
+  const scoreEl = document.getElementById("score");
+  const timeEl = document.getElementById("time");
+  const timeStat = document.getElementById("timeStat");
+  const comboBar = document.getElementById("comboBar");
+  const startScreen = document.getElementById("startScreen");
+  const endScreen = document.getElementById("endScreen");
+  const muteBtn = document.getElementById("muteBtn");
+
+  // ---------- Audio ----------
+  let AC = null;
+  function actx(){ if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return AC; }
+  function beep(freqs, dur, type, vol){
+    if (muted) return;
+    const ac = actx(); if(!ac) return;
+    const t0 = ac.currentTime;
+    freqs.forEach((f, i) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type || "sine";
+      o.frequency.value = f;
+      const st = t0 + i * 0.05;
+      g.gain.setValueAtTime(0, st);
+      g.gain.linearRampToValueAtTime(vol || 0.2, st + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
+      o.connect(g); g.connect(ac.destination);
+      o.start(st); o.stop(st + dur + 0.02);
+    });
+  }
+  function noise(dur, vol){
+    if (muted) return;
+    const ac = actx(); if(!ac) return;
+    const len = Math.floor(ac.sampleRate * dur);
+    const buf = ac.createBuffer(1, len, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0;i<len;i++) d[i] = (Math.random()*2-1) * (1 - i/len);
+    const s = ac.createBufferSource(); s.buffer = buf;
+    const g = ac.createGain(); g.gain.value = vol || 0.15;
+    const f = ac.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 900;
+    s.connect(f); f.connect(g); g.connect(ac.destination);
+    s.start();
+  }
+  const snd = {
+    pop:  () => beep([620, 880], 0.14, "triangle", 0.22),
+    gold: () => beep([660, 880, 1175, 1568], 0.16, "square", 0.16),
+    shh:  () => noise(0.35, 0.12),
+    miss: () => beep([200], 0.15, "sine", 0.12),
+    tick: () => beep([1200], 0.05, "sine", 0.08),
+    cheer:() => beep([523, 659, 784, 1047], 0.4, "triangle", 0.2),
+  };
+
+  // ---------- Build grid ----------
+  function buildGrid(){
+    garden.innerHTML = "";
+    cells = [];
+    for (let i=0;i<CELL_COUNT;i++){
+      const b = document.createElement("div");
+      b.className = "burrow";
+      b.innerHTML =
+        '<div class="hole"><div class="critter"><span class="face"></span></div></div>' +
+        '<div class="mound"></div>';
+      const state = { el: b, up: false, type: null, face: b.querySelector(".face"),
+                      critter: b.querySelector(".critter"), duckAt: 0, hitLock: false };
+      b.addEventListener("pointerdown", (e) => { e.preventDefault(); onTap(state); }, {passive:false});
+      garden.appendChild(b);
+      cells.push(state);
+    }
+  }
+
+  // ---------- Spawning ----------
+  function difficulty(){
+    // 0 at start -> 1 at end
+    return Math.min(1, elapsed / ROUND_TIME);
+  }
+  function upDuration(){
+    const d = difficulty();
+    return 1400 - d * 750 + Math.random()*300; // ms visible
+  }
+  function nextSpawnDelay(){
+    const d = difficulty();
+    return Math.max(260, (820 - d*430) + Math.random()*300);
+  }
+  function maxActive(){
+    return 2 + Math.floor(difficulty() * 3); // 2 -> 5
+  }
+
+  function pickType(){
+    const r = Math.random();
+    if (r < 0.14) return "gold";
+    if (r < 0.14 + 0.20) return "sleepy";
+    return "normal";
+  }
+
+  function spawn(){
+    if (!running) return;
+    const free = cells.filter(c => !c.up);
+    const active = cells.filter(c => c.up).length;
+    if (free.length && active < maxActive()){
+      const c = free[Math.floor(Math.random()*free.length)];
+      const type = pickType();
+      showCritter(c, type);
+    }
+    spawnTimer = setTimeout(spawn, nextSpawnDelay());
+  }
+
+  function showCritter(c, type){
+    c.up = true; c.type = type; c.hitLock = false;
+    c.el.classList.remove("golden","bonk");
+    // reset any prior extras
+    c.critter.querySelectorAll(".cap,.zzz").forEach(n=>n.remove());
+
+    if (type === "gold"){
+      c.face.textContent = GOLD_PAL;
+      c.el.classList.add("golden");
+    } else if (type === "sleepy"){
+      c.face.textContent = NORMAL_PALS[Math.floor(Math.random()*NORMAL_PALS.length)];
+      const cap = document.createElement("span"); cap.className = "cap"; cap.textContent = "🌙";
+      const z = document.createElement("span"); z.className = "zzz"; z.textContent = "z";
+      c.critter.appendChild(cap); c.critter.appendChild(z);
+    } else {
+      c.face.textContent = NORMAL_PALS[Math.floor(Math.random()*NORMAL_PALS.length)];
+    }
+
+    requestAnimationFrame(() => c.el.classList.add("up"));
+    const dur = type === "gold" ? upDuration()*0.85 : upDuration();
+    c.duckAt = setTimeout(() => duck(c, false), dur);
+  }
+
+  function duck(c, wasHit){
+    if (!c.up) return;
+    clearTimeout(c.duckAt);
+    c.el.classList.remove("up");
+    const type = c.type;
+    c.up = false;
+    // missing an active pal (not hit) breaks combo — but sleepy escaping is GOOD
+    if (!wasHit){
+      if (type === "sleepy"){
+        // correctly left alone — tiny reward, keep combo
+      } else {
+        breakCombo();
+      }
+    }
+    setTimeout(() => {
+      if (!c.up){ c.type = null; c.el.classList.remove("golden"); }
+    }, 220);
+  }
+
+  // ---------- Tapping ----------
+  function onTap(c){
+    if (!running || !c.up || c.hitLock) return;
+    c.hitLock = true;
+    const type = c.type;
+
+    if (type === "sleepy"){
+      snd.shh();
+      floatText(c.el, "shhh 😴", "#b98cff");
+      breakCombo();
+      // gentle bonk, let it duck normally (still counts as "left" fine)
+      c.el.classList.add("bonk");
+      clearTimeout(c.duckAt);
+      c.duckAt = setTimeout(() => duck(c, true), 260);
+      return;
+    }
+
+    // good hit
+    combo++;
+    const mult = comboMult();
+    let pts;
+    if (type === "gold"){
+      pts = 5 * mult;
+      snd.gold();
+      floatText(c.el, "+" + pts + " ⭐", "#ffcf3f");
+      flashScreen();
+      confettiBurst(10);
+    } else {
+      pts = 1 * mult;
+      snd.pop();
+      floatText(c.el, "+" + pts, "#fff");
+    }
+    addScore(pts);
+    showCombo();
+    c.el.classList.add("bonk");
+    duck(c, true);
+  }
+
+  function comboMult(){ return Math.min(5, 1 + Math.floor(combo / 4)); }
+
+  function showCombo(){
+    const m = comboMult();
+    if (combo >= 2){
+      comboBar.textContent = combo >= 4 ? ("🔥 " + combo + " combo!  x" + m) : (combo + " in a row!");
+      comboBar.classList.add("show");
+      comboBar.style.color = m >= 3 ? "#ff5b9c" : "#ffffff";
+    }
+  }
+  function breakCombo(){
+    combo = 0;
+    comboBar.classList.remove("show");
+  }
+
+  function addScore(n){
+    score += n;
+    scoreEl.textContent = score;
+    scoreEl.animate([{transform:"scale(1.4)"},{transform:"scale(1)"}], {duration:220, easing:"ease-out"});
+  }
+
+  // ---------- Effects ----------
+  function floatText(cell, txt, color){
+    const p = document.createElement("div");
+    p.className = "pop";
+    p.textContent = txt;
+    p.style.color = color;
+    cell.appendChild(p);
+    setTimeout(() => p.remove(), 820);
+  }
+  function flashScreen(){
+    document.body.animate(
+      [{filter:"brightness(1.4)"},{filter:"brightness(1)"}],
+      {duration:260, easing:"ease-out"});
+  }
+  const CONFETTI_COLORS = ["#ff6fae","#ffcf3f","#4aa3ff","#8ee06a","#b98cff","#ff8a4a"];
+  function confettiBurst(n){
+    for (let i=0;i<n;i++){
+      const c = document.createElement("div");
+      c.className = "confetti";
+      c.style.left = (Math.random()*100) + "vw";
+      c.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      c.style.top = "-20px";
+      document.body.appendChild(c);
+      const dx = (Math.random()*2-1) * 40;
+      const rot = Math.random()*720 - 360;
+      const dur = 1400 + Math.random()*1200;
+      c.animate([
+        {transform:"translate(0,0) rotate(0deg)", opacity:1},
+        {transform:`translate(${dx}px, 105vh) rotate(${rot}deg)`, opacity:1}
+      ], {duration:dur, easing:"cubic-bezier(.3,.6,.7,1)"});
+      setTimeout(() => c.remove(), dur);
+    }
+  }
+
+  // ---------- Game flow ----------
+  function startGame(){
+    actx(); // unlock audio on user gesture
+    score = 0; combo = 0; timeLeft = ROUND_TIME; elapsed = 0; running = true;
+    scoreEl.textContent = "0";
+    timeEl.textContent = ROUND_TIME;
+    timeStat.classList.remove("low");
+    comboBar.classList.remove("show");
+    startScreen.classList.add("hidden");
+    endScreen.classList.add("hidden");
+    muteBtn.style.display = "flex";
+
+    cells.forEach(c => { c.up = false; c.type = null; c.el.classList.remove("up","golden","bonk"); });
+
+    clearTimeout(spawnTimer);
+    clearInterval(gameTimer);
+    spawnTimer = setTimeout(spawn, 500);
+
+    gameTimer = setInterval(() => {
+      timeLeft--; elapsed++;
+      timeEl.textContent = timeLeft;
+      if (timeLeft <= 5 && timeLeft > 0){ timeStat.classList.add("low"); snd.tick(); }
+      if (timeLeft <= 0) endGame();
+    }, 1000);
+  }
+
+  function endGame(){
+    running = false;
+    clearTimeout(spawnTimer);
+    clearInterval(gameTimer);
+    cells.forEach(c => { clearTimeout(c.duckAt); c.el.classList.remove("up"); c.up = false; });
+    comboBar.classList.remove("show");
+    snd.cheer();
+    confettiBurst(60);
+
+    // stars: thresholds scale gently so most kids get 2-3
+    let stars = 1;
+    if (score >= 30) stars = 2;
+    if (score >= 60) stars = 3;
+
+    const titles = ["Nice Try! 🌱", "Great Job! 🎈", "Amazing! 🌟"];
+    const emojis = ["🐾", "🎉", "🏆"];
+    document.getElementById("endTitle").textContent = titles[stars-1];
+    document.getElementById("endEmoji").textContent = emojis[stars-1];
+    document.getElementById("finalScore").textContent = score;
+
+    const starEls = document.querySelectorAll("#stars .s");
+    starEls.forEach((s,i) => {
+      s.classList.remove("on");
+      if (i < stars) setTimeout(() => { s.classList.add("on"); snd.pop(); }, 400 + i*300);
+    });
+
+    const bestLine = document.getElementById("bestLine");
+    if (score > best){
+      best = score;
+      try { localStorage.setItem("cowork-peekaboo-best", String(best)); } catch(e){}
+      bestLine.textContent = "🎊 New best score!";
+    } else {
+      bestLine.textContent = "Best: " + best;
+    }
+
+    endScreen.classList.remove("hidden");
+  }
+
+  // ---------- Controls ----------
+  document.getElementById("startBtn").addEventListener("click", startGame);
+  document.getElementById("againBtn").addEventListener("click", startGame);
+  muteBtn.addEventListener("click", () => {
+    muted = !muted;
+    muteBtn.textContent = muted ? "🔇" : "🔊";
+    if (!muted) snd.pop();
+  });
+  // pause spawns if tab hidden
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && running){ clearTimeout(spawnTimer); }
+    else if (!document.hidden && running){ spawnTimer = setTimeout(spawn, 400); }
+  });
+
+  buildGrid();
+})();
+</script>
+</body>
+</html>

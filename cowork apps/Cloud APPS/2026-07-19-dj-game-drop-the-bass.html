@@ -1,0 +1,795 @@
+<!-- CONCEPT: DJ GAME / CHALLENGE - Beat-drop timing game: ride the buildup and slam the DROP pad on the exact downbeat before the crowd loses energy | Audience: Music Lovers / All Ages -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Drop The Bass — DJ Timing Challenge</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: radial-gradient(ellipse at 50% 0%, #1a0f2e 0%, #0a0612 55%, #050308 100%);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #eee;
+    overflow-x: hidden;
+  }
+  .app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 14px 12px 24px;
+  }
+  header {
+    text-align: center;
+    max-width: 640px;
+    margin-bottom: 8px;
+  }
+  h1 {
+    margin: 4px 0 2px;
+    font-size: clamp(22px, 5vw, 34px);
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, #ff2fd0, #37e6ff, #ffe93f);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 30px rgba(255,47,208,0.25);
+  }
+  header p {
+    margin: 2px 0;
+    font-size: 13px;
+    color: #a9a4c2;
+    line-height: 1.4;
+  }
+  .audience {
+    font-size: 11px;
+    color: #6f6a8c;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .stage {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    background: linear-gradient(160deg, #14101f 0%, #0c0a15 100%);
+    border: 1px solid #2b2440;
+    border-radius: 18px;
+    box-shadow: 0 0 40px rgba(120, 40, 200, 0.15), inset 0 0 60px rgba(0,0,0,0.5);
+    padding: 14px;
+    margin-top: 10px;
+  }
+
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+  }
+  .led {
+    flex: 1 1 0;
+    min-width: 68px;
+    background: #050308;
+    border: 1px solid #34d1ff55;
+    border-radius: 8px;
+    padding: 6px 4px;
+    text-align: center;
+    box-shadow: inset 0 0 12px rgba(52,209,255,0.15);
+  }
+  .led .label {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: #4fd9ff;
+    text-transform: uppercase;
+  }
+  .led .value {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 19px;
+    color: #7cf7ff;
+    text-shadow: 0 0 8px #34d1ff;
+    margin-top: 2px;
+  }
+  .led.pink .label { color: #ff6fe0; }
+  .led.pink .value { color: #ffa6f0; text-shadow: 0 0 8px #ff2fd0; }
+  .led.yellow .label { color: #ffe93f; }
+  .led.yellow .value { color: #fff4a3; text-shadow: 0 0 8px #ffe93f; }
+
+  canvas#viz {
+    display: block;
+    width: 100%;
+    height: 190px;
+    border-radius: 12px;
+    background: #050308;
+    border: 1px solid #241c38;
+  }
+
+  .energy-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .energy-label {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: #a9a4c2;
+    text-transform: uppercase;
+    width: 90px;
+  }
+  .energy-bar-bg {
+    flex: 1;
+    height: 14px;
+    border-radius: 7px;
+    background: #0d0a16;
+    border: 1px solid #2b2440;
+    overflow: hidden;
+  }
+  .energy-bar-fill {
+    height: 100%;
+    width: 50%;
+    background: linear-gradient(90deg, #ff2f6d, #ffe93f, #37ff8f);
+    box-shadow: 0 0 10px rgba(55,255,143,0.5);
+    transition: width 0.35s ease;
+  }
+
+  .feedback {
+    text-align: center;
+    height: 30px;
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin-top: 8px;
+    text-transform: uppercase;
+  }
+  .feedback.perfect { color: #37ff8f; text-shadow: 0 0 14px #37ff8f; }
+  .feedback.good { color: #4fd9ff; text-shadow: 0 0 14px #4fd9ff; }
+  .feedback.miss { color: #ff3860; text-shadow: 0 0 14px #ff3860; }
+  .feedback.info { color: #d8d2ff; }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    outline: none;
+  }
+
+  #startBtn, #resetBtn {
+    padding: 12px 22px;
+    border-radius: 30px;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    font-weight: bold;
+    text-transform: uppercase;
+    background: linear-gradient(160deg, #2a2140, #150f22);
+    color: #cfc8ff;
+    border: 1px solid #4b3d78;
+    box-shadow: 0 0 14px rgba(120,80,220,0.25);
+    transition: transform 0.1s ease, box-shadow 0.2s ease;
+  }
+  #startBtn:active, #resetBtn:active { transform: scale(0.96); }
+  #startBtn:disabled { opacity: 0.35; cursor: default; }
+
+  #dropPad {
+    width: 170px;
+    height: 170px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ff5fd0, #b800a0 55%, #4a0060 100%);
+    color: #fff;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    box-shadow: 0 0 25px rgba(255,47,208,0.55), inset 0 0 30px rgba(255,255,255,0.15);
+    transition: transform 0.08s ease, box-shadow 0.15s ease;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  }
+  #dropPad:active {
+    transform: scale(0.93);
+    box-shadow: 0 0 45px rgba(255,47,208,0.9), inset 0 0 40px rgba(255,255,255,0.25);
+  }
+  #dropPad:disabled {
+    background: radial-gradient(circle at 35% 30%, #4a4058, #2a2436 55%, #14101c 100%);
+    box-shadow: none;
+    color: #79738f;
+  }
+  #dropPad.armed {
+    animation: pulseGlow 0.6s infinite alternate;
+  }
+  @keyframes pulseGlow {
+    from { box-shadow: 0 0 25px rgba(255,47,208,0.5); }
+    to   { box-shadow: 0 0 45px rgba(255,47,208,0.95); }
+  }
+
+  .hint {
+    max-width: 640px;
+    text-align: center;
+    font-size: 11px;
+    color: #6f6a8c;
+    margin-top: 14px;
+    line-height: 1.5;
+  }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(5,3,8,0.88);
+    border-radius: 18px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+  }
+  .overlay.show { display: flex; }
+  .overlay h2 {
+    font-size: 26px;
+    margin: 0 0 6px;
+    color: #ff5fd0;
+    text-shadow: 0 0 20px #ff2fd0;
+  }
+  .overlay p { margin: 4px 0; color: #cfc8ff; font-size: 14px; }
+  .stage { position: relative; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>DROP THE BASS</h1>
+    <p>Ride the build-up, watch the beat grid, and slam the pad the instant the marker hits the drop line. Nail the timing to keep the crowd hyped — miss it and they walk.</p>
+    <div class="audience">A DJ Timing Challenge · Music Lovers · All Ages</div>
+  </header>
+
+  <div class="stage">
+    <div class="hud">
+      <div class="led"><div class="label">Score</div><div class="value" id="ledScore">0</div></div>
+      <div class="led pink"><div class="label">Combo</div><div class="value" id="ledCombo">x0</div></div>
+      <div class="led yellow"><div class="label">BPM</div><div class="value" id="ledBpm">100</div></div>
+      <div class="led"><div class="label">Round</div><div class="value" id="ledRound">1</div></div>
+    </div>
+
+    <canvas id="viz" width="640" height="190"></canvas>
+
+    <div class="energy-wrap">
+      <div class="energy-label">Crowd Energy</div>
+      <div class="energy-bar-bg"><div class="energy-bar-fill" id="energyFill"></div></div>
+    </div>
+
+    <div class="feedback info" id="feedback">Press START SESSION to plug in</div>
+
+    <div class="overlay" id="gameOverOverlay">
+      <h2>CROWD'S GONE HOME</h2>
+      <p id="finalScoreText">Final Score: 0</p>
+      <p>Reset to spin it up again.</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="startBtn">▶ Start Session</button>
+    <button id="dropPad" disabled>DROP<br>THE BASS</button>
+    <button id="resetBtn">⟲ Reset</button>
+  </div>
+
+  <p class="hint">Tip: hit SPACEBAR or tap the pad exactly when the glowing marker crosses the pink drop line. Perfect timing = max points + biggest crowd boost. Each round speeds up the tempo and tightens the window.</p>
+</div>
+
+<script>
+(function () {
+  const startBtn   = document.getElementById('startBtn');
+  const dropPad    = document.getElementById('dropPad');
+  const resetBtn   = document.getElementById('resetBtn');
+  const feedbackEl = document.getElementById('feedback');
+  const energyFill = document.getElementById('energyFill');
+  const ledScore   = document.getElementById('ledScore');
+  const ledCombo   = document.getElementById('ledCombo');
+  const ledBpm     = document.getElementById('ledBpm');
+  const ledRound   = document.getElementById('ledRound');
+  const overlay    = document.getElementById('gameOverOverlay');
+  const finalScoreText = document.getElementById('finalScoreText');
+  const canvas = document.getElementById('viz');
+  const ctx = canvas.getContext('2d');
+
+  let audioCtx = null;
+  let masterGain = null;
+
+  // ---- game state ----
+  let bpm = 100;
+  let round = 1;
+  let score = 0;
+  let combo = 0;
+  let crowdEnergy = 50;
+  let toleranceGood = 0.30;     // seconds, "good" half-window
+  let toleranceGoodMin = 0.11;
+  const BEATS_PER_ROUND = 8;
+
+  let gameActive = false;
+  let roundActive = false;
+  let dropResolved = true;
+  let roundStartTime = 0;
+  let dropTargetTime = 0;
+  let secondsPerBeat = 60 / bpm;
+  let missTimeoutId = null;
+  let nextRoundTimeoutId = null;
+  let activeRiserNodes = [];
+
+  function fmtScore(n) { return n.toString().padStart(5, '0'); }
+
+  function updateHUD() {
+    ledScore.textContent = fmtScore(score);
+    ledCombo.textContent = 'x' + combo;
+    ledBpm.textContent = Math.round(bpm);
+    ledRound.textContent = round;
+    energyFill.style.width = Math.max(0, Math.min(100, crowdEnergy)) + '%';
+  }
+
+  function setFeedback(text, cls) {
+    feedbackEl.textContent = text;
+    feedbackEl.className = 'feedback ' + (cls || 'info');
+  }
+
+  // ---------------- AUDIO SYNTHESIS ----------------
+  function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.9;
+    masterGain.connect(audioCtx.destination);
+  }
+
+  function noiseBuffer(duration) {
+    const rate = audioCtx.sampleRate;
+    const buf = audioCtx.createBuffer(1, rate * duration, rate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  function playKick(time, accent) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    const peak = accent ? 0.95 : 0.8;
+    osc.frequency.setValueAtTime(150, time);
+    osc.frequency.exponentialRampToValueAtTime(42, time + 0.13);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(peak, time + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.32);
+    osc.connect(gain).connect(masterGain);
+    osc.start(time);
+    osc.stop(time + 0.34);
+  }
+
+  function playHat(time, open) {
+    const dur = open ? 0.18 : 0.045;
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuffer(dur);
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 7500;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.28, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    src.connect(hp).connect(gain).connect(masterGain);
+    src.start(time);
+    src.stop(time + dur + 0.01);
+  }
+
+  function playSnareRoll(time) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuffer(0.09);
+    const bp = audioCtx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1800;
+    bp.Q.value = 0.7;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.35, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.09);
+    src.connect(bp).connect(gain).connect(masterGain);
+    src.start(time);
+    src.stop(time + 0.1);
+  }
+
+  function scheduleRiser(startTime, duration) {
+    // filtered noise sweep
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuffer(duration);
+    const bp = audioCtx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 1.1;
+    bp.frequency.setValueAtTime(300, startTime);
+    bp.frequency.exponentialRampToValueAtTime(6500, startTime + duration);
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.exponentialRampToValueAtTime(0.35, startTime + duration * 0.9);
+    gain.gain.linearRampToValueAtTime(0.0001, startTime + duration);
+    src.connect(bp).connect(gain).connect(masterGain);
+    src.start(startTime);
+    src.stop(startTime + duration + 0.02);
+
+    // rising tension oscillator
+    const osc = audioCtx.createOscillator();
+    const oscGain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(80, startTime);
+    osc.frequency.exponentialRampToValueAtTime(520, startTime + duration);
+    oscGain.gain.setValueAtTime(0.0001, startTime);
+    oscGain.gain.exponentialRampToValueAtTime(0.12, startTime + duration * 0.95);
+    oscGain.gain.linearRampToValueAtTime(0.0001, startTime + duration);
+    osc.connect(oscGain).connect(masterGain);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.02);
+
+    activeRiserNodes.push(src, osc);
+  }
+
+  function playSubDrop(time) {
+    // sub bass hit
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(120, time);
+    osc.frequency.exponentialRampToValueAtTime(48, time + 0.25);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(1.0, time + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 1.1);
+    osc.connect(gain).connect(masterGain);
+    osc.start(time);
+    osc.stop(time + 1.15);
+
+    // impact noise crack
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuffer(0.25);
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1800;
+    const ig = audioCtx.createGain();
+    ig.gain.setValueAtTime(0.6, time);
+    ig.gain.exponentialRampToValueAtTime(0.0001, time + 0.25);
+    src.connect(lp).connect(ig).connect(masterGain);
+    src.start(time);
+    src.stop(time + 0.26);
+
+    // stab chord
+    [55, 82.4, 110].forEach((f, i) => {
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = 'square';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.exponentialRampToValueAtTime(0.09, time + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + 0.5);
+      o.connect(g).connect(masterGain);
+      o.start(time);
+      o.stop(time + 0.52);
+    });
+  }
+
+  function playCheer(time) {
+    const src = audioCtx.createBufferSource();
+    src.buffer = noiseBuffer(1.4);
+    const bp = audioCtx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(900, time);
+    bp.frequency.linearRampToValueAtTime(2200, time + 0.7);
+    bp.frequency.linearRampToValueAtTime(1400, time + 1.4);
+    bp.Q.value = 0.6;
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(0.32, time + 0.25);
+    gain.gain.linearRampToValueAtTime(0.0001, time + 1.4);
+    src.connect(bp).connect(gain).connect(masterGain);
+    src.start(time);
+    src.stop(time + 1.42);
+  }
+
+  function playBuzz(time) {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(90, time);
+    osc.frequency.linearRampToValueAtTime(60, time + 0.35);
+    gain.gain.setValueAtTime(0.25, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.4);
+    osc.connect(gain).connect(masterGain);
+    osc.start(time);
+    osc.stop(time + 0.42);
+  }
+
+  function playClickTap() {
+    if (!audioCtx) return;
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 900;
+    gain.gain.setValueAtTime(0.15, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    osc.connect(gain).connect(masterGain);
+    osc.start(t);
+    osc.stop(t + 0.06);
+  }
+
+  // ---------------- BEAT SCHEDULING / VISUAL TIMELINE ----------------
+  let beatTimes = []; // absolute audioCtx times of each beat marker in current round, for viz pulsing
+
+  function startRound() {
+    secondsPerBeat = 60 / bpm;
+    roundStartTime = audioCtx.currentTime + 0.15;
+    dropTargetTime = roundStartTime + BEATS_PER_ROUND * secondsPerBeat;
+    beatTimes = [];
+    activeRiserNodes = [];
+
+    for (let b = 0; b < BEATS_PER_ROUND; b++) {
+      const t = roundStartTime + b * secondsPerBeat;
+      beatTimes.push(t);
+      const accent = (b === 0);
+      playKick(t, accent);
+      // off-beat hat
+      playHat(t + secondsPerBeat / 2, false);
+      // snare roll building tension on last 2 beats, subdivided
+      if (b >= BEATS_PER_ROUND - 2) {
+        playSnareRoll(t);
+        playSnareRoll(t + secondsPerBeat / 2);
+      }
+    }
+    // extra 16th-note snare roll right before the drop for tension
+    const preDrop = dropTargetTime - secondsPerBeat;
+    for (let s = 0; s < 4; s++) {
+      playSnareRoll(preDrop + s * (secondsPerBeat / 4));
+    }
+
+    scheduleRiser(roundStartTime, BEATS_PER_ROUND * secondsPerBeat);
+
+    roundActive = true;
+    dropResolved = false;
+    dropPad.disabled = false;
+    dropPad.classList.add('armed');
+    setFeedback('Round ' + round + ': ride the build-up…', 'info');
+
+    const windowMs = (dropTargetTime - audioCtx.currentTime + toleranceGood + 0.05) * 1000;
+    missTimeoutId = setTimeout(() => {
+      if (!dropResolved) resolveDrop(null);
+    }, windowMs);
+
+    updateHUD();
+  }
+
+  function resolveDrop(diffOrNull) {
+    if (dropResolved) return;
+    dropResolved = true;
+    roundActive = false;
+    dropPad.classList.remove('armed');
+    dropPad.disabled = true;
+    if (missTimeoutId) { clearTimeout(missTimeoutId); missTimeoutId = null; }
+
+    const now = audioCtx.currentTime;
+    let tier;
+    if (diffOrNull === null) {
+      tier = 'miss';
+    } else {
+      const abs = Math.abs(diffOrNull);
+      if (abs <= toleranceGood * 0.35) tier = 'perfect';
+      else if (abs <= toleranceGood) tier = 'good';
+      else tier = 'miss';
+    }
+
+    if (tier === 'perfect') {
+      playSubDrop(now);
+      playCheer(now + 0.05);
+      combo++;
+      score += Math.round(100 * (1 + combo * 0.12));
+      crowdEnergy += 15;
+      setFeedback('PERFECT DROP!', 'perfect');
+    } else if (tier === 'good') {
+      playSubDrop(now);
+      playCheer(now + 0.05);
+      combo++;
+      score += Math.round(50 * (1 + combo * 0.08));
+      crowdEnergy += 8;
+      setFeedback('Good drop', 'good');
+    } else {
+      playBuzz(now);
+      combo = 0;
+      crowdEnergy -= 22;
+      setFeedback(diffOrNull === null ? 'Too late — crowd groans' : 'Off beat — miss', 'miss');
+    }
+
+    crowdEnergy = Math.max(0, Math.min(100, crowdEnergy));
+    updateHUD();
+
+    if (crowdEnergy <= 0) {
+      endGame();
+      return;
+    }
+
+    nextRoundTimeoutId = setTimeout(() => {
+      round++;
+      bpm = Math.min(bpm + 3, 168);
+      toleranceGood = Math.max(toleranceGood - 0.018, toleranceGoodMin);
+      startRound();
+    }, 1300);
+  }
+
+  function handleDropPress() {
+    if (!gameActive || !roundActive || dropResolved) return;
+    const now = audioCtx.currentTime;
+    resolveDrop(now - dropTargetTime);
+  }
+
+  function endGame() {
+    gameActive = false;
+    roundActive = false;
+    dropPad.disabled = true;
+    dropPad.classList.remove('armed');
+    finalScoreText.textContent = 'Final Score: ' + score + '  ·  Reached Round ' + round + ' at ' + Math.round(bpm) + ' BPM';
+    overlay.classList.add('show');
+    startBtn.disabled = false;
+    startBtn.textContent = '▶ Start Session';
+  }
+
+  function fullReset() {
+    if (missTimeoutId) clearTimeout(missTimeoutId);
+    if (nextRoundTimeoutId) clearTimeout(nextRoundTimeoutId);
+    missTimeoutId = null;
+    nextRoundTimeoutId = null;
+    bpm = 100;
+    round = 1;
+    score = 0;
+    combo = 0;
+    crowdEnergy = 50;
+    toleranceGood = 0.30;
+    gameActive = false;
+    roundActive = false;
+    dropResolved = true;
+    beatTimes = [];
+    dropPad.disabled = true;
+    dropPad.classList.remove('armed');
+    overlay.classList.remove('show');
+    startBtn.disabled = false;
+    startBtn.textContent = '▶ Start Session';
+    setFeedback('Press START SESSION to plug in', 'info');
+    updateHUD();
+  }
+
+  // ---------------- VISUALIZER ----------------
+  function draw() {
+    requestAnimationFrame(draw);
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // background grid
+    ctx.fillStyle = '#050308';
+    ctx.fillRect(0, 0, w, h);
+
+    if (!audioCtx) {
+      ctx.fillStyle = '#4a4460';
+      ctx.font = '14px Segoe UI';
+      ctx.textAlign = 'center';
+      ctx.fillText('Beat grid will appear here once the session starts', w / 2, h / 2);
+      return;
+    }
+
+    const now = audioCtx.currentTime;
+
+    // pulsing center core: scale based on proximity to nearest beat
+    let pulse = 0;
+    if (beatTimes.length) {
+      let nearest = Infinity;
+      for (const t of beatTimes) nearest = Math.min(nearest, Math.abs(now - t));
+      pulse = Math.max(0, 1 - nearest / 0.18);
+    }
+    const coreR = 28 + pulse * 22;
+    const cx = w / 2, cy = 62;
+    const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, coreR);
+    grad.addColorStop(0, 'rgba(255,150,240,' + (0.9) + ')');
+    grad.addColorStop(1, 'rgba(120,20,140,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, coreR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(120,220,255,0.6)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 30, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // beat-grid track along the bottom
+    const trackY = h - 46;
+    const trackX0 = 20, trackX1 = w - 20;
+    ctx.strokeStyle = '#241c38';
+    ctx.lineWidth = 6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(trackX0, trackY);
+    ctx.lineTo(trackX1, trackY);
+    ctx.stroke();
+
+    // drop line near the right end
+    const dropX = trackX1 - 14;
+    ctx.strokeStyle = '#ff2f8f';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(dropX, trackY - 22);
+    ctx.lineTo(dropX, trackY + 22);
+    ctx.stroke();
+    ctx.fillStyle = '#ff8fd0';
+    ctx.font = 'bold 10px Segoe UI';
+    ctx.textAlign = 'center';
+    ctx.fillText('DROP', dropX, trackY - 28);
+
+    // moving marker representing progress through the round
+    if (roundActive && !dropResolved) {
+      const total = dropTargetTime - roundStartTime;
+      const elapsed = now - roundStartTime;
+      const frac = Math.max(0, Math.min(1.15, elapsed / total));
+      const mx = trackX0 + frac * (trackX1 - trackX0 - 20);
+      ctx.fillStyle = '#ffe93f';
+      ctx.shadowColor = '#ffe93f';
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(mx, trackY, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    // beat tick marks
+    if (beatTimes.length) {
+      const total = dropTargetTime - roundStartTime;
+      beatTimes.forEach((t) => {
+        const frac = (t - roundStartTime) / total;
+        const tx = trackX0 + frac * (trackX1 - trackX0 - 20);
+        const lit = Math.abs(now - t) < 0.1;
+        ctx.fillStyle = lit ? '#7cf7ff' : '#3a3355';
+        ctx.beginPath();
+        ctx.arc(tx, trackY, lit ? 5 : 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+  }
+  requestAnimationFrame(draw);
+
+  // ---------------- INPUT ----------------
+  startBtn.addEventListener('click', () => {
+    initAudio();
+    audioCtx.resume();
+    startBtn.disabled = true;
+    startBtn.textContent = 'Session Live';
+    overlay.classList.remove('show');
+    gameActive = true;
+    score = 0; combo = 0; round = 1; bpm = 100; crowdEnergy = 50; toleranceGood = 0.30;
+    updateHUD();
+    startRound();
+  });
+
+  function padPress(e) {
+    e.preventDefault();
+    if (!audioCtx) return;
+    handleDropPress();
+  }
+  dropPad.addEventListener('pointerdown', padPress);
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (gameActive) handleDropPress();
+    }
+  });
+
+  resetBtn.addEventListener('click', fullReset);
+
+  updateHUD();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,760 @@
+<!-- CONCEPT: DJ GAME / CHALLENGE - beat-drop timing game: ride the buildup and slam the DROP at the perfect instant | Audience: Music Lovers / All Ages -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>DROP IT — Beat Drop Timing Challenge</title>
+<style>
+  :root{
+    --bg:#0a0a14;
+    --panel:#12121e;
+    --cyan:#00e5ff;
+    --magenta:#ff2fa0;
+    --purple:#8a4dff;
+    --yellow:#ffd23f;
+    --green:#39ff8f;
+    --red:#ff3b3b;
+    --text:#eaf6ff;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, #1a1230 0%, transparent 60%),
+      radial-gradient(900px 500px at 100% 110%, #0d1f2a 0%, transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    overflow:hidden;
+    height:100vh;
+    touch-action: manipulation;
+  }
+  #app{
+    display:flex; flex-direction:column; align-items:center;
+    height:100%; width:100%; padding:10px 12px 16px;
+  }
+  header{
+    text-align:center; margin-bottom:6px; flex-shrink:0;
+  }
+  header h1{
+    margin:0; font-size:clamp(22px,5vw,34px); letter-spacing:4px;
+    font-weight:800;
+    background:linear-gradient(90deg,var(--cyan),var(--magenta),var(--purple));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 0 30px rgba(0,229,255,0.25);
+  }
+  header p{
+    margin:2px 0 0; font-size:12px; color:#9aa8c7; letter-spacing:1px;
+  }
+  header .audience{
+    font-size:10px; color:#6b7aa0; letter-spacing:1.5px; text-transform:uppercase;
+  }
+
+  #stage{
+    position:relative; width:min(560px,92vw); flex:1; min-height:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px;
+  }
+
+  canvas#bg{
+    position:absolute; inset:0; width:100%; height:100%;
+    border-radius:16px; z-index:0;
+  }
+
+  .hud{
+    position:relative; z-index:2; width:100%;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 14px; background:rgba(10,10,20,0.55);
+    border:1px solid rgba(0,229,255,0.25); border-radius:10px;
+    backdrop-filter: blur(3px);
+  }
+  .stat{ text-align:center; }
+  .stat .label{ font-size:9px; letter-spacing:2px; color:#7d8bb0; text-transform:uppercase;}
+  .stat .value{ font-size:20px; font-weight:800; font-variant-numeric:tabular-nums;
+    text-shadow:0 0 10px currentColor; }
+  .stat.score .value{ color:var(--cyan); }
+  .stat.streak .value{ color:var(--yellow); }
+  .stat.round .value{ color:var(--magenta); }
+
+  #energyWrap{
+    position:relative; z-index:2; width:100%;
+  }
+  #energyLabel{ font-size:10px; letter-spacing:2px; color:#7d8bb0; margin-bottom:4px; text-transform:uppercase;}
+  #energyBar{
+    width:100%; height:16px; border-radius:8px; overflow:hidden;
+    background:#1a1a2a; border:1px solid rgba(255,255,255,0.08);
+    display:flex; gap:2px; padding:2px;
+  }
+  #energyFill{
+    height:100%; width:60%; border-radius:6px;
+    background:linear-gradient(90deg,var(--red),var(--yellow),var(--green));
+    box-shadow:0 0 14px rgba(57,255,143,0.5);
+    transition:width 0.25s ease;
+  }
+
+  #gaugeWrap{
+    position:relative; z-index:2;
+    width:min(320px,80vw); aspect-ratio:1/1;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #gaugeCanvas{ width:100%; height:100%; }
+  #gaugeCenter{
+    position:absolute; text-align:center; pointer-events:none;
+  }
+  #gaugeCenter .phase{
+    font-size:12px; letter-spacing:3px; color:#8fb8ff; text-transform:uppercase;
+  }
+  #gaugeCenter .feedback{
+    font-size:clamp(20px,6vw,30px); font-weight:900; margin-top:2px;
+    text-shadow:0 0 16px currentColor;
+    min-height:34px;
+  }
+
+  #dropBtn{
+    position:relative; z-index:2;
+    width:min(220px,70vw); height:64px; border-radius:16px;
+    border:2px solid var(--magenta);
+    background:linear-gradient(180deg,#2a1030,#160818);
+    color:#fff; font-size:22px; font-weight:900; letter-spacing:3px;
+    cursor:pointer;
+    box-shadow:0 0 24px rgba(255,47,160,0.45), inset 0 0 20px rgba(255,47,160,0.15);
+    transition:transform 0.06s ease, box-shadow 0.15s ease;
+  }
+  #dropBtn:active{ transform:scale(0.95); box-shadow:0 0 40px rgba(255,47,160,0.85); }
+  #dropBtn.armed{
+    animation:pulseArmed 0.5s infinite alternate;
+  }
+  @keyframes pulseArmed{
+    from{ box-shadow:0 0 24px rgba(255,47,160,0.45); }
+    to{ box-shadow:0 0 50px rgba(0,229,255,0.9); border-color:var(--cyan); }
+  }
+  #dropBtn:disabled{ opacity:0.35; cursor:default; animation:none; }
+
+  #controls{
+    position:relative; z-index:2;
+    display:flex; gap:10px; margin-top:2px;
+  }
+  .ctrlBtn{
+    padding:8px 16px; border-radius:20px; font-size:12px; letter-spacing:1.5px;
+    border:1px solid rgba(0,229,255,0.4); background:rgba(0,229,255,0.06);
+    color:var(--cyan); cursor:pointer; font-weight:700; text-transform:uppercase;
+  }
+  .ctrlBtn:active{ background:rgba(0,229,255,0.2); }
+  .ctrlBtn.secondary{ border-color:rgba(255,255,255,0.2); color:#c8d2ea; background:rgba(255,255,255,0.04); }
+
+  #overlay{
+    position:absolute; inset:0; z-index:10;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:rgba(6,6,12,0.92); border-radius:16px;
+    text-align:center; padding:20px; gap:14px;
+  }
+  #overlay h2{
+    margin:0; font-size:26px; letter-spacing:2px;
+    background:linear-gradient(90deg,var(--cyan),var(--magenta));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  #overlay p{ margin:0; font-size:13px; color:#9aa8c7; max-width:340px; line-height:1.5; }
+  #overlay .bigScore{ font-size:40px; font-weight:900; color:var(--yellow); text-shadow:0 0 20px rgba(255,210,63,0.6); }
+  #startBtn, #playAgainBtn{
+    padding:14px 34px; border-radius:30px; font-size:16px; font-weight:800; letter-spacing:2px;
+    background:linear-gradient(90deg,var(--cyan),var(--purple));
+    border:none; color:#0a0a14; cursor:pointer;
+    box-shadow:0 0 30px rgba(0,229,255,0.4);
+  }
+  #startBtn:active, #playAgainBtn:active{ transform:scale(0.97); }
+
+  footer{
+    flex-shrink:0; font-size:10px; color:#5b6786; margin-top:6px; text-align:center;
+    letter-spacing:0.5px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>DROP IT</h1>
+    <p>Ride the buildup, feel the crowd, slam DROP the instant the bass hits.</p>
+    <p class="audience">A beat-drop timing challenge · Music Lovers / All Ages</p>
+  </header>
+
+  <div id="stage">
+    <canvas id="bg"></canvas>
+
+    <div class="hud">
+      <div class="stat score"><div class="label">Score</div><div class="value" id="scoreVal">0</div></div>
+      <div class="stat streak"><div class="label">Streak</div><div class="value" id="streakVal">0</div></div>
+      <div class="stat round"><div class="label">Round</div><div class="value" id="roundVal">1</div></div>
+    </div>
+
+    <div id="gaugeWrap">
+      <canvas id="gaugeCanvas"></canvas>
+      <div id="gaugeCenter">
+        <div class="phase" id="phaseLabel">WAITING</div>
+        <div class="feedback" id="feedbackLabel"></div>
+      </div>
+    </div>
+
+    <div id="energyWrap">
+      <div id="energyLabel">Crowd Energy</div>
+      <div id="energyBar"><div id="energyFill"></div></div>
+    </div>
+
+    <button id="dropBtn" disabled>DROP</button>
+
+    <div id="controls">
+      <button class="ctrlBtn secondary" id="resetBtn">Reset</button>
+    </div>
+
+    <div id="overlay">
+      <h2>DROP IT</h2>
+      <p>A tension riser will build up. Watch the ring fill and feel the snare roll accelerate —
+      tap <b>DROP</b> (or press <b>Space</b>) the instant it peaks. Nail the window for a huge
+      kick + bass stab and crowd energy. Miss the window and the crowd cools off.
+      Three misses in a row and the set ends.</p>
+      <button id="startBtn">TAP TO START</button>
+    </div>
+  </div>
+
+  <footer>Real-time synthesized audio via Web Audio API · No samples, no ads, no tracking</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- Canvas setup ----------
+  const bgCanvas = document.getElementById('bg');
+  const bgCtx = bgCanvas.getContext('2d');
+  const gaugeCanvas = document.getElementById('gaugeCanvas');
+  const gaugeCtx = gaugeCanvas.getContext('2d');
+  const stage = document.getElementById('stage');
+
+  function resize(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const r = stage.getBoundingClientRect();
+    bgCanvas.width = r.width * dpr; bgCanvas.height = r.height * dpr;
+    bgCanvas.style.width = r.width+'px'; bgCanvas.style.height = r.height+'px';
+    bgCtx.setTransform(dpr,0,0,dpr,0,0);
+
+    const gw = document.getElementById('gaugeWrap').getBoundingClientRect();
+    gaugeCanvas.width = gw.width * dpr; gaugeCanvas.height = gw.height * dpr;
+    gaugeCanvas.style.width = gw.width+'px'; gaugeCanvas.style.height = gw.height+'px';
+    gaugeCtx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  // ---------- Audio ----------
+  let ctx = null;
+  let master = null;
+  let noiseBuffer = null;
+
+  function initAudio(){
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain();
+    master.gain.value = 0.85;
+    master.connect(ctx.destination);
+
+    const len = ctx.sampleRate * 2;
+    noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i=0;i<len;i++) data[i] = Math.random()*2-1;
+  }
+
+  function noiseSource(){
+    const src = ctx.createBufferSource();
+    src.buffer = noiseBuffer;
+    src.loop = true;
+    return src;
+  }
+
+  // low punchy kick
+  function playKick(time, vel){
+    vel = vel===undefined?1:vel;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(155, time);
+    osc.frequency.exponentialRampToValueAtTime(42, time+0.14);
+    gain.gain.setValueAtTime(0.001, time);
+    gain.gain.exponentialRampToValueAtTime(1.1*vel, time+0.008);
+    gain.gain.exponentialRampToValueAtTime(0.001, time+0.35);
+    osc.connect(gain).connect(master);
+    osc.start(time); osc.stop(time+0.4);
+  }
+
+  // sub bass stab
+  function playBassStab(time, freq, vel){
+    vel = vel===undefined?1:vel;
+    const osc = ctx.createOscillator();
+    const filt = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, time);
+    filt.type = 'lowpass';
+    filt.frequency.setValueAtTime(1200, time);
+    filt.frequency.exponentialRampToValueAtTime(80, time+0.5);
+    filt.Q.value = 4;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.7*vel, time+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time+0.55);
+    osc.connect(filt).connect(gain).connect(master);
+    osc.start(time); osc.stop(time+0.6);
+  }
+
+  // synth stab chord
+  function playStabChord(time, vel){
+    vel = vel===undefined?1:vel;
+    const freqs = [220, 277.18, 329.63, 440];
+    freqs.forEach((f, idx)=>{
+      const osc = ctx.createOscillator();
+      const filt = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      osc.type = idx%2===0 ? 'sawtooth' : 'square';
+      osc.frequency.value = f;
+      filt.type = 'lowpass';
+      filt.frequency.setValueAtTime(4000, time);
+      filt.frequency.exponentialRampToValueAtTime(400, time+0.4);
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(0.18*vel, time+0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, time+0.45);
+      osc.connect(filt).connect(gain).connect(master);
+      osc.start(time); osc.stop(time+0.5);
+    });
+  }
+
+  // crash / cymbal wash on the drop
+  function playCrash(time, vel){
+    vel = vel===undefined?1:vel;
+    const src = noiseSource();
+    const hp = ctx.createBiquadFilter();
+    const bp = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    hp.type='highpass'; hp.frequency.value = 5000;
+    bp.type='bandpass'; bp.frequency.value = 9000; bp.Q.value = 0.6;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.5*vel, time+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time+1.4);
+    src.connect(hp).connect(bp).connect(gain).connect(master);
+    src.start(time); src.stop(time+1.5);
+  }
+
+  // short noise burst for snare-roll / hats
+  function playSnareTick(time, vel, tone){
+    vel = vel===undefined?0.5:vel;
+    tone = tone||1800;
+    const src = noiseSource();
+    const bp = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    bp.type='bandpass'; bp.frequency.value = tone; bp.Q.value = 1.1;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.6*vel, time+0.003);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time+0.09);
+    src.connect(bp).connect(gain).connect(master);
+    src.start(time); src.stop(time+0.1);
+  }
+
+  // riser: filtered noise sweep + rising pitch osc, scheduled across [time, time+dur]
+  let riserNodes = [];
+  function playRiser(time, dur){
+    const src = noiseSource();
+    const bp = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    bp.type='bandpass'; bp.Q.value = 0.9;
+    bp.frequency.setValueAtTime(200, time);
+    bp.frequency.exponentialRampToValueAtTime(7000, time+dur);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.5, time+dur*0.85);
+    gain.gain.linearRampToValueAtTime(0.0001, time+dur+0.05);
+    src.connect(bp).connect(gain).connect(master);
+    src.start(time); src.stop(time+dur+0.1);
+
+    const osc = ctx.createOscillator();
+    const oGain = ctx.createGain();
+    osc.type='sawtooth';
+    osc.frequency.setValueAtTime(80, time);
+    osc.frequency.exponentialRampToValueAtTime(900, time+dur);
+    oGain.gain.setValueAtTime(0.0001, time);
+    oGain.gain.exponentialRampToValueAtTime(0.22, time+dur*0.9);
+    oGain.gain.linearRampToValueAtTime(0.0001, time+dur+0.05);
+    osc.connect(oGain).connect(master);
+    osc.start(time); osc.stop(time+dur+0.1);
+
+    riserNodes.push(src, osc);
+  }
+
+  // schedule an accelerating snare roll leading into the drop moment
+  function scheduleSnareRoll(startTime, dropTime){
+    const totalGap = dropTime - startTime;
+    let t = startTime;
+    let interval = 0.34;
+    let i = 0;
+    while (t < dropTime - 0.02){
+      const progress = (t - startTime) / totalGap;
+      interval = 0.34 * (1 - progress*0.85) + 0.03;
+      playSnareTick(t, 0.35 + progress*0.5, 1500 + progress*2500);
+      t += Math.max(interval, 0.035);
+      i++;
+      if (i > 200) break;
+    }
+  }
+
+  function playDropHit(time, vel){
+    playKick(time, vel);
+    playBassStab(time+0.01, 55, vel);
+    playStabChord(time+0.005, vel*0.9);
+    playCrash(time, vel*0.8);
+  }
+
+  function playMissThud(time){
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type='triangle';
+    osc.frequency.setValueAtTime(140, time);
+    osc.frequency.exponentialRampToValueAtTime(60, time+0.2);
+    gain.gain.setValueAtTime(0.001, time);
+    gain.gain.exponentialRampToValueAtTime(0.35, time+0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, time+0.25);
+    osc.connect(gain).connect(master);
+    osc.start(time); osc.stop(time+0.3);
+  }
+
+  // ---------- Game state ----------
+  const state = {
+    running:false,
+    phase:'idle', // idle | buildup | window | resolved | cooldown
+    score:0,
+    streak:0,
+    bestStreak:0,
+    round:1,
+    energy:60,
+    misses:0,
+    buildupStart:0,
+    buildupDur:0,
+    dropTime:0,
+    windowMs:260, // total forgiving window (ms) around dropTime, shrinks with rounds
+    resolvedThisRound:false,
+    particles:[]
+  };
+
+  const scoreVal = document.getElementById('scoreVal');
+  const streakVal = document.getElementById('streakVal');
+  const roundVal = document.getElementById('roundVal');
+  const energyFill = document.getElementById('energyFill');
+  const phaseLabel = document.getElementById('phaseLabel');
+  const feedbackLabel = document.getElementById('feedbackLabel');
+  const dropBtn = document.getElementById('dropBtn');
+  const overlay = document.getElementById('overlay');
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+
+  function updateHUD(){
+    scoreVal.textContent = state.score;
+    streakVal.textContent = state.streak;
+    roundVal.textContent = state.round;
+    energyFill.style.width = Math.max(0, Math.min(100, state.energy)) + '%';
+    if (state.energy > 70) energyFill.style.boxShadow = '0 0 18px rgba(57,255,143,0.7)';
+    else if (state.energy > 35) energyFill.style.boxShadow = '0 0 14px rgba(255,210,63,0.6)';
+    else energyFill.style.boxShadow = '0 0 14px rgba(255,59,59,0.7)';
+  }
+
+  function setPhaseLabel(t){ phaseLabel.textContent = t; }
+
+  function startRound(){
+    if (!state.running) return;
+    state.phase = 'buildup';
+    state.resolvedThisRound = false;
+    setPhaseLabel('BUILDING UP');
+    feedbackLabel.textContent = '';
+    dropBtn.disabled = false;
+    dropBtn.classList.add('armed');
+
+    const difficultyFactor = Math.min(state.round, 12);
+    const dur = Math.max(2.6, 5.6 - difficultyFactor*0.22) + Math.random()*1.2;
+    state.windowMs = Math.max(120, 260 - difficultyFactor*10);
+
+    const now = ctx.currentTime + 0.05;
+    state.buildupStart = now;
+    state.buildupDur = dur;
+    state.dropTime = now + dur;
+
+    playRiser(now, dur);
+    scheduleSnareRoll(now + dur*0.15, state.dropTime);
+  }
+
+  function endRoundAndAdvanceOrFinish(){
+    setTimeout(()=>{
+      if (!state.running) return;
+      if (state.misses >= 3){
+        finishGame();
+      } else {
+        state.round += 1;
+        state.phase = 'cooldown';
+        setPhaseLabel('GET READY');
+        updateHUD();
+        setTimeout(startRound, 900 + Math.random()*500);
+      }
+    }, 650);
+  }
+
+  function judgeTap(){
+    if (state.phase !== 'buildup' && state.phase !== 'window') return;
+    if (state.resolvedThisRound) return;
+    state.resolvedThisRound = true;
+    dropBtn.disabled = true;
+    dropBtn.classList.remove('armed');
+
+    const nowAudio = ctx.currentTime;
+    const diffMs = (nowAudio - state.dropTime) * 1000; // negative = early, positive = late
+    const absDiff = Math.abs(diffMs);
+    const win = state.windowMs;
+
+    let grade, color, points, vel, energyDelta;
+    if (absDiff <= win*0.25){
+      grade='PERFECT!'; color='var(--green)'; points=150; vel=1.15; energyDelta=14; state.misses=0;
+    } else if (absDiff <= win*0.6){
+      grade='GREAT'; color='var(--cyan)'; points=100; vel=0.95; energyDelta=8; state.misses=0;
+    } else if (absDiff <= win){
+      grade='GOOD'; color='var(--yellow)'; points=55; vel=0.75; energyDelta=3; state.misses=0;
+    } else {
+      grade = diffMs < 0 ? 'TOO EARLY' : 'TOO LATE';
+      color='var(--red)'; points=0; vel=0; energyDelta=-22; state.misses += 1;
+    }
+
+    setPhaseLabel(diffMs<0 ? 'EARLY' : (diffMs>0 ? 'LATE' : 'ON POINT'));
+    feedbackLabel.textContent = grade;
+    feedbackLabel.style.color = color;
+
+    if (points>0){
+      const dropAt = Math.max(nowAudio, state.dropTime);
+      playDropHit(dropAt, vel);
+      state.streak += 1;
+      state.bestStreak = Math.max(state.bestStreak, state.streak);
+      const streakBonus = Math.floor(state.streak/3) * 20;
+      state.score += points + streakBonus;
+      spawnBurst(color, 1 + vel);
+    } else {
+      playMissThud(nowAudio);
+      state.streak = 0;
+      spawnBurst('#443', 0.4);
+    }
+
+    state.energy = Math.max(0, Math.min(100, state.energy + energyDelta));
+    updateHUD();
+
+    // if they tapped early (before drop time), wait until actual drop time already passed
+    endRoundAndAdvanceOrFinish();
+  }
+
+  // if the buildup fully passes with no tap at all, auto-resolve as a miss
+  function watchdogTick(){
+    if (state.phase === 'buildup' && !state.resolvedThisRound){
+      const nowAudio = ctx.currentTime;
+      if (nowAudio - state.dropTime > (state.windowMs/1000) + 0.05){
+        state.resolvedThisRound = true;
+        dropBtn.disabled = true;
+        dropBtn.classList.remove('armed');
+        setPhaseLabel('TOO LATE');
+        feedbackLabel.textContent = 'MISSED';
+        feedbackLabel.style.color = 'var(--red)';
+        playMissThud(nowAudio);
+        state.streak = 0;
+        state.misses += 1;
+        state.energy = Math.max(0, state.energy - 22);
+        updateHUD();
+        spawnBurst('#443', 0.4);
+        endRoundAndAdvanceOrFinish();
+      }
+    }
+  }
+
+  function finishGame(){
+    state.running = false;
+    setPhaseLabel('SET OVER');
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <h2>SET OVER</h2>
+      <div class="bigScore">${state.score}</div>
+      <p>Best streak: ${state.bestStreak} · Rounds survived: ${state.round}<br/>
+      The crowd energy hit zero. Every DJ misses a drop sometimes — dial back in and go again.</p>
+      <button id="playAgainBtn">PLAY AGAIN</button>
+    `;
+    document.getElementById('playAgainBtn').addEventListener('click', ()=>{
+      resetGame();
+      beginGame();
+    });
+  }
+
+  function resetGame(){
+    state.running=false; state.phase='idle'; state.score=0; state.streak=0; state.bestStreak=0;
+    state.round=1; state.energy=60; state.misses=0; state.particles=[];
+    updateHUD();
+    dropBtn.disabled = true;
+    dropBtn.classList.remove('armed');
+    setPhaseLabel('WAITING');
+    feedbackLabel.textContent='';
+  }
+
+  function beginGame(){
+    initAudio();
+    if (ctx.state === 'suspended') ctx.resume();
+    overlay.style.display = 'none';
+    state.running = true;
+    state.phase = 'cooldown';
+    updateHUD();
+    setPhaseLabel('GET READY');
+    setTimeout(startRound, 700);
+  }
+
+  // ---------- particles for the visualizer ----------
+  function spawnBurst(color, power){
+    const cx = bgCanvas.clientWidth/2, cy = bgCanvas.clientHeight/2;
+    const n = Math.floor(14 + power*16);
+    for (let i=0;i<n;i++){
+      const ang = Math.random()*Math.PI*2;
+      const spd = (1+Math.random()*3) * power;
+      state.particles.push({
+        x:cx, y:cy,
+        vx:Math.cos(ang)*spd, vy:Math.sin(ang)*spd,
+        life:1, color: color.startsWith('var')? getComputedStyle(document.documentElement).getPropertyValue(color.slice(4,-1)) || '#00e5ff' : color,
+        size: 2+Math.random()*3
+      });
+    }
+  }
+
+  // ---------- render loop ----------
+  let lastT = 0;
+  function render(ts){
+    requestAnimationFrame(render);
+    watchdogTick();
+    const dt = lastT ? (ts-lastT)/1000 : 0.016;
+    lastT = ts;
+
+    const w = bgCanvas.clientWidth, h = bgCanvas.clientHeight;
+    bgCtx.clearRect(0,0,w,h);
+
+    // pulsing background rings tied to crowd energy
+    const t = ts/1000;
+    const energyNorm = state.energy/100;
+    bgCtx.save();
+    bgCtx.translate(w/2, h/2);
+    for (let i=0;i<3;i++){
+      const pulse = (Math.sin(t*2.4 - i*0.7)+1)/2;
+      const r = (Math.min(w,h)/2.6) * (0.55 + i*0.22) * (0.85+pulse*0.25*energyNorm);
+      bgCtx.beginPath();
+      bgCtx.arc(0,0,Math.max(4,r),0,Math.PI*2);
+      bgCtx.strokeStyle = `rgba(${120+energyNorm*40},${80+energyNorm*140},255,${0.10+0.10*pulse})`;
+      bgCtx.lineWidth = 1.5;
+      bgCtx.stroke();
+    }
+    bgCtx.restore();
+
+    // particles
+    for (let i=state.particles.length-1;i>=0;i--){
+      const p = state.particles[i];
+      p.x += p.vx; p.y += p.vy; p.vx*=0.97; p.vy*=0.97; p.life -= dt*1.1;
+      if (p.life<=0){ state.particles.splice(i,1); continue; }
+      bgCtx.globalAlpha = Math.max(0,p.life);
+      bgCtx.fillStyle = p.color;
+      bgCtx.beginPath();
+      bgCtx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+      bgCtx.fill();
+    }
+    bgCtx.globalAlpha = 1;
+
+    drawGauge();
+  }
+  requestAnimationFrame(render);
+
+  function drawGauge(){
+    const w = gaugeCanvas.clientWidth, h = gaugeCanvas.clientHeight;
+    if (!w || !h) return;
+    gaugeCtx.clearRect(0,0,w,h);
+    const cx=w/2, cy=h/2, R = Math.min(w,h)/2 - 10;
+
+    // base ring
+    gaugeCtx.beginPath();
+    gaugeCtx.arc(cx,cy,R,0,Math.PI*2);
+    gaugeCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+    gaugeCtx.lineWidth = 10;
+    gaugeCtx.stroke();
+
+    // sweet-zone arc near the top (12 o'clock = drop point), width proportional to window
+    const winFrac = (state.phase==='buildup'||state.phase==='window') ?
+      Math.min(0.22, (state.windowMs/1000) / Math.max(0.6, state.buildupDur) * 1.4 + 0.04) : 0.06;
+    const topAngle = -Math.PI/2;
+    gaugeCtx.beginPath();
+    gaugeCtx.arc(cx,cy,R, topAngle - winFrac, topAngle + winFrac);
+    gaugeCtx.strokeStyle = 'rgba(57,255,143,0.85)';
+    gaugeCtx.lineWidth = 10;
+    gaugeCtx.lineCap='round';
+    gaugeCtx.shadowColor = '#39ff8f';
+    gaugeCtx.shadowBlur = 14;
+    gaugeCtx.stroke();
+    gaugeCtx.shadowBlur = 0;
+
+    // progress arc showing buildup progress (starts at top, sweeps clockwise, reaches top again = drop)
+    if ((state.phase==='buildup') && state.buildupDur>0){
+      const elapsed = ctx.currentTime - state.buildupStart;
+      const frac = Math.max(0, Math.min(1, elapsed / state.buildupDur));
+      const ang = topAngle + frac*Math.PI*2;
+      gaugeCtx.beginPath();
+      gaugeCtx.arc(cx,cy,R, topAngle, ang);
+      gaugeCtx.strokeStyle = 'rgba(0,229,255,0.9)';
+      gaugeCtx.lineWidth = 4;
+      gaugeCtx.stroke();
+
+      // moving indicator dot
+      const ix = cx + Math.cos(ang)*R;
+      const iy = cy + Math.sin(ang)*R;
+      gaugeCtx.beginPath();
+      gaugeCtx.arc(ix,iy,7,0,Math.PI*2);
+      gaugeCtx.fillStyle = '#fff';
+      gaugeCtx.shadowColor = '#00e5ff';
+      gaugeCtx.shadowBlur = 16;
+      gaugeCtx.fill();
+      gaugeCtx.shadowBlur = 0;
+    }
+  }
+
+  // ---------- input ----------
+  function handleDrop(e){
+    if (e) e.preventDefault();
+    if (!state.running) return;
+    judgeTap();
+  }
+  dropBtn.addEventListener('click', handleDrop);
+  dropBtn.addEventListener('touchstart', handleDrop, {passive:false});
+  window.addEventListener('keydown', (e)=>{
+    if (e.code === 'Space'){
+      e.preventDefault();
+      if (!state.running && overlay.style.display !== 'none'){
+        beginGame();
+      } else {
+        handleDrop();
+      }
+    }
+  });
+
+  startBtn.addEventListener('click', beginGame);
+  resetBtn.addEventListener('click', ()=>{
+    resetGame();
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <h2>DROP IT</h2>
+      <p>A tension riser will build up. Watch the ring fill and feel the snare roll accelerate —
+      tap <b>DROP</b> (or press <b>Space</b>) the instant it peaks. Nail the window for a huge
+      kick + bass stab and crowd energy. Miss the window and the crowd cools off.
+      Three misses in a row and the set ends.</p>
+      <button id="startBtn">TAP TO START</button>
+    `;
+    document.getElementById('startBtn').addEventListener('click', beginGame);
+  });
+
+  updateHUD();
+})();
+</script>
+</body>
+</html>
