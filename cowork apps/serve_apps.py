@@ -74,6 +74,9 @@ CATEGORY_ICONS = {
     "Inspirational": "\U0001f31f",
     "Music Production": "\U0001f39b️",
     "Shooting Games": "\U0001f3af",
+    # FIX 2026-08-08: "Cloud APPS" folder (new since 2026-07-19) title-cases to
+    # "Cloud Apps" and had no icon entry, rendering the generic fallback on the hub grid.
+    "Cloud Apps": "☁️",
 }
 
 def get_local_ip():
@@ -2253,8 +2256,9 @@ def generate_index(apps, reviews, base_url):
   #search::placeholder {{ color: var(--muted); }}
   .count {{ background: var(--border); color: var(--muted); border-radius: 99px; padding: 0.1em 0.5em; font-size: 0.75em; font-weight: 500; text-transform: none; letter-spacing: 0; }}
   .app-list {{ display: flex; flex-direction: column; gap: 0.4rem; }}
-  .app-link {{ text-decoration: none; }}
-  .app-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem 0.8rem; display: flex; align-items: center; gap: 0.5rem; transition: background 0.15s, border-color 0.15s, transform 0.1s; cursor: pointer; }}
+  .app-link {{ text-decoration: none; display: flex; flex: 1; width: 100%; color: inherit; }}
+  .app-item {{ position: relative; display: flex; flex-direction: column; width: 100%; }}
+  .app-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem 0.8rem; display: flex; align-items: center; gap: 0.5rem; transition: background 0.15s, border-color 0.15s, transform 0.1s; cursor: pointer; width: 100%; }}
   .app-card:hover, .app-card:active {{ background: var(--card-hover); border-color: var(--accent); transform: translateX(3px); }}
   .app-card.favorite {{ border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124,110,230,0.3); }}
   .app-main {{ flex: 1; min-width: 0; }}
@@ -2278,7 +2282,7 @@ def generate_index(apps, reviews, base_url):
   .hidden {{ display: none !important; }}
   @keyframes fadeout {{ to {{ opacity: 0; transform: scaleY(0); max-height: 0; padding: 0; margin: 0; overflow: hidden; }} }}
   .removing {{ animation: fadeout 0.25s ease forwards; transform-origin: top; }}
-  #removed-section {{ max-width: 700px; margin: 0 auto; padding: 0 1.5rem 1rem; }}
+  #removed-section {{ max-width: 900px; margin: 0 auto; padding: 0 1.5rem 1rem; }}
   .show-removed-btn {{ background: none; border: none; color: var(--muted); font-size: 0.82rem; cursor: pointer; padding: 0.4rem 0; text-decoration: underline; }}
   .show-removed-btn:hover {{ color: var(--text); }}
   #tab-reviews {{ display: none; padding: 1.5rem; max-width: 960px; margin: 0 auto; }}
@@ -2394,23 +2398,61 @@ def generate_index(apps, reviews, base_url):
   .view-toggle-btn.active {{ background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.25); font-weight: 700; }}
 
   /* Mode 1: List (default) */
-  .cat-app-list {{ display: flex; flex-direction: column; gap: 0.4rem; }}
+  .cat-app-list {{ display: flex; flex-direction: column; gap: 0.4rem; width: 100%; }}
 
   /* Mode 2: Grid */
-  .cat-app-list.view-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; }}
-  .cat-app-list.view-grid .app-item {{ height: 100%; }}
-  .cat-app-list.view-grid .app-card {{ flex-direction: column; align-items: flex-start; height: 100%; padding: 0.9rem; gap: 0.5rem; justify-content: space-between; }}
+  .cat-app-list.view-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem; width: 100%; }}
+  .cat-app-list.view-grid .app-item {{ height: 100%; width: 100%; }}
+  .cat-app-list.view-grid .app-link {{ display: flex; flex-direction: column; width: 100%; height: 100%; text-decoration: none; color: inherit; }}
+  .cat-app-list.view-grid .app-card {{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: stretch;
+    width: 100%;
+    height: 100%;
+    min-height: 130px;
+    padding: 0.85rem 0.95rem 0.65rem;
+    border-radius: 12px;
+    position: relative;
+    box-sizing: border-box;
+  }}
   .cat-app-list.view-grid .app-card:hover, .cat-app-list.view-grid .app-card:active {{ transform: translateY(-3px); }}
-  .cat-app-list.view-grid .app-main {{ width: 100%; }}
-  .cat-app-list.view-grid .app-name {{ font-size: 0.95rem; font-weight: 600; line-height: 1.35; margin-top: 0.2rem; }}
-  .cat-app-list.view-grid .card-meta {{ margin-top: 0.4rem; flex-wrap: wrap; }}
+  .cat-app-list.view-grid .app-card > .fav-btn {{ position: absolute; top: 0.6rem; right: 0.6rem; margin: 0; font-size: 1.15rem; z-index: 2; }}
+  .cat-app-list.view-grid .app-main {{ width: 100%; flex: 1; min-width: 0; padding-right: 1.8rem; display: flex; flex-direction: column; justify-content: flex-start; }}
+  .cat-app-list.view-grid .app-name {{ font-size: 0.93rem; font-weight: 600; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 0.35rem; }}
+  .cat-app-list.view-grid .card-meta {{ margin-top: 0.2rem; flex-wrap: wrap; }}
+  .cat-app-list.view-grid .note-quick-btn,
+  .cat-app-list.view-grid .pin-btn,
+  .cat-app-list.view-grid .remove-btn {{
+    display: inline-flex !important;
+    align-self: flex-end;
+    margin-top: 0.4rem;
+  }}
 
   /* Mode 3: Compact */
-  .cat-app-list.view-compact {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.45rem; }}
-  .cat-app-list.view-compact .app-card {{ padding: 0.5rem 0.7rem; border-radius: 8px; min-height: 52px; gap: 0.4rem; }}
-  .cat-app-list.view-compact .app-name {{ font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-  .cat-app-list.view-compact .card-meta {{ display: none; }}
-  .cat-app-list.view-compact .star-row {{ display: none; }}
+  .cat-app-list.view-compact {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.5rem; width: 100%; }}
+  .cat-app-list.view-compact .app-item {{ width: 100%; height: 100%; }}
+  .cat-app-list.view-compact .app-link {{ display: flex; flex-direction: row; width: 100%; height: 100%; text-decoration: none; color: inherit; }}
+  .cat-app-list.view-compact .app-card {{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+    min-height: 42px;
+    padding: 0.45rem 0.75rem;
+    border-radius: 8px;
+    gap: 0.5rem;
+    box-sizing: border-box;
+  }}
+  .cat-app-list.view-compact .fav-btn {{ font-size: 1rem; flex-shrink: 0; }}
+  .cat-app-list.view-compact .app-main {{ flex: 1; min-width: 0; overflow: hidden; }}
+  .cat-app-list.view-compact .app-name {{ font-size: 0.88rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }}
+  .cat-app-list.view-compact .pin-btn {{ flex-shrink: 0; }}
+  .cat-app-list.view-compact .card-meta,
+  .cat-app-list.view-compact .star-row,
+  .cat-app-list.view-compact .note-quick-btn,
+  .cat-app-list.view-compact .remove-btn {{ display: none !important; }}
 
   #search-global {{ width: 100%; padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 1rem; outline: none; transition: border-color 0.2s; }}
   #search-global:focus {{ border-color: var(--accent); }}
