@@ -4,13 +4,13 @@
 
 <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://tokkathedj.github.io/party-command-games/" alt="QR code" />
 
-One catalog for everything — **Party games**, **Carnival**, and **Kids apps** — in a single searchable menu. Tap any card and it opens full-screen; tap **← All Games** to come back. No install, no server, no framework.
+One catalog for everything — **Party games**, **Carnival**, and **Kids apps** — in a single searchable menu, **53 games** in all. Tap any card and it opens full-screen; tap **← All Games** to come back. No install, no server, no framework.
 
 ## What's inside
 
 - **🎉 Party Games (19)** — Floor is Lava, Simon Says, Red/Green Light, Hot Potato, Musical Chairs, Freeze Dance, Would You Rather, Dice & Coins, Memory Match, Quick Match, Charades, Truth or Dare, Never Have I Ever, Scavenger Hunt, Voice Box, Spin the Wheel, Team Picker, Shell Game, Follow the Pattern
 - **🎠 Carnival (8)** — each carnival game as its own card (Basketball Hoops, Spin Reels, Guess the Number, Ring Toss, Critter Boop, Prize Wheel, Duck Gallery), plus **Carnival Midway** for the full hub
-- **🧒 Kids Games (24)** — drawing & colors, math play, hidden objects, bubble pop, song maker, memory games, monster makers, and lots more
+- **🧒 Kids Games (26)** — drawing & colors, guided math worksheets, hidden objects, bubble pop, song maker, memory games, monster makers, and lots more
 
 ## How it works
 
