@@ -8101,6 +8101,13 @@ function extractAnswer(solBox){
   var clone = solBox.cloneNode(true);
   // Strip sol-label, ak-badge, blanks, prob-check-bar
   clone.querySelectorAll('.sol-label, .ak-badge, .blank, .prob-check-bar').forEach(function(el){el.remove();});
+  // Render fractions as a/b and superscripts as ^n so the extracted answer isn't lossy
+  // (a 7-over-12 fraction would otherwise flatten to "712", and 3^6 to "36").
+  clone.querySelectorAll('.frac').forEach(function(fr){
+    var num=fr.querySelector('.num'), den=fr.querySelector('.den');
+    if(num&&den) fr.textContent = num.textContent.trim()+'/'+den.textContent.trim();
+  });
+  clone.querySelectorAll('sup').forEach(function(sp){ sp.textContent = '^'+sp.textContent.trim(); });
   // Get the inner math/text content
   var math = clone.querySelector('.math');
   if(math) return math.textContent.trim();
@@ -8123,55 +8130,160 @@ function normalizeAnswer(s){
     .replace(/[π]/g,'pi');
 }
 
+// ─── Answer-equivalence engine ──────────────────────────────────────────────
+// Grades by mathematical VALUE, not string shape: accepts equivalent forms
+// (1/2 = 0.5 = 50%, x=7 ⇔ 7, 3^6 ⇔ 729, 2/1 ⇔ 2), multi-value sets & tuples,
+// counting/skip runs, and money — while rejecting near-misses. No CAS needed.
+
+// Collapse thousands separators: "1,234,567" -> "1234567".
+function stripThousands(str){ var s=String(str),p; do{p=s;s=s.replace(/(\d),(\d{3})(?!\d)/g,'$1$2');}while(s!==p); return s; }
+
+// Safe arithmetic evaluator (numbers, + - * / ^, parens, unary -, sqrt, pi). No eval().
+function safeEval(expr){
+  var toks=[],i=0,s=expr,isD=function(c){return c>='0'&&c<='9';};
+  while(i<s.length){
+    var c=s[i];
+    if(c===' '){i++;continue;}
+    if(isD(c)||(c==='.'&&isD(s[i+1]))){var j=i;while(j<s.length&&(isD(s[j])||s[j]==='.'))j++;toks.push({t:'num',v:parseFloat(s.slice(i,j))});i=j;continue;}
+    if('+-*/^()'.indexOf(c)!==-1){toks.push({t:'op',v:c});i++;continue;}
+    if(/[a-z]/.test(c)){var k=i;while(k<s.length&&/[a-z]/.test(s[k]))k++;var id=s.slice(i,k);i=k;
+      if(id==='pi')toks.push({t:'num',v:Math.PI});else if(id==='e')toks.push({t:'num',v:Math.E});else if(id==='sqrt')toks.push({t:'func',v:'sqrt'});else return null;continue;}
+    return null;
+  }
+  if(!toks.length) return null;
+  var out=[];for(var p=0;p<toks.length;p++){var cur=toks[p],pr=out[out.length-1];
+    if(pr){var pv=(pr.t==='num')||(pr.t==='op'&&pr.v===')');var co=(cur.t==='num')||(cur.t==='func')||(cur.t==='op'&&cur.v==='(');if(pv&&co)out.push({t:'op',v:'*'});}
+    out.push(cur);}
+  toks=out;
+  var output=[],ops=[],prec={'+':1,'-':1,'*':2,'/':2,'^':4,'u-':5},ra={'^':true,'u-':true},pt=null;
+  for(var q=0;q<toks.length;q++){var tk=toks[q];
+    if(tk.t==='num'){output.push(tk);pt=tk;continue;}
+    if(tk.t==='func'){ops.push({t:'func',v:tk.v});pt=tk;continue;}
+    if(tk.v==='('){ops.push(tk);pt=tk;continue;}
+    if(tk.v===')'){while(ops.length&&ops[ops.length-1].v!=='(')output.push(ops.pop());if(!ops.length)return null;ops.pop();if(ops.length&&ops[ops.length-1].t==='func')output.push(ops.pop());pt=tk;continue;}
+    var o=tk.v,un=(o==='-'||o==='+')&&(pt===null||(pt.t==='op'&&pt.v!==')'));
+    if(un){if(o==='-')ops.push({t:'op',v:'u-'});pt=tk;continue;}
+    while(ops.length){var top=ops[ops.length-1];if(top.t==='func'){output.push(ops.pop());continue;}if(top.v==='(')break;if(ra[o]?prec[o]<prec[top.v]:prec[o]<=prec[top.v])output.push(ops.pop());else break;}
+    ops.push({t:'op',v:o});pt=tk;
+  }
+  while(ops.length){var t2=ops.pop();if(t2.v==='('||t2.v===')')return null;output.push(t2);}
+  var st=[];for(var r=0;r<output.length;r++){var e=output[r];
+    if(e.t==='num'){st.push(e.v);continue;}
+    if(e.t==='func'){if(!st.length)return null;st.push(Math.sqrt(st.pop()));continue;}
+    if(e.v==='u-'){if(!st.length)return null;st.push(-st.pop());continue;}
+    if(st.length<2)return null;var b=st.pop(),a=st.pop();
+    st.push(e.v==='+'?a+b:e.v==='-'?a-b:e.v==='*'?a*b:e.v==='/'?a/b:e.v==='^'?Math.pow(a,b):NaN);}
+  if(st.length!==1)return null;
+  return (typeof st[0]==='number'&&isFinite(st[0]))?st[0]:null;
+}
+
+// Does the answer hold more than one value (list, tuple, inequality chain, "or")?
+function hasMultiMarker(raw){
+  var t=stripThousands(String(raw)).toLowerCase();
+  return t.indexOf(',')!==-1 || /\bor\b|\band\b/.test(t) || /[<>≤≥]/.test(t) || /[✓✗]/.test(t);
+}
+
+// Parse ONE scalar answer to a number, or null (null for anything multi-valued).
+function toValue(raw){
+  if(raw==null) return null;
+  var t0=stripThousands(String(raw)).toLowerCase().trim();
+  if(!t0||hasMultiMarker(t0)) return null;
+  var isPct=/%/.test(t0);
+  var t=t0.replace(/&sup4;/g,'^4').replace(/&sup5;/g,'^5').replace(/&sup6;/g,'^6')
+    .replace(/[$%]/g,'').replace(/[−–—]/g,'-').replace(/[×]/g,'*').replace(/[÷]/g,'/')
+    .replace(/π/g,'pi').replace(/√/g,'sqrt')
+    .replace(/[²]/g,'^2').replace(/[³]/g,'^3').replace(/[⁴]/g,'^4').replace(/[⁵]/g,'^5').replace(/[⁶]/g,'^6')
+    .replace(/[°]/g,'').replace(/\(\s*exact\s*\)/g,'')
+    .replace(/\b(square|cubic)?\s*(units?|cm|mm|m|in|inches|ft|feet|yd|mi|kg|g|lb|oz|apples|crayons|books|marbles|rolls)\b/g,'')
+    .replace(/\s+/g,'');
+  if(t==='') return null;
+  var v=safeEval(t);
+  if(v==null) return null;
+  return isPct? v/100 : v;
+}
+
+// Decimal places shown in a numeric string ("8.49"->2, "1/2"/"729"->-1 = exact form).
+function decimalsOf(str){ var m=String(str==null?'':str).match(/\.(\d+)/); return m? m[1].length : -1; }
+
+// Precision-aware equality: round both to the LESSER shown precision, then compare.
+function valuesEqual(a,b,aRaw,bRaw){
+  if(a==null||b==null||!isFinite(a)||!isFinite(b)) return false;
+  var da=decimalsOf(aRaw!=null?aRaw:a), db=decimalsOf(bRaw!=null?bRaw:b);
+  if(da<0&&db<0) return Math.abs(a-b)<=1e-9;
+  if(da<0) da=db; if(db<0) db=da;
+  var p=Math.max(0,Math.min(da,db)), f=Math.pow(10,p);
+  return Math.round(a*f)===Math.round(b*f);
+}
+
+// Ordered list of {v, raw} scalar tokens pulled from a compound answer.
+function scalarTokens(raw){
+  var t=stripThousands(String(raw)).toLowerCase().replace(/[−–—]/g,'-')
+    .replace(/[$]/g,' ').replace(/[()✓✗]/g,' ').replace(/[<>≤≥=≈]/g,' ')
+    .replace(/\bor\b|\band\b/g,' ').replace(/,/g,' ');
+  var out=[],re=/-?\d+(?:\.\d+)?(?:\/-?\d+(?:\.\d+)?)?%?/g,m;
+  while((m=re.exec(t))){var v=toValue(m[0]); if(v!=null) out.push({v:v,raw:m[0]});}
+  return out;
+}
+function multisetEqual(A,B){
+  if(A.length!==B.length||A.length===0) return false;
+  var used=new Array(B.length).fill(false);
+  for(var i=0;i<A.length;i++){var f=-1;for(var j=0;j<B.length;j++){if(!used[j]&&valuesEqual(A[i].v,B[j].v,A[i].raw,B[j].raw)){f=j;break;}}if(f<0)return false;used[f]=true;}
+  return true;
+}
+function orderedEqual(A,B){
+  if(A.length!==B.length||A.length===0) return false;
+  for(var i=0;i<A.length;i++) if(!valuesEqual(A[i].v,B[i].v,A[i].raw,B[i].raw)) return false;
+  return true;
+}
+// Arithmetic integer run (counting / skip counting): constant step, >=3 terms.
+function arithmeticIntRun(parts){
+  if(parts.length<3) return null;
+  var nums=[];for(var i=0;i<parts.length;i++){if(!/^-?\d+$/.test(parts[i]))return null;nums.push(parseInt(parts[i],10));}
+  var step=nums[1]-nums[0];for(var k=2;k<nums.length;k++){if(nums[k]-nums[k-1]!==step)return null;}
+  return nums;
+}
+function afterLastEq(raw){ var str=String(raw),idx=str.lastIndexOf('='); return idx>=0? str.slice(idx+1):str; }
+
 function answersMatch(student, expected){
   if(!student || !expected) return false;
-  var s = normalizeAnswer(student);
-  var e = normalizeAnswer(expected);
+  var s = normalizeAnswer(student), e = normalizeAnswer(expected);
   if(!s||!e) return false;
   if(s===e) return true;
 
-  // Sequence answers (counting / skip-counting), e.g. expected "1, 2, 3, ... 20" — a list
-  // of integers. Don't force typing every term: accept the last number alone (the natural
-  // "count up to" answer), a "first-last" range (1-20 / 1 to 20 / 1 through 20), or the full
-  // list. Grade these AUTHORITATIVELY — return here without falling through — otherwise the
-  // loose numeric/containment fallbacks below would accept any number that merely appears in
-  // the sequence (e.g. "15"), making the check meaningless. Integer lists only, so genuine
-  // single-value or non-integer answers still use the normal matching.
-  var seqParts = String(expected).split(',').map(function(x){return x.trim();}).filter(function(x){return x!=='';});
-  if(seqParts.length >= 3 && seqParts.every(function(x){return /^-?\d+$/.test(x);})){
-    var seqNums = seqParts.map(function(x){return parseInt(x,10);});
-    var seqFirst = seqNums[0], seqLast = seqNums[seqNums.length-1];
-    var sDigits = s.replace(/[^0-9]/g,'');           // student, digits only
-    if(s === ''+seqLast) return true;                // just the last number
-    if(sDigits === ''+seqFirst+seqLast) return true;  // range forms: 1-20, 1to20, 1through20, 1..20
-    if(sDigits === seqNums.join('')) return true;     // full sequence typed out
-    return false;                                     // authoritative for integer lists
+  // Tier 1 — arithmetic integer run: accept last number, first-last range, or full list.
+  var commaParts = String(expected).split(',').map(function(x){return x.trim();}).filter(function(x){return x!=='';});
+  var run = arithmeticIntRun(commaParts);
+  if(run){
+    var first=run[0], last=run[run.length-1], digits=s.replace(/[^0-9]/g,'');
+    if(s===''+last) return true;
+    if(s===first+'-'+last || s===first+'to'+last) return true;
+    if(digits===''+first+last) return true;
+    if(digits===run.map(function(n){return ''+n;}).join('')) return true;
+    return false;
   }
 
-  // Try to extract the final number/expression after "=" in expected (e.g. "5x = 25 → x = 5" → "5")
-  var eEquals = e.split('=');
-  if(eEquals.length > 1){
-    var eFinal = eEquals[eEquals.length-1];
-    if(eFinal && (s===eFinal || s.indexOf(eFinal)!==-1 || eFinal.indexOf(s)!==-1)) return true;
-  }
-  // Try same on student answer
-  var sEquals = s.split('=');
-  if(sEquals.length > 1){
-    var sFinal = sEquals[sEquals.length-1];
-    if(sFinal === e || sFinal === eEquals[eEquals.length-1]) return true;
+  var multi = hasMultiMarker(expected);
+
+  // Tier 2/3 — single-valued: equivalent-form chain "a = b = c", then plain scalar equivalence.
+  if(!multi){
+    var sAfter=afterLastEq(student), sVal=toValue(sAfter);
+    if(sVal!=null){
+      var pieces=String(expected).split(/=|≈|→/).map(function(x){return x.trim();}).filter(Boolean);
+      for(var p=0;p<pieces.length;p++){ var pv=toValue(pieces[p]); if(pv!=null&&valuesEqual(sVal,pv,sAfter,pieces[p])) return true; }
+      var eAfter=afterLastEq(expected), eVal=toValue(eAfter);
+      if(eVal!=null && valuesEqual(sVal,eVal,sAfter,eAfter)) return true;
+    }
+    return false;
   }
 
-  // Numeric match with tolerance
-  var sNum = parseFloat(s.replace(/[^0-9.\-]/g,''));
-  var eNum = parseFloat(e.replace(/[^0-9.\-]/g,''));
-  if(!isNaN(sNum) && !isNaN(eNum)){
-    if(Math.abs(sNum-eNum) < 0.01) return true;
-    if(Math.abs(eNum)>0 && Math.abs(sNum-eNum)/Math.abs(eNum) < 0.01) return true;
+  // Tier 4 — multi-value: ordered tuple (coords) / inequality chain, else unordered set.
+  var eTok=scalarTokens(expected), sTok=scalarTokens(student);
+  if(eTok.length>=2){
+    var isTuple=/^\(\s*-?[\d.\/]+\s*(?:,\s*-?[\d.\/]+\s*){1,2}\)$/.test(String(expected).trim());
+    var ordered=isTuple || /[<>≤≥]/.test(String(expected));
+    if(ordered){ if(orderedEqual(sTok,eTok)) return true; }
+    else { if(multisetEqual(sTok,eTok)) return true; }
   }
-
-  // Containment match (e.g. student types "5" and expected is "5 apples")
-  if(e.length>=2 && s.indexOf(e)!==-1) return true;
-  if(s.length>=2 && e.indexOf(s)!==-1) return true;
   return false;
 }
 
