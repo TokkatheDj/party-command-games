@@ -12,6 +12,12 @@ One catalog for everything — **Party games**, **Carnival**, and **Kids apps** 
 - **🎠 Carnival (8)** — each carnival game as its own card (Basketball Hoops, Spin Reels, Guess the Number, Ring Toss, Critter Boop, Prize Wheel, Duck Gallery), plus **Carnival Midway** for the full hub
 - **🧒 Kids Games (26)** — drawing & colors, guided math worksheets, hidden objects, bubble pop, song maker, memory games, monster makers, and lots more
 
+## Smart answer checking (Math Worksheets)
+
+The **Math Worksheets** app grades by mathematical *value*, not exact text — it accepts equivalent forms (`1/2 = 0.5 = 50%`, `x = 7` ⇔ `7`, `3^6` ⇔ `729`, `2(x+3)` ⇔ `2x+6`) and bundles the [nerdamer](https://nerdamer.com) CAS for symbolic algebra equivalence. Answer grading is verified end-to-end across these modules:
+
+> counting · fractions · decimals & percents (fdp) · PEMDAS · exponents · equations · proportions · radicals · slope · graphing lines · polynomial division · polynomial products · derivative rules · absolute value · quadratic formula · systems · factors & multiples · functions
+
 ## How it works
 
 `index.html` is the catalog. Each card opens its game in a full-screen iframe, so every app runs isolated — the Phaser-based Carnival build and the vanilla party/kids apps never collide. Party games deep-link straight into the chosen game via the party app's own navigation, and every game is addressable with a `#play/<id>` hash (Back button works).
