@@ -14,7 +14,7 @@ One catalog for everything — **Party games**, **Carnival**, and **Kids apps** 
 
 ## Smart answer checking (Math Worksheets)
 
-The **Math Worksheets** app grades by mathematical *value*, not exact text — it accepts equivalent forms (`1/2 = 0.5 = 50%`, `x = 7` ⇔ `7`, `3^6` ⇔ `729`, `2(x+3)` ⇔ `2x+6`) and bundles the [nerdamer](https://nerdamer.com) CAS for symbolic algebra equivalence. Answer grading is verified end-to-end across these modules:
+The **Math Worksheets** app grades by mathematical *value*, not exact text — it accepts equivalent forms (`1/2 = 0.5 = 50%`, `x = 7` ⇔ `7`, `3^6` ⇔ `729`, `2(x+3)` ⇔ `2x+6`) using a compact, self-contained polynomial-equivalence normalizer for symbolic algebra (no external libraries). Answer grading is verified end-to-end across these modules:
 
 > counting · fractions · decimals & percents (fdp) · PEMDAS · exponents · equations · proportions · radicals · slope · graphing lines · polynomial division · polynomial products · derivative rules · absolute value · quadratic formula · systems · factors & multiples · functions
 
