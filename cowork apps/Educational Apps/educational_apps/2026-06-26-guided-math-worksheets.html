@@ -38,6 +38,10 @@ body{font-family:var(--ui);background:#f4f3f0;color:#111;font-size:13px;}
 .subj-btn[data-subj="finance"].active{background:#1a4a3a;color:#fff;}
 .subj-divider{width:1px;background:#e0e0e0;margin:8px 4px;align-self:stretch;display:inline-block;}
 .subj-btn[data-subj="elementary"].active{background:#7a5c00;color:#fff;}
+/* Green theme (Personal Finance focused card, via ?theme=green) */
+body.theme-green #global-header{background:linear-gradient(120deg,#14432f,#2d6a4f);}
+body.theme-green #subject-bar{border-bottom-color:#cfe3d8;}
+body.theme-green .subj-btn[data-subj="finance"].active{background:#2d6a4f;}
 
 #topic-bar{background:#f9f8f6;border-bottom:2px solid #111;display:flex;overflow-x:auto;padding:0 16px;min-height:38px;align-items:stretch;}
 .topic-btn{padding:8px 14px;font-size:11px;font-weight:600;color:#777;background:transparent;border:none;cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent;margin-bottom:-2px;font-family:var(--ui);letter-spacing:.03em;transition:color .12s;}
@@ -534,6 +538,11 @@ body.answer-key-mode .ak-fill{
 .choice-btn.i-wrong{border-color:#c0392b!important;background:#fbeae8!important;color:#c0392b;}
 .choice-btn.i-disabled{cursor:not-allowed;opacity:.5;}
 .choice-btn.i-correct.i-disabled{opacity:1;cursor:default;}
+/* Answer Key reveal is purely CSS-driven off body.answer-key-mode so it fully reverses
+   when toggled off — no persistent DOM mutation leaking filled answers into student prints. */
+body.answer-key-mode .interactive-step.locked{display:block;}
+body.answer-key-mode .choice-btn{pointer-events:none;}
+body.answer-key-mode .choice-btn[data-correct="true"]{border-color:#2d6a4f!important;background:#e7f7ed!important;color:#2d6a4f;font-weight:700;}
 .prob-score-badge{margin-top:13px;padding:7px 14px;border-radius:5px;background:#e7f7ed;border:1.5px solid #2d6a4f;color:#2d6a4f;font-family:var(--ui);font-size:12px;font-weight:700;display:none;letter-spacing:.01em;}
 .prob-score-badge.i-show{display:inline-block;}
 .prob-score-badge.i-perfect{background:#fff3e0;border-color:#e67e22;color:#d35400;}
@@ -556,7 +565,7 @@ body.answer-key-mode .ak-fill{
 
 <!-- GLOBAL HEADER -->
 <div id="global-header">
-  <h1>&#128221; Guided Math Worksheets</h1>
+  <h1 id="app-title">&#128221; Guided Math Worksheets</h1>
   <div class="gmeta"><label>Class / Period</label><input type="text" id="gClass" value="Period ___" oninput="updateAllMeta()"></div>
   <div class="gmeta"><label>Name line</label><input type="text" id="gName" value="Name: ________________________" oninput="updateAllMeta()"></div>
   <div class="gmeta"><label>Date</label><input type="text" id="gDate" value="Date: ___________" oninput="updateAllMeta()"></div>
@@ -3799,7 +3808,7 @@ var PROP = (function(){
 // ═══════════════════════════════════════════════
 var EQN = (function(){
   var problems = [
-    {a:1,b:0,c:7,op_a:'mul',op_b:'none'},   // x = 7 (trivial — actually x·1=7)
+    {a:2,b:0,c:8,op_a:'mul',op_b:'none'},    // 2x = 8  (was x = 7, which showed its own answer)
     {a:3,b:0,c:12,op_a:'mul',op_b:'none'},   // 3x = 12
     {a:1,b:5,c:11,op_a:'mul',op_b:'add'},    // x + 5 = 11
     {a:2,b:3,c:11,op_a:'mul',op_b:'add'},    // 2x + 3 = 11
@@ -6714,8 +6723,32 @@ updateAllMeta = function(){
 };
 
 document.querySelectorAll('.module').forEach(function(m){m.classList.remove('active');});
-renderTopicBar('basic','counting');
-switchModule('counting');
+
+// ── Focused-app URL config (one codebase → multiple focused catalog cards) ──
+//   ?subjects=basic,elementary   show only these subject tabs
+//   ?title=Elementary%20Math     override the app/tab title
+//   ?theme=green                 green theme (Personal Finance)
+(function applyUrlConfig(){
+  var params = new URLSearchParams(location.search);
+  var subj = params.get('subjects');
+  if(subj){
+    var keep = subj.split(',').map(function(s){return s.trim();}).filter(function(k){return SUBJECTS[k];});
+    if(keep.length){
+      Object.keys(SUBJECTS).forEach(function(k){ if(keep.indexOf(k)===-1) delete SUBJECTS[k]; });
+      document.querySelectorAll('.subj-btn').forEach(function(b){ if(keep.indexOf(b.dataset.subj)===-1) b.style.display='none'; });
+      document.querySelectorAll('.subj-divider').forEach(function(d){ d.style.display='none'; });
+      currentSubject = keep[0];
+      currentModule  = SUBJECTS[currentSubject][0].id;
+    }
+  }
+  if(params.get('theme')==='green') document.body.classList.add('theme-green');
+  var title = params.get('title');
+  if(title){ document.title = title; var hEl=document.getElementById('app-title'); if(hEl) hEl.textContent = title; }
+})();
+
+renderTopicBar(currentSubject, currentModule);
+switchModule(currentModule);
+document.querySelectorAll('.subj-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.subj===currentSubject); });
 updateAllMeta();
 // Inject toolbars after all modules have rendered
 setTimeout(injectToolbars, 100);
@@ -8852,10 +8885,9 @@ function toggleAnswerKey(){
   if(tpIcon) tpIcon.textContent = answerKeyOn ? '☑' : '☐';
   if(tpBtn) tpBtn.childNodes[1].textContent = answerKeyOn ? ' Answer Key ON' : ' Answer Key OFF';
 
-  // Interactive steps: auto-complete when answer key is turned on
-  if(answerKeyOn && typeof autoCompleteAllInteractive==='function'){
-    autoCompleteAllInteractive();
-  }
+  // Interactive steps are revealed by CSS (body.answer-key-mode) — reversible, no DOM mutation.
+  // (Previously called autoCompleteAllInteractive(), which permanently filled the steps and
+  //  leaked the answers into student prints even after turning Answer Key back off.)
 
   // When turning ON: show a "KEY" watermark on each solution box
   document.querySelectorAll('.solution-box').forEach(function(box){
