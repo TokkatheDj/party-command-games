@@ -1013,7 +1013,7 @@ body.answer-key-mode .ak-fill{
 <div id="mod-pemdas" class="module">
   <div class="editor-strip">
     <h2>Order of Operations — Problem Editor</h2>
-    <p class="ed-hint">Build an expression using the fields below. Each component is shown at the right step in PEMDAS order.</p>
+    <p class="ed-hint">Type any expression using numbers and + − × ÷ ^ ( ). The guided steps and the answer are generated automatically in PEMDAS order.</p>
     <div id="pem-prob-list" class="prob-list"></div>
     <div class="ed-actions">
       <button class="act primary" onclick="PEM.addProblem()">+ Add problem</button>
@@ -3510,29 +3510,81 @@ var RADICALS = (function(){
 // ═══════════════════════════════════════════════
 // MODULE 13: ORDER OF OPERATIONS (PEMDAS)
 // ═══════════════════════════════════════════════
+// PEMDAS step + answer derivation from a typed expression: parse it to a tree, then reduce
+// one operation at a time in true PEMDAS order (deepest parentheses → exponents → ×/÷
+// left-to-right → +/− left-to-right), recording each reduction as a labeled step + its result.
+// So editing the expression regenerates the guided steps AND the answer consistently.
+function pemSup(n){ var map={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','-':'⁻'}; return String(n).split('').map(function(ch){return map[ch]||ch;}).join(''); }
+function pemFmt(v){ return ''+(Math.round(v*1000)/1000); }
+function pemNum(v){ return v<0 ? '(−'+pemFmt(-v)+')' : pemFmt(v); }
+function pemLabel(op,a,b){ if(op==='^') return pemNum(a)+pemSup(pemFmt(b)); var sym=op==='*'?'×':op==='/'?'÷':op==='-'?'−':'+'; return pemNum(a)+' '+sym+' '+pemNum(b); }
+function pemDerive(exprRaw){
+  var s=String(exprRaw).replace(/[−–—]/g,'-').replace(/[×·]/g,'*').replace(/[÷]/g,'/')
+    .replace(/²/g,'^2').replace(/³/g,'^3').replace(/⁴/g,'^4').replace(/⁵/g,'^5').replace(/⁶/g,'^6')
+    .replace(/⁷/g,'^7').replace(/⁸/g,'^8').replace(/⁹/g,'^9').replace(/⁰/g,'^0').replace(/\s+/g,'');
+  if(!s) return null;
+  var toks=[], i=0, isD=function(ch){return ch>='0'&&ch<='9';};
+  while(i<s.length){ var ch=s[i];
+    if(isD(ch)||(ch==='.'&&isD(s[i+1]))){ var j=i; while(j<s.length&&(isD(s[j])||s[j]==='.'))j++; toks.push({t:'num',v:parseFloat(s.slice(i,j))}); i=j; }
+    else if('+-*/^()'.indexOf(ch)!==-1){ toks.push({t:ch}); i++; }
+    else return null;
+  }
+  var p=0, depth=0, posCtr=0, peek=function(){return toks[p];}, eat=function(){return toks[p++];};
+  try {
+    function atom(){ var tk=peek(); if(!tk) throw 0;
+      if(tk.t==='('){ eat(); depth++; var e=expr(); if(!peek()||peek().t!==')') throw 0; eat(); depth--; return e; }
+      if(tk.t==='-'){ eat(); var a=atom(); if(a.type==='num') return {type:'num',val:-a.val}; return {type:'op',op:'*',left:{type:'num',val:-1},right:a,depth:depth,pos:posCtr++}; }
+      if(tk.t==='+'){ eat(); return atom(); }
+      if(tk.t==='num'){ eat(); return {type:'num',val:tk.v}; }
+      throw 0;
+    }
+    function power(){ var b=atom(); if(peek()&&peek().t==='^'){ eat(); var e=power(); return {type:'op',op:'^',left:b,right:e,depth:depth,pos:posCtr++}; } return b; }
+    function term(){ var v=power(); while(peek()&&(peek().t==='*'||peek().t==='/')){ var op=eat().t; var r=power(); v={type:'op',op:op,left:v,right:r,depth:depth,pos:posCtr++}; } return v; }
+    function expr(){ var v=term(); while(peek()&&(peek().t==='+'||peek().t==='-')){ var op=eat().t; var r=term(); v={type:'op',op:op,left:v,right:r,depth:depth,pos:posCtr++}; } return v; }
+    var root=expr(); if(p!==toks.length) return null;
+    var steps=[], answers=[], prio={'^':3,'*':2,'/':2,'+':1,'-':1};
+    function collect(node,arr){ if(node.type==='op'){ if(node.left.type==='num'&&node.right.type==='num') arr.push(node); else { collect(node.left,arr); collect(node.right,arr); } } }
+    var guard=0;
+    while(root.type==='op'){
+      if(++guard>500) return null;
+      var ready=[]; collect(root,ready); if(!ready.length) return null;
+      ready.sort(function(x,y){ return (y.depth-x.depth) || (prio[y.op]-prio[x.op]) || (x.pos-y.pos); });
+      var n=ready[0], a=n.left.val, b=n.right.val, val;
+      switch(n.op){ case '+':val=a+b;break; case '-':val=a-b;break; case '*':val=a*b;break; case '/':val=a/b;break; case '^':val=Math.pow(a,b);break; }
+      if(!isFinite(val)) return null;
+      steps.push(pemLabel(n.op,a,b)); answers.push(val);
+      n.type='num'; n.val=val; delete n.op; delete n.left; delete n.right; delete n.depth; delete n.pos;
+    }
+    if(!steps.length) return {steps:[], answers:[root.val]};
+    return {steps:steps, answers:answers};
+  } catch(e){ return null; }
+}
+
 var PEM = (function(){
-  // Each problem: a string expression and an array of steps
+  // Each problem stores ONLY its expression; guided steps + answer are derived by pemDerive(),
+  // so editing the expression regenerates everything consistently.
   var problems = [
-    { expr:'3 + (8 ÷ 4) × 2² − 1',  steps:['(8 ÷ 4)','2²','result × 2','3 + result','result − 1'], answers:[2,4,8,11,10] },
-    { expr:'5 × (3 + 2)² ÷ 25 − 1',  steps:['(3 + 2)','result²','5 × result','result ÷ 25','result − 1'], answers:[5,25,125,5,4] },
-    { expr:'(9 − 3) ÷ 2 + 4 × 3',    steps:['(9 − 3)','result ÷ 2','4 × 3','step 2 + step 3'], answers:[6,3,12,15] },
-    { expr:'2³ + (10 − 4) ÷ 3 × 2',  steps:['2³','(10 − 4)','result ÷ 3','result × 2','step 1 + step 4'], answers:[8,6,2,4,12] }
+    { expr:'3 + (8 ÷ 4) × 2² − 1' },
+    { expr:'5 × (3 + 2)² ÷ 25 − 1' },
+    { expr:'(9 − 3) ÷ 2 + 4 × 3' },
+    { expr:'2³ + (10 − 4) ÷ 3 × 2' }
   ];
 
   var PEMDAS = ['P — Parentheses','E — Exponents','M/D — Multiply &amp; Divide (left to right)','A/S — Add &amp; Subtract (left to right)'];
 
-  function makePEMSteps(p){
-    var steps=[], letters=['a','b','c','d','e'];
-    p.steps.forEach(function(step,si){
-      var ans=p.answers[si];
-      var d=[ans+1,ans-1,ans+3].filter(function(v){return v!==ans;});
-      var c=iMakeChoices(''+ans,d.map(function(v){return ''+v;}));
-      steps.push({prompt:'<b>('+letters[si]+')</b> Evaluate <span class="math">'+step+'</span> = ?',type:'choice',choices:c.choices,correct:c.correct});
+  function makePEMSteps(d){
+    var steps=[], letters=['a','b','c','d','e','f','g','h','i','j'];
+    d.steps.forEach(function(step,si){
+      var raw=d.answers[si], ans=pemFmt(raw);
+      var distr=[raw+1,raw-1,raw+2].filter(function(v){return v!==raw;}).map(function(v){return pemFmt(v);});
+      var c=iMakeChoices(ans, distr);
+      steps.push({prompt:'<b>('+(letters[si]||('#'+(si+1)))+')</b> Evaluate <span class="math">'+step+'</span> = ?',type:'choice',choices:c.choices,correct:c.correct});
     });
     return steps;
   }
 
   function probHTML(p, idx) {
+    var d = pemDerive(p.expr);
     var h = '<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
     h += '<div class="prob-prompt">Evaluate the expression step-by-step: <span class="math" style="font-size:14px;"><b>'+p.expr+'</b></span></div>';
     h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">';
@@ -3541,17 +3593,26 @@ var PEM = (function(){
       h += '<span style="font-size:10px;font-weight:600;color:'+colors[i]+';border:1px solid '+colors[i]+';padding:2px 8px;border-radius:2px;">'+label+'</span>';
     });
     h += '</div>';
-    h += renderInteractiveSteps(makePEMSteps(p),'pemdas',idx);
-    h += '<div class="solution-box"><span class="sol-label">Answer:</span><span class="math">'+p.answers[p.answers.length-1]+'</span></div>';
+    if(d && d.steps.length){
+      h += renderInteractiveSteps(makePEMSteps(d),'pemdas',idx);
+      h += '<div class="solution-box"><span class="sol-label">Answer:</span><span class="math">'+pemFmt(d.answers[d.answers.length-1])+'</span></div>';
+    } else if(d){
+      h += '<div class="solution-box"><span class="sol-label">Answer:</span><span class="math">'+pemFmt(d.answers[0])+'</span></div>';
+    } else {
+      h += '<div style="font-size:11px;color:#b5451b;">Couldn\'t read this expression — use numbers and + − × ÷ ^ ( ).</div>';
+    }
     h += '</div>'; return h;
   }
+
+  function editorAns(p){ var d=pemDerive(p.expr); return d ? pemFmt(d.answers.length? d.answers[d.answers.length-1] : d.answers[0]) : '—'; }
 
   function renderEditor() {
     var h = '';
     problems.forEach(function(p,i){
       h += '<div class="prow"><span class="prow-num">'+(i+1)+'.</span>';
-      h += '<div class="pf" style="flex:1;"><label>Expression (displayed as-is)</label>';
-      h += '<input type="text" value="'+p.expr+'" style="width:240px;" oninput="PEM.setExpr('+i+',this.value)"></div>';
+      h += '<div class="pf" style="flex:1;"><label>Expression (steps &amp; answer auto-generated)</label>';
+      h += '<input type="text" value="'+p.expr.replace(/"/g,'&quot;')+'" style="width:240px;" oninput="PEM.setExpr('+i+',this.value)"></div>';
+      h += '<div class="pf"><label>Answer</label><div id="pem-ans-'+i+'" style="font-weight:700;padding-top:6px;">'+editorAns(p)+'</div></div>';
       h += '<button class="pdel" onclick="PEM.del('+i+')">&#x2715;</button></div>';
     });
     document.getElementById('pem-prob-list').innerHTML = h;
@@ -3560,8 +3621,8 @@ var PEM = (function(){
   function render(){ renderEditor(); renderWS(); }
   return {
     render: render,
-    setExpr: function(i,v){ problems[i].expr = v; renderWS(); },
-    addProblem: function(){ problems.push({ expr:'4 + 6 ÷ 2 × (3 − 1)', steps:['(3 − 1)','6 ÷ 2','result × step 1','4 + result'], answers:[2,3,6,10] }); render(); },
+    setExpr: function(i,v){ problems[i].expr = v; renderWS(); var el=document.getElementById('pem-ans-'+i); if(el) el.textContent = editorAns(problems[i]); },
+    addProblem: function(){ problems.push({ expr:'4 + 6 ÷ 2 × (3 − 1)' }); render(); },
     del: function(i){ problems.splice(i,1); render(); },
     clearAll: function(){ problems=[]; render(); }
   };
