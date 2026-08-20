@@ -8367,52 +8367,52 @@ function cwsRenderSections(){
 function cwsClear(){cwsSections=[];cwsRenderSections();}
 function cwsPrint(){
   if(cwsSections.length===0){alert('Add at least one section first.');return;}
-  var title=document.getElementById('cws-title').value||'Math Worksheet';
+  var title=(document.getElementById('cws-title').value||'Math Worksheet');
   var meta=getMeta();
-  var limit=wsState.perPage==='all'?Infinity:parseInt(wsState.perPage);
 
-  var html='<div class="worksheet" style="max-width:100%;margin:0;border:none;padding:0;">';
-  html+='<div class="ws-head"><div><div class="ws-title">'+title+'</div></div><div class="ws-meta">'+meta+'</div></div>';
-
-  var probNum=1;
+  // Build the unified worksheet body from the chosen sections.
+  var body='<div class="worksheet" style="max-width:100%;margin:0;border:none;padding:0;">';
+  body+='<div class="ws-head"><div><div class="ws-title">'+title+'</div></div><div class="ws-meta">'+meta+'</div></div>';
+  var probNum=1, any=false;
   cwsSections.forEach(function(sec){
     var modEl=document.getElementById('mod-'+sec.topicId);
     if(!modEl) return;
     var probs=Array.from(modEl.querySelectorAll('.worksheet .problem'));
     var take=sec.count==='all'?probs:probs.slice(0,parseInt(sec.count));
     if(take.length===0) return;
-    html+='<div style="margin-top:20px;margin-bottom:6px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#888;border-bottom:1px solid #ddd;padding-bottom:4px;">'+sec.label+'</div>';
+    body+='<div class="cws-section-label">'+sec.label+'</div>';
     take.forEach(function(prob){
       var clone=prob.cloneNode(true);
-      // renumber
-      var numEl=clone.querySelector('.prob-num');
-      if(numEl) numEl.textContent=probNum+'.';
-      probNum++;
-      // hide solution box if answer key is off
-      if(!answerKeyOn){
-        var solBox=clone.querySelector('.solution-box');
-        if(solBox) solBox.style.display='none';
-      }
-      html+=clone.outerHTML;
+      var numEl=clone.querySelector('.prob-num'); if(numEl) numEl.textContent=probNum+'.'; probNum++;
+      // strip interactive-only UI and any typed-in answers → a clean blank worksheet
+      clone.querySelectorAll('.prob-check-bar, .prob-score-badge').forEach(function(el){el.remove();});
+      clone.querySelectorAll('.blank input').forEach(function(inp){inp.value='';});
+      if(!answerKeyOn){ var s=clone.querySelector('.solution-box'); if(s) s.remove(); }
+      body+=clone.outerHTML;
+      any=true;
     });
   });
-  html+='</div>';
+  body+='</div>';
+  if(!any){ alert('No problems to print — check your sections.'); return; }
 
-  // Write to print container and print
-  var printDiv=document.getElementById('custom-ws-print');
-  printDiv.innerHTML=html;
-  printDiv.style.display='block';
-  document.querySelector('.module.active').style.display='none';
-  window.print();
-  setTimeout(function(){
-    printDiv.style.display='none';
-    printDiv.innerHTML='';
-    document.querySelector('.module').classList.forEach ? null : null;
-    document.querySelectorAll('.module').forEach(function(m){
-      m.style.display = m.classList.contains('active') ? '' : '';
-    });
-    switchModule(currentModule);
-  }, 500);
+  // Print in a CLEAN new window (works whether the app is standalone or inside the catalog
+  // iframe — window.print() from an iframe would otherwise print the whole catalog page).
+  var css=''; document.querySelectorAll('style').forEach(function(st){ css+=st.textContent+'\n'; });
+  var extra='body{background:#fff;margin:0;padding:26px;color:#111;}'
+    +'.cws-section-label{margin-top:22px;margin-bottom:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#666;border-bottom:1px solid #ccc;padding-bottom:4px;}'
+    +'.prob-check-bar,.prob-score-badge,.tp-toggle-btn,#teacher-panel,#custom-ws-panel{display:none!important;}'
+    +'.problem{break-inside:avoid;}'
+    +'@media print{body{padding:0;}}';
+  var bodyClass='student-mode'+(answerKeyOn?' answer-key-mode':'');
+  var win=window.open('','_blank');
+  if(!win){ alert('Please allow pop-ups so the worksheet can open in a new tab to print.'); return; }
+  win.document.open();
+  win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'
+    +title.replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];})
+    +'</title><style>'+css+'\n'+extra+'</style></head><body class="'+bodyClass+'">'+body+'</body></html>');
+  win.document.close();
+  win.focus();
+  setTimeout(function(){ try{ win.print(); }catch(e){} }, 400);
   closeCustomWS();
 }
 
