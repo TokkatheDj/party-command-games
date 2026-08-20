@@ -556,7 +556,21 @@ body.answer-key-mode .choice-btn[data-correct="true"]{border-color:#2d6a4f!impor
 .prob-score-badge.i-show{display:inline-block;}
 .prob-score-badge.i-perfect{background:#e7f7ed;border-color:#2d6a4f;color:#2d6a4f;}
 
+/* Word Problem Generator: briefly highlight the freshly added problem after we jump to it. */
+@keyframes wpgFlash{0%{background:#fff4cc;box-shadow:0 0 0 3px #ffe38a;}100%{background:transparent;box-shadow:0 0 0 0 transparent;}}
+.wpg-flash{animation:wpgFlash 1.6s ease;border-radius:6px;}
 
+/* Progressive graph reveal (Graphing Linear Inequalities): each SVG layer starts hidden and
+   fades in as the matching guided step is answered. Answer-key mode shows every layer at once;
+   student prints show the boundary line only so the sheet stays drawable. */
+.gph-layer{opacity:0;transition:opacity .4s ease;}
+.gph-layer.gph-shown{opacity:1;}
+body.answer-key-mode .gph-layer{opacity:1;}
+@media print{
+  body:not(.answer-key-mode) .gph-line{opacity:1!important;}
+  body:not(.answer-key-mode) .gph-point,
+  body:not(.answer-key-mode) .gph-shade{opacity:0!important;}
+}
 </style>
 
   
@@ -2980,7 +2994,7 @@ function renderInteractiveSteps(steps, modId, probIdx){
   initIState(modId, probIdx, steps.length);
   var h = '<div class="steps" id="isteps-'+modId+'-'+probIdx+'">';
   steps.forEach(function(s, si){
-    h += '<div class="interactive-step'+(si===0?'':' locked')+'" id="istep-'+modId+'-'+probIdx+'-'+si+'">';
+    h += '<div class="interactive-step'+(si===0?'':' locked')+'"'+(s.reveal?' data-reveal="'+s.reveal+'"':'')+' id="istep-'+modId+'-'+probIdx+'-'+si+'">';
     h += '<div class="step-q">'+s.prompt+'</div>';
     h += '<div class="step-choices">';
     s.choices.forEach(function(c, ci){
@@ -3008,6 +3022,13 @@ function iCheck(btn, modId, probIdx, stepIdx, isCorrect){
         if(b.dataset.correct==='true') b.classList.add('i-correct');
       });
       stepEl.classList.add('i-done');
+      // Progressive reveal: if this step names a graph layer, fade it in now.
+      if(stepEl.dataset.reveal){
+        var prob = stepEl.closest('.problem');
+        if(prob){
+          prob.querySelectorAll('.gph-'+stepEl.dataset.reveal).forEach(function(g){ g.classList.add('gph-shown'); });
+        }
+      }
     }
     iUnlock(modId, probIdx, stepIdx, st.stepCount);
   } else {
@@ -5686,53 +5707,67 @@ var GRAPHONE = (function(){
   function makePlane(a,b,c,sym){
     var W=200,H=200,cx=100,cy=100,r=80,sc=r/5;
     function tx(x){return cx+x*sc;} function ty(y){return cy-y*sc;}
-    var strict=IS_STRICT[sym], shadeAbove=IS_GT[sym];
+    var strict=IS_STRICT[sym];
+    // Does (x,y) satisfy the inequality? Robust for either sign of b (avoids the
+    // slope-flip that a fixed "shade above" rule gets wrong when b < 0).
+    function satisfies(x,y){var v=a*x+b*y;return sym==='gt'?v>c:sym==='lt'?v<c:sym==='gte'?v>=c:v<=c;}
     var s='<svg width="'+W+'" height="'+H+'" xmlns="http://www.w3.org/2000/svg">';
-    // grid
+    // --- base layer (always visible): grid, axes, ticks ---
     s+='<g stroke="#eee" stroke-width="0.5">';
     for(var i=-5;i<=5;i++){s+='<line x1="'+tx(i)+'" y1="'+ty(-5)+'" x2="'+tx(i)+'" y2="'+ty(5)+'"/><line x1="'+tx(-5)+'" y1="'+ty(i)+'" x2="'+tx(5)+'" y2="'+ty(i)+'"/'+'>';}
     s+='</g>';
-    // axes
     s+='<line x1="'+tx(-5)+'" y1="'+cy+'" x2="'+tx(5)+'" y2="'+cy+'" stroke="#444" stroke-width="1.2"/>';
     s+='<line x1="'+cx+'" y1="'+ty(-5)+'" x2="'+cx+'" y2="'+ty(5)+'" stroke="#444" stroke-width="1.2"/>';
     s+='<polygon points="'+tx(5)+','+cy+' '+(tx(5)-5)+','+(cy-2.5)+' '+(tx(5)-5)+','+(cy+2.5)+'" fill="#444"/>';
     s+='<polygon points="'+cx+','+ty(5)+' '+(cx-2.5)+','+(ty(5)+5)+' '+(cx+2.5)+','+(ty(5)+5)+'" fill="#444"/>';
-    // axis labels
     [-4,-2,2,4].forEach(function(t){
       s+='<text x="'+tx(t)+'" y="'+(cy+11)+'" font-size="8" fill="#bbb" text-anchor="middle">'+t+'</text>';
       s+='<text x="'+(cx-8)+'" y="'+(ty(t)+3)+'" font-size="8" fill="#bbb" text-anchor="end">'+t+'</text>';
     });
     s+='<text x="'+(tx(5)+4)+'" y="'+(cy+4)+'" font-size="9" fill="#555" font-family="sans-serif">x</text>';
     s+='<text x="'+(cx+4)+'" y="'+(ty(5)-2)+'" font-size="9" fill="#555" font-family="sans-serif">y</text>';
-    // boundary + shading
+    // --- boundary + shading, split into reveal layers ---
     if(b!==0){
       var m=-a/b, k=c/b;
       var x1=-5,x2=5;
       var y1=Math.max(-5.5,Math.min(5.5,m*x1+k)), y2=Math.max(-5.5,Math.min(5.5,m*x2+k));
-      var shadePts;
-      if(shadeAbove) shadePts=[[tx(x1),ty(5)],[tx(x2),ty(5)],[tx(x2),ty(y2)],[tx(x1),ty(y1)]];
-      else           shadePts=[[tx(x1),ty(-5)],[tx(x2),ty(-5)],[tx(x2),ty(y2)],[tx(x1),ty(y1)]];
-      // shading: wrapped in ak-shade class — hidden in student mode
-      s+='<polygon class="ak-shade" points="'+shadePts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ')+'" fill="#1d6a96" opacity="0.18"/>';
-      // boundary line: always visible
+      var shadeAbove=satisfies(0,1000);
+      var shadePts= shadeAbove
+        ? [[tx(x1),ty(5)],[tx(x2),ty(5)],[tx(x2),ty(y2)],[tx(x1),ty(y1)]]
+        : [[tx(x1),ty(-5)],[tx(x2),ty(-5)],[tx(x2),ty(y2)],[tx(x1),ty(y1)]];
+      // shade layer — revealed by Step 3 (painted first, so it sits under the line)
+      s+='<g class="gph-layer gph-shade"><polygon points="'+shadePts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ')+'" fill="#1d6a96" opacity="0.18"/></g>';
+      // line layer — revealed by Step 1 (boundary + intercept dots)
       var dash=strict?'6,4':'none';
-      s+='<line x1="'+tx(x1)+'" y1="'+ty(y1)+'" x2="'+tx(x2)+'" y2="'+ty(y2)+'" stroke="#c0392b" stroke-width="2.2" stroke-dasharray="'+dash+'" stroke-linecap="round"/>';
-      // intercept dots: always visible (they're on the boundary line, not the answer)
+      var ln='<g class="gph-layer gph-line">';
+      ln+='<line x1="'+tx(x1)+'" y1="'+ty(y1)+'" x2="'+tx(x2)+'" y2="'+ty(y2)+'" stroke="#c0392b" stroke-width="2.2" stroke-dasharray="'+dash+'" stroke-linecap="round"/>';
       if(k>=-5&&k<=5){
-        s+='<circle cx="'+cx+'" cy="'+ty(k)+'" r="4" fill="'+(strict?'#fff':'#c0392b')+'" stroke="#c0392b" stroke-width="2"/>';
+        ln+='<circle cx="'+cx+'" cy="'+ty(k)+'" r="4" fill="'+(strict?'#fff':'#c0392b')+'" stroke="#c0392b" stroke-width="2"/>';
         var kd=Number.isInteger(k)?k:k.toFixed(2);
-        s+='<text x="'+(cx+8)+'" y="'+(ty(k)-4)+'" font-size="8" font-family="sans-serif" fill="#c0392b" font-weight="700">(0,'+kd+')</text>';
+        ln+='<text x="'+(cx+8)+'" y="'+(ty(k)-4)+'" font-size="8" font-family="sans-serif" fill="#c0392b" font-weight="700">(0,'+kd+')</text>';
       }
-      if(m!==0){var xi=-k/m;if(xi>=-5&&xi<=5&&Math.abs(xi)>0.1){s+='<circle cx="'+tx(xi)+'" cy="'+cy+'" r="4" fill="'+(strict?'#fff':'#c0392b')+'" stroke="#c0392b" stroke-width="2"/>';var xid=Number.isInteger(xi)?xi:xi.toFixed(2);s+='<text x="'+tx(xi)+'" y="'+(cy+15)+'" font-size="8" font-family="sans-serif" fill="#c0392b" font-weight="700" text-anchor="middle">('+xid+',0)</text>';}}
+      if(m!==0){var xi=-k/m;if(xi>=-5&&xi<=5&&Math.abs(xi)>0.1){ln+='<circle cx="'+tx(xi)+'" cy="'+cy+'" r="4" fill="'+(strict?'#fff':'#c0392b')+'" stroke="#c0392b" stroke-width="2"/>';var xid=Number.isInteger(xi)?xi:xi.toFixed(2);ln+='<text x="'+tx(xi)+'" y="'+(cy+15)+'" font-size="8" font-family="sans-serif" fill="#c0392b" font-weight="700" text-anchor="middle">('+xid+',0)</text>';}}
+      ln+='</g>';
+      s+=ln;
     } else if(a!==0){
       var xv=c/a;
-      var shPts=shadeAbove?[[tx(xv),ty(-5)],[tx(5),ty(-5)],[tx(5),ty(5)],[tx(xv),ty(5)]]:[[tx(-5),ty(-5)],[tx(xv),ty(-5)],[tx(xv),ty(5)],[tx(-5),ty(5)]];
-      s+='<polygon class="ak-shade" points="'+shPts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ')+'" fill="#1d6a96" opacity="0.18"/>';
-      s+='<line x1="'+tx(xv)+'" y1="'+ty(-5)+'" x2="'+tx(xv)+'" y2="'+ty(5)+'" stroke="#c0392b" stroke-width="2.2" stroke-dasharray="'+(strict?'6,4':'none')+'"/>';
+      var shadeRight=satisfies(1000,0);
+      var shPts=shadeRight?[[tx(xv),ty(-5)],[tx(5),ty(-5)],[tx(5),ty(5)],[tx(xv),ty(5)]]:[[tx(-5),ty(-5)],[tx(xv),ty(-5)],[tx(xv),ty(5)],[tx(-5),ty(5)]];
+      s+='<g class="gph-layer gph-shade"><polygon points="'+shPts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ')+'" fill="#1d6a96" opacity="0.18"/></g>';
+      s+='<g class="gph-layer gph-line"><line x1="'+tx(xv)+'" y1="'+ty(-5)+'" x2="'+tx(xv)+'" y2="'+ty(5)+'" stroke="#c0392b" stroke-width="2.2" stroke-dasharray="'+(strict?'6,4':'none')+'"/></g>';
     }
-    // origin dot
+    // --- test-point layer — revealed by Step 2 (new ink: a coloured ring + pass/fail tag) ---
+    var useOrigin=(c!==0), ptx=useOrigin?0:1, pty=useOrigin?0:1;
+    var tpass=satisfies(ptx,pty), pcol=tpass?'#2d6a4f':'#c0392b';
+    var pl='<g class="gph-layer gph-point">';
+    pl+='<circle cx="'+tx(ptx)+'" cy="'+ty(pty)+'" r="6" fill="none" stroke="'+pcol+'" stroke-width="2.5"/>';
+    pl+='<circle cx="'+tx(ptx)+'" cy="'+ty(pty)+'" r="2.2" fill="'+pcol+'"/>';
+    pl+='<text x="'+(tx(ptx)+9)+'" y="'+(ty(pty)+(useOrigin?-8:3))+'" font-size="8" font-family="sans-serif" fill="'+pcol+'" font-weight="700">('+ptx+','+pty+') '+(tpass?'✓':'✗')+'</text>';
+    pl+='</g>';
+    s+=pl;
+    // --- base: origin dot (always visible) ---
     s+='<circle cx="'+cx+'" cy="'+cy+'" r="3.5" fill="#333"/>';
-    s+='<text x="'+(cx+6)+'" y="'+(cy-4)+'" font-size="8" fill="#333" font-family="sans-serif">(0,0)</text>';
+    if(!useOrigin){ s+='<text x="'+(cx+6)+'" y="'+(cy-4)+'" font-size="8" fill="#333" font-family="sans-serif">(0,0)</text>'; }
     s+='</svg>';
     return s;
   }
@@ -5751,7 +5786,7 @@ var GRAPHONE = (function(){
   function sifDisplay(a,b,c){
     if(b===0) return '<i>x</i> = '+(c/a);
     var m=-a/b, k=c/b;
-    function frac(n,d){var g=gcd(Math.abs(n),Math.abs(d));var nn=n/g,dd=d/g;if(dd===1)return ''+nn;if(dd<0){nn=-nn;dd=-dd;}return '<span class="frac"><span class="num">'+nn+'</span><span class="den">'+dd+'</span></span>';}
+    function frac(n,d){var g=gcd(Math.abs(n),Math.abs(d));var nn=n/g,dd=d/g;if(dd<0){nn=-nn;dd=-dd;}if(dd===1)return ''+nn;return '<span class="frac"><span class="num">'+nn+'</span><span class="den">'+dd+'</span></span>';}
     var mStr=m===0?'':(m===1?'<i>x</i>':m===-1?'&minus;<i>x</i>':frac(-a,b)+'<i>x</i>');
     var kStr=k===0?'':(k>0?(mStr?' + '+frac(c,b):frac(c,b)):(mStr?' &minus; '+frac(-c,b):frac(c,b)));
     return '<i>y</i> = '+(mStr||'')+kStr||(mStr+kStr);
@@ -5763,14 +5798,14 @@ var GRAPHONE = (function(){
     var steps=[];
     var lineType=strict?'Dashed':'Solid', lineOther=strict?'Solid':'Dashed';
     var c1=iMakeChoices(lineType+' (boundary not included)',[lineOther+' (boundary included)']);
-    steps.push({prompt:'<b>Step 1.</b> The symbol <span class="math">'+SYM_HTML[sym]+'</span> means the boundary line should be:',type:'choice',choices:c1.choices,correct:c1.correct});
+    steps.push({prompt:'<b>Step 1.</b> The symbol <span class="math">'+SYM_HTML[sym]+'</span> means the boundary line should be:',type:'choice',choices:c1.choices,correct:c1.correct,reveal:'line'});
     var useOrigin=(c!==0), ptx=useOrigin?0:1, pty=useOrigin?0:1, ptLabel=useOrigin?'(0, 0)':'(1, 1)';
     var tlhs=a*ptx+b*pty, tpasses;
     if(sym==='gt') tpasses=tlhs>c; else if(sym==='lt') tpasses=tlhs<c; else if(sym==='gte') tpasses=tlhs>=c; else tpasses=tlhs<=c;
     var c2=iMakeChoices(tpasses?'True ✓ — in the solution region':'False ✗ — not in the solution region',[tpasses?'False ✗ — not in the solution region':'True ✓ — in the solution region']);
-    steps.push({prompt:'<b>Step 2.</b> Substitute <span class="math">'+ptLabel+'</span> → is <span class="math">'+tlhs+' '+SYM_HTML[sym]+' '+c+'</span> true or false?',type:'choice',choices:c2.choices,correct:c2.correct});
+    steps.push({prompt:'<b>Step 2.</b> Substitute <span class="math">'+ptLabel+'</span> → is <span class="math">'+tlhs+' '+SYM_HTML[sym]+' '+c+'</span> true or false?',type:'choice',choices:c2.choices,correct:c2.correct,reveal:'point'});
     var c3=iMakeChoices(tpasses?'Contains '+ptLabel:'Does NOT contain '+ptLabel,[tpasses?'Does NOT contain '+ptLabel:'Contains '+ptLabel]);
-    steps.push({prompt:'<b>Step 3.</b> Shade the half-plane that:',type:'choice',choices:c3.choices,correct:c3.correct});
+    steps.push({prompt:'<b>Step 3.</b> Shade the half-plane that:',type:'choice',choices:c3.choices,correct:c3.correct,reveal:'shade'});
     return steps;
   }
 
@@ -6664,7 +6699,7 @@ var WORDPROB = (function(){
   function renderEditor(){var h='';problems.forEach(function(p,i){h+='<div class="prow" style="flex-direction:column;align-items:flex-start;gap:4px;"><div style="display:flex;align-items:center;gap:6px;width:100%;"><span class="prow-num">'+(i+1)+'.</span><div class="pf"><label>Operation</label><select onchange="WORDPROB.setOp('+i+',this.value)"><option value="addition"'+(p.op==='addition'?' selected':'')+'>Addition</option><option value="subtraction"'+(p.op==='subtraction'?' selected':'')+'>Subtraction</option><option value="multiplication"'+(p.op==='multiplication'?' selected':'')+'>Multiplication</option><option value="division"'+(p.op==='division'?' selected':'')+'>Division</option></select></div><button class="pdel" onclick="WORDPROB.del('+i+')">&#x2715;</button></div><div class="pf" style="width:100%;"><label>Problem text</label><textarea style="width:100%;height:52px;padding:4px 7px;border:1px solid #ddd;border-radius:3px;font-size:12px;font-family:var(--ui);resize:vertical;" oninput="WORDPROB.setText('+i+',this.value)">'+p.text+'</textarea></div><div style="display:flex;gap:8px;"><div class="pf"><label>Equation</label><input type="text" value="'+p.equation+'" style="width:150px;" oninput="WORDPROB.setField('+i+',\'equation\',this.value)"></div><div class="pf"><label>Answer</label><input type="text" value="'+p.answer+'" style="width:120px;" oninput="WORDPROB.setField('+i+',\'answer\',this.value)"></div></div></div>';});document.getElementById('wordprob-prob-list').innerHTML=h;}
   function renderWS(){document.getElementById('wordprob-area').innerHTML=problems.map(probHTML).join('');document.getElementById('wordprob-meta').innerHTML=getMeta();}
   function render(){renderEditor();renderWS();}
-  return{render:render,setOp:function(i,v){problems[i].op=v;renderWS();},setText:function(i,v){problems[i].text=v;renderWS();},setField:function(i,k,v){problems[i][k]=v;renderWS();},addProblem:function(){problems.push({text:'Write your word problem here.',op:'addition',equation:'? + ? = ?',answer:'? units'});render();},addFromGenerator:function(prob){problems.push({text:prob.text,op:prob.op,equation:prob.equation,answer:prob.answer});render();injectReviewButtons();},del:function(i){problems.splice(i,1);render();},clearAll:function(){problems=[];render();}};
+  return{render:render,setOp:function(i,v){problems[i].op=v;renderWS();},setText:function(i,v){problems[i].text=v;renderWS();},setField:function(i,k,v){problems[i][k]=v;renderWS();},addProblem:function(){problems.push({text:'Write your word problem here.',op:'addition',equation:'? + ? = ?',answer:'? units'});render();},addFromGenerator:function(prob){var OPMAP={add:'addition',sub:'subtraction',mul:'multiplication',div:'division'};var op=OPMAP[prob.op]||prob.op;problems.push({text:prob.text,op:op,equation:prob.equation,answer:prob.answer});render();injectReviewButtons();},del:function(i){problems.splice(i,1);render();},clearAll:function(){problems=[];render();}};
 })();
 
 // ═══════════════════════════════════════════════
@@ -8374,6 +8409,9 @@ function cwsPrint(){
       var clone=prob.cloneNode(true);
       var numEl=clone.querySelector('.prob-num'); if(numEl) numEl.textContent=probNum+'.'; probNum++;
       clone.querySelectorAll('.prob-check-bar, .prob-score-badge').forEach(function(el){el.remove();});
+      // Reset any progressively-revealed graph layers so a mid-answered graph doesn't print
+      // half-filled; the print CSS decides what shows (boundary only for students, all for keys).
+      clone.querySelectorAll('.gph-shown').forEach(function(g){g.classList.remove('gph-shown');});
       // The interactive multiple-choice scaffold reveals one step at a time (later steps are
       // hidden), so it prints as just "Step 1" — useless on paper. Remove it; keep write-in
       // scaffolds, which ARE paper-friendly.
@@ -9816,21 +9854,33 @@ function wpgGenerate(){
   var ctx  = document.getElementById('wpg-ctx').value;
   var diff = document.getElementById('wpg-diff').value;
   var prob = WPG.generate(op, ctx, diff);
-  // Add to WORDPROB module
-  if(typeof WORDPROB !== 'undefined' && WORDPROB.addFromGenerator){
-    WORDPROB.addFromGenerator(prob);
-  } else {
-    // Switch to word problems module
-    switchSubject('elementary');
-    switchModule('wordprob');
-    setTimeout(function(){
-      if(typeof WORDPROB !== 'undefined'){
-        WORDPROB.addFromGenerator ? WORDPROB.addFromGenerator(prob) : null;
-      }
-    }, 100);
-  }
   var status = document.getElementById('wpg-status');
-  if(status){ status.textContent = '✓ Added to Word Problems!'; setTimeout(function(){status.textContent='';},3000); }
+  // Find which subject owns the Word Problems module in the (possibly filtered) SUBJECTS.
+  var subj = null;
+  for(var s in SUBJECTS){
+    if(SUBJECTS[s] && SUBJECTS[s].some(function(t){return t.id==='wordprob';})){ subj = s; break; }
+  }
+  if(typeof WORDPROB === 'undefined' || !WORDPROB.addFromGenerator || !subj){
+    if(status){ status.textContent = '⚠ Word Problems module isn’t available in this app.'; setTimeout(function(){status.textContent='';},4000); }
+    return;
+  }
+  WORDPROB.addFromGenerator(prob);
+  // Navigate so the teacher can actually see the problem that was just added.
+  if(currentModule !== 'wordprob'){
+    switchSubject(subj);
+    switchTopic('wordprob');
+  }
+  // Scroll the new (last) problem into view and briefly flash it.
+  setTimeout(function(){
+    var probs = document.querySelectorAll('#wordprob-area .problem');
+    var last = probs[probs.length-1];
+    if(last){
+      last.scrollIntoView({behavior:'smooth',block:'center'});
+      last.classList.add('wpg-flash');
+      setTimeout(function(){ last.classList.remove('wpg-flash'); }, 1600);
+    }
+  }, 120);
+  if(status){ status.textContent = '✓ Added — jumped to Word Problems'; setTimeout(function(){status.textContent='';},3000); }
 }
 
 function switchTPTab(tabName) {
