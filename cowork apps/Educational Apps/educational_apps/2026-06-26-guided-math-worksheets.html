@@ -392,6 +392,12 @@ body.student-mode #progress-panel{display:flex;}
 /* ── DIFFICULTY MODE ── */
 body.streamlined-mode .steps { display: none !important; }
 body.streamlined-mode .prob-body .steps { display: none !important; }
+/* Streamlined = less direction: no steps-correct badge, no hint badges, no Show Answer (keep Type answer + Check). */
+body.streamlined-mode .prob-score-badge { display: none !important; }
+body.streamlined-mode .direction-hint { display: none !important; }
+body.streamlined-mode .prob-check-bar .show-answer { display: none !important; }
+/* Scaffolded, stepped problems answer via the steps — hide the redundant "Type final answer" box. */
+body.student-mode:not(.streamlined-mode) .problem:has(.steps) .prob-check-bar { display: none !important; }
 body.streamlined-mode .solution-box { margin-top: 18px; }
 body.streamlined-mode .problem {
   padding-bottom: 18px;
@@ -615,6 +621,15 @@ body.answer-key-mode .choice-btn[data-correct="true"]{border-color:#2d6a4f!impor
 
   <!-- TAB: WORKSHEETS -->
   <div id="tp-tab-worksheets" class="tp-tab-content active">
+    <!-- Worksheet style: Scaffolded vs Streamlined -->
+    <div class="tp-section">
+      <h3>📄 Worksheet Style</h3>
+      <div style="display:flex;gap:6px;">
+        <button class="tp-btn active-mode" id="tp-diff-scaffolded" onclick="setDifficulty('scaffolded')" style="flex:1;">📖 Scaffolded</button>
+        <button class="tp-btn" id="tp-diff-streamlined" onclick="setDifficulty('streamlined')" style="flex:1;">⚡ Streamlined</button>
+      </div>
+      <div style="font-size:11px;color:#666;line-height:1.5;">Scaffolded shows the guided steps. Streamlined shows just the problems and an answer space — great for a clean printout.</div>
+    </div>
     <!-- Per-module Randomize -->
     <div class="tp-section">
       <h3>🎲 Randomize Current Module</h3>
@@ -3704,7 +3719,7 @@ var PEM = (function(){
     var d = pemDerive(p.expr);
     var h = '<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
     h += '<div class="prob-prompt">Evaluate the expression step-by-step: <span class="math" style="font-size:14px;"><b>'+p.expr+'</b></span></div>';
-    h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">';
+    h += '<div class="direction-hint" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;">';
     PEMDAS.forEach(function(label,i){
       var colors=['#2d6a4f','#1d3557','#7b2d00','#555'];
       h += '<span style="font-size:10px;font-weight:600;color:'+colors[i]+';border:1px solid '+colors[i]+';padding:2px 8px;border-radius:2px;">'+label+'</span>';
@@ -3950,7 +3965,7 @@ var EQN = (function(){
     var lhs=(Math.abs(p.a)===1?(p.a<0?'&minus;':''):''+p.a)+'<i>x</i>'+(p.b!==0?(p.b>0?' + '+p.b:' &minus; '+Math.abs(p.b)):'');
     var h='<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
     h+='<div class="prob-prompt">Solve for <i>x</i>: <span class="math" style="font-size:14px;">'+lhs+' = '+p.c+'</span></div>';
-    h+='<div style="display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#fff;background:'+(oneStep?'#2d6a4f':'#1d3557')+';padding:2px 8px;border-radius:2px;margin-bottom:12px;">'+(oneStep?'One-step':'Two-step')+' equation</div>';
+    h+='<div class="direction-hint" style="display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#fff;background:'+(oneStep?'#2d6a4f':'#1d3557')+';padding:2px 8px;border-radius:2px;margin-bottom:12px;">'+(oneStep?'One-step':'Two-step')+' equation</div>';
     h+=renderInteractiveSteps(makeEQNSteps(p),'eqn',idx);
     h+='<div class="solution-box"><span class="sol-label">Answer:</span><span class="math"><i>x</i> = '+sol+'</span></div>';
     h+='</div>'; return h;
@@ -6885,16 +6900,12 @@ function wsToolbarHTML(moduleId) {
     +'</div></div>';
 }
 
-function setDifficulty(mode, moduleId) {
+function setDifficulty(mode) {
   wsState.difficulty = mode;
   document.body.classList.toggle('streamlined-mode', mode === 'streamlined');
-  // update all toolbars
-  document.querySelectorAll('.ws-toolbar').forEach(function(tb) {
-    tb.querySelectorAll('.ws-chip').forEach(function(chip) {
-      if(chip.classList.contains('diff-scaffolded')) chip.classList.toggle('active', mode==='scaffolded');
-      if(chip.classList.contains('diff-streamlined')) chip.classList.toggle('active', mode==='streamlined');
-    });
-  });
+  var a=document.getElementById('tp-diff-scaffolded'), b=document.getElementById('tp-diff-streamlined');
+  if(a) a.classList.toggle('active-mode', mode==='scaffolded');
+  if(b) b.classList.toggle('active-mode', mode==='streamlined');
 }
 
 function setPerPage(n, moduleId) {
@@ -6917,20 +6928,8 @@ function setPerPage(n, moduleId) {
 
 // Patch every renderWS to inject toolbar. We'll inject it generically after render
 function injectToolbars() {
-  document.querySelectorAll('.worksheet').forEach(function(ws) {
-    var modEl = ws.closest('.module');
-    if (!modEl) return;
-    var modId = modEl.id.replace('mod-', '');
-    // only add if not already present
-    if (ws.querySelector('.ws-toolbar')) return;
-    var head = ws.querySelector('.ws-head');
-    if (head) {
-      var tb = document.createElement('div');
-      tb.innerHTML = wsToolbarHTML(modId);
-      head.parentNode.insertBefore(tb.firstChild, head.nextSibling);
-    }
-  });
-  setPerPage(wsState.perPage, null);
+  // The per-worksheet Difficulty / Problems-per-page toolbar was removed from the main
+  // screen. The Scaffolded/Streamlined toggle now lives in the Tools menu (setDifficulty).
 }
 
 // ═══════════════════════════════════════════════
