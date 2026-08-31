@@ -8,7 +8,12 @@ $Sched    = "C:\Users\tokka\Claude Local\cowork apps\_scheduler"
 $Root     = "C:\Users\tokka\Claude Local\cowork apps"
 $Wrapper  = Join-Path $Sched "Run-CoworkRoutine.ps1"
 $Manifest = Join-Path $Sched "manifest.json"
-$PS       = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+# Tasks launch through wscript + run-hidden.vbs so the routine runs with NO visible
+# console window (was powershell.exe directly, which popped a terminal every run).
+# run-hidden.vbs re-invokes $Wrapper hidden and waits, so it stays in the user's
+# interactive session (keeps the G: mount) and ExecutionTimeLimit still applies.
+$WS       = "$env:SystemRoot\System32\wscript.exe"
+$VBS      = Join-Path $Sched "run-hidden.vbs"
 
 $items = Get-Content -Raw -LiteralPath $Manifest | ConvertFrom-Json
 
@@ -26,7 +31,7 @@ $Settings = New-ScheduledTaskSettingsSet `
     -WakeToRun `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 45) `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 60) `
     -MultipleInstances IgnoreNew
 
 $ok = 0
@@ -43,8 +48,8 @@ foreach ($m in $items) {
         continue
     }
 
-    $arg = "-NoProfile -ExecutionPolicy Bypass -File `"$Wrapper`" -Name `"$($m.safeName)`""
-    $Action = New-ScheduledTaskAction -Execute $PS -Argument $arg -WorkingDirectory $Root
+    $arg = "`"$VBS`" -Name `"$($m.safeName)`""
+    $Action = New-ScheduledTaskAction -Execute $WS -Argument $arg -WorkingDirectory $Root
 
     if ($m.triggerType -eq "Weekly") {
         $Trigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $m.localDow -At $m.localAt

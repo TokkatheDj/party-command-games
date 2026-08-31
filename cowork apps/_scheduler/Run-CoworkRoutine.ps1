@@ -19,8 +19,13 @@ param(
     # (it reliably produces the report text but ends by asking "want me to fix?").
     # A literal {date} in the path is replaced with today's yyyy-MM-dd.
     [string]$OutReport = "",
-    [int]$TimeoutMin   = 40,
-    [int]$MaxTurns     = 40
+    # 40m/40turns was too tight once the collection grew: Action-games, Adult-puzzles
+    # and Shooting-games hit "Reached max turns (40)" every day, losing their summary.
+    [int]$TimeoutMin   = 50,
+    [int]$MaxTurns     = 60,
+    # Skip the pre-run registry rebuild (for hand-testing a prompt against a
+    # deliberately stale registry).
+    [switch]$NoRegistry
 )
 
 $ErrorActionPreference = "Stop"
@@ -56,6 +61,24 @@ if (-not (Test-Path -LiteralPath $claude)) {
 # in here; Read/Glob/Grep/LS let it survey the collection like the cloud run did.
 $allow = "Edit($Root\**),Read($Root\**),Glob,Grep,LS"
 
+# Refresh the concept registry the prompts read in STEP 1. Done per-run rather
+# than once nightly because several confirmed duplicate pairs were generated on
+# the SAME day -- a stale registry would not have caught them.
+if (-not $NoRegistry) {
+    $rebuild = Join-Path $SchedHome "Rebuild-Registry.ps1"
+    if (Test-Path -LiteralPath $rebuild) {
+        try {
+            $rstat = & $rebuild -Quiet:$false 2>&1
+            W "registry: $($rstat -join '; ')"
+        } catch {
+            # A stale registry is far better than no run at all.
+            W "WARN: registry rebuild failed ($($_.Exception.Message)) -- continuing with existing registry"
+        }
+    } else {
+        W "WARN: Rebuild-Registry.ps1 not found at $rebuild -- STEP 1 will fall back to a folder listing"
+    }
+}
+
 W "=== START '$Name'  (timeout ${TimeoutMin}m, max-turns $MaxTurns) ==="
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
@@ -82,6 +105,22 @@ if (Wait-Job $job -Timeout ($TimeoutMin * 60)) {
     $tail = ($out | Select-Object -Last 25) -join "`n"
     $sw.Stop()
     W "--- claude output (tail; full output in $Name.out.txt) ---`n$tail"
+
+    # The job "completing" says nothing about whether the routine produced anything.
+    # Both of these exited 0 for weeks while writing no app at all, so Task Scheduler
+    # reported LastTaskResult 0 and the failures stayed invisible.
+    $degraded = $null
+    if ($fullOut -match '(?i)Reached max turns')        { $degraded = 'max-turns' }
+    elseif ($fullOut -match "(?i)hit your session limit") { $degraded = 'session-limit' }
+    elseif ($fullOut.Trim().Length -lt 200)              { $degraded = 'empty-output' }
+
+    if ($degraded) {
+        W "WARN: '$Name' finished DEGRADED ($degraded) -- may not have produced an app"
+        W "=== DONE '$Name'  state=$($job.State)  degraded=$degraded  elapsed=$([int]$sw.Elapsed.TotalSeconds)s ==="
+        Remove-Job $job -Force
+        exit 3
+    }
+
     W "=== DONE '$Name'  state=$($job.State)  elapsed=$([int]$sw.Elapsed.TotalSeconds)s ==="
     Remove-Job $job -Force
     exit 0
