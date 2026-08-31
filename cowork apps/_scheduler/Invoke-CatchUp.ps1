@@ -124,9 +124,19 @@ if (-not $Apply) {
 
 $ok = 0
 foreach ($m in $todo) {
-    W "=== catch-up START '$($m.safeName)' (missed $($m.localAt)) ==="
+    # Some routines carry extraArgs in the manifest and are WRONG without them --
+    # Bug-check targets 'G:\My Drive\Netlify Apps' via -Root and writes its report
+    # via -OutReport. Rerunning it bare would scan the wrong tree and file the
+    # report in the wrong place. Split on whitespace outside double quotes.
+    $extra = @()
+    if ($m.PSObject.Properties.Name -contains 'extraArgs' -and $m.extraArgs) {
+        $extra = [regex]::Matches($m.extraArgs, '(?:[^\s"]+|"[^"]*")+') |
+                 ForEach-Object { $_.Value.Trim('"') }
+    }
+
+    W "=== catch-up START '$($m.safeName)' (missed $($m.localAt))$(if($extra){" +$($extra.Count) args"}) ==="
     # Serial on purpose: & blocks until the routine finishes.
-    & $Wrapper -Name $m.safeName
+    & $Wrapper -Name $m.safeName @extra
     $rc = $LASTEXITCODE
     W "=== catch-up DONE '$($m.safeName)' exit=$rc ==="
     if ($rc -eq 0) { $ok++ }
