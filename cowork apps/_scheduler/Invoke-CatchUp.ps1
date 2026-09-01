@@ -54,8 +54,14 @@ function W([string]$m) {
 # is to avoid two generators writing at once. Only gate -Apply: a dry run starts
 # nothing, so blocking it would just stop you inspecting during the working day.
 if ($Apply) {
+    # Exclusions matter more than they look. CoworkApps-CatchUp matches
+    # "CoworkApps-*" itself, so when this runs FROM its own scheduled task it sees
+    # itself Running and stands down -- a silent permanent no-op that still exits 0.
+    # That is exactly what happened on the first live fire (20:10 on 2026-08-31).
+    # Server-Boot is the long-lived web server and is never a conflict either.
+    $ignore = @("CoworkApps-CatchUp", "CoworkApps-Server-Boot")
     $running = @(Get-ScheduledTask -TaskName "CoworkApps-*" -ErrorAction SilentlyContinue |
-                 Where-Object { $_.State -eq "Running" -and $_.TaskName -ne "CoworkApps-Server-Boot" })
+                 Where-Object { $_.State -eq "Running" -and $ignore -notcontains $_.TaskName })
     if ($running.Count -gt 0) {
         W "SKIP: $($running[0].TaskName) is still running -- catch-up stands down"
         exit 0
