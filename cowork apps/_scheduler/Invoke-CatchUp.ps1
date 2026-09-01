@@ -129,6 +129,7 @@ if (-not $Apply) {
 }
 
 $ok = 0
+$reasons = @()
 foreach ($m in $todo) {
     # Some routines carry extraArgs in the manifest and are WRONG without them --
     # Bug-check targets 'G:\My Drive\Netlify Apps' via -Root and writes its report
@@ -144,7 +145,31 @@ foreach ($m in $todo) {
     # Serial on purpose: & blocks until the routine finishes.
     & $Wrapper -Name $m.safeName @extra
     $rc = $LASTEXITCODE
-    W "=== catch-up DONE '$($m.safeName)' exit=$rc ==="
-    if ($rc -eq 0) { $ok++ }
+
+    # The wrapper records WHY a run was degraded on its DONE line. Read it back:
+    # "degraded" covers three very different outcomes and lumping them together is
+    # what made the old summary misleading.
+    $why = ""
+    $rl = Join-Path $LogDir "$($m.safeName).log"
+    if (Test-Path -LiteralPath $rl) {
+        $done = @(Get-Content -LiteralPath $rl | Where-Object { $_ -match "=== DONE " })
+        if ($done.Count -gt 0 -and $done[-1] -match "degraded=([\w-]+)") { $why = $Matches[1] }
+    }
+
+    W "=== catch-up DONE '$($m.safeName)' exit=$rc$(if($why){" ($why)"}) ==="
+    if ($rc -eq 0) { $ok++ } else { $reasons += $why }
 }
-W "catch-up finished: $ok/$($todo.Count) clean"
+
+# Do NOT report this as "N/3 clean". On 2026-08-31 all three reruns wrote their
+# file and the summary still said "1/3 clean", because two hit the turn cap AFTER
+# producing output and only lost their closing chat summary. Reporting exit codes
+# as if they were output made a working night look half-failed.
+$degraded = $todo.Count - $ok
+$detail = if ($reasons) { " (" + (($reasons | Where-Object { $_ } | Group-Object |
+            ForEach-Object { "$($_.Name) x$($_.Count)" }) -join ", ") + ")" } else { "" }
+W "catch-up finished: $($todo.Count) rerun -- $ok exited clean, $degraded degraded$detail"
+if ($degraded -gt 0) {
+    W "  NOTE: degraded is not the same as produced nothing. A max-turns run usually"
+    W "  writes its app or report before hitting the cap and only loses the summary."
+    W "  Check the routine's own folder before assuming the rerun failed."
+}
