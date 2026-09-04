@@ -126,6 +126,11 @@ def _discover_apps_uncached():
             continue
         rel = html_file.relative_to(APPS_DIR)
         parts = rel.parts
+        # Folders prefixed with "_" or "." hold tooling, not apps. Without this,
+        # _scheduler/dashboard/template.html was listed in the menu as an app named
+        # "Template" under a category called " Scheduler" (leading space and all).
+        if any(part.startswith(("_", ".")) for part in parts[:-1]):
+            continue
         if len(parts) == 1:
             category = "Other"
         else:
