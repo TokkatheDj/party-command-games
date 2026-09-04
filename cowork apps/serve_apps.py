@@ -2616,6 +2616,23 @@ def generate_index(apps, reviews, base_url):
   .pin-picker-new:hover {{ background: rgba(124,110,230,0.12); }}
   .pl-empty {{ color: var(--muted); font-style: italic; font-size: 0.9rem; padding: 1rem 0; }}
 {BUILDER_STYLES}
+  /* Touch targets. Measured on a Pixel: stars were 11x17 with only 12px between
+     centres, so aiming for 4 stars often set 3 -- and ratings now decide what gets
+     demoted, so a mis-tap has consequences. The note and remove buttons also sat at
+     40% opacity until :hover, which never fires on a phone, so they were permanently
+     faded. Scoped to coarse pointers (and narrow screens, which is how it is testable)
+     so mouse users keep the dense layout. */
+  @media (pointer: coarse), (max-width: 820px) {{
+    /* No negative margin here: it slid the first star's padding under the heart,
+       so a tap meant for the heart could land on a star instead. */
+    .star {{ font-size: 1.05rem; padding: 0.4rem 0.34rem; }}
+    .star-row {{ margin-top: 0.1rem; line-height: 1; }}
+    .fav-btn {{ font-size: 1.35rem; padding: 0.5rem 0.55rem; }}
+    .note-quick-btn,
+    .pin-btn,
+    .remove-btn {{ font-size: 1rem; padding: 0.55rem 0.5rem; opacity: 1; }}
+    .app-card {{ gap: 0.15rem; }}
+  }}
 </style>
 </head>
 <body>
