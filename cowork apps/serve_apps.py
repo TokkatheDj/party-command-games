@@ -27,6 +27,28 @@ from applock import data_lock
 APPS_DIR = Path(__file__).parent
 # Overridable so a preview instance can run beside the live server on 8080.
 PORT = int(os.environ.get("APPVERSE_PORT", "8080"))
+
+# Request log. The handler only ever printed to stdout, which goes to whichever
+# console window started the server -- so when the server runs from the scheduled
+# task (pythonw, no console) the log went nowhere, and there was no way to answer
+# "did my phone actually reach this?" after the fact. Rolls at 2 MB, keeps one
+# previous file. Contains client IPs and the paths browsed, so it stays local:
+# *.log is gitignored by the parent repo.
+ACCESS_LOG = APPS_DIR / "_access.log"
+ACCESS_LOG_MAX = 2 * 1024 * 1024
+
+
+def append_access_log(line):
+    """Best-effort: a logging failure must never break a page load."""
+    try:
+        if ACCESS_LOG.exists() and ACCESS_LOG.stat().st_size > ACCESS_LOG_MAX:
+            os.replace(ACCESS_LOG, ACCESS_LOG.with_name(ACCESS_LOG.name + ".1"))
+        with open(ACCESS_LOG, "a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except OSError:
+        pass
+
+
 DATA_FILE = APPS_DIR / ".app_data.json"
 CUSTOM_APPS_DIR = APPS_DIR / "custom_apps"
 EMAIL_CONFIG_FILE = APPS_DIR / "email_config.json"
@@ -3918,7 +3940,18 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, fmt, *args):
-        print(f"  {self.address_string()} -- {fmt % args}")
+        msg = fmt % args
+        print(f"  {self.address_string()} -- {msg}")
+        # User-Agent is what distinguishes a phone from the desktop browser, which
+        # is the whole reason this log exists.
+        try:
+            agent = (self.headers.get("User-Agent") or "-")[:160]
+        except Exception:
+            agent = "-"
+        append_access_log(
+            f'{time.strftime("%Y-%m-%d %H:%M:%S")} {self.address_string()} '
+            f'{msg} ua="{agent}"'
+        )
 
 
 def main():
