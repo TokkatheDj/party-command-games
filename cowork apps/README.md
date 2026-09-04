@@ -23,6 +23,21 @@ Then open `http://<this machine's LAN IP>:8080` on the phone or tablet. The serv
 on all interfaces, so any device on the same wifi can reach it. It is **http on the local
 network only** — deliberately not exposed to the internet.
 
+**Keep it that way.** There is no login, and the front page embeds the email addresses that
+come in with build requests — so this server must never be reachable from outside the house.
+To use it from elsewhere, Tailscale is the right answer, and it needs no extra setup: the
+plain tailnet IP on port 8080 works, because the server already listens on all interfaces.
+Putting a `tailscale serve` or `funnel` proxy in front of it adds nothing but exposure.
+
+```
+tailscale serve status     # expect no route to :8080
+```
+
+Worth knowing before you go hunting: requests that arrive through such a proxy are logged
+with a client address of `127.0.0.1`, not the real public IP. So a burst of localhost hits
+carrying a scanner User-Agent — probing `.env`, `wp-config.php`, `/actuator/env` — means
+something is exposed to the internet, not that something local is misbehaving.
+
 Only one instance can hold the port; a second one exits cleanly rather than fighting for
 it. To run a preview build beside the live server, give it another port:
 
@@ -78,6 +93,18 @@ discovers it on the next page load and it shows up under **New this week**. See
 
 Folders prefixed with `_` or `.` hold tooling and are skipped by discovery, so a template
 or a dashboard scaffold never shows up as an app.
+
+## The request log
+
+Every request is appended to `_access.log` — timestamp, client address, request line, status
+and User-Agent. The User-Agent is the useful part: it is what tells a phone apart from the
+desktop browser, which answers "did my phone actually reach the server?" without guessing.
+
+It rotates to `_access.log.1` at 2 MB and is **gitignored** — it records your IP addresses
+and everything you opened. Writes are best-effort: a logging failure can never break a page
+load. This matters more than it sounds, because the server normally runs from a scheduled
+task under `pythonw` with no console, so before this file existed the request log went
+nowhere at all.
 
 ## Testing
 
