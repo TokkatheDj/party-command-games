@@ -2263,9 +2263,11 @@ def generate_index(apps, reviews, base_url):
         path = a["path"]
         return (0 if path in favorites else 1, -ratings.get(path, 0), -a["mtime"])
 
+    # Favorites only. A 4-5 star rating says "this one was good", which is not the
+    # same as "put this on my front page" -- including them made Yours 55 apps when
+    # the hearted set is 38. Highly-rated apps stay in Browse and in search.
     yours = sorted(
-        (a for a in live_apps
-         if a["path"] in favorites or ratings.get(a["path"], 0) >= 4),
+        (a for a in live_apps if a["path"] in favorites),
         key=_home_rank,
     )
     yours_paths = {a["path"] for a in yours}
@@ -2294,8 +2296,8 @@ def generate_index(apps, reviews, base_url):
     else:
         home_sections = (
             '<div class="home-section"><p class="home-empty">'
-            'Nothing favourited or rated 4 stars yet. Tap a heart or some stars on '
-            'any app and it will show up here.</p></div>'
+            'Nothing favourited yet. Tap the heart on any app and it will show up '
+            'here.</p></div>'
         )
     if fresh:
         home_sections += (
