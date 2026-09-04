@@ -25,7 +25,8 @@ from urllib.parse import unquote
 from applock import data_lock
 
 APPS_DIR = Path(__file__).parent
-PORT = 8080
+# Overridable so a preview instance can run beside the live server on 8080.
+PORT = int(os.environ.get("APPVERSE_PORT", "8080"))
 DATA_FILE = APPS_DIR / ".app_data.json"
 CUSTOM_APPS_DIR = APPS_DIR / "custom_apps"
 EMAIL_CONFIG_FILE = APPS_DIR / "email_config.json"
@@ -2017,12 +2018,32 @@ def build_category_html(category, safe_cat, icon, items, data):
     threshold_new = 48 * 3600
 
     fav_items = [a for a in items if a["path"] in favorites and a["path"] not in removed_set]
-    reg_items = [a for a in items if a["path"] not in favorites and a["path"] not in removed_set]
-    visible_count = len(fav_items) + len(reg_items)
+    rest = [a for a in items if a["path"] not in favorites and a["path"] not in removed_set]
+    # A 1-2 star rating is an answer he already gave. Those apps stay reachable and
+    # searchable, they just stop taking the same room as everything else.
+    low_items = [a for a in rest if 0 < ratings.get(a["path"], 0) <= 2]
+    low_paths = {a["path"] for a in low_items}
+    reg_items = [a for a in rest if a["path"] not in low_paths]
+    visible_count = len(fav_items) + len(reg_items) + len(low_items)
 
     cards = ""
     for app in fav_items + reg_items:
         cards += _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new, playlists=playlists)
+
+    low_html = ""
+    if low_items:
+        low_cards = "".join(
+            _make_card(app, favorites, ratings, removed_set, opened, now,
+                       threshold_new, playlists=playlists)
+            for app in low_items
+        )
+        plural = "app" if len(low_items) == 1 else "apps"
+        low_html = (
+            f'<details class="low-rated">'
+            f'<summary>{len(low_items)} {plural} you rated low</summary>'
+            f'<div class="cat-app-list">{low_cards}</div>'
+            f'</details>'
+        )
 
     return (
         f'<div class="cat-nav">'
@@ -2035,6 +2056,7 @@ def build_category_html(category, safe_cat, icon, items, data):
         f'<div class="cat-app-list" id="catlist-{safe_cat}">'
         f'{cards}'
         f'</div>'
+        f'{low_html}'
     )
 
 
@@ -2076,6 +2098,8 @@ def generate_index(apps, reviews, base_url):
     data = load_data()
     favorites = set(data.get("favorites", []))
     removed = set(data.get("removed", []))
+    ratings = data.get("ratings", {})
+    opened = set(data.get("opened", []))
     now = time.time()
     threshold_new = 48 * 3600
 
@@ -2224,6 +2248,63 @@ def generate_index(apps, reviews, base_url):
             f'\n    <div id="removed-list" class="hidden"></div>'
             f'\n  </div>'
         )
+
+    # ---- Home: what he actually uses ----
+    # This page used to mirror the folder tree, so a 46-app folder opened once got
+    # the same billing as one where every app gets used, and 218 of 389 apps had
+    # never been opened, rated or favorited. Home answers "what do I want to open
+    # right now"; the folders are still one tap away under Browse all. Nothing is
+    # hidden from search and nothing is deleted.
+    FRESH_WINDOW = 7 * 24 * 3600
+
+    live_apps = [a for items in apps.values() for a in items if a["path"] not in removed]
+
+    def _home_rank(a):
+        path = a["path"]
+        return (0 if path in favorites else 1, -ratings.get(path, 0), -a["mtime"])
+
+    yours = sorted(
+        (a for a in live_apps
+         if a["path"] in favorites or ratings.get(a["path"], 0) >= 4),
+        key=_home_rank,
+    )
+    yours_paths = {a["path"] for a in yours}
+    # A file built yesterday has had no chance to be rated, so age is the only fair
+    # signal for it. Without this row a newly built app would be born invisible.
+    fresh = sorted(
+        (a for a in live_apps
+         if a["path"] not in yours_paths and (now - a["mtime"]) < FRESH_WINDOW),
+        key=lambda a: -a["mtime"],
+    )
+
+    def _home_cards(items):
+        return "".join(
+            _make_card(a, favorites, ratings, removed, opened, now,
+                       threshold_new, playlists=playlists)
+            for a in items
+        )
+
+    if yours:
+        home_sections = (
+            f'<div class="home-section">'
+            f'<h2 class="home-title">&#9733; Yours <span class="count">{len(yours)}</span></h2>'
+            f'<div class="cat-app-list">{_home_cards(yours)}</div>'
+            f'</div>'
+        )
+    else:
+        home_sections = (
+            '<div class="home-section"><p class="home-empty">'
+            'Nothing favourited or rated 4 stars yet. Tap a heart or some stars on '
+            'any app and it will show up here.</p></div>'
+        )
+    if fresh:
+        home_sections += (
+            f'<div class="home-section">'
+            f'<h2 class="home-title">&#127381; New this week <span class="count">{len(fresh)}</span></h2>'
+            f'<div class="cat-app-list">{_home_cards(fresh)}</div>'
+            f'</div>'
+        )
+    browse_count = len(live_apps)
 
     return f"""<!DOCTYPE html>
 <html lang="en"{theme_html_attr(data)}>
@@ -2454,6 +2535,29 @@ def generate_index(apps, reviews, base_url):
   .cat-app-list.view-compact .note-quick-btn,
   .cat-app-list.view-compact .remove-btn {{ display: none !important; }}
 
+  .search-wrap {{ max-width: 700px; margin: 0 auto; padding: 1rem 1.5rem 0.5rem; }}
+  .search-row {{ display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }}
+  .search-row #search-global {{ flex: 1 1 100%; }}
+  .search-row .view-toggle-group {{ flex: 0 0 auto; margin-left: auto; }}
+  @media (min-width: 560px) {{ .search-row #search-global {{ flex: 1 1 auto; }} }}
+  .low-rated {{ max-width: 700px; margin: 0.5rem auto 1.5rem; padding: 0 1.5rem; }}
+  .low-rated > summary {{ color: var(--muted); font-size: 0.88rem; cursor: pointer; padding: 0.6rem 0; list-style: none; }}
+  .low-rated > summary::-webkit-details-marker {{ display: none; }}
+  .low-rated > summary::before {{ content: "B8 "; }}
+  .low-rated[open] > summary::before {{ content: "BE "; }}
+  .low-rated > summary:hover {{ color: var(--text); }}
+  .home-section {{ max-width: 700px; margin: 0 auto; padding: 0 1.5rem 0.5rem; }}
+  .home-title {{ font-size: 1.05rem; font-weight: 600; color: var(--text); margin: 1.2rem 0 0.7rem; display: flex; align-items: center; gap: 0.5rem; }}
+  .home-title .count {{ font-size: 0.78rem; color: var(--muted); font-weight: 500; background: var(--surface); border: 1px solid var(--border); border-radius: 99px; padding: 0.1rem 0.55rem; }}
+  .home-empty {{ color: var(--muted); font-style: italic; font-size: 0.9rem; padding: 2rem 0; text-align: center; }}
+  .browse-all-btn {{ display: block; width: calc(100% - 3rem); max-width: 700px; margin: 1rem auto 2.5rem; padding: 0.9rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-size: 0.95rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }}
+  .browse-all-btn:hover {{ border-color: var(--accent); color: var(--text); }}
+  .home-back-row {{ max-width: 700px; margin: 0 auto; padding: 0.6rem 1.5rem 0; }}
+  .more-wrap {{ position: relative; flex: 1; display: flex; }}
+  .more-wrap .more-btn {{ flex: 1; }}
+  .more-menu {{ position: absolute; top: 100%; right: 0.4rem; z-index: 30; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.35); min-width: 200px; padding: 0.3rem; }}
+  .more-item {{ display: block; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); font-size: 0.9rem; padding: 0.6rem 0.7rem; border-radius: 7px; cursor: pointer; }}
+  .more-item:hover {{ background: rgba(124,110,230,0.12); }}
   #search-global {{ width: 100%; padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 1rem; outline: none; transition: border-color 0.2s; }}
   #search-global:focus {{ border-color: var(--accent); }}
   #search-global::placeholder {{ color: var(--muted); }}
@@ -2511,21 +2615,26 @@ def generate_index(apps, reviews, base_url):
 {THEME_TOGGLE_HTML}
 <header>
   <h1>AppVerse</h1>
-  <p class="subtitle">{app_count} apps &middot; {review_count} {review_label}</p>
+  <p class="subtitle">{browse_count} apps &middot; {review_count} {review_label}</p>
   <div class="tabs-nav">
-    <button class="tab-btn active" data-tab="apps">&#128241; Apps ({app_count})</button>
-    <button class="tab-btn" data-tab="reviews">&#11088; Reviews ({review_count})</button>
+    <button class="tab-btn active" data-tab="apps">&#128241; Apps</button>
     <button class="tab-btn" data-tab="notes">&#128203; Notes {notes_tab_label}</button>
-    <button class="tab-btn" data-tab="playlists">&#128204; Lists ({playlist_count})</button>
-    <button class="tab-btn" data-tab="builder">&#128736; Build ({app_request_count})</button>
+    <div class="more-wrap">
+      <button class="tab-btn more-btn" id="more-btn">&#8943; More</button>
+      <div class="more-menu hidden" id="more-menu">
+        <button class="more-item" data-tab="reviews">&#11088; Reviews ({review_count})</button>
+        <button class="more-item" data-tab="playlists">&#128204; Lists ({playlist_count})</button>
+        <button class="more-item" data-tab="builder">&#128736; Build ({app_request_count})</button>
+      </div>
+    </div>
   </div>
 </header>
 
 <main>
 <div id="tab-apps">
-  <div class="search-wrap" style="max-width:700px;margin:0 auto;padding:1rem 1.5rem 0.5rem;">
-    <div style="display:flex;gap:0.5rem;align-items:center;">
-      <input id="search-global" type="search" placeholder="Search all apps..." autocomplete="off" style="flex:1;">
+  <div class="search-wrap">
+    <div class="search-row">
+      <input id="search-global" type="search" placeholder="Search all apps..." autocomplete="off">
       <div class="view-toggle-group">
         <button class="view-toggle-btn active" data-view="list" title="List View">&#9776; List</button>
         <button class="view-toggle-btn" data-view="grid" title="Grid View">&#9638; Grid</button>
@@ -2533,7 +2642,12 @@ def generate_index(apps, reviews, base_url):
       </div>
     </div>
   </div>
-  <div id="view-grid">
+  <div id="view-home">
+{home_sections}
+    <button class="browse-all-btn" id="browse-all-btn">&#9656; Browse all {browse_count} by category</button>
+  </div>
+  <div id="view-grid" class="hidden">
+    <div class="home-back-row"><button class="back-btn" id="grid-back-btn">&#8592; Home</button></div>
     <div class="cat-grid">
 {grid_tiles_html}
     </div>
@@ -2634,6 +2748,8 @@ const plView = document.getElementById('playlist-view-container');
 
 function switchTab(name) {{
   tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.getElementById('more-btn')?.classList.toggle(
+    'active', ['reviews', 'playlists', 'builder'].includes(name));
   Object.entries(panels).forEach(([k, p]) => {{ p.style.display = k === name ? 'block' : 'none'; }});
   plView.classList.add('hidden');
   if (name === 'playlists') {{
@@ -2645,19 +2761,58 @@ function switchTab(name) {{
   location.hash = name === 'apps' ? '' : name;
 }}
 
-tabs.forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+tabs.forEach(btn => {{
+  if (btn.dataset.tab) btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+}});
+
+// Reviews / Lists / Build were three header tabs competing with the one that is
+// actually the point of the page. They live behind More now.
+const moreBtn = document.getElementById('more-btn');
+const moreMenu = document.getElementById('more-menu');
+moreBtn?.addEventListener('click', e => {{
+  e.stopPropagation();
+  moreMenu.classList.toggle('hidden');
+}});
+document.addEventListener('click', e => {{
+  if (moreMenu && !moreMenu.classList.contains('hidden') && !moreMenu.contains(e.target)) {{
+    moreMenu.classList.add('hidden');
+  }}
+}});
+document.querySelectorAll('.more-item').forEach(item => {{
+  item.addEventListener('click', () => {{
+    moreMenu.classList.add('hidden');
+    switchTab(item.dataset.tab);
+  }});
+}});
+
+document.getElementById('browse-all-btn')?.addEventListener('click', showGrid);
+document.getElementById('grid-back-btn')?.addEventListener('click', showHome);
+
+// Home cards are the same markup as category cards, so they get the same wiring
+// (hearts, stars, pins, quick notes, open tracking).
+attachCatListeners(document.getElementById('view-home'));
 const hash = location.hash.slice(1);
 if (hash && panels[hash]) switchTab(hash);
 
 function showGrid() {{
   document.getElementById('cat-view-container').classList.add('hidden');
   document.getElementById('search-results-view').classList.add('hidden');
+  document.getElementById('view-home').classList.add('hidden');
   document.getElementById('view-grid').classList.remove('hidden');
+  document.getElementById('search-global').value = '';
+}}
+
+function showHome() {{
+  document.getElementById('cat-view-container').classList.add('hidden');
+  document.getElementById('search-results-view').classList.add('hidden');
+  document.getElementById('view-grid').classList.add('hidden');
+  document.getElementById('view-home').classList.remove('hidden');
   document.getElementById('search-global').value = '';
 }}
 
 function showCat(safeCat) {{
   document.getElementById('view-grid').classList.add('hidden');
+  document.getElementById('view-home').classList.add('hidden');
   document.getElementById('search-results-view').classList.add('hidden');
   const container = document.getElementById('cat-view-container');
   container.classList.remove('hidden');
@@ -2684,19 +2839,28 @@ document.querySelectorAll('.cat-tile').forEach(tile => {{
   tile.addEventListener('click', () => showCat(tile.dataset.cat));
 }});
 
+let searchReturnView = 'home';
 const searchGlobal = document.getElementById('search-global');
 searchGlobal.addEventListener('input', () => {{
   const q = searchGlobal.value.toLowerCase().trim();
   const resultsView = document.getElementById('search-results-view');
   const grid = document.getElementById('view-grid');
+  const home = document.getElementById('view-home');
   document.getElementById('cat-view-container').classList.add('hidden');
 
   if (!q) {{
     resultsView.classList.add('hidden');
-    grid.classList.remove('hidden');
+    // Put back the view they were on when they started typing, so searching from
+    // Browse does not silently bounce them to Home.
+    if (searchReturnView === 'grid') grid.classList.remove('hidden');
+    else home.classList.remove('hidden');
     return;
   }}
+  if (resultsView.classList.contains('hidden')) {{
+    searchReturnView = grid.classList.contains('hidden') ? 'home' : 'grid';
+  }}
   grid.classList.add('hidden');
+  home.classList.add('hidden');
   resultsView.classList.remove('hidden');
 
   const bycat = {{}};
