@@ -2658,7 +2658,13 @@ def generate_index(apps, reviews, base_url):
        width toward the line and elbows the buttons onto a second row, which
        wrapped differently on every card. */
     .app-name {{ flex: 1 1 0%; min-width: 0; overflow-wrap: anywhere; }}
-    .card-meta {{ order: 10; flex-basis: 100%; }}
+    /* NEW + UNREAD + five 44px stars wants 327.6px in a 321px row -- over by
+       6.2 -- so the badges wrapped to a line of their own and made those three
+       cards 24px taller. Take the difference out of spacing, never out of the
+       stars: a tighter meta gap, tighter badge padding, and the 1px star
+       gutters. Two badges is the worst case; only NEW and UNREAD exist. */
+    .card-meta {{ order: 10; flex-basis: 100%; gap: 0.25rem; }}
+    .badge {{ padding: 0.15em 0.3em; }}
     /* No negative margin here: it slid the first star's padding under the heart,
        so a tap meant for the heart could land on a star instead. */
     .star,
@@ -2674,7 +2680,7 @@ def generate_index(apps, reviews, base_url):
     .note-quick-btn,
     .pin-btn,
     .remove-btn {{ font-size: 1rem; opacity: 1; }}
-    .star-row {{ margin-top: 0; line-height: 1; }}
+    .star-row {{ margin-top: 0; line-height: 1; gap: 0; }}
     .more-item {{ min-height: 44px; }}
   }}
 </style>
