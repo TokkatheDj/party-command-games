@@ -2645,15 +2645,37 @@ def generate_index(apps, reviews, base_url):
      faded. Scoped to coarse pointers (and narrow screens, which is how it is testable)
      so mouse users keep the dense layout. */
   @media (pointer: coarse), (max-width: 820px) {{
+    /* Touch targets: 44px minimum (Apple HIG / Material). Five 44px stars need
+       220px, and inline the star row only gets the ~176px middle column, so on
+       touch the card wraps and the stars take a full-width line of their own.
+       display:contents lifts .app-name and .card-meta out of .app-main to become
+       direct flex children of the card -- that is what lets them land on separate
+       rows -- and order:10 keeps the stars *below* the buttons rather than
+       pushing the buttons down to a third row. */
+    .app-card {{ flex-wrap: wrap; align-items: center; row-gap: 0.2rem; }}
+    .app-main {{ display: contents; }}
+    /* basis 0, not auto: with an auto basis a long title counts its full
+       width toward the line and elbows the buttons onto a second row, which
+       wrapped differently on every card. */
+    .app-name {{ flex: 1 1 0%; min-width: 0; overflow-wrap: anywhere; }}
+    .card-meta {{ order: 10; flex-basis: 100%; }}
     /* No negative margin here: it slid the first star's padding under the heart,
        so a tap meant for the heart could land on a star instead. */
-    .star {{ font-size: 1.05rem; padding: 0.4rem 0.34rem; }}
-    .star-row {{ margin-top: 0.1rem; line-height: 1; }}
-    .fav-btn {{ font-size: 1.35rem; padding: 0.5rem 0.55rem; }}
+    .star,
+    .fav-btn,
     .note-quick-btn,
     .pin-btn,
-    .remove-btn {{ font-size: 1rem; padding: 0.55rem 0.5rem; opacity: 1; }}
-    .app-card {{ gap: 0.15rem; }}
+    .remove-btn {{
+      min-width: 44px; min-height: 44px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+    }}
+    .star {{ font-size: 1.15rem; }}
+    .fav-btn {{ font-size: 1.35rem; }}
+    .note-quick-btn,
+    .pin-btn,
+    .remove-btn {{ font-size: 1rem; opacity: 1; }}
+    .star-row {{ margin-top: 0; line-height: 1; }}
+    .more-item {{ min-height: 44px; }}
   }}
 </style>
 </head>
