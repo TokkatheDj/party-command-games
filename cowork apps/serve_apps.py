@@ -2657,9 +2657,7 @@ def generate_index(apps, reviews, base_url):
     /* basis 0, not auto: with an auto basis a long title counts its full
        width toward the line and elbows the buttons onto a second row, which
        wrapped differently on every card. */
-    .app-name {{ flex: 1 1 0%; min-width: 0; overflow-wrap: anywhere;
-                 display: -webkit-box; -webkit-box-orient: vertical;
-                 -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }}
+    .app-name {{ flex: 1 1 0%; min-width: 0; overflow-wrap: anywhere; }}
     .card-meta {{ order: 10; flex-basis: 100%; }}
     /* No negative margin here: it slid the first star's padding under the heart,
        so a tap meant for the heart could land on a star instead. */
