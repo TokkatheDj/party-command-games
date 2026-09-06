@@ -2071,7 +2071,7 @@ def build_category_html(category, safe_cat, icon, items, data):
     if low_items:
         low_cards = "".join(
             _make_card(app, favorites, ratings, removed_set, opened, now,
-                       threshold_new, playlists=playlists)
+                       threshold_new, playlists=playlists, mobile=mobile_set)
             for app in low_items
         )
         plural = "app" if len(low_items) == 1 else "apps"
@@ -3028,12 +3028,17 @@ function updateMobileCount() {{
 function syncSectionCounts(on) {{
   document.querySelectorAll('.home-title .count, .cat-nav-title .count').forEach(c => {{
     if (c.dataset.full === undefined) c.dataset.full = c.textContent.trim();
-    const list = c.closest('.home-title, .cat-nav-title')
-      ?.parentElement?.querySelector('.cat-app-list')
-      || c.closest('.home-title')?.nextElementSibling;
+    // The two layouts differ: a home title is a sibling of its list inside
+    // .home-section, but a category title sits in .cat-nav, one level above the
+    // list. Walking up to the first ancestor that actually contains a list
+    // handles both without hard-coding either shape.
+    let node = c, list = null;
+    while (node && !list) {{ list = node.querySelector?.('.cat-app-list'); node = node.parentElement; }}
     if (!on || !list) {{ c.textContent = c.dataset.full; return; }}
     const shown = list.querySelectorAll('.app-item.is-mobile').length;
-    c.textContent = shown + ' of ' + c.dataset.full;
+    c.textContent = shown === parseInt(c.dataset.full, 10)
+      ? c.dataset.full
+      : shown + ' of ' + c.dataset.full;
   }});
 }}
 
@@ -3051,9 +3056,9 @@ function applyMobileFilter(on) {{
 function showMobileEmptyState(on) {{
   document.querySelectorAll('.mfilter-empty').forEach(n => n.remove());
   if (!on) return;
-  document.querySelectorAll('.app-list, .cat-app-list, .home-list').forEach(list => {{
+  document.querySelectorAll('.cat-app-list').forEach(list => {{
     const total = list.querySelectorAll('.app-item').length;
-    if (!total) return;
+    if (!total || list.offsetParent === null) return;
     if (list.querySelectorAll('.app-item.is-mobile').length === 0) {{
       const d = document.createElement('div');
       d.className = 'mfilter-empty';
@@ -3138,6 +3143,7 @@ function restoreApp(btn) {{
 }}
 
 function markOpen(e, link) {{
+  if (e.target.closest('.mobile-btn')) return;
   const path = link.dataset.path;
   apiPost('/api/open', {{path}});
   const badge = link.querySelector('.badge-unread');
@@ -3180,6 +3186,11 @@ function attachRemovedListeners(container) {{
 
 function attachCatListeners(container) {{
   applyViewMode(currentViewMode);
+  // A category arrives after applyMobileFilter() has already run, so its counts
+  // and empty state have to be brought up to date here.
+  const mOn = document.body.classList.contains('mobile-only');
+  showMobileEmptyState(mOn);
+  syncSectionCounts(mOn);
   container.querySelector('.back-btn')?.addEventListener('click', showGrid);
 
   const catSearch = container.querySelector('.cat-search');
