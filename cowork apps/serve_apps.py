@@ -1974,7 +1974,7 @@ def _star_html(path, current_rating):
     return f'<div class="star-row">{stars}</div>'
 
 
-def _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new, is_removed=False, playlists=None):
+def _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new, is_removed=False, playlists=None, mobile=None):
     path = app["path"]
     is_fav = path in favorites
     rating = ratings.get(path, 0)
@@ -1995,6 +1995,14 @@ def _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new,
     safe_id = path.replace("/", "__").replace(".", "_")
     is_pinned = any(path in p.get("apps", []) for p in (playlists or {}).values())
     pin_cls = "pin-btn pinned" if is_pinned else "pin-btn"
+    # Deliberately NOT a third badge in .card-meta: on touch, NEW + UNREAD + five
+    # 44px stars already fits with only 8.6px of slack (see the touch block), so a
+    # third badge would put the meta row back on its own line. The phone gets the
+    # filter instead; this button is the desktop marker and is hidden on touch.
+    is_mobile = path in (mobile or ())
+    mob_attr = ' data-mobile="1"' if is_mobile else ""
+    mob_cls = "mobile-btn on" if is_mobile else "mobile-btn"
+    mob_title = "Mobile-friendly - tap to unmark" if is_mobile else "Mark as mobile-friendly"
 
     if is_removed:
         return (
@@ -2010,7 +2018,7 @@ def _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new,
     else:
         app_name_esc = app["name"].replace('"', '&quot;')
         return (
-            f'\n            <div class="app-item" id="item-{safe_id}">'
+            f'\n            <div class="app-item{" is-mobile" if is_mobile else ""}" id="item-{safe_id}"{mob_attr}>'
             f'\n              <a href="/{path}" class="app-link" data-path="{path}">'
             f'\n                <div class="app-card {fav_border}" data-path="{path}" id="card-{safe_id}">'
             f'\n                  <button class="{heart_cls}" data-path="{path}" title="Favorite">{heart}</button>'
@@ -2019,6 +2027,7 @@ def _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new,
             f'\n                    <div class="card-meta">{badges}{stars}</div>'
             f'\n                  </div>'
             f'\n                  <button class="note-quick-btn" data-path="{path}" data-name="{app_name_esc}" data-id="{safe_id}" title="Quick note">&#128221;</button>'
+            f'\n                  <button class="{mob_cls}" data-path="{path}" title="{mob_title}">&#128241;</button>'
             f'\n                  <button class="{pin_cls}" data-path="{path}" title="Add to playlist">&#128204;</button>'
             f'\n                  <button class="remove-btn" data-path="{path}" title="Remove">&#10005;</button>'
             f'\n                </div>'
@@ -2037,6 +2046,7 @@ def _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new,
 def build_category_html(category, safe_cat, icon, items, data):
     """Generate inner HTML for a category view (lazy-loaded on demand)."""
     favorites = set(data.get("favorites", []))
+    mobile_set = set(data.get("mobile", []))
     ratings = data.get("ratings", {})
     removed_set = set(data.get("removed", []))
     opened = set(data.get("opened", []))
@@ -2055,7 +2065,7 @@ def build_category_html(category, safe_cat, icon, items, data):
 
     cards = ""
     for app in fav_items + reg_items:
-        cards += _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new, playlists=playlists)
+        cards += _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new, playlists=playlists, mobile=mobile_set)
 
     low_html = ""
     if low_items:
@@ -2090,6 +2100,7 @@ def build_category_html(category, safe_cat, icon, items, data):
 def build_playlist_html(playlist_id, playlist, all_apps_map, data):
     """Generate inner HTML for a playlist view (lazy-loaded on demand)."""
     favorites = set(data.get("favorites", []))
+    mobile_set = set(data.get("mobile", []))
     ratings = data.get("ratings", {})
     removed_set = set(data.get("removed", []))
     opened = set(data.get("opened", []))
@@ -2105,7 +2116,7 @@ def build_playlist_html(playlist_id, playlist, all_apps_map, data):
     for path in pl_apps:
         app = all_apps_map.get(path)
         if app:
-            cards += _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new, playlists=playlists)
+            cards += _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new, playlists=playlists, mobile=mobile_set)
 
     if not cards:
         cards = '<p style="color:var(--muted);padding:1.5rem;text-align:center;font-style:italic">No apps in this playlist yet — pin apps using the \U0001f4cc button on any app card.</p>'
@@ -2124,6 +2135,7 @@ def build_playlist_html(playlist_id, playlist, all_apps_map, data):
 def generate_index(apps, reviews, base_url):
     data = load_data()
     favorites = set(data.get("favorites", []))
+    mobile_set = set(data.get("mobile", []))
     removed = set(data.get("removed", []))
     ratings = data.get("ratings", {})
     opened = set(data.get("opened", []))
@@ -2249,6 +2261,7 @@ def generate_index(apps, reviews, base_url):
                 "path": app["path"],
                 "safeCat": safe_cat,
                 "catTitle": cat_title,
+                "mobile": 1 if app["path"] in mobile_set else 0,
             })
 
     all_apps_json = json.dumps(all_apps_list)
@@ -2309,7 +2322,7 @@ def generate_index(apps, reviews, base_url):
     def _home_cards(items):
         return "".join(
             _make_card(a, favorites, ratings, removed, opened, now,
-                       threshold_new, playlists=playlists)
+                       threshold_new, playlists=playlists, mobile=mobile_set)
             for a in items
         )
 
@@ -2598,6 +2611,15 @@ def generate_index(apps, reviews, base_url):
   .pin-btn {{ background: none; border: none; cursor: pointer; font-size: 0.85rem; color: var(--muted); padding: 0.2rem 0.3rem; flex-shrink: 0; border-radius: 4px; transition: color 0.15s, background 0.15s; opacity: 0.4; }}
   .app-card:hover .pin-btn {{ opacity: 1; }}
   .pin-btn.pinned {{ color: var(--accent); opacity: 1; }}
+  /* ---- Mobile-friendly flag ---- */
+  .mobile-btn {{ background: none; border: none; cursor: pointer; font-size: 0.85rem; color: var(--muted); padding: 0.2rem 0.3rem; flex-shrink: 0; border-radius: 4px; transition: color 0.15s, background 0.15s, filter 0.15s; opacity: 0.25; filter: grayscale(1); }}
+  .app-card:hover .mobile-btn {{ opacity: 0.7; }}
+  .mobile-btn.on {{ opacity: 1; filter: none; }}
+  .mfilter {{ background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 999px; padding: 0.35rem 0.75rem; font-size: 0.85rem; cursor: pointer; flex-shrink: 0; transition: background 0.15s, color 0.15s, border-color 0.15s; }}
+  .mfilter.on {{ background: var(--accent); border-color: var(--accent); color: #fff; }}
+  body.mobile-only .app-item:not(.is-mobile) {{ display: none; }}
+  .mfilter-empty {{ color: var(--muted); font-style: italic; padding: 1.2rem 0.2rem; line-height: 1.5; }}
+  .search-mob {{ font-size: 0.8rem; opacity: 0.85; }}
   .pin-btn:hover {{ color: var(--accent); background: rgba(124,110,230,0.15); }}
   #tab-playlists {{ display: none; padding: 1.5rem; max-width: 700px; margin: 0 auto; }}
   .pl-header {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }}
@@ -2682,6 +2704,12 @@ def generate_index(apps, reviews, base_url):
     .remove-btn {{ font-size: 1rem; opacity: 1; }}
     .star-row {{ margin-top: 0; line-height: 1; gap: 0; }}
     .more-item {{ min-height: 44px; }}
+    /* The mobile-friendly toggle is desktop-only. A sixth 44px control needs
+       220px of the button row and pushed a long title onto a fourth line
+       (one card went 136px -> 156px); at 28x24 it also failed the 44px floor.
+       Marking is a thing done while curating at the desk -- on the phone the
+       Mobile-ready filter is what matters, and that stays visible. */
+    .mobile-btn {{ display: none; }}
   }}
 </style>
 </head>
@@ -2709,6 +2737,7 @@ def generate_index(apps, reviews, base_url):
   <div class="search-wrap">
     <div class="search-row">
       <input id="search-global" type="search" placeholder="Search all apps..." autocomplete="off">
+      <button class="mfilter" id="mobile-filter" title="Show only apps marked mobile-friendly">&#128241; Mobile-ready <span id="mfilter-count"></span></button>
       <div class="view-toggle-group">
         <button class="view-toggle-btn active" data-view="list" title="List View">&#9776; List</button>
         <button class="view-toggle-btn" data-view="grid" title="Grid View">&#9638; Grid</button>
@@ -2948,7 +2977,8 @@ searchGlobal.addEventListener('input', () => {{
   Object.values(bycat).forEach(g => {{
     html += '<div class="search-result-cat">' + g.title + '</div><div class="cat-app-list view-' + currentViewMode + '">';
     g.items.forEach(a => {{
-      html += '<a href="/' + a.path + '" class="app-link search-result-link"><div class="app-card"><div class="app-main"><span class="app-name">' + a.name + '</span></div></div></a>';
+      const mk = a.mobile ? ' <span class="search-mob" title="Mobile-friendly">&#128241;</span>' : '';
+      html += '<a href="/' + a.path + '" class="app-link search-result-link"><div class="app-card"><div class="app-main"><span class="app-name">' + a.name + mk + '</span></div></div></a>';
     }});
     html += '</div>';
   }});
@@ -2969,6 +2999,85 @@ async function apiPost(endpoint, body) {{
     return null;
   }}
 }}
+
+// ---- Mobile-friendly flag -------------------------------------------------
+// Delegated at the document level so it also covers lazily loaded category
+// views without having to touch each attach*Listeners function.
+function toggleMobile(btn) {{
+  const on = btn.classList.toggle('on');
+  const item = btn.closest('.app-item');
+  if (item) {{ item.classList.toggle('is-mobile', on); if (on) item.dataset.mobile = '1'; else delete item.dataset.mobile; }}
+  btn.title = on ? 'Mobile-friendly - tap to unmark' : 'Mark as mobile-friendly';
+  apiPost('/api/mobile', {{path: btn.dataset.path}});
+  updateMobileCount();
+}}
+
+document.addEventListener('click', e => {{
+  const b = e.target.closest('.mobile-btn');
+  if (b) {{ e.preventDefault(); e.stopPropagation(); toggleMobile(b); }}
+}});
+
+function updateMobileCount() {{
+  const el = document.getElementById('mfilter-count');
+  if (el) el.textContent = ALL_APPS.filter(a => a.mobile).length || '';
+}}
+
+// A section headed "Yours 38" above 33 visible cards reads as a bug. While the
+// filter is on, every count shows what is actually on screen and carries the
+// full number alongside it.
+function syncSectionCounts(on) {{
+  document.querySelectorAll('.home-title .count, .cat-nav-title .count').forEach(c => {{
+    if (c.dataset.full === undefined) c.dataset.full = c.textContent.trim();
+    const list = c.closest('.home-title, .cat-nav-title')
+      ?.parentElement?.querySelector('.cat-app-list')
+      || c.closest('.home-title')?.nextElementSibling;
+    if (!on || !list) {{ c.textContent = c.dataset.full; return; }}
+    const shown = list.querySelectorAll('.app-item.is-mobile').length;
+    c.textContent = shown + ' of ' + c.dataset.full;
+  }});
+}}
+
+const mFilterBtn = document.getElementById('mobile-filter');
+function applyMobileFilter(on) {{
+  document.body.classList.toggle('mobile-only', on);
+  mFilterBtn?.classList.toggle('on', on);
+  try {{ localStorage.setItem('appverse-mobile-only', on ? '1' : '0'); }} catch (err) {{}}
+  showMobileEmptyState(on);
+  syncSectionCounts(on);
+}}
+
+// A filter that silently empties the page reads as a broken app, so when it
+// hides everything in a section, say which switch did it.
+function showMobileEmptyState(on) {{
+  document.querySelectorAll('.mfilter-empty').forEach(n => n.remove());
+  if (!on) return;
+  document.querySelectorAll('.app-list, .cat-app-list, .home-list').forEach(list => {{
+    const total = list.querySelectorAll('.app-item').length;
+    if (!total) return;
+    if (list.querySelectorAll('.app-item.is-mobile').length === 0) {{
+      const d = document.createElement('div');
+      d.className = 'mfilter-empty';
+      d.textContent = 'Nothing here is marked mobile-ready yet - tap ' +
+        String.fromCodePoint(0x1F4F1) + ' Mobile-ready above to show all ' + total + '.';
+      list.after(d);
+    }}
+  }});
+}}
+mFilterBtn?.addEventListener('click', () => {{
+  applyMobileFilter(!document.body.classList.contains('mobile-only'));
+}});
+// Default ON for touch devices: the whole point is not opening a broken app in
+// front of someone, and a filter you have to remember to switch on does not do
+// that. Desktop defaults off, since that is where marking happens.
+(function initMobileFilter() {{
+  let saved = null;
+  try {{ saved = localStorage.getItem('appverse-mobile-only'); }} catch (err) {{}}
+  const touch = window.matchMedia('(pointer: coarse)').matches;
+  // Only default the filter on when there is actually something to show.
+  const anyMarked = document.querySelectorAll('.app-item.is-mobile').length > 0;
+  applyMobileFilter(saved === null ? (touch && anyMarked) : (saved === '1' && anyMarked));
+  updateMobileCount();
+}})();
 
 function toggleFav(btn) {{
   const path = btn.dataset.path;
@@ -3552,6 +3661,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             data = load_data()
             removed_set = set(data.get("removed", []))
             favorites = set(data.get("favorites", []))
+            mobile_set = set(data.get("mobile", []))
             ratings = data.get("ratings", {})
             opened = set(data.get("opened", []))
             now = time.time()
@@ -3660,7 +3770,19 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         app_path = payload.get("path", "")
         data = load_data()
 
-        if path == "/api/favorite":
+        if path == "/api/mobile":
+            # Phone-friendliness is a judgement call, so it is a flag Lance sets,
+            # not something inferred at render time. Seeded once by a Playwright
+            # sweep that measured every app at Pixel size; toggled by hand after.
+            mob = data.setdefault("mobile", [])
+            if app_path in mob:
+                mob.remove(app_path)
+            else:
+                mob.append(app_path)
+            save_data(data)
+            self._json({"ok": True, "on": app_path in mob})
+
+        elif path == "/api/favorite":
             favs = data.setdefault("favorites", [])
             if app_path in favs:
                 favs.remove(app_path)
