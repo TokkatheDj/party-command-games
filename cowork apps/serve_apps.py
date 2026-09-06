@@ -2341,7 +2341,7 @@ def generate_index(apps, reviews, base_url):
         )
     if fresh:
         home_sections += (
-            f'<div class="home-section">'
+            f'<div class="home-section mobile-exempt" data-mobile-exempt="1">'
             f'<h2 class="home-title">&#127381; New this week <span class="count">{len(fresh)}</span></h2>'
             f'<div class="cat-app-list">{_home_cards(fresh)}</div>'
             f'</div>'
@@ -2618,6 +2618,15 @@ def generate_index(apps, reviews, base_url):
   .mfilter {{ background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 999px; padding: 0.35rem 0.75rem; font-size: 0.85rem; cursor: pointer; flex-shrink: 0; transition: background 0.15s, color 0.15s, border-color 0.15s; }}
   .mfilter.on {{ background: var(--accent); border-color: var(--accent); color: #fff; }}
   body.mobile-only .app-item:not(.is-mobile) {{ display: none; }}
+  /* A brand new app is unmarked by definition -- it was built after the last
+     sweep -- so the filter would make it invisible on the phone, which is the
+     exact "born invisible" problem the New this week row exists to solve. Show
+     it anyway, but draw it as provisional so an unchecked app never looks
+     identical to one that passed. */
+  body.mobile-only .mobile-exempt .app-item:not(.is-mobile) {{ display: block; }}
+  body.mobile-only .mobile-exempt .app-item:not(.is-mobile) .app-card {{
+    border-style: dashed; border-color: var(--muted); opacity: 0.72;
+  }}
   .mfilter-empty {{ color: var(--muted); font-style: italic; padding: 1.2rem 0.2rem; line-height: 1.5; }}
   .search-mob {{ font-size: 0.8rem; opacity: 0.85; }}
   .pin-btn:hover {{ color: var(--accent); background: rgba(124,110,230,0.15); }}
@@ -3034,7 +3043,7 @@ function syncSectionCounts(on) {{
     // handles both without hard-coding either shape.
     let node = c, list = null;
     while (node && !list) {{ list = node.querySelector?.('.cat-app-list'); node = node.parentElement; }}
-    if (!on || !list) {{ c.textContent = c.dataset.full; return; }}
+    if (!on || !list || c.closest('[data-mobile-exempt]')) {{ c.textContent = c.dataset.full; return; }}
     const shown = list.querySelectorAll('.app-item.is-mobile').length;
     c.textContent = shown === parseInt(c.dataset.full, 10)
       ? c.dataset.full
@@ -3058,7 +3067,7 @@ function showMobileEmptyState(on) {{
   if (!on) return;
   document.querySelectorAll('.cat-app-list').forEach(list => {{
     const total = list.querySelectorAll('.app-item').length;
-    if (!total || list.offsetParent === null) return;
+    if (!total || list.offsetParent === null || list.closest('[data-mobile-exempt]')) return;
     if (list.querySelectorAll('.app-item.is-mobile').length === 0) {{
       const d = document.createElement('div');
       d.className = 'mfilter-empty';
