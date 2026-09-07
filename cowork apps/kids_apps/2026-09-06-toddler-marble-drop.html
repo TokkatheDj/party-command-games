@@ -486,6 +486,9 @@ function spawn(n, x, y) {
       color: pal[(Math.random() * pal.length) | 0],
       wob: Math.random() * Math.PI * 2,
       pop: 0,
+      rest: 0,     // seconds spent settled on the floor
+      chimes: 0,   // sounds this marble has been allowed to make
+      fade: 0,     // 0..1 while draining away
     });
   }
 }
@@ -497,10 +500,10 @@ function spawn(n, x, y) {
 function collide(bounce) {
   for (let i = 0; i < balls.length; i++) {
     const a = balls[i];
-    if (a.pop > 0) continue;
+    if (a.pop > 0 || a.fade > 0) continue;
     for (let j = i + 1; j < balls.length; j++) {
       const b = balls[j];
-      if (b.pop > 0) continue;
+      if (b.pop > 0 || b.fade > 0) continue;
       const dx = b.x - a.x, dy = b.y - a.y;
       const rr = a.r + b.r;
       const d2 = dx * dx + dy * dy;
@@ -535,6 +538,28 @@ function step(dt) {
       continue;
     }
 
+    // A pile that stays put is what made the sound repeat over itself: every new
+    // drop crashed into the same heap and rang the same landing again, and the
+    // heap only ever grew. Marbles that have come to rest now drain away, so the
+    // screen goes quiet when nobody is playing and each new drop lands on a
+    // clear floor. Balloons and bubbles already leave on their own.
+    if (b.fade > 0) {
+      b.fade += dt * 2.2;
+      if (b.fade >= 1) balls.splice(i, 1);
+      continue;
+    }
+    if (kind === "marble") {
+      // Not "on the floor and stopped": a heap stands three or four deep, so only
+      // a third of it ever touches the floor line, and collision resolution keeps
+      // nudging the rest -- measured median speed in a settled pile is 35 and the
+      // fastest is 67, so nothing stays under 30 for long. Sustained slowness is
+      // the honest test, and anything still falling blows past 90 within a frame
+      // or two, so it cannot be caught by mistake.
+      const settled = Math.hypot(b.vx, b.vy) < 90;
+      b.rest = settled ? b.rest + dt : 0;
+      if (b.rest > 2.5) { b.fade = 0.001; continue; }
+    }
+
     b.vy += g * dt;
     if (drag) { b.vx *= 1 - drag * dt; b.vy *= 1 - drag * dt; }
 
@@ -549,14 +574,17 @@ function step(dt) {
 
     // Walls only ring on a real knock, and quieter than the floor -- they were
     // doubling the note density for no musical gain.
-    if (b.x < b.r) { b.x = b.r; if (kind === "marble" && Math.abs(b.vx) > 150) note(Math.abs(b.vx) / 1400); b.vx = Math.abs(b.vx) * bounce; }
-    if (b.x > W - b.r) { b.x = W - b.r; if (kind === "marble" && Math.abs(b.vx) > 150) note(Math.abs(b.vx) / 1400); b.vx = -Math.abs(b.vx) * bounce; }
+    if (b.x < b.r) { b.x = b.r; if (kind === "marble" && Math.abs(b.vx) > 150 && b.chimes < 3) { note(Math.abs(b.vx) / 1400); b.chimes++; } b.vx = Math.abs(b.vx) * bounce; }
+    if (b.x > W - b.r) { b.x = W - b.r; if (kind === "marble" && Math.abs(b.vx) > 150 && b.chimes < 3) { note(Math.abs(b.vx) / 1400); b.chimes++; } b.vx = -Math.abs(b.vx) * bounce; }
 
     if (b.y > H - b.r) {
       b.y = H - b.r;
       // 60 was low enough that marbles still rattled while settling; 130 keeps
       // the landing and drops the gravel.
-      if (Math.abs(b.vy) > 130) { note(Math.abs(b.vy) / 1100); b.vy = -Math.abs(b.vy) * bounce; }
+      if (Math.abs(b.vy) > 130) {
+        if (b.chimes < 3) { note(Math.abs(b.vy) / 1100); b.chimes++; }
+        b.vy = -Math.abs(b.vy) * bounce;
+      }
       else if (Math.abs(b.vy) > 60) { b.vy = -Math.abs(b.vy) * bounce; }
       else { b.vy = 0; b.vx *= 0.9; }
     }
@@ -570,7 +598,7 @@ function step(dt) {
 
   // collisions can shove one back through a wall, so clamp afterwards
   for (const b of balls) {
-    if (b.pop > 0) continue;
+    if (b.pop > 0 || b.fade > 0) continue;
     if (b.x < b.r) b.x = b.r;
     if (b.x > W - b.r) b.x = W - b.r;
     if (b.y > H - b.r) b.y = H - b.r;
@@ -580,8 +608,9 @@ function step(dt) {
 function draw() {
   ctx.clearRect(0, 0, W, H);
   for (const b of balls) {
-    const alpha = b.pop > 0 ? 1 - b.pop : 1;
-    const r = b.r * (b.pop > 0 ? 1 + b.pop * 0.8 : 1);
+    // A pop grows as it vanishes; a drain shrinks, so the two read differently.
+    const alpha = b.pop > 0 ? 1 - b.pop : b.fade > 0 ? 1 - b.fade : 1;
+    const r = b.r * (b.pop > 0 ? 1 + b.pop * 0.8 : b.fade > 0 ? 1 - b.fade * 0.45 : 1);
     ctx.globalAlpha = Math.max(0, alpha);
 
     if (picks.kind === "bubble") {
@@ -629,7 +658,7 @@ function loop(t) {
 function popAt(x, y) {
   let hit = false;
   for (const b of balls) {
-    if (b.pop > 0) continue;
+    if (b.pop > 0 || b.fade > 0) continue;
     const dx = b.x - x, dy = b.y - y;
     if (dx * dx + dy * dy < (b.r + 14) * (b.r + 14)) { b.pop = 0.001; hit = true; }
   }
