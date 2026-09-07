@@ -25,18 +25,43 @@ network only** — deliberately not exposed to the internet.
 
 **Keep it that way.** There is no login, and the front page embeds the email addresses that
 come in with build requests — so this server must never be reachable from outside the house.
-To use it from elsewhere, Tailscale is the right answer, and it needs no extra setup: the
-plain tailnet IP on port 8080 works, because the server already listens on all interfaces.
-Putting a `tailscale serve` or `funnel` proxy in front of it adds nothing but exposure.
+Tailscale is the right answer for using it from elsewhere, and the plain tailnet IP on port
+8080 needs no setup at all, because the server already listens on all interfaces.
+
+There is now also a **`tailscale serve` route, deliberately**, added 6 Sep 2026:
 
 ```
-tailscale serve status     # expect no route to :8080
+https://<this-machine>.<your-tailnet>.ts.net:8444   ->   http://127.0.0.1:8080
+
+# the real hostname is whatever `tailscale status` reports for this machine;
+# it is kept out of this file because the repo is public
 ```
 
-Worth knowing before you go hunting: requests that arrive through such a proxy are logged
-with a client address of `127.0.0.1`, not the real public IP. So a burst of localhost hits
-carrying a scanner User-Agent — probing `.env`, `wp-config.php`, `/actuator/env` — means
-something is exposed to the internet, not that something local is misbehaving.
+It exists because Chrome's "Always use secure connections" silently upgrades a plain-http
+address to https and then fails, which made the launcher look dead on an Android tablet.
+Serving it over the tailnet's real certificate sidesteps that on every device, with no
+per-device setting to remember.
+
+`serve` is **tailnet only** — your own signed-in devices, nothing public. `funnel` is the
+one that publishes to the internet, and it must stay off. Check both, and read the labels
+rather than the presence of a route:
+
+```
+tailscale serve status      # both routes should say "(tailnet only)"
+tailscale funnel status     # must show nothing public
+tailscale serve --https=8444 off     # to remove the AppVerse route
+```
+
+**This changes what the log can tell you.** Requests arriving through any such proxy are
+logged with a client address of `127.0.0.1` rather than the device's own address, so traffic
+through the 8444 route is indistinguishable from local traffic — you can no longer tell a
+phone from a tablet by IP for those requests. Use the LAN or plain tailnet IP on 8080 when
+you need per-device attribution.
+
+That also blunts an alarm that used to be reliable: localhost hits were once proof of
+internet exposure. They are now normal. What still means trouble is a burst of them carrying
+a **scanner User-Agent** — probing `.env`, `wp-config.php`, `/actuator/env` — which is what
+the September Funnel incident looked like. If you see that, check `funnel status` first.
 
 Only one instance can hold the port; a second one exits cleanly rather than fighting for
 it. To run a preview build beside the live server, give it another port:
