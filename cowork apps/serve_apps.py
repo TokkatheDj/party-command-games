@@ -2132,6 +2132,55 @@ def build_playlist_html(playlist_id, playlist, all_apps_map, data):
     )
 
 
+# The touch layout's rules, kept in one place because they are emitted twice:
+# once under a (pointer: coarse) media query and once under html.is-touch, which
+# JS sets from navigator.maxTouchPoints so a tablet in desktop-site mode still
+# gets 44px targets. Plain braces -- this is inserted into the page f-string.
+TOUCH_RULES = r"""    /* Touch targets: 44px minimum (Apple HIG / Material). Five 44px stars need
+       220px, and inline the star row only gets the ~176px middle column, so on
+       touch the card wraps and the stars take a full-width line of their own.
+       display:contents lifts .app-name and .card-meta out of .app-main to become
+       direct flex children of the card -- that is what lets them land on separate
+       rows -- and order:10 keeps the stars *below* the buttons rather than
+       pushing the buttons down to a third row. */
+    .app-card { flex-wrap: wrap; align-items: center; row-gap: 0.2rem; }
+    .app-main { display: contents; }
+    /* basis 0, not auto: with an auto basis a long title counts its full
+       width toward the line and elbows the buttons onto a second row, which
+       wrapped differently on every card. */
+    .app-name { flex: 1 1 0%; min-width: 0; overflow-wrap: anywhere; }
+    /* NEW + UNREAD + five 44px stars wants 327.6px in a 321px row -- over by
+       6.2 -- so the badges wrapped to a line of their own and made those three
+       cards 24px taller. Take the difference out of spacing, never out of the
+       stars: a tighter meta gap, tighter badge padding, and the 1px star
+       gutters. Two badges is the worst case; only NEW and UNREAD exist. */
+    .card-meta { order: 10; flex-basis: 100%; gap: 0.25rem; }
+    .badge { padding: 0.15em 0.3em; }
+    /* No negative margin here: it slid the first star's padding under the heart,
+       so a tap meant for the heart could land on a star instead. */
+    .star,
+    .fav-btn,
+    .note-quick-btn,
+    .pin-btn,
+    .remove-btn {
+      min-width: 44px; min-height: 44px; padding: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .star { font-size: 1.15rem; }
+    .fav-btn { font-size: 1.35rem; }
+    .note-quick-btn,
+    .pin-btn,
+    .remove-btn { font-size: 1rem; opacity: 1; }
+    .star-row { margin-top: 0; line-height: 1; gap: 0; }
+    .more-item { min-height: 44px; }
+    /* The mobile-friendly toggle is desktop-only. A sixth 44px control needs
+       220px of the button row and pushed a long title onto a fourth line
+       (one card went 136px -> 156px); at 28x24 it also failed the 44px floor.
+       Marking is a thing done while curating at the desk -- on the phone the
+       Mobile-ready filter is what matters, and that stays visible. */
+    .mobile-btn { display: none; }"""
+
+
 def generate_index(apps, reviews, base_url):
     data = load_data()
     favorites = set(data.get("favorites", []))
@@ -2676,51 +2725,26 @@ def generate_index(apps, reviews, base_url):
      faded. Scoped to coarse pointers (and narrow screens, which is how it is testable)
      so mouse users keep the dense layout. */
   @media (pointer: coarse), (max-width: 820px) {{
-    /* Touch targets: 44px minimum (Apple HIG / Material). Five 44px stars need
-       220px, and inline the star row only gets the ~176px middle column, so on
-       touch the card wraps and the stars take a full-width line of their own.
-       display:contents lifts .app-name and .card-meta out of .app-main to become
-       direct flex children of the card -- that is what lets them land on separate
-       rows -- and order:10 keeps the stars *below* the buttons rather than
-       pushing the buttons down to a third row. */
-    .app-card {{ flex-wrap: wrap; align-items: center; row-gap: 0.2rem; }}
-    .app-main {{ display: contents; }}
-    /* basis 0, not auto: with an auto basis a long title counts its full
-       width toward the line and elbows the buttons onto a second row, which
-       wrapped differently on every card. */
-    .app-name {{ flex: 1 1 0%; min-width: 0; overflow-wrap: anywhere; }}
-    /* NEW + UNREAD + five 44px stars wants 327.6px in a 321px row -- over by
-       6.2 -- so the badges wrapped to a line of their own and made those three
-       cards 24px taller. Take the difference out of spacing, never out of the
-       stars: a tighter meta gap, tighter badge padding, and the 1px star
-       gutters. Two badges is the worst case; only NEW and UNREAD exist. */
-    .card-meta {{ order: 10; flex-basis: 100%; gap: 0.25rem; }}
-    .badge {{ padding: 0.15em 0.3em; }}
-    /* No negative margin here: it slid the first star's padding under the heart,
-       so a tap meant for the heart could land on a star instead. */
-    .star,
-    .fav-btn,
-    .note-quick-btn,
-    .pin-btn,
-    .remove-btn {{
-      min-width: 44px; min-height: 44px; padding: 0;
-      display: inline-flex; align-items: center; justify-content: center;
-    }}
-    .star {{ font-size: 1.15rem; }}
-    .fav-btn {{ font-size: 1.35rem; }}
-    .note-quick-btn,
-    .pin-btn,
-    .remove-btn {{ font-size: 1rem; opacity: 1; }}
-    .star-row {{ margin-top: 0; line-height: 1; gap: 0; }}
-    .more-item {{ min-height: 44px; }}
-    /* The mobile-friendly toggle is desktop-only. A sixth 44px control needs
-       220px of the button row and pushed a long title onto a fourth line
-       (one card went 136px -> 156px); at 28x24 it also failed the 44px floor.
-       Marking is a thing done while curating at the desk -- on the phone the
-       Mobile-ready filter is what matters, and that stays visible. */
-    .mobile-btn {{ display: none; }}
+{TOUCH_RULES}
+  }}
+  /* Same rules again, keyed off a class instead of the pointer query.
+     Chrome's "Desktop site" on a tablet keeps the touch hardware but widens the
+     viewport past 820px and can report pointer:fine, which stripped every 44px
+     target: the Pixel Tablet measured 490 controls under 44px and the
+     Mobile-ready filter defaulted off. navigator.maxTouchPoints still tells the
+     truth there. The rule text is interpolated from one constant so the two
+     copies cannot drift; this one relies on CSS nesting, and where that is
+     unsupported the media query above still covers phones. */
+  html.is-touch {{
+{TOUCH_RULES}
   }}
 </style>
+<script>
+  // Before first paint, so the layout never flashes the desktop version: a
+  // tablet in Chrome's desktop-site mode reports a wide viewport and can report
+  // pointer:fine, but maxTouchPoints still knows it is a touchscreen.
+  if (navigator.maxTouchPoints > 0) document.documentElement.classList.add('is-touch');
+</script>
 </head>
 <body>
 {THEME_TOGGLE_HTML}
@@ -3086,7 +3110,8 @@ mFilterBtn?.addEventListener('click', () => {{
 (function initMobileFilter() {{
   let saved = null;
   try {{ saved = localStorage.getItem('appverse-mobile-only'); }} catch (err) {{}}
-  const touch = window.matchMedia('(pointer: coarse)').matches;
+  const touch = window.matchMedia('(pointer: coarse)').matches
+    || navigator.maxTouchPoints > 0;
   // Only default the filter on when there is actually something to show.
   const anyMarked = document.querySelectorAll('.app-item.is-mobile').length > 0;
   applyMobileFilter(saved === null ? (touch && anyMarked) : (saved === '1' && anyMarked));
