@@ -380,13 +380,27 @@ nextBtn.addEventListener("click", () => {
 
 /* ----------------------------------------------------------------- sound */
 
-let actx = null;
+let actx = null, bus = null;
 function audio() {
   if (picks.sound === "quiet") return null;
   if (!actx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
     actx = new AC();
+    // Every note used to connect straight to destination. With "Lots!" the
+    // whole pile lands within a few milliseconds, so thirty-odd gains summed
+    // well past 1.0 and the output square-clipped into a buzz. A compressor on
+    // a shared bus is what turns that back into a chord instead of a crunch.
+    const comp = actx.createDynamicsCompressor();
+    comp.threshold.value = -20;
+    comp.knee.value = 15;
+    comp.ratio.value = 12;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.25;
+    bus = actx.createGain();
+    bus.gain.value = 0.45;
+    bus.connect(comp);
+    comp.connect(actx.destination);
   }
   if (actx.state === "suspended") actx.resume();
   return actx;
@@ -394,22 +408,40 @@ function audio() {
 
 const PENTA = [523.25, 587.33, 659.25, 783.99, 880.0];
 
-function blip(freq) {
+let voices = 0, lastNoteAt = -1;
+const MAX_VOICES = 6;     // ringing at once
+const MIN_GAP = 0.028;    // seconds between note starts
+
+// `strength` is 0..1 from the impact speed, so a marble settling is a tick and
+// a marble dropped from the top is a chime. Before, every bounce was equally
+// loud, which is most of why a settling pile sounded like gravel.
+function blip(freq, strength) {
   const a = audio();
   if (!a) return;
-  const o = a.createOscillator(), g = a.createGain();
+  const t = a.currentTime;
+  // A pile lands in the same millisecond, so cap both how many notes ring at
+  // once and how close together they may start. Dropped notes are not missed --
+  // at that density they only add mud.
+  if (voices >= MAX_VOICES || t - lastNoteAt < MIN_GAP) return;
+  lastNoteAt = t;
+  voices++;
   const pop = picks.sound === "pop";
+  const s = Math.max(0.18, Math.min(1, strength == null ? 1 : strength));
+  const peak = (pop ? 0.11 : 0.075) * s;
+  const dur = pop ? 0.09 : 0.34;   // was 0.55: long tails piled up
+  const o = a.createOscillator(), g = a.createGain();
   o.type = pop ? "square" : "sine";
   o.frequency.value = freq;
-  g.gain.setValueAtTime(0.0001, a.currentTime);
-  g.gain.exponentialRampToValueAtTime(pop ? 0.16 : 0.1, a.currentTime + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + (pop ? 0.09 : 0.5));
-  o.connect(g); g.connect(a.destination);
-  o.start();
-  o.stop(a.currentTime + (pop ? 0.1 : 0.55));
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(bus);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+  o.onended = () => { voices = Math.max(0, voices - 1); };
 }
 
-const note = () => blip(PENTA[(Math.random() * PENTA.length) | 0]);
+const note = (strength) => blip(PENTA[(Math.random() * PENTA.length) | 0], strength);
 
 /* ---------------------------------------------------------------- physics */
 
@@ -515,12 +547,17 @@ function step(dt) {
     b.x += b.vx * dt;
     b.y += b.vy * dt;
 
-    if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * bounce; if (kind === "marble") note(); }
-    if (b.x > W - b.r) { b.x = W - b.r; b.vx = -Math.abs(b.vx) * bounce; if (kind === "marble") note(); }
+    // Walls only ring on a real knock, and quieter than the floor -- they were
+    // doubling the note density for no musical gain.
+    if (b.x < b.r) { b.x = b.r; if (kind === "marble" && Math.abs(b.vx) > 150) note(Math.abs(b.vx) / 1400); b.vx = Math.abs(b.vx) * bounce; }
+    if (b.x > W - b.r) { b.x = W - b.r; if (kind === "marble" && Math.abs(b.vx) > 150) note(Math.abs(b.vx) / 1400); b.vx = -Math.abs(b.vx) * bounce; }
 
     if (b.y > H - b.r) {
       b.y = H - b.r;
-      if (Math.abs(b.vy) > 60) { b.vy = -Math.abs(b.vy) * bounce; note(); }
+      // 60 was low enough that marbles still rattled while settling; 130 keeps
+      // the landing and drops the gravel.
+      if (Math.abs(b.vy) > 130) { note(Math.abs(b.vy) / 1100); b.vy = -Math.abs(b.vy) * bounce; }
+      else if (Math.abs(b.vy) > 60) { b.vy = -Math.abs(b.vy) * bounce; }
       else { b.vy = 0; b.vx *= 0.9; }
     }
 
@@ -633,6 +670,7 @@ function start() {
   setupEl.style.display = "none";
   playEl.classList.add("on");
   hintEl.classList.remove("gone");
+  voices = 0; lastNoteAt = -1;
   resize();
   balls = [];
   spawn(picks.count || 16);
