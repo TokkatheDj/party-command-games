@@ -205,6 +205,11 @@
     font-weight: 600;
     white-space: nowrap;
     transition: opacity 0.5s;
+    /* Never a tap target. It sits above the canvas, and fading it left an
+       invisible pill that still swallowed pointerdown -- a dead strip across the
+       top of the play area, in an app whose whole promise is that no tap is
+       wrong. */
+    pointer-events: none;
   }
   .hint.gone { opacity: 0; }
 
@@ -293,6 +298,7 @@ const STEPS = [
 
 const picks = { kind: null, count: null, bounce: null, sound: null, theme: null };
 let stepIx = 0;
+let advanceTimer = null;
 
 /* ------------------------------------------------------------- setup view */
 
@@ -355,7 +361,15 @@ function renderStep() {
       renderStep();
       // Choosing is the whole interaction, so move on by itself -- a toddler
       // should not have to find a separate Next button after every pick.
-      setTimeout(() => {
+      //
+      // Cancel any pending advance first. Toddlers double-tap, and two timers
+      // both read stepIx when they fire, so a second tap 100ms later skipped a
+      // whole question: it was rendered and dismissed before anyone saw it, and
+      // its pick stayed null and fell back to a default. On the last step the
+      // second timer went straight to start() and the colour question never
+      // appeared at all.
+      clearTimeout(advanceTimer);
+      advanceTimer = setTimeout(() => {
         if (stepIx < STEPS.length - 1) { stepIx++; renderStep(); renderDots(); }
         else start();
       }, 260);
@@ -370,6 +384,7 @@ function renderStep() {
 }
 
 backBtn.addEventListener("click", () => {
+  clearTimeout(advanceTimer);
   if (stepIx > 0) { stepIx--; renderStep(); }
 });
 nextBtn.addEventListener("click", () => {

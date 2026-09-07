@@ -2748,10 +2748,14 @@ def generate_index(apps, reviews, base_url):
   // anything that actually has a mouse.
   //
   // "Has a mouse" is any-hover:hover AND any-pointer:fine together, not hover
-  // on its own. any-pointer:fine describes hardware a tablet does not have in
-  // any mode, whereas Chrome's desktop-site mode is a viewport and UA change
+  // on its own, because Chrome's desktop-site mode is a viewport and UA change
   // that could plausibly carry hover with it -- and if it did, hover alone
-  // would undo the very fix this class exists for. Both conditions must hold.
+  // would undo the very fix this class exists for.
+  //
+  // Known gap: a stylus tablet (S-Pen and friends) reports both, because a pen
+  // hovers and is a fine pointer, so it would be treated as a mouse and lose the
+  // touch layout in desktop-site mode. Not a regression -- the media query still
+  // covers it at phone widths -- but the pair is a heuristic, not a proof.
   //
   // Re-evaluated on change, so plugging a mouse into the Surface (or undocking
   // it) switches layout without a reload.
@@ -3097,11 +3101,23 @@ function syncSectionCounts(on) {{
   }});
 }}
 
+// Key is versioned: values written by the old build were recorded on load
+// rather than on a tap, so they are defaults masquerading as choices and must
+// not outlive the bug. Bumping the name retires them once.
+const MOBILE_PREF_KEY = 'appverse-mobile-only-v2';
 const mFilterBtn = document.getElementById('mobile-filter');
-function applyMobileFilter(on) {{
+function applyMobileFilter(on, persist) {{
   document.body.classList.toggle('mobile-only', on);
   mFilterBtn?.classList.toggle('on', on);
-  try {{ localStorage.setItem('appverse-mobile-only', on ? '1' : '0'); }} catch (err) {{}}
+  // Only a real tap is a preference. Writing from the startup path meant the
+  // very first load recorded whatever the default happened to be, so the
+  // default could never change afterwards -- and a device that had already
+  // loaded the page before the is-touch fix had '0' on record, which is exactly
+  // the tablet the fix was for. It also let a startup where nothing was marked
+  // overwrite a deliberate ON with '0'.
+  if (persist !== false) {{
+    try {{ localStorage.setItem(MOBILE_PREF_KEY, on ? '1' : '0'); }} catch (err) {{}}
+  }}
   showMobileEmptyState(on);
   syncSectionCounts(on);
 }}
@@ -3124,19 +3140,19 @@ function showMobileEmptyState(on) {{
   }});
 }}
 mFilterBtn?.addEventListener('click', () => {{
-  applyMobileFilter(!document.body.classList.contains('mobile-only'));
+  applyMobileFilter(!document.body.classList.contains('mobile-only'), true);
 }});
 // Default ON for touch devices: the whole point is not opening a broken app in
 // front of someone, and a filter you have to remember to switch on does not do
 // that. Desktop defaults off, since that is where marking happens.
 (function initMobileFilter() {{
   let saved = null;
-  try {{ saved = localStorage.getItem('appverse-mobile-only'); }} catch (err) {{}}
+  try {{ saved = localStorage.getItem(MOBILE_PREF_KEY); }} catch (err) {{}}
   const touch = document.documentElement.classList.contains('is-touch')
     || window.matchMedia('(pointer: coarse)').matches;
   // Only default the filter on when there is actually something to show.
   const anyMarked = document.querySelectorAll('.app-item.is-mobile').length > 0;
-  applyMobileFilter(saved === null ? (touch && anyMarked) : (saved === '1' && anyMarked));
+  applyMobileFilter(saved === null ? (touch && anyMarked) : (saved === '1' && anyMarked), false);
   updateMobileCount();
 }})();
 
