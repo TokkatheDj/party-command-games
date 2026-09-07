@@ -3661,8 +3661,19 @@ def make_manifest():
     }, indent=2)
 
 class AppHandler(http.server.SimpleHTTPRequestHandler):
+    _no_cache = False
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(APPS_DIR), **kwargs)
+
+    def end_headers(self):
+        # SimpleHTTPRequestHandler writes its own headers inside send_head(),
+        # so there is no point in the file path where a header can be appended
+        # -- except here, just before the blank line that closes them.
+        if self._no_cache:
+            self.send_header("Cache-Control", "no-cache")
+            self._no_cache = False
+        super().end_headers()
 
     def do_GET(self):
         path = unquote(self.path.split("?")[0])
@@ -3794,6 +3805,10 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             if not self._is_public_static(path):
                 self.send_error(404, "Not Found")
                 return
+            # Apps change constantly, so never serve one from cache without
+            # asking. Last-Modified is still sent, so an unchanged app costs a
+            # 304 and no body -- cheap on a LAN, and always correct.
+            self._no_cache = path.lower().endswith(".html")
             super().do_GET()
 
     @staticmethod
