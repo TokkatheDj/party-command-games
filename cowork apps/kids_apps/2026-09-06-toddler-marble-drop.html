@@ -408,6 +408,7 @@ function audio() {
 
 const PENTA = [523.25, 587.33, 659.25, 783.99, 880.0];
 
+let drainClock = 0;   // paces how fast the floor clears
 let voices = 0, lastNoteAt = -1;
 const MAX_VOICES = 6;     // ringing at once
 const MIN_GAP = 0.028;    // seconds between note starts
@@ -529,6 +530,19 @@ function step(dt) {
   const g = kind === "balloon" ? -260 : kind === "bubble" ? 90 : 1100;
   const drag = kind === "marble" ? 0 : 0.6;
 
+  // Draining used to clear the floor completely, which left a toddler looking at
+  // a blank screen with nothing to come back to. Keep a few instead -- about a
+  // quarter of the amount they chose, never fewer than three, so "A few" still
+  // keeps some and "Lots!" does not leave a crowd. They are stationary and have
+  // spent their chimes, so they sit there silently.
+  const keepFloor = Math.max(3, Math.round((picks.count || 16) * 0.25));
+  let liveCount = 0;
+  for (const x of balls) if (x.fade === 0 && x.pop === 0) liveCount++;
+  // One at a time, and not too quickly. Draining freely meant a tap's three new
+  // marbles instantly freed three settled ones, so tapping swapped rather than
+  // added and the count never moved -- which reads as a tap that did nothing.
+  drainClock += dt;
+
   for (let i = balls.length - 1; i >= 0; i--) {
     const b = balls[i];
 
@@ -557,7 +571,9 @@ function step(dt) {
       // or two, so it cannot be caught by mistake.
       const settled = Math.hypot(b.vx, b.vy) < 90;
       b.rest = settled ? b.rest + dt : 0;
-      if (b.rest > 2.5) { b.fade = 0.001; continue; }
+      if (b.rest > 2.5 && liveCount > keepFloor && drainClock > 0.45) {
+        b.fade = 0.001; liveCount--; drainClock = 0; continue;
+      }
     }
 
     b.vy += g * dt;
@@ -699,7 +715,7 @@ function start() {
   setupEl.style.display = "none";
   playEl.classList.add("on");
   hintEl.classList.remove("gone");
-  voices = 0; lastNoteAt = -1;
+  voices = 0; lastNoteAt = -1; drainClock = 0;
   resize();
   balls = [];
   spawn(picks.count || 16);
