@@ -2740,10 +2740,32 @@ def generate_index(apps, reviews, base_url):
   }}
 </style>
 <script>
-  // Before first paint, so the layout never flashes the desktop version: a
-  // tablet in Chrome's desktop-site mode reports a wide viewport and can report
-  // pointer:fine, but maxTouchPoints still knows it is a touchscreen.
-  if (navigator.maxTouchPoints > 0) document.documentElement.classList.add('is-touch');
+  // Runs before first paint, so the layout never flashes the desktop version.
+  //
+  // Touch hardware alone is not enough to justify the touch layout: the Surface
+  // reports maxTouchPoints > 0 with the keyboard attached, and at desk width
+  // with a mouse in hand the 44px targets are just wasted space. So exclude
+  // anything that actually has a mouse.
+  //
+  // "Has a mouse" is any-hover:hover AND any-pointer:fine together, not hover
+  // on its own. any-pointer:fine describes hardware a tablet does not have in
+  // any mode, whereas Chrome's desktop-site mode is a viewport and UA change
+  // that could plausibly carry hover with it -- and if it did, hover alone
+  // would undo the very fix this class exists for. Both conditions must hold.
+  //
+  // Re-evaluated on change, so plugging a mouse into the Surface (or undocking
+  // it) switches layout without a reload.
+  // NB: braces are doubled -- this whole page is one Python f-string.
+  (function () {{
+    var mouse = window.matchMedia('(any-hover: hover) and (any-pointer: fine)');
+    function applyTouchClass() {{
+      var touchOnly = navigator.maxTouchPoints > 0 && !mouse.matches;
+      document.documentElement.classList.toggle('is-touch', touchOnly);
+    }}
+    applyTouchClass();
+    if (mouse.addEventListener) mouse.addEventListener('change', applyTouchClass);
+    else if (mouse.addListener) mouse.addListener(applyTouchClass);
+  }})();
 </script>
 </head>
 <body>
@@ -3110,8 +3132,8 @@ mFilterBtn?.addEventListener('click', () => {{
 (function initMobileFilter() {{
   let saved = null;
   try {{ saved = localStorage.getItem('appverse-mobile-only'); }} catch (err) {{}}
-  const touch = window.matchMedia('(pointer: coarse)').matches
-    || navigator.maxTouchPoints > 0;
+  const touch = document.documentElement.classList.contains('is-touch')
+    || window.matchMedia('(pointer: coarse)').matches;
   // Only default the filter on when there is actually something to show.
   const anyMarked = document.querySelectorAll('.app-item.is-mobile').length > 0;
   applyMobileFilter(saved === null ? (touch && anyMarked) : (saved === '1' && anyMarked));
