@@ -372,6 +372,7 @@ THEME_ROOT_VARS = """
     --ok: #3D6B4C;
     --warn: #8A6212;
     --accent-rgb: 168, 85, 46;
+    --accent2-rgb: 156, 59, 46;
     --f-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
     --f-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --f-mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", monospace;
@@ -389,6 +390,7 @@ THEME_ROOT_VARS = """
     --ok: #7BB08A;
     --warn: #D6A94A;
     --accent-rgb: 224, 145, 106;
+    --accent2-rgb: 217, 112, 92;
   }
 """
 
@@ -436,7 +438,7 @@ BUILDER_STYLES = """
 /* ---- App Builder ---- */
 #tab-builder { display: none; padding: 1.5rem; max-width: 700px; margin: 0 auto; }
 .builder-form { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 1rem; margin-bottom: 1.2rem; }
-.builder-form label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin: 0.75rem 0 0.4rem; }
+.builder-form label { font-family: var(--f-mono); font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin: 0.75rem 0 0.4rem; }
 .builder-form label:first-child { margin-top: 0; }
 #builder-name-input, #builder-theme-input, #builder-inspired-input, #builder-name-select, #builder-email-input { width: 100%; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; transition: border-color 0.2s; }
 #builder-name-input:focus, #builder-theme-input:focus, #builder-inspired-input:focus, #builder-name-select:focus, #builder-email-input:focus { border-color: var(--accent); }
@@ -477,10 +479,10 @@ BUILDER_STYLES = """
 .builder-card-title { font-size: 0.9rem; color: var(--text); font-weight: 600; }
 .builder-card-meta { font-size: 0.75rem; color: var(--muted); }
 .builder-badge { font-size: 0.68rem; font-weight: 700; padding: 0.15em 0.55em; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0; }
-.builder-badge.queued { background: rgba(136,136,153,0.15); color: var(--muted); }
+.builder-badge.queued { background: var(--card-hover); color: var(--muted); }
 .builder-badge.generating { background: rgba(var(--accent-rgb),0.15); color: var(--accent); }
 .builder-badge.done { background: rgba(61,107,76,0.12); color: var(--ok); }
-.builder-badge.error { background: rgba(230,110,124,0.15); color: var(--accent2); }
+.builder-badge.error { background: rgba(var(--accent2-rgb),0.15); color: var(--accent2); }
 .builder-card-open { display: inline-block; margin-top: 0.4rem; margin-right: 0.6rem; font-size: 0.83rem; color: var(--accent); text-decoration: none; font-weight: 600; }
 .builder-card-open:hover { text-decoration: underline; }
 .builder-card-error { margin-top: 0.4rem; font-size: 0.82rem; color: var(--accent2); }
@@ -511,7 +513,7 @@ BUILDER_STYLES = """
 .feedback-popup-close { display: block; margin-top: 0.5rem; background: none; border: none; color: var(--muted); font-size: 0.78rem; cursor: pointer; padding: 0.3rem 0; }
 .standalone-wrap { max-width: 700px; margin: 0 auto; padding: 1.5rem; }
 .standalone-header { text-align: center; margin-bottom: 1.2rem; }
-.standalone-header h1 { font-size: 1.4rem; font-weight: 700; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 0.3rem; }
+.standalone-header h1 { font-family: var(--f-display); font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text); margin-bottom: 0.3rem; }
 .standalone-header p { color: var(--muted); font-size: 0.85rem; }
 .standalone-footer { text-align: center; margin-top: 1.5rem; }
 .standalone-footer a { color: var(--accent); font-size: 0.85rem; text-decoration: none; }
@@ -2496,7 +2498,7 @@ def generate_index(apps, reviews, base_url):
   .app-name {{ color: var(--text); font-size: 0.95rem; display: block; }}
   .card-meta {{ display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.25rem; }}
   .badge {{ font-family: var(--f-mono); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; padding: 0.15em 0.45em; border-radius: 4px; text-transform: uppercase; }}
-  .badge-new {{ background: rgba(230,110,124,0.2); color: var(--accent2); border: 1px solid rgba(230,110,124,0.4); }}
+  .badge-new {{ background: rgba(var(--accent2-rgb),0.2); color: var(--accent2); border: 1px solid rgba(var(--accent2-rgb),0.4); }}
   .badge-unread {{ background: rgba(var(--accent-rgb),0.2); color: var(--accent); border: 1px solid rgba(var(--accent-rgb),0.4); }}
   .star-row {{ display: flex; gap: 1px; }}
   .star {{ font-size: 0.8rem; color: var(--border); cursor: pointer; transition: color 0.1s; user-select: none; }}
@@ -2507,7 +2509,7 @@ def generate_index(apps, reviews, base_url):
   .fav-btn:hover {{ transform: scale(1.2); color: var(--accent2); }}
   .remove-btn {{ background: none; border: none; cursor: pointer; font-size: 0.85rem; color: var(--muted); padding: 0.2rem 0.3rem; flex-shrink: 0; border-radius: 4px; transition: color 0.15s, background 0.15s; opacity: 0.4; }}
   .app-card:hover .remove-btn {{ opacity: 1; }}
-  .remove-btn:hover {{ color: var(--accent2); background: rgba(230,110,124,0.15); }}
+  .remove-btn:hover {{ color: var(--accent2); background: rgba(var(--accent2-rgb),0.15); }}
   .restore-btn {{ background: rgba(var(--accent-rgb),0.15); border: 1px solid rgba(var(--accent-rgb),0.4); cursor: pointer; font-size: 0.75rem; color: var(--accent); padding: 0.25rem 0.6rem; flex-shrink: 0; border-radius: 6px; transition: background 0.15s; }}
   .restore-btn:hover {{ background: rgba(var(--accent-rgb),0.3); }}
   .hidden {{ display: none !important; }}
@@ -2571,7 +2573,7 @@ def generate_index(apps, reviews, base_url):
     font-size: 0.7rem; font-weight: 700; padding: 0.15em 0.55em;
     border-radius: 99px; text-transform: uppercase; letter-spacing: 0.04em;
   }}
-  .note-badge.pending {{ background: rgba(230,110,124,0.15); color: var(--accent2); }}
+  .note-badge.pending {{ background: rgba(var(--accent2-rgb),0.15); color: var(--accent2); }}
   .note-badge.reviewed {{ background: rgba(61,107,76,0.12); color: var(--ok); }}
   .note-badge.needs-reply {{ background: rgba(138,98,18,0.14); color: var(--warn); }}
   .note-delete {{
@@ -2706,7 +2708,10 @@ def generate_index(apps, reviews, base_url):
   .pl-home-btn:hover {{ border-color: var(--accent); color: var(--accent); }}
   .pl-home-btn.on {{ background: var(--tint); border-color: var(--accent); color: var(--accent); }}
   .playlist-tile.is-home {{ border-color: var(--accent); padding-bottom: 1.6rem; }}
-  .playlist-tile.is-home::after {{ content: "\01f3e0 Home"; position: absolute; bottom: 0.35rem; left: 0; right: 0; font-size: 0.62rem; color: var(--accent); font-weight: 600; }}
+  /* Literal glyph, not a CSS \01f3e0 escape -- this block is a Python
+     f-string and Python eats \01 as an octal escape, so the browser was
+     receiving U+0001 followed by the text "f3e0". */
+  .playlist-tile.is-home::after {{ content: "🏠 Home"; position: absolute; bottom: 0.35rem; left: 0; right: 0; font-size: 0.62rem; color: var(--accent); font-weight: 600; }}
   .browse-all-btn {{ display: block; width: calc(100% - 3rem); max-width: 700px; margin: 1rem auto 2.5rem; padding: 0.9rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-size: 0.95rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }}
   .browse-all-btn:hover {{ border-color: var(--accent); color: var(--text); }}
   .home-back-row {{ max-width: 700px; margin: 0 auto; padding: 0.6rem 1.5rem 0; }}
