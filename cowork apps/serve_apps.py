@@ -20,6 +20,8 @@ import uuid
 import os
 from email.message import EmailMessage
 from pathlib import Path
+import urllib.error
+import urllib.request
 from urllib.parse import unquote
 
 from applock import data_lock
@@ -1723,6 +1725,79 @@ def send_note_notification(snippet, response, is_reply, needs_reply=False):
         print(f"[notes] notification email failed: {e}", flush=True)
 
 
+# Amigo is the assistant the house already knows -- the coqui on the desk
+# speaks to Khalil and Kareem in his voice, so a suggestion box that answers as
+# Amigo is a familiar face rather than a form. Same machine, so this is a plain
+# loopback call and the phone never needs to know the port exists.
+AMIGO_URL = "http://127.0.0.1:11435"
+# A cold model costs ~17s to load before it writes a word (measured, gemma3:12b),
+# and the second question of an evening answers in about one. Budget for cold.
+AMIGO_TIMEOUT_SEC = 45
+
+AMIGO_SYSTEM = (
+    "You are Amigo, the family's own assistant, running on the computer in the "
+    "house. Someone -- often one of the kids -- has just made a suggestion or "
+    "asked a question about an app in AppVerse, the family's app library.\n\n"
+    "Reply in AT MOST two short sentences, warm and plain, the way you would "
+    "speak to a child. Take the idea seriously and say something specific about "
+    "it rather than a generic thank-you.\n\n"
+    "You cannot build or change anything yourself, and you must never promise "
+    "that something will be added or say when. Lance reads every suggestion; "
+    "say it has been passed on to him, and leave the decision to him."
+)
+
+
+def ask_amigo(app_name, question):
+    """Put a suggestion to Amigo and return (reply, ok).
+
+    Never raises. Amigo lives on a desktop that powers off overnight, and a
+    suggestion box that shows an error is a suggestion box a kid does not try
+    twice -- so every failure here is silent to the caller and the suggestion
+    is saved regardless.
+    """
+    try:
+        with urllib.request.urlopen(f"{AMIGO_URL}/model", timeout=5) as resp:
+            model = json.loads(resp.read().decode("utf-8")).get("model")
+        if not model:
+            return "", False
+        body = json.dumps({
+            "model": model,
+            "stream": False,
+            "messages": [
+                {"role": "system", "content": AMIGO_SYSTEM},
+                {"role": "user",
+                 "content": f"The app is called \"{app_name}\".\n\n{question}"},
+            ],
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            f"{AMIGO_URL}/api/chat", data=body,
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=AMIGO_TIMEOUT_SEC) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+        reply = (payload.get("message") or {}).get("content", "").strip()
+        return (reply, True) if reply else ("", False)
+    except Exception as exc:
+        print(f"[amigo] could not ask: {exc}", flush=True)
+        return "", False
+
+
+def append_amigo_reply(note_id, reply):
+    """Record what Amigo told them, on the note Lance will read.
+
+    Without this he would see the suggestion but not the answer it already got,
+    and could easily tell a child the opposite of what Amigo just said.
+    """
+    # data_lock is a factory, not a lock -- `with data_lock:` raises. And it
+    # must only ever be taken here, never while a request already holds it.
+    with DATA_LOCK, data_lock():
+        data = load_data()
+        for note in data.get("notes", []):
+            if note.get("id") == note_id:
+                note["text"] = f"{note['text']}\n\nAmigo replied: {reply}"
+                save_data(data)
+                return
+
+
 def review_note_worker(note_id, reply_id=None):
     with NOTE_REVIEW_SEMAPHORE:
         data = load_data()
@@ -2039,18 +2114,20 @@ def _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new,
             f'\n                    <span class="app-name">{app["name"]}</span>'
             f'\n                    <div class="card-meta">{badges}{stars}</div>'
             f'\n                  </div>'
-            f'\n                  <button class="note-quick-btn" data-path="{path}" data-name="{app_name_esc}" data-id="{safe_id}" title="Quick note">&#128221;</button>'
+            f'\n                  <button class="note-quick-btn" data-path="{path}" data-name="{app_name_esc}" data-id="{safe_id}" title="Ask Amigo">&#128483;</button>'
             f'\n                  <button class="{mob_cls}" data-path="{path}" title="{mob_title}">&#128241;</button>'
             f'\n                  <button class="{pin_cls}" data-path="{path}" title="Add to playlist">&#128204;</button>'
             f'\n                  <button class="remove-btn" data-path="{path}" title="Remove">&#10005;</button>'
             f'\n                </div>'
             f'\n              </a>'
             f'\n              <div class="quick-note-form hidden" id="qnote-{safe_id}">'
-            f'\n                <textarea class="quick-note-ta" placeholder="Note for AI checker..."></textarea>'
+            f'\n                <div class="ask-amigo-title">&#128483; Ask Amigo about <strong>{app_name_esc}</strong></div>'
+            f'\n                <textarea class="quick-note-ta" placeholder="Ask a question, or say what you would change..."></textarea>'
             f'\n                <div class="quick-note-actions">'
-            f'\n                  <button class="quick-note-submit" data-path="{path}" data-name="{app_name_esc}">Add Note</button>'
+            f'\n                  <button class="quick-note-submit" data-path="{path}" data-name="{app_name_esc}">Ask Amigo</button>'
             f'\n                  <button class="quick-note-cancel" data-id="{safe_id}">Cancel</button>'
             f'\n                </div>'
+            f'\n                <div class="amigo-reply hidden"></div>'
             f'\n              </div>'
             f'\n            </div>'
         )
@@ -2600,6 +2677,11 @@ def generate_index(apps, reviews, base_url):
   .quick-note-ta {{ width: 100%; min-height: 60px; padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.88rem; resize: none; outline: none; font-family: inherit; line-height: 1.4; transition: border-color 0.2s; }}
   .quick-note-ta:focus {{ border-color: var(--accent); }}
   .quick-note-actions {{ display: flex; gap: 0.5rem; margin-top: 0.4rem; justify-content: flex-end; }}
+  .ask-amigo-title {{ font-family: var(--f-mono); font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.45rem; }}
+  .ask-amigo-title strong {{ color: var(--accent); font-weight: 700; }}
+  .amigo-reply {{ margin-top: 0.6rem; padding: 0.6rem 0.75rem; background: var(--tint); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; color: var(--text); font-size: 0.88rem; line-height: 1.5; }}
+  .amigo-reply.amigo-quiet {{ background: var(--card-hover); border-left-color: var(--border); color: var(--muted); }}
+  .amigo-saved {{ font-family: var(--f-mono); font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-top: 0.45rem; }}
   .quick-note-submit {{ background: var(--accent); border: none; border-radius: 6px; color: #fff; font-size: 0.8rem; font-weight: 600; padding: 0.35rem 0.8rem; cursor: pointer; transition: opacity 0.15s; }}
   .quick-note-submit:hover {{ opacity: 0.85; }}
   .quick-note-cancel {{ background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.8rem; padding: 0.35rem 0.7rem; cursor: pointer; transition: color 0.15s; }}
@@ -3364,7 +3446,13 @@ function attachCatListeners(container) {{
     btn.addEventListener('click', e => {{
       e.preventDefault(); e.stopPropagation();
       const form = document.getElementById('qnote-' + btn.dataset.id);
-      if (form) {{ form.classList.toggle('hidden'); if (!form.classList.contains('hidden')) form.querySelector('.quick-note-ta').focus(); }}
+      if (form) {{
+        form.classList.toggle('hidden');
+        if (!form.classList.contains('hidden')) {{
+          form.querySelector('.amigo-reply')?.classList.add('hidden');
+          form.querySelector('.quick-note-ta').focus();
+        }}
+      }}
     }});
   }});
   container.querySelectorAll('.quick-note-submit').forEach(btn => {{
@@ -3372,21 +3460,41 @@ function attachCatListeners(container) {{
       e.preventDefault();
       const form = btn.closest('.quick-note-form');
       const ta = form.querySelector('.quick-note-ta');
+      const out = form.querySelector('.amigo-reply');
       const text = ta.value.trim();
       if (!text) {{ ta.focus(); return; }}
-      const fullText = '[' + btn.dataset.name + '] ' + text;
-      btn.disabled = true; btn.textContent = 'Adding...';
-      await apiPost('/api/notes/add', {{text: fullText}});
-      form.classList.add('hidden');
+      btn.disabled = true; btn.textContent = 'Asking...';
+      // A cold model takes about 17 seconds to load before it says anything,
+      // so the box must look busy rather than broken.
+      out.classList.remove('hidden', 'amigo-quiet');
+      out.textContent = 'Amigo is thinking...';
+      const r = await apiPost('/api/ask_amigo', {{name: btn.dataset.name, text: text}});
+      if (r?.amigo && r.reply) {{
+        out.textContent = r.reply;
+        out.classList.remove('amigo-quiet');
+      }} else {{
+        // Saved either way -- the suggestion is the part that matters, and
+        // Amigo is asleep whenever the desktop is.
+        out.textContent = 'Saved. Amigo is asleep right now, but Lance will read this.';
+        out.classList.add('amigo-quiet');
+      }}
+      const done = document.createElement('div');
+      done.className = 'amigo-saved';
+      done.textContent = r?.saved ? 'Saved as a suggestion' : 'Could not save -- try again';
+      out.appendChild(done);
       ta.value = '';
-      btn.disabled = false; btn.textContent = 'Add Note';
+      btn.disabled = false; btn.textContent = 'Ask Amigo';
     }});
   }});
   container.querySelectorAll('.quick-note-cancel').forEach(btn => {{
     btn.addEventListener('click', e => {{
       e.preventDefault();
       const form = document.getElementById('qnote-' + btn.dataset.id);
-      if (form) {{ form.classList.add('hidden'); form.querySelector('.quick-note-ta').value = ''; }}
+      if (form) {{
+        form.classList.add('hidden');
+        form.querySelector('.quick-note-ta').value = '';
+        form.querySelector('.amigo-reply')?.classList.add('hidden');
+      }}
     }});
   }});
   attachPinListeners(container);
@@ -3954,8 +4062,49 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         # isn't safe once background threads can write concurrently. data_lock()
         # extends that guarantee across processes (vs. daily_check.py), whose
         # writes DATA_LOCK -- an in-process threading.Lock -- cannot see.
+        # Asking Amigo is the one POST that must NOT run inside the lock.
+        # Every other handler is microseconds of dictionary work, but this one
+        # waits on a language model -- about 17 seconds when the model is cold.
+        # Held here, that would freeze every heart, star and note in the house
+        # for the length of a child's question.
+        if path == "/api/ask_amigo":
+            self._handle_ask_amigo(payload)
+            return
         with DATA_LOCK, data_lock():
             self._handle_post(path, payload)
+
+    def _handle_ask_amigo(self, payload):
+        text = payload.get("text", "").strip()
+        app_name = payload.get("name", "").strip() or "an app"
+        if not text:
+            self._json({"ok": False, "error": "empty"}, status=400)
+            return
+        note = {
+            "id": uuid.uuid4().hex[:8],
+            "text": f"[{app_name}] {text}",
+            "created": now_iso(),
+            "reviewed": False,
+            "ai_response": None,
+            "reviewed_at": None,
+            "needs_reply": False,
+            "replies": [],
+        }
+        # Saved first, in its own short lock, and saved whatever Amigo does
+        # next. The suggestion is the part Lance needs; the reply is what makes
+        # the person feel heard. Losing the first to a sleeping desktop would be
+        # the whole feature failing silently.
+        with DATA_LOCK, data_lock():
+            data = load_data()
+            data.setdefault("notes", []).append(note)
+            save_data(data)
+
+        reply, ok = ask_amigo(app_name, text)          # no lock held here
+        if ok:
+            append_amigo_reply(note["id"], reply)
+        # Started last so the reviewer reads the finished note.
+        threading.Thread(target=review_note_worker, args=(note["id"],),
+                         daemon=True).start()
+        self._json({"ok": True, "saved": True, "reply": reply, "amigo": ok})
 
     def _handle_post(self, path, payload):
         app_path = payload.get("path", "")
