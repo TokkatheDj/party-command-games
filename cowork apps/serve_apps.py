@@ -2220,6 +2220,10 @@ def generate_index(apps, reviews, base_url):
         notes_tab_label = f"({pending_count} pending)"
     else:
         notes_tab_label = f"({note_count})"
+    # Notes is where AI build requests land and where replies are waiting, so
+    # moving it behind More must not make it silent. The dot is the count the
+    # tab used to carry, reduced to the one bit that reads at a glance.
+    more_dot = '<span class="more-dot"></span>' if (pending_count or needs_reply_count) else ""
     playlists = data.get("playlists", {})
     playlists_json = json.dumps(playlists).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     playlist_count = len(playlists)
@@ -2689,6 +2693,7 @@ def generate_index(apps, reviews, base_url):
   .browse-all-btn {{ display: block; width: calc(100% - 3rem); max-width: 700px; margin: 1rem auto 2.5rem; padding: 0.9rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-size: 0.95rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }}
   .browse-all-btn:hover {{ border-color: var(--accent); color: var(--text); }}
   .home-back-row {{ max-width: 700px; margin: 0 auto; padding: 0.6rem 1.5rem 0; }}
+  .more-dot {{ display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); margin-left: 0.3rem; vertical-align: 0.35em; }}
   .more-wrap {{ position: relative; flex: 1; display: flex; }}
   .more-wrap .more-btn {{ flex: 1; }}
   .more-menu {{ position: absolute; top: 100%; right: 0.4rem; z-index: 30; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.35); min-width: 200px; padding: 0.3rem; }}
@@ -2824,12 +2829,12 @@ def generate_index(apps, reviews, base_url):
   <p class="subtitle">{browse_count} apps &middot; {review_count} {review_label}</p>
   <div class="tabs-nav">
     <button class="tab-btn active" data-tab="apps">&#128241; Apps</button>
-    <button class="tab-btn" data-tab="notes">&#128203; Notes {notes_tab_label}</button>
+    <button class="tab-btn" data-tab="playlists">&#128204; Lists ({playlist_count})</button>
     <div class="more-wrap">
-      <button class="tab-btn more-btn" id="more-btn">&#8943; More</button>
+      <button class="tab-btn more-btn" id="more-btn">&#8943; More{more_dot}</button>
       <div class="more-menu hidden" id="more-menu">
+        <button class="more-item" data-tab="notes">&#128203; Notes {notes_tab_label}</button>
         <button class="more-item" data-tab="reviews">&#11088; Reviews ({review_count})</button>
-        <button class="more-item" data-tab="playlists">&#128204; Lists ({playlist_count})</button>
         <button class="more-item" data-tab="builder">&#128736; Build ({app_request_count})</button>
       </div>
     </div>
@@ -2957,7 +2962,7 @@ const plView = document.getElementById('playlist-view-container');
 function switchTab(name) {{
   tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.getElementById('more-btn')?.classList.toggle(
-    'active', ['reviews', 'playlists', 'builder'].includes(name));
+    'active', ['reviews', 'notes', 'builder'].includes(name));
   Object.entries(panels).forEach(([k, p]) => {{ p.style.display = k === name ? 'block' : 'none'; }});
   plView.classList.add('hidden');
   if (name === 'playlists') {{
