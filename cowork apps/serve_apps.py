@@ -256,7 +256,7 @@ def discover_reviews():
 
 
 def load_data():
-    defaults = {"favorites": [], "ratings": {}, "removed": [], "opened": [], "notes": [], "playlists": {}, "app_requests": [], "builders": {}}
+    defaults = {"favorites": [], "ratings": {}, "removed": [], "opened": [], "notes": [], "playlists": {}, "app_requests": [], "builders": {}, "home_list": ""}
     if DATA_FILE.exists():
         try:
             data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
@@ -2110,6 +2110,9 @@ def build_playlist_html(playlist_id, playlist, all_apps_map, data):
 
     pl_name = playlist.get("name", "Playlist")
     pl_emoji = playlist.get("emoji", "📋")
+    is_home = data.get("home_list", "") == playlist_id
+    home_cls = "pl-home-btn on" if is_home else "pl-home-btn"
+    home_txt = "\U0001f3e0 Home list" if is_home else "\U0001f3e0 Make home"
     pl_apps = [p for p in playlist.get("apps", []) if p not in removed_set]
 
     cards = ""
@@ -2125,6 +2128,10 @@ def build_playlist_html(playlist_id, playlist, all_apps_map, data):
         f'<div class="cat-nav">'
         f'<button class="back-btn pl-back-btn">&#8592; Playlists</button>'
         f'<span class="cat-nav-title">{html.escape(pl_emoji)} {html.escape(pl_name)} <span class="count">{len(pl_apps)}</span></span>'
+        # Always visible, never hover-revealed. The tile's delete button is
+        # opacity:0 until :hover, which means it does not exist on a phone --
+        # and the phone is where he actually decides what to show people.
+        f'<button class="{home_cls}" data-plid="{playlist_id}">{home_txt}</button>'
         f'</div>'
         f'<div class="cat-app-list" id="pllist-{playlist_id}">'
         f'{cards}'
@@ -2173,6 +2180,8 @@ TOUCH_RULES = r"""    /* Touch targets: 44px minimum (Apple HIG / Material). Fiv
     .remove-btn { font-size: 1rem; opacity: 1; }
     .star-row { margin-top: 0; line-height: 1; gap: 0; }
     .more-item { min-height: 44px; }
+    .pl-home-btn { min-height: 44px; padding: 0 1rem; }
+    .home-list-change { min-height: 44px; padding: 0 0.9rem; }
     /* The mobile-friendly toggle is desktop-only. A sixth 44px control needs
        220px of the button row and pushed a long title onto a fourth line
        (one card went 136px -> 156px); at 28x24 it also failed the 44px floor.
@@ -2214,6 +2223,7 @@ def generate_index(apps, reviews, base_url):
     playlists = data.get("playlists", {})
     playlists_json = json.dumps(playlists).replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
     playlist_count = len(playlists)
+    home_list_json = json.dumps(data.get("home_list", ""))
 
     app_requests = data.get("app_requests", [])
     app_requests_public = [strip_private_fields(r) for r in app_requests]
@@ -2375,15 +2385,43 @@ def generate_index(apps, reviews, base_url):
             for a in items
         )
 
+    # A chosen list leads the page instead of Yours. Yours stays underneath --
+    # picking a home list is "show me this first", not "throw away my hearts".
+    home_list_id = data.get("home_list", "")
+    home_pl = playlists.get(home_list_id)
+    home_sections = ""
+    if home_pl:
+        by_path = {a["path"]: a for a in live_apps}
+        # The list's own order, not a re-sort: he arranged it.
+        hl_apps = [by_path[p] for p in home_pl.get("apps", []) if p in by_path]
+        hl_emoji = html.escape(home_pl.get("emoji", "📋"))
+        hl_name = html.escape(home_pl.get("name", "List"))
+        if hl_apps:
+            hl_body = f'<div class="cat-app-list">{_home_cards(hl_apps)}</div>'
+        else:
+            hl_body = (
+                '<p class="home-empty">This list is empty. Pin apps to it with '
+                'the 📌 button on any app card.</p>'
+            )
+        home_sections += (
+            f'<div class="home-section home-list-section">'
+            f'<h2 class="home-title">{hl_emoji} {hl_name} '
+            f'<span class="count">{len(hl_apps)}</span>'
+            f'<button class="home-list-change" id="home-list-change">Change</button>'
+            f'</h2>{hl_body}</div>'
+        )
+
     if yours:
-        home_sections = (
+        home_sections += (
             f'<div class="home-section">'
             f'<h2 class="home-title">&#9733; Yours <span class="count">{len(yours)}</span></h2>'
             f'<div class="cat-app-list">{_home_cards(yours)}</div>'
             f'</div>'
         )
-    else:
-        home_sections = (
+    elif not home_pl:
+        # With a home list up top, an empty-favourites nudge under it would be
+        # noise -- the page already leads with something he chose.
+        home_sections += (
             '<div class="home-section"><p class="home-empty">'
             'Nothing favourited yet. Tap the heart on any app and it will show up '
             'here.</p></div>'
@@ -2641,6 +2679,13 @@ def generate_index(apps, reviews, base_url):
   .home-title {{ font-size: 1.05rem; font-weight: 600; color: var(--text); margin: 1.2rem 0 0.7rem; display: flex; align-items: center; gap: 0.5rem; }}
   .home-title .count {{ font-size: 0.78rem; color: var(--muted); font-weight: 500; background: var(--surface); border: 1px solid var(--border); border-radius: 99px; padding: 0.1rem 0.55rem; }}
   .home-empty {{ color: var(--muted); font-style: italic; font-size: 0.9rem; padding: 2rem 0; text-align: center; }}
+  .home-list-change {{ margin-left: auto; background: transparent; border: 1px solid var(--border); border-radius: 99px; color: var(--muted); font-size: 0.72rem; font-family: inherit; padding: 0.25rem 0.7rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }}
+  .home-list-change:hover {{ border-color: var(--accent); color: var(--accent); }}
+  .pl-home-btn {{ background: transparent; border: 1px solid var(--border); border-radius: 99px; color: var(--muted); font-size: 0.78rem; font-family: inherit; padding: 0.35rem 0.8rem; cursor: pointer; flex-shrink: 0; transition: border-color 0.15s, color 0.15s, background 0.15s; }}
+  .pl-home-btn:hover {{ border-color: var(--accent); color: var(--accent); }}
+  .pl-home-btn.on {{ background: var(--accent); border-color: var(--accent); color: #fff; }}
+  .playlist-tile.is-home {{ border-color: var(--accent); padding-bottom: 1.6rem; }}
+  .playlist-tile.is-home::after {{ content: "\01f3e0 Home"; position: absolute; bottom: 0.35rem; left: 0; right: 0; font-size: 0.62rem; color: var(--accent); font-weight: 600; }}
   .browse-all-btn {{ display: block; width: calc(100% - 3rem); max-width: 700px; margin: 1rem auto 2.5rem; padding: 0.9rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-size: 0.95rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }}
   .browse-all-btn:hover {{ border-color: var(--accent); color: var(--text); }}
   .home-back-row {{ max-width: 700px; margin: 0 auto; padding: 0.6rem 1.5rem 0; }}
@@ -2878,6 +2923,7 @@ def generate_index(apps, reviews, base_url):
 <script>
 const ALL_APPS = {all_apps_json};
 let PLAYLISTS = {playlists_json};
+let HOME_LIST = {home_list_json};
 const catCache = {{}};
 const playlistCache = {{}};
 let pickerOpen = null;
@@ -2947,6 +2993,7 @@ document.querySelectorAll('.more-item').forEach(item => {{
   }});
 }});
 
+document.getElementById('home-list-change')?.addEventListener('click', () => switchTab('playlists'));
 document.getElementById('browse-all-btn')?.addEventListener('click', showGrid);
 document.getElementById('grid-back-btn')?.addEventListener('click', showHome);
 
@@ -3334,7 +3381,7 @@ function renderPlaylistGrid() {{
   grid.innerHTML = ids.map(id => {{
     const p = PLAYLISTS[id];
     const cnt = (p.apps || []).length;
-    return `<div class="playlist-tile" data-plid="${{id}}">
+    return `<div class="playlist-tile${{id === HOME_LIST ? ' is-home' : ''}}" data-plid="${{id}}">
       <button class="playlist-tile-del" data-plid="${{id}}" title="Delete playlist">&#10005;</button>
       <span class="playlist-tile-emoji">${{escHtml(p.emoji || '📋')}}</span>
       <div class="playlist-tile-name">${{escHtml(p.name)}}</div>
@@ -3374,6 +3421,7 @@ async function showPlaylistView(id) {{
     container.innerHTML = playlistCache[id];
     attachCatListeners(container);
     container.querySelector('.pl-back-btn')?.addEventListener('click', backToPlaylists);
+    wireHomeBtn(container, id);
     return;
   }}
   container.innerHTML = '<p class="loading-msg">Loading…</p>';
@@ -3385,6 +3433,12 @@ async function showPlaylistView(id) {{
   container.innerHTML = d.html;
   attachCatListeners(container);
   container.querySelector('.pl-back-btn')?.addEventListener('click', backToPlaylists);
+  wireHomeBtn(container, id);
+}}
+
+function wireHomeBtn(container, id) {{
+  const btn = container.querySelector('.pl-home-btn');
+  if (btn) btn.addEventListener('click', () => toggleHomeList(id));
 }}
 
 function backToPlaylists() {{
@@ -3471,6 +3525,18 @@ function updatePinBtns(path) {{
   document.querySelectorAll('.pin-btn[data-path="' + path + '"]').forEach(b => {{
     b.classList.toggle('pinned', isPinned);
   }});
+}}
+
+// Which list leads the front page. Toggling the one already set clears it,
+// so there is always a way back to Yours without a second control.
+async function toggleHomeList(id) {{
+  const r = await apiPost('/api/home_list', {{playlist_id: id}});
+  if (!r?.ok) return;
+  HOME_LIST = r.home_list || '';
+  // The front page is rendered on the server, so the only honest way to show
+  // the new lead section is to go and look at it -- and landing on home is
+  // itself the answer to "did that work", because he sees what he just picked.
+  location.replace('/');
 }}
 
 function updatePlaylistTabCount() {{
@@ -3997,8 +4063,23 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             pid = payload.get("playlist_id", "")
             playlists = data.setdefault("playlists", {})
             playlists.pop(pid, None)
+            # A home list that no longer exists would leave the front page
+            # falling back to Yours forever with nothing to show why.
+            if data.get("home_list") == pid:
+                data["home_list"] = ""
             save_data(data)
             self._json({"ok": True})
+
+        elif path == "/api/home_list":
+            # Which section leads the front page. Toggle semantics, like
+            # /api/favorite: choosing the same list again means "Yours back".
+            pid = payload.get("playlist_id", "")
+            if pid and pid not in data.get("playlists", {}):
+                self._json({"ok": False, "error": "playlist not found"}, status=404)
+                return
+            data["home_list"] = "" if data.get("home_list") == pid else pid
+            save_data(data)
+            self._json({"ok": True, "home_list": data["home_list"]})
 
         elif path == "/api/playlist/rename":
             pid = payload.get("playlist_id", "")
