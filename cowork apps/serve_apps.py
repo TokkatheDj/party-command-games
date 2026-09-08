@@ -2191,6 +2191,12 @@ TOUCH_RULES = r"""    /* Touch targets: 44px minimum (Apple HIG / Material). Fiv
     .remove-btn { font-size: 1rem; opacity: 1; }
     .star-row { margin-top: 0; line-height: 1; gap: 0; }
     .more-item { min-height: 44px; }
+    /* gap, not the collapsed whitespace: inline-flex drops the text node
+       between the label and its count, so it read "Mobile-ready296". */
+    .mfilter,
+    .view-toggle-btn,
+    #show-removed-btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 0.35rem; }
+    .theme-toggle-btn { width: 44px; height: 44px; }
     .pl-home-btn { min-height: 44px; padding: 0 1rem; }
     .home-list-change { min-height: 44px; padding: 0 0.9rem; }
     /* The mobile-friendly toggle is desktop-only. A sixth 44px control needs
