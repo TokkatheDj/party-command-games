@@ -360,24 +360,35 @@ def list_builders(data):
 # can drift.
 THEME_ROOT_VARS = """
   :root {
-    --bg: #f5f5fa;
-    --surface: #ffffff;
-    --border: #dcdce6;
-    --accent: #6d5ce0;
-    --accent2: #d1495c;
-    --text: #1c1c26;
-    --muted: #62626f;
-    --card-hover: #eeeef6;
+    --bg: #F6F3EF;          /* Amigo --ground  */
+    --surface: #FFFFFF;
+    --border: #DDD5CB;      /* Amigo --line    */
+    --accent: #A8552E;      /* Amigo terracotta */
+    --accent2: #9C3B2E;     /* the warm red that replaces the purple pair */
+    --text: #221F1B;        /* Amigo --ink     */
+    --muted: #6B645C;
+    --card-hover: #EDE8E1;  /* Amigo --sunk    */
+    --tint: #F3E3D9;        /* Amigo --mine -- the "this one is yours" wash */
+    --ok: #3D6B4C;
+    --warn: #8A6212;
+    --accent-rgb: 168, 85, 46;
+    --f-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --f-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --f-mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", monospace;
   }
   :root[data-theme="dark"] {
-    --bg: #0f0f13;
-    --surface: #2a1f4d;
-    --border: #3d2e6b;
-    --accent: #7c6ee6;
-    --accent2: #e66e7c;
-    --text: #e8e8f0;
-    --muted: #a99ce0;
-    --card-hover: #352763;
+    --bg: #16140F;
+    --surface: #1F1C16;
+    --border: #38322A;
+    --accent: #E0916A;
+    --accent2: #D9705C;
+    --text: #EDE8DF;
+    --muted: #9A9287;
+    --card-hover: #262219;
+    --tint: #33241B;
+    --ok: #7BB08A;
+    --warn: #D6A94A;
+    --accent-rgb: 224, 145, 106;
   }
 """
 
@@ -420,8 +431,8 @@ themeToggleBtn?.addEventListener('click', () => {
 # to maintain instead of two that can drift.
 BUILDER_STYLES = """
 /* ---- Theme toggle ---- */
-.theme-toggle-btn { position: fixed; top: 0.7rem; right: 0.8rem; z-index: 50; background: rgba(20,20,30,0.55); border: 1px solid rgba(255,255,255,0.25); color: #fff; border-radius: 8px; width: 2.2rem; height: 2.2rem; font-size: 1.1rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
-.theme-toggle-btn:hover { background: rgba(20,20,30,0.75); }
+.theme-toggle-btn { position: fixed; top: 0.7rem; right: 0.8rem; z-index: 50; background: var(--card-hover); border: 1px solid var(--border); color: var(--muted); border-radius: 99px; width: 2.2rem; height: 2.2rem; font-size: 1rem; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.15s, border-color 0.15s; }
+.theme-toggle-btn:hover { background: var(--tint); border-color: var(--accent); }
 /* ---- App Builder ---- */
 #tab-builder { display: none; padding: 1.5rem; max-width: 700px; margin: 0 auto; }
 .builder-form { background: var(--surface); border: 1px solid var(--accent); border-radius: 10px; padding: 1rem; margin-bottom: 1.2rem; }
@@ -433,10 +444,10 @@ BUILDER_STYLES = """
 .builder-optional { text-transform: none; letter-spacing: normal; font-weight: 400; opacity: 0.75; }
 #builder-idea-input, #builder-tech-input { width: 100%; min-height: 60px; padding: 0.6rem 0.85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none; font-family: inherit; resize: vertical; transition: border-color 0.2s; }
 #builder-idea-input:focus, #builder-tech-input:focus { border-color: var(--accent); }
-.builder-select { width: 100%; margin-bottom: 0.5rem; min-height: 44px; padding: 0.5rem 0.85rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; outline: none; border: 1px solid var(--accent); color: var(--accent); background: rgba(124,110,230,0.1); transition: border-color 0.15s; }
+.builder-select { width: 100%; margin-bottom: 0.5rem; min-height: 44px; padding: 0.5rem 0.85rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; font-family: inherit; outline: none; border: 1px solid var(--accent); color: var(--accent); background: rgba(var(--accent-rgb),0.1); transition: border-color 0.15s; }
 .choice-group { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .choice-opt { font-size: 0.85rem; color: var(--text); cursor: pointer; border-radius: 7px; padding: 0.4rem 0.75rem; border: 2px solid var(--border); transition: border-color 0.12s, background 0.12s; min-height: 44px; display: inline-flex; align-items: center; }
-.choice-opt.selected { border-color: var(--accent); background: rgba(124,110,230,0.12); color: var(--accent); }
+.choice-opt.selected { border-color: var(--accent); background: rgba(var(--accent-rgb),0.12); color: var(--accent); }
 .choice-checkboxes { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .choice-checkbox { display: flex; align-items: center; gap: 0.35rem; font-size: 0.83rem; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 0.35rem 0.6rem; cursor: pointer; min-height: 44px; }
 .choice-checkbox input { accent-color: var(--accent); }
@@ -449,12 +460,12 @@ BUILDER_STYLES = """
 #builder-share-link { flex: 1; min-width: 140px; padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.82rem; outline: none; font-family: inherit; }
 .builder-copy-btn, .builder-share-btn { background: var(--accent); border: none; border-radius: 8px; color: #fff; font-size: 0.82rem; font-weight: 600; padding: 0.5rem 0.85rem; cursor: pointer; transition: opacity 0.15s; white-space: nowrap; }
 .builder-copy-btn:hover, .builder-share-btn:hover { opacity: 0.85; }
-.builder-share-copied { display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: #44ee66; }
+.builder-share-copied { display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: var(--ok); }
 .builder-print-link { display: block; margin-top: 0.6rem; font-size: 0.8rem; color: var(--accent); text-decoration: none; }
 .builder-print-link:hover { text-decoration: underline; }
 .builder-email-links-btn { display: block; margin-top: 0.5rem; background: none; border: none; color: var(--accent); font-size: 0.8rem; text-decoration: none; cursor: pointer; padding: 0; font-family: inherit; }
 .builder-email-links-btn:hover { text-decoration: underline; }
-.builder-email-links-sent { display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: #44ee66; }
+.builder-email-links-sent { display: inline-block; margin-top: 0.4rem; font-size: 0.78rem; color: var(--ok); }
 .builder-lists { margin-top: 1.5rem; }
 .builder-list-heading { font-size: 0.85rem; font-weight: 600; color: var(--text); margin: 1.2rem 0 0.6rem; }
 .builder-card-list { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -467,8 +478,8 @@ BUILDER_STYLES = """
 .builder-card-meta { font-size: 0.75rem; color: var(--muted); }
 .builder-badge { font-size: 0.68rem; font-weight: 700; padding: 0.15em 0.55em; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; flex-shrink: 0; }
 .builder-badge.queued { background: rgba(136,136,153,0.15); color: var(--muted); }
-.builder-badge.generating { background: rgba(124,110,230,0.15); color: var(--accent); }
-.builder-badge.done { background: rgba(68,238,102,0.12); color: #44ee66; }
+.builder-badge.generating { background: rgba(var(--accent-rgb),0.15); color: var(--accent); }
+.builder-badge.done { background: rgba(61,107,76,0.12); color: var(--ok); }
 .builder-badge.error { background: rgba(230,110,124,0.15); color: var(--accent2); }
 .builder-card-open { display: inline-block; margin-top: 0.4rem; margin-right: 0.6rem; font-size: 0.83rem; color: var(--accent); text-decoration: none; font-weight: 600; }
 .builder-card-open:hover { text-decoration: underline; }
@@ -481,7 +492,7 @@ BUILDER_STYLES = """
 .report-ta { width: 100%; min-height: 50px; padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.85rem; resize: vertical; outline: none; font-family: inherit; line-height: 1.4; transition: border-color 0.2s; }
 .report-ta:focus { border-color: var(--accent2); }
 .fix-status { margin-top: 0.4rem; font-size: 0.8rem; color: var(--muted); font-style: italic; }
-.fix-status-done { color: #44ee66; font-style: normal; }
+.fix-status-done { color: var(--ok); font-style: normal; }
 .fix-status-error { color: var(--accent2); font-style: normal; }
 .feedback-btn { display: inline-block; margin-top: 0.4rem; margin-right: 0.4rem; font-size: 0.78rem; color: var(--accent); background: none; border: 1px solid var(--accent); border-radius: 6px; padding: 0.25rem 0.6rem; cursor: pointer; transition: opacity 0.15s; }
 .feedback-btn:hover { opacity: 0.8; }
@@ -675,7 +686,7 @@ BUILD_PRINT_STYLES = """
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1a1a1a; background: #fff; max-width: 780px; margin: 0 auto; padding: 1.5rem; }
   .print-toolbar { text-align: center; margin-bottom: 1.2rem; }
-  .print-btn { background: #7c6ee6; color: #fff; border: none; border-radius: 8px; padding: 0.7rem 1.4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
+  .print-btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 0.7rem 1.4rem; font-size: 1rem; font-weight: 600; cursor: pointer; }
   .print-header { text-align: center; margin-bottom: 1.2rem; }
   .print-header h1 { font-size: 1.5rem; margin-bottom: 0.3rem; }
   .print-instructions { background: #f3f1ff; border: 1px solid #ddd6ff; border-radius: 10px; padding: 0.9rem 1.1rem; font-size: 0.92rem; line-height: 1.5; margin-bottom: 1.4rem; }
@@ -2447,7 +2458,7 @@ def generate_index(apps, reviews, base_url):
 <title>AppVerse</title>
 <meta name="description" content="A local launcher for {app_count} HTML apps — games, tools, education, music, and more.">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#7c6ee6">
+<meta name="theme-color" content="#A8552E">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2456,10 +2467,10 @@ def generate_index(apps, reviews, base_url):
 <style>
 {THEME_ROOT_VARS}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }}
+  body {{ font-family: var(--f-body); background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }}
   header {{ background: var(--surface); padding: 2rem 1.5rem 0; border-bottom: 1px solid var(--border); text-align: center; }}
-  header h1 {{ font-size: 1.8rem; font-weight: 700; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 0.3rem; }}
-  .subtitle {{ color: var(--muted); font-size: 0.9rem; margin-bottom: 1.2rem; }}
+  header h1 {{ font-family: var(--f-display); font-size: 1.8rem; font-weight: 700; letter-spacing: -0.01em; color: var(--text); margin-bottom: 0.3rem; }}
+  .subtitle {{ font-family: var(--f-mono); color: var(--muted); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 1.2rem; }}
   .tabs-nav {{ display: flex; border-top: 1px solid var(--border); }}
   .tab-btn {{ flex: 1; padding: 0.8rem; background: transparent; border: none; border-bottom: 3px solid transparent; color: var(--muted); font-size: 0.95rem; font-weight: 500; cursor: pointer; transition: color 0.15s, border-color 0.15s; }}
   .tab-btn.active {{ color: var(--accent); border-bottom-color: var(--accent); }}
@@ -2474,13 +2485,13 @@ def generate_index(apps, reviews, base_url):
   .app-item {{ position: relative; display: flex; flex-direction: column; width: 100%; }}
   .app-card {{ background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem 0.8rem; display: flex; align-items: center; gap: 0.5rem; transition: background 0.15s, border-color 0.15s, transform 0.1s; cursor: pointer; width: 100%; }}
   .app-card:hover, .app-card:active {{ background: var(--card-hover); border-color: var(--accent); transform: translateX(3px); }}
-  .app-card.favorite {{ border-color: var(--accent); box-shadow: 0 0 0 1px rgba(124,110,230,0.3); }}
+  .app-card.favorite {{ border-color: var(--accent); background: rgba(var(--accent-rgb),0.055); }}
   .app-main {{ flex: 1; min-width: 0; }}
   .app-name {{ color: var(--text); font-size: 0.95rem; display: block; }}
   .card-meta {{ display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.25rem; }}
-  .badge {{ font-size: 0.62rem; font-weight: 700; letter-spacing: 0.05em; padding: 0.15em 0.45em; border-radius: 4px; text-transform: uppercase; }}
+  .badge {{ font-family: var(--f-mono); font-size: 0.6rem; font-weight: 700; letter-spacing: 0.08em; padding: 0.15em 0.45em; border-radius: 4px; text-transform: uppercase; }}
   .badge-new {{ background: rgba(230,110,124,0.2); color: var(--accent2); border: 1px solid rgba(230,110,124,0.4); }}
-  .badge-unread {{ background: rgba(124,110,230,0.2); color: var(--accent); border: 1px solid rgba(124,110,230,0.4); }}
+  .badge-unread {{ background: rgba(var(--accent-rgb),0.2); color: var(--accent); border: 1px solid rgba(var(--accent-rgb),0.4); }}
   .star-row {{ display: flex; gap: 1px; }}
   .star {{ font-size: 0.8rem; color: var(--border); cursor: pointer; transition: color 0.1s; user-select: none; }}
   .star.filled {{ color: #f0b429; }}
@@ -2491,8 +2502,8 @@ def generate_index(apps, reviews, base_url):
   .remove-btn {{ background: none; border: none; cursor: pointer; font-size: 0.85rem; color: var(--muted); padding: 0.2rem 0.3rem; flex-shrink: 0; border-radius: 4px; transition: color 0.15s, background 0.15s; opacity: 0.4; }}
   .app-card:hover .remove-btn {{ opacity: 1; }}
   .remove-btn:hover {{ color: var(--accent2); background: rgba(230,110,124,0.15); }}
-  .restore-btn {{ background: rgba(124,110,230,0.15); border: 1px solid rgba(124,110,230,0.4); cursor: pointer; font-size: 0.75rem; color: var(--accent); padding: 0.25rem 0.6rem; flex-shrink: 0; border-radius: 6px; transition: background 0.15s; }}
-  .restore-btn:hover {{ background: rgba(124,110,230,0.3); }}
+  .restore-btn {{ background: rgba(var(--accent-rgb),0.15); border: 1px solid rgba(var(--accent-rgb),0.4); cursor: pointer; font-size: 0.75rem; color: var(--accent); padding: 0.25rem 0.6rem; flex-shrink: 0; border-radius: 6px; transition: background 0.15s; }}
+  .restore-btn:hover {{ background: rgba(var(--accent-rgb),0.3); }}
   .hidden {{ display: none !important; }}
   @keyframes fadeout {{ to {{ opacity: 0; transform: scaleY(0); max-height: 0; padding: 0; margin: 0; overflow: hidden; }} }}
   .removing {{ animation: fadeout 0.25s ease forwards; transform-origin: top; }}
@@ -2505,23 +2516,23 @@ def generate_index(apps, reviews, base_url):
   .review-card h1 {{ font-size: 1.25rem; color: var(--text); margin-bottom: 1rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }}
   .review-card h2 {{ font-size: 1.05rem; color: var(--accent); margin: 1.4rem 0 0.6rem; }}
   .review-card h3 {{ font-size: 0.97rem; color: var(--text); margin: 1.1rem 0 0.4rem; }}
-  .review-card p {{ color: #bbbbc8; line-height: 1.65; margin-bottom: 0.7rem; }}
+  .review-card p {{ color: var(--text); line-height: 1.7; margin-bottom: 0.7rem; }}
   .review-card hr {{ border: none; border-top: 1px solid var(--border); margin: 1.2rem 0; }}
   .review-card ul {{ padding-left: 1.4rem; margin-bottom: 0.8rem; }}
-  .review-card li {{ color: #bbbbc8; line-height: 1.65; margin-bottom: 0.3rem; }}
-  .review-card code {{ background: #0d0d18; color: #aaffaa; padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.87em; font-family: monospace; }}
+  .review-card li {{ color: var(--text); line-height: 1.65; margin-bottom: 0.3rem; }}
+  .review-card code {{ background: var(--bg); color: var(--ok); padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.87em; font-family: monospace; }}
   .review-card strong {{ color: var(--text); }}
-  .review-card em {{ color: #bbbbdd; font-style: italic; }}
+  .review-card em {{ color: var(--muted); font-style: italic; }}
   .review-card a {{ color: var(--accent); }}
   .table-wrap {{ overflow-x: auto; margin: 0.8rem 0; border-radius: 8px; }}
   .review-table {{ width: 100%; border-collapse: collapse; font-size: 0.83rem; }}
   .review-table th, .review-table td {{ text-align: left; padding: 0.5rem 0.75rem; border: 1px solid var(--border); }}
-  .review-table th {{ background: #111120; color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.73rem; letter-spacing: 0.05em; }}
-  .review-table td {{ color: #bbbbc8; vertical-align: top; }}
-  .review-table tr:hover td {{ background: #1e1e2e; }}
-  .rating-pass {{ color: #44ee66 !important; font-weight: 600; }}
-  .rating-warn {{ color: #ffaa00 !important; font-weight: 600; }}
-  .rating-fail {{ color: #ff4444 !important; font-weight: 600; }}
+  .review-table th {{ background: var(--card-hover); color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 0.73rem; letter-spacing: 0.05em; }}
+  .review-table td {{ color: var(--text); vertical-align: top; }}
+  .review-table tr:hover td {{ background: var(--card-hover); }}
+  .rating-pass {{ color: var(--ok) !important; font-weight: 600; }}
+  .rating-warn {{ color: var(--warn) !important; font-weight: 600; }}
+  .rating-fail {{ color: var(--accent2) !important; font-weight: 600; }}
   .no-reviews {{ color: var(--muted); font-style: italic; }}
   #tab-notes {{ display: none; padding: 1.5rem; max-width: 700px; margin: 0 auto; }}
   .note-compose {{ margin-bottom: 1.5rem; }}
@@ -2555,8 +2566,8 @@ def generate_index(apps, reviews, base_url):
     border-radius: 99px; text-transform: uppercase; letter-spacing: 0.04em;
   }}
   .note-badge.pending {{ background: rgba(230,110,124,0.15); color: var(--accent2); }}
-  .note-badge.reviewed {{ background: rgba(68,238,102,0.12); color: #44ee66; }}
-  .note-badge.needs-reply {{ background: rgba(230,162,60,0.16); color: #e6a23c; }}
+  .note-badge.reviewed {{ background: rgba(61,107,76,0.12); color: var(--ok); }}
+  .note-badge.needs-reply {{ background: rgba(138,98,18,0.14); color: var(--warn); }}
   .note-delete {{
     background: none; border: none; color: var(--muted);
     cursor: pointer; font-size: 1rem; padding: 0; line-height: 1;
@@ -2565,8 +2576,8 @@ def generate_index(apps, reviews, base_url):
   .note-text {{ color: var(--text); font-size: 0.92rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }}
   .ai-response {{
     margin-top: 0.8rem; padding: 0.75rem 0.9rem;
-    background: rgba(124,110,230,0.08); border-left: 3px solid var(--accent);
-    border-radius: 0 8px 8px 0; color: #bbbbc8;
+    background: rgba(var(--accent-rgb),0.08); border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0; color: var(--text);
     font-size: 0.88rem; line-height: 1.65; white-space: pre-wrap; word-break: break-word;
   }}
   .ai-label {{ font-size: 0.7rem; color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.3rem; }}
@@ -2575,7 +2586,7 @@ def generate_index(apps, reviews, base_url):
   .app-item {{ position: relative; }}
   .note-quick-btn {{ background: none; border: none; cursor: pointer; font-size: 0.85rem; color: var(--muted); padding: 0.2rem 0.3rem; flex-shrink: 0; border-radius: 4px; transition: color 0.15s, background 0.15s; opacity: 0.4; }}
   .app-card:hover .note-quick-btn {{ opacity: 1; }}
-  .note-quick-btn:hover {{ color: var(--accent); background: rgba(124,110,230,0.15); }}
+  .note-quick-btn:hover {{ color: var(--accent); background: rgba(var(--accent-rgb),0.15); }}
   .remove-btn.remove-confirm {{ color: var(--accent2) !important; opacity: 1 !important; font-size: 0.75rem; font-weight: 700; }}
   .quick-note-form {{ background: var(--surface); border: 1px solid var(--accent); border-top: none; border-radius: 0 0 10px 10px; padding: 0.6rem 0.8rem; margin-top: -2px; }}
   .quick-note-ta {{ width: 100%; min-height: 60px; padding: 0.5rem 0.7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 0.88rem; resize: none; outline: none; font-family: inherit; line-height: 1.4; transition: border-color 0.2s; }}
@@ -2585,7 +2596,7 @@ def generate_index(apps, reviews, base_url):
   .quick-note-submit:hover {{ opacity: 0.85; }}
   .quick-note-cancel {{ background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.8rem; padding: 0.35rem 0.7rem; cursor: pointer; transition: color 0.15s; }}
   .quick-note-cancel:hover {{ color: var(--text); }}
-  .note-reply {{ margin: 0.6rem 0 0 1rem; padding: 0.7rem 0.9rem; border-left: 2px solid var(--border); background: rgba(124,110,230,0.04); border-radius: 0 8px 8px 0; }}
+  .note-reply {{ margin: 0.6rem 0 0 1rem; padding: 0.7rem 0.9rem; border-left: 2px solid var(--border); background: rgba(var(--accent-rgb),0.04); border-radius: 0 8px 8px 0; }}
   .note-reply-toggle-row {{ margin-top: 0.7rem; }}
   .note-reply-toggle-btn {{ background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 0.78rem; padding: 0.3rem 0.7rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; }}
   .note-reply-toggle-btn:hover {{ color: var(--accent); border-color: var(--accent); }}
@@ -2599,17 +2610,17 @@ def generate_index(apps, reviews, base_url):
   .view-cat {{ padding: 0 1.5rem 2rem; max-width: 700px; margin: 0 auto; }}
   .cat-nav {{ display: flex; align-items: center; gap: 0.8rem; padding: 1rem 0 0.8rem; border-bottom: 1px solid var(--border); margin-bottom: 0.8rem; }}
   .back-btn {{ background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--accent); font-size: 0.85rem; padding: 0.35rem 0.75rem; cursor: pointer; flex-shrink: 0; transition: background 0.15s; }}
-  .back-btn:hover {{ background: rgba(124,110,230,0.12); }}
-  .cat-nav-title {{ color: var(--text); font-size: 1rem; font-weight: 600; flex: 1; }}
+  .back-btn:hover {{ background: rgba(var(--accent-rgb),0.12); }}
+  .cat-nav-title {{ font-family: var(--f-display); color: var(--text); font-size: 1.1rem; font-weight: 700; flex: 1; }}
   .cat-search-wrap {{ margin-bottom: 0.8rem; }}
   .cat-search {{ width: 100%; padding: 0.65rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 0.95rem; outline: none; transition: border-color 0.2s; }}
   .cat-search:focus {{ border-color: var(--accent); }}
   .cat-search::placeholder {{ color: var(--muted); }}
   /* ---- Library View Modes ---- */
   .view-toggle-group {{ display: inline-flex; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px; flex-shrink: 0; }}
-  .view-toggle-btn {{ background: transparent; border: none; color: var(--muted); font-size: 0.82rem; padding: 0.35rem 0.65rem; border-radius: 6px; cursor: pointer; line-height: 1; transition: background 0.15s, color 0.15s; display: inline-flex; align-items: center; gap: 4px; font-weight: 500; }}
-  .view-toggle-btn:hover {{ color: var(--text); background: rgba(255,255,255,0.06); }}
-  .view-toggle-btn.active {{ background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.25); font-weight: 700; }}
+  .view-toggle-btn {{ font-family: var(--f-mono); background: transparent; border: none; color: var(--muted); font-size: 0.7rem; letter-spacing: 0.04em; padding: 0.35rem 0.65rem; border-radius: 6px; cursor: pointer; line-height: 1; transition: background 0.15s, color 0.15s; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }}
+  .view-toggle-btn:hover {{ color: var(--text); background: var(--card-hover); }}
+  .view-toggle-btn.active {{ background: var(--surface); color: var(--accent); box-shadow: 0 1px 2px rgba(0,0,0,0.08); font-weight: 700; }}
 
   /* Mode 1: List (default) */
   .cat-app-list {{ display: flex; flex-direction: column; gap: 0.4rem; width: 100%; }}
@@ -2680,14 +2691,14 @@ def generate_index(apps, reviews, base_url):
   .low-rated[open] > summary::before {{ content: "BE "; }}
   .low-rated > summary:hover {{ color: var(--text); }}
   .home-section {{ max-width: 700px; margin: 0 auto; padding: 0 1.5rem 0.5rem; }}
-  .home-title {{ font-size: 1.05rem; font-weight: 600; color: var(--text); margin: 1.2rem 0 0.7rem; display: flex; align-items: center; gap: 0.5rem; }}
-  .home-title .count {{ font-size: 0.78rem; color: var(--muted); font-weight: 500; background: var(--surface); border: 1px solid var(--border); border-radius: 99px; padding: 0.1rem 0.55rem; }}
+  .home-title {{ font-family: var(--f-display); font-size: 1.15rem; font-weight: 700; color: var(--text); margin: 1.2rem 0 0.7rem; display: flex; align-items: center; gap: 0.5rem; }}
+  .home-title .count {{ font-family: var(--f-mono); font-size: 0.68rem; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; background: var(--card-hover); border: 1px solid var(--border); border-radius: 99px; padding: 0.15rem 0.55rem; }}
   .home-empty {{ color: var(--muted); font-style: italic; font-size: 0.9rem; padding: 2rem 0; text-align: center; }}
-  .home-list-change {{ margin-left: auto; background: transparent; border: 1px solid var(--border); border-radius: 99px; color: var(--muted); font-size: 0.72rem; font-family: inherit; padding: 0.25rem 0.7rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }}
+  .home-list-change {{ margin-left: auto; background: transparent; border: 1px solid var(--border); border-radius: 99px; color: var(--muted); font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; font-family: var(--f-mono); padding: 0.25rem 0.7rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }}
   .home-list-change:hover {{ border-color: var(--accent); color: var(--accent); }}
-  .pl-home-btn {{ background: transparent; border: 1px solid var(--border); border-radius: 99px; color: var(--muted); font-size: 0.78rem; font-family: inherit; padding: 0.35rem 0.8rem; cursor: pointer; flex-shrink: 0; transition: border-color 0.15s, color 0.15s, background 0.15s; }}
+  .pl-home-btn {{ font-family: var(--f-mono); letter-spacing: 0.03em; background: var(--card-hover); border: 1px solid var(--border); border-radius: 99px; color: var(--muted); font-size: 0.78rem; font-family: inherit; padding: 0.35rem 0.8rem; cursor: pointer; flex-shrink: 0; transition: border-color 0.15s, color 0.15s, background 0.15s; }}
   .pl-home-btn:hover {{ border-color: var(--accent); color: var(--accent); }}
-  .pl-home-btn.on {{ background: var(--accent); border-color: var(--accent); color: #fff; }}
+  .pl-home-btn.on {{ background: var(--tint); border-color: var(--accent); color: var(--accent); }}
   .playlist-tile.is-home {{ border-color: var(--accent); padding-bottom: 1.6rem; }}
   .playlist-tile.is-home::after {{ content: "\01f3e0 Home"; position: absolute; bottom: 0.35rem; left: 0; right: 0; font-size: 0.62rem; color: var(--accent); font-weight: 600; }}
   .browse-all-btn {{ display: block; width: calc(100% - 3rem); max-width: 700px; margin: 1rem auto 2.5rem; padding: 0.9rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-size: 0.95rem; cursor: pointer; transition: border-color 0.15s, color 0.15s; }}
@@ -2698,7 +2709,7 @@ def generate_index(apps, reviews, base_url):
   .more-wrap .more-btn {{ flex: 1; }}
   .more-menu {{ position: absolute; top: 100%; right: 0.4rem; z-index: 30; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 30px rgba(0,0,0,0.35); min-width: 200px; padding: 0.3rem; }}
   .more-item {{ display: block; width: 100%; text-align: left; background: transparent; border: none; color: var(--text); font-size: 0.9rem; padding: 0.6rem 0.7rem; border-radius: 7px; cursor: pointer; }}
-  .more-item:hover {{ background: rgba(124,110,230,0.12); }}
+  .more-item:hover {{ background: rgba(var(--accent-rgb),0.12); }}
   #search-global {{ width: 100%; padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 1rem; outline: none; transition: border-color 0.2s; }}
   #search-global:focus {{ border-color: var(--accent); }}
   #search-global::placeholder {{ color: var(--muted); }}
@@ -2714,8 +2725,8 @@ def generate_index(apps, reviews, base_url):
   .mobile-btn {{ background: none; border: none; cursor: pointer; font-size: 0.85rem; color: var(--muted); padding: 0.2rem 0.3rem; flex-shrink: 0; border-radius: 4px; transition: color 0.15s, background 0.15s, filter 0.15s; opacity: 0.25; filter: grayscale(1); }}
   .app-card:hover .mobile-btn {{ opacity: 0.7; }}
   .mobile-btn.on {{ opacity: 1; filter: none; }}
-  .mfilter {{ background: var(--surface); border: 1px solid var(--border); color: var(--muted); border-radius: 999px; padding: 0.35rem 0.75rem; font-size: 0.85rem; cursor: pointer; flex-shrink: 0; transition: background 0.15s, color 0.15s, border-color 0.15s; }}
-  .mfilter.on {{ background: var(--accent); border-color: var(--accent); color: #fff; }}
+  .mfilter {{ font-family: var(--f-mono); font-size: 0.72rem; letter-spacing: 0.04em; font-weight: 600; background: var(--card-hover); border: 1px solid var(--border); color: var(--muted); border-radius: 999px; padding: 0.4rem 0.8rem; cursor: pointer; flex-shrink: 0; transition: background 0.15s, color 0.15s, border-color 0.15s; }}
+  .mfilter.on {{ background: var(--tint); border-color: var(--accent); color: var(--accent); }}
   body.mobile-only .app-item:not(.is-mobile) {{ display: none; }}
   /* A brand new app is unmarked by definition -- it was built after the last
      sweep -- so the filter would make it invisible on the phone, which is the
@@ -2728,10 +2739,10 @@ def generate_index(apps, reviews, base_url):
   }}
   .mfilter-empty {{ color: var(--muted); font-style: italic; padding: 1.2rem 0.2rem; line-height: 1.5; }}
   .search-mob {{ font-size: 0.8rem; opacity: 0.85; }}
-  .pin-btn:hover {{ color: var(--accent); background: rgba(124,110,230,0.15); }}
+  .pin-btn:hover {{ color: var(--accent); background: rgba(var(--accent-rgb),0.15); }}
   #tab-playlists {{ display: none; padding: 1.5rem; max-width: 700px; margin: 0 auto; }}
   .pl-header {{ display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }}
-  .pl-header h2 {{ font-size: 1rem; font-weight: 600; color: var(--text); }}
+  .pl-header h2 {{ font-family: var(--f-display); font-size: 1.15rem; font-weight: 700; color: var(--text); }}
   .pl-new-btn {{ background: var(--accent); border: none; border-radius: 8px; color: #fff; font-size: 0.85rem; font-weight: 600; padding: 0.45rem 1rem; cursor: pointer; transition: opacity 0.15s; }}
   .pl-new-btn:hover {{ opacity: 0.85; }}
   .playlist-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem; }}
@@ -2750,7 +2761,7 @@ def generate_index(apps, reviews, base_url):
   #pl-name-input:focus {{ border-color: var(--accent); }}
   .emoji-picker {{ display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 0.75rem; }}
   .emoji-opt {{ font-size: 1.4rem; cursor: pointer; border-radius: 6px; padding: 0.15rem 0.3rem; border: 2px solid transparent; transition: border-color 0.12s; line-height: 1.4; }}
-  .emoji-opt.selected {{ border-color: var(--accent); background: rgba(124,110,230,0.12); }}
+  .emoji-opt.selected {{ border-color: var(--accent); background: rgba(var(--accent-rgb),0.12); }}
   .pl-form-actions {{ display: flex; gap: 0.5rem; justify-content: flex-end; }}
   .pl-create-btn {{ background: var(--accent); border: none; border-radius: 7px; color: #fff; font-size: 0.88rem; font-weight: 600; padding: 0.45rem 1.1rem; cursor: pointer; transition: opacity 0.15s; }}
   .pl-create-btn:hover {{ opacity: 0.85; }}
@@ -2765,7 +2776,7 @@ def generate_index(apps, reviews, base_url):
   .pin-picker-label {{ font-size: 0.88rem; color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
   .pin-picker-empty {{ font-size: 0.82rem; color: var(--muted); padding: 0.4rem 0.5rem; font-style: italic; }}
   .pin-picker-new {{ font-size: 0.82rem; color: var(--accent); padding: 0.45rem 0.5rem; cursor: pointer; border-top: 1px solid var(--border); margin-top: 0.3rem; border-radius: 0 0 6px 6px; transition: background 0.12s; }}
-  .pin-picker-new:hover {{ background: rgba(124,110,230,0.12); }}
+  .pin-picker-new:hover {{ background: rgba(var(--accent-rgb),0.12); }}
   .pl-empty {{ color: var(--muted); font-style: italic; font-size: 0.9rem; padding: 1rem 0; }}
 {BUILDER_STYLES}
   /* Touch targets. Measured on a Pixel: stars were 11x17 with only 12px between
@@ -3661,11 +3672,11 @@ def generate_builder_page(app_requests_public, builders, share_url):
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Build Your Own App &mdash; AppVerse</title>
 <meta name="description" content="Build your own app: pick a type, theme, and idea, and a real playable app gets created for you.">
-<meta name="theme-color" content="#7c6ee6">
+<meta name="theme-color" content="#A8552E">
 <style>
 {THEME_ROOT_VARS}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }}
+  body {{ font-family: var(--f-body); background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }}
   .hidden {{ display: none !important; }}
   #tab-builder {{ display: block; padding: 0; max-width: none; margin: 0; }}
 {BUILDER_STYLES}
@@ -3739,8 +3750,8 @@ def make_manifest():
         "start_url": "/",
         "scope": "/",
         "display": "standalone",
-        "background_color": "#f5f5fa",
-        "theme_color": "#7c6ee6",
+        "background_color": "#F6F3EF",
+        "theme_color": "#A8552E",
         "icons": [
             {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
             {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
