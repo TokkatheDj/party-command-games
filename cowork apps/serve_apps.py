@@ -3888,7 +3888,16 @@ def make_manifest():
         "start_url": "/",
         "scope": "/",
         "display": "standalone",
-        "background_color": "#F6F3EF",
+        # THE SPLASH IS PAINTED BEFORE ANY CSS RUNS, so this is the one colour
+        # a variable swap can never reach -- it survived the terracotta pass as
+        # cream and would have flashed cream on the Pixel before the page came
+        # up blue. Amigo's own manifest sets its background to the icon's
+        # ground for exactly this reason ("so the splash doesn't flash").
+        #
+        # Dark, because the saved theme is server-side and global and his is
+        # dark: this is the ground the installed app actually opens on. If the
+        # hub is ever switched to light for good, flip this to #F2F5FA.
+        "background_color": "#060912",
         "theme_color": "#3A84FF",
         "icons": [
             {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
