@@ -361,38 +361,57 @@ def list_builders(data):
 # there's one definition of "what dark mode looks like" instead of two that
 # can drift.
 THEME_ROOT_VARS = """
+  /* THE COQUI'S COLOURS, NOT THE DESKTOP'S. Amigo wears two palettes and this
+     file backed the wrong one first. The desktop chat page (the index.html beside amigo-web.py)
+     is warm paper and terracotta, from the days when a desktop was the only
+     Amigo screen. But the Amigo Lance actually carries -- the watch face and
+     the /w page in amigo-web.py -- is the pixel coqui himself: silver body,
+     navy, and the blue of his belly, on white. He looked at it on 6 Sep 2026
+     and said "keep the colour scheme (blue)", and on 9 Sep, of this hub:
+     "I want AppVerse the same color theme as Amigo on the pixel, blue/white."
+
+     So these are lifted from WATCH_CSS, not invented: #3A84FF is his belly and
+     the time on his face, #CED4DE is his body, #8C96AA the quiet line under
+     it, #121E46 and #24346B the navy. One accent in BOTH modes, because he
+     has one belly -- it reads 3.2:1 on the light ground and 5.6:1 on the dark,
+     which is why it paints fills, borders and labels but never body copy. */
   :root {
-    --bg: #F6F3EF;          /* Amigo --ground  */
+    --bg: #F2F5FA;          /* Amigo /w, light ground */
     --surface: #FFFFFF;
-    --border: #DDD5CB;      /* Amigo --line    */
-    --accent: #A8552E;      /* Amigo terracotta */
-    --accent2: #9C3B2E;     /* the warm red that replaces the purple pair */
-    --text: #221F1B;        /* Amigo --ink     */
-    --muted: #6B645C;
-    --card-hover: #EDE8E1;  /* Amigo --sunk    */
-    --tint: #F3E3D9;        /* Amigo --mine -- the "this one is yours" wash */
-    --ok: #3D6B4C;
-    --warn: #8A6212;
-    --accent-rgb: 168, 85, 46;
-    --accent2-rgb: 156, 59, 46;
+    --border: #C6D0E4;      /* Amigo /w, light input border */
+    --accent: #3A84FF;      /* his belly */
+    --accent2: #D2364C;     /* NOT part of the coqui, and deliberately so: this
+                               is the alarm hue -- hearts, errors, delete, the
+                               NEW badge. In blue it would stop being a signal. */
+    --text: #121E46;        /* Amigo /w, light ink */
+    --muted: #5A6B8C;       /* Amigo /w, light h1 */
+    --card-hover: #E6EDF7;
+    --tint: #DEE9FB;        /* the "this one is yours" wash */
+    --ok: #1F7A5A;
+    --warn: #A8690F;
+    --accent-rgb: 58, 132, 255;
+    --accent2-rgb: 210, 54, 76;
     --f-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
     --f-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --f-mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", monospace;
   }
   :root[data-theme="dark"] {
-    --bg: #16140F;
-    --surface: #1F1C16;
-    --border: #38322A;
-    --accent: #E0916A;
-    --accent2: #D9705C;
-    --text: #EDE8DF;
-    --muted: #9A9287;
-    --card-hover: #262219;
-    --tint: #33241B;
-    --ok: #7BB08A;
-    --warn: #D6A94A;
-    --accent-rgb: 224, 145, 106;
-    --accent2-rgb: 217, 112, 92;
+    --bg: #060912;          /* Amigo /w, dark ground */
+    --surface: #111318;     /* the games page's ground, the same near-black */
+    --border: #24346B;      /* Amigo /w, dark input border */
+    --accent: #3A84FF;      /* the same belly. One colour, both modes. */
+    --accent2: #FF6B81;
+    --text: #CED4DE;        /* his body */
+    --muted: #8C96AA;       /* the quiet line under the time */
+    /* Hover must be visibly off surface, not merely different from it:
+       #12141c is a real Amigo colour and was the obvious pick, but beside
+       #111318 it is the same square. */
+    --card-hover: #1A2033;
+    --tint: #121E46;        /* Amigo /w, the dark navy fill */
+    --ok: #5FBF9B;
+    --warn: #E0B050;
+    --accent-rgb: 58, 132, 255;
+    --accent2-rgb: 255, 107, 129;
   }
 """
 
@@ -2543,7 +2562,7 @@ def generate_index(apps, reviews, base_url):
 <title>AppVerse</title>
 <meta name="description" content="A local launcher for {app_count} HTML apps — games, tools, education, music, and more.">
 <link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#A8552E">
+<meta name="theme-color" content="#3A84FF">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -3791,7 +3810,7 @@ def generate_builder_page(app_requests_public, builders, share_url):
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Build Your Own App &mdash; AppVerse</title>
 <meta name="description" content="Build your own app: pick a type, theme, and idea, and a real playable app gets created for you.">
-<meta name="theme-color" content="#A8552E">
+<meta name="theme-color" content="#3A84FF">
 <style>
 {THEME_ROOT_VARS}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -3870,7 +3889,7 @@ def make_manifest():
         "scope": "/",
         "display": "standalone",
         "background_color": "#F6F3EF",
-        "theme_color": "#A8552E",
+        "theme_color": "#3A84FF",
         "icons": [
             {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
             {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
