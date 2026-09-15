@@ -2754,11 +2754,12 @@ var GLIN = (function(){
     {a:1,b:-1,c:3},{a:2,b:1,c:6},{a:-3,b:1,c:-2},{a:0,b:1,c:-4}
   ];
   function makePlane(a,b,c){
-    var W=186,H=186,cx=93,cy=93,r=74,sc=r/8;
+    // One square per unit, -8..8, sized to fill the 210px graph column so students can plot by hand.
+    var W=210,H=210,cx=105,cy=105,r=92,sc=r/8;
     function tx(x){return cx+x*sc;} function ty(y){return cy-y*sc;}
-    var s='<svg width="'+W+'" height="'+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
-    // grid
-    s+='<g stroke="#eee" stroke-width="0.5">';
+    var s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+    // grid: dark enough to survive printing
+    s+='<g stroke="#cfd8df" stroke-width="0.7">';
     for(var i=-8;i<=8;i++){s+='<line x1="'+tx(i)+'" y1="'+ty(-8)+'" x2="'+tx(i)+'" y2="'+ty(8)+'"/><line x1="'+tx(-8)+'" y1="'+ty(i)+'" x2="'+tx(8)+'" y2="'+ty(i)+'"/'+'>';}
     s+='</g>';
     // axes
@@ -2768,12 +2769,14 @@ var GLIN = (function(){
     s+='<polygon points="'+tx(8)+','+cy+' '+(tx(8)-6)+','+(cy-3)+' '+(tx(8)-6)+','+(cy+3)+'" fill="#444"/>';
     s+='<polygon points="'+cx+','+ty(8)+' '+(cx-3)+','+(ty(8)+6)+' '+(cx+3)+','+(ty(8)+6)+'" fill="#444"/>';
     // axis labels
-    s+='<g font-size="7" font-family="sans-serif" fill="#bbb" text-anchor="middle">';
-    [-8,-4,4,8].forEach(function(t){s+='<text x="'+tx(t)+'" y="'+(cy+10)+'">'+t+'</text><text x="'+(cx-7)+'" y="'+(ty(t)+3)+'" text-anchor="end">'+t+'</text>';});
+    s+='<g font-size="7" font-family="sans-serif" fill="#777" text-anchor="middle">';
+    [-8,-6,-4,-2,2,4,6].forEach(function(t){s+='<text x="'+tx(t)+'" y="'+(cy+10)+'">'+t+'</text><text x="'+(cx-7)+'" y="'+(ty(t)+3)+'" text-anchor="end">'+t+'</text>';});
     s+='</g>';
     s+='<text x="'+(tx(8)+4)+'" y="'+(cy+4)+'" font-size="9" fill="#555" font-family="sans-serif">x</text>';
     s+='<text x="'+(cx+4)+'" y="'+(ty(8)-2)+'" font-size="9" fill="#555" font-family="sans-serif">y</text>';
-    // line + intercepts
+    // Answer layer: the line and its intercepts. Hidden on the student copy until the last step is
+    // answered, always shown on the answer key, never on a student printout (see .gph-layer CSS).
+    s+='<g class="gph-layer gph-glinans">';
     if(b!==0){
       var m=-a/b, k=c/b;
       // clip to viewport
@@ -2796,7 +2799,7 @@ var GLIN = (function(){
       if(k>=-8&&k<=8){
         s+='<circle cx="'+cx+'" cy="'+ty(k)+'" r="4.5" fill="#fff" stroke="#1d6a96" stroke-width="2"/>';
         var kDisp=Number.isInteger(k)?k:k.toFixed(2);
-        s+='<text x="'+(cx+8)+'" y="'+(ty(k)-4)+'" font-size="9" font-family="sans-serif" fill="#1d6a96" font-weight="700">(0,'+kDisp+')</text>';
+        s+='<text x="'+(cx+8)+'" y="'+(ty(k)-4)+'" font-size="9" font-family="sans-serif" fill="#1d6a96" font-weight="700" stroke="#fff" stroke-width="3" paint-order="stroke">(0,'+kDisp+')</text>';
       }
       // x-intercept dot + label (only if m!=0)
       if(m!==0){
@@ -2804,14 +2807,15 @@ var GLIN = (function(){
         if(xi>=-8&&xi<=8&&xi!==0){
           s+='<circle cx="'+tx(xi)+'" cy="'+cy+'" r="4.5" fill="#fff" stroke="#c0392b" stroke-width="2"/>';
           var xiDisp=Number.isInteger(xi)?xi:xi.toFixed(2);
-          s+='<text x="'+tx(xi)+'" y="'+(cy+16)+'" font-size="9" font-family="sans-serif" fill="#c0392b" font-weight="700" text-anchor="middle">('+xiDisp+',0)</text>';
+          // above the axis, clear of the tick numbers underneath it; white halo keeps it legible over grid lines
+          s+='<text x="'+tx(xi)+'" y="'+(cy-8)+'" font-size="9" font-family="sans-serif" fill="#c0392b" font-weight="700" text-anchor="middle" stroke="#fff" stroke-width="3" paint-order="stroke">('+xiDisp+',0)</text>';
         }
       }
     } else if(a!==0){
       var xv=c/a;
       s+='<line x1="'+tx(xv)+'" y1="'+ty(-8)+'" x2="'+tx(xv)+'" y2="'+ty(8)+'" stroke="#1d6a96" stroke-width="2.2"/>';
     }
-    s+='</svg>';return s;
+    s+='</g></svg>';return s;
   }
   function makeGLINSteps(p){
     var a=p.a,b=p.b,c=p.c;
@@ -2844,6 +2848,7 @@ var GLIN = (function(){
       var c4=iMakeChoices('(0, '+fmtN(pt1y)+') and ('+pt2x+', '+fmtN(pt2y)+')',['(0, '+fmtN(mNum)+') and ('+pt2x+', '+fmtN(bNum)+')','('+fmtN(bNum)+', 0) and (0, '+fmtN(mNum)+')','(1, '+fmtN(mNum+bNum)+') and ('+fmtN(bNum)+', 1)']);
       steps.push({prompt:'<b>Step 4.</b> Plot the y-intercept and use slope to find a second point. Which two points are on the line?',type:'choice',choices:c4.choices,correct:c4.correct});
     }
+    if(steps.length) steps[steps.length-1].reveal='glinans';   // finishing the steps draws the line
     return steps;
   }
   function probHTML(p,idx){
@@ -2856,7 +2861,9 @@ var GLIN = (function(){
     var ansStr=isVert?('<i>x</i> = '+(c/a)):isHoriz?('<i>y</i> = '+(c/b)):('<i>y</i> = '+mStr+'<i>x</i> + '+bStr);
     var h='<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
     h+='<div class="prob-prompt">Graph the equation: <span class="math">'+eqDisp+'</span></div>';
+    h+='<div class="prob-body"><div class="graph-area">'+makePlane(a,b,c)+'</div>';
     h+=renderInteractiveSteps(makeGLINSteps(p),'glin',idx);
+    h+='</div>';
     h+='<div class="solution-box"><span class="sol-label">Equation:</span><span class="math">'+ansStr+'</span></div>';
     h+='</div>';return h;
   }
