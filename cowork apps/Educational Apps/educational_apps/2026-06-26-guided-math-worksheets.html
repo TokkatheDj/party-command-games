@@ -4597,85 +4597,191 @@ var ANGLES = (function(){
 // MODULE 22: COMPOSITE FIGURES
 // ═══════════════════════════════════════════════
 var COMP = (function(){
+  // Each problem stores ONE geometric model. The area, the perimeter, the diagram and
+  // the answer key are all computed from it, so none of them can drift from the others.
+  // (Before 2026-09-15 the answer was always the SUM of the shape areas: a perimeter
+  // problem showed its area as the answer, and a cut-out piece was added, not subtracted.)
+  //   parts   - decomposition used for AREA. sign:+1 adds, sign:-1 is a cut-out piece.
+  //   outline - counter-clockwise outer boundary used for PERIMETER and the drawing.
+  //             A vertex carrying arc:r means the edge ARRIVING at it is a semicircle
+  //             of radius r that bulges outward.
+  //   seams   - dashed interior lines showing how the figure splits. Never in the perimeter.
+  //   holes   - cut-out pieces, drawn dashed and shaded outside the solid shape.
+  //   marks   - measurements that are not edges, e.g. a triangle's height.
   var problems=[
-    {shapes:[{type:'rectangle',w:10,h:6},{type:'triangle',b:10,h:4}],task:'area',label:'Rectangle + Triangle on top'},
-    {shapes:[{type:'rectangle',w:8,h:5},{type:'semicircle',r:4}],task:'area',label:'Rectangle + Semicircle on top'},
-    {shapes:[{type:'rectangle',w:12,h:4},{type:'rectangle',w:6,h:3}],task:'perimeter',label:'L-shaped figure'},
-    {shapes:[{type:'rectangle',w:9,h:7},{type:'rectangle',w:3,h:3}],task:'area',label:'Rectangle with square removed'}
+    {label:'Rectangle + Triangle on top', task:'area',
+     parts:[{type:'rectangle',w:10,h:6,sign:1},{type:'triangle',b:10,h:4,sign:1}],
+     outline:[{x:0,y:0},{x:10,y:0},{x:10,y:6},{x:5,y:10},{x:0,y:6}],
+     seams:[[0,6,10,6]], holes:[], marks:[{x1:5,y1:6,x2:5,y2:10,text:'h = 4'}]},
+    {label:'Rectangle + Semicircle on top', task:'area',
+     parts:[{type:'rectangle',w:8,h:5,sign:1},{type:'semicircle',r:4,sign:1}],
+     outline:[{x:0,y:0},{x:8,y:0},{x:8,y:5},{x:0,y:5,arc:4}],
+     seams:[[0,5,8,5]], holes:[], marks:[{x1:4,y1:5,x2:4,y2:9,text:'r = 4'}]},
+    {label:'L-shaped figure', task:'perimeter',
+     parts:[{type:'rectangle',w:12,h:4,sign:1},{type:'rectangle',w:6,h:3,sign:1}],
+     outline:[{x:0,y:0},{x:12,y:0},{x:12,y:4},{x:6,y:4},{x:6,y:7},{x:0,y:7}],
+     seams:[[0,4,6,4]], holes:[], marks:[]},
+    {label:'Rectangle with a square cut out of the corner', task:'area',
+     parts:[{type:'rectangle',w:9,h:7,sign:1},{type:'rectangle',w:3,h:3,sign:-1}],
+     outline:[{x:0,y:0},{x:9,y:0},{x:9,y:4},{x:6,y:4},{x:6,y:7},{x:0,y:7}],
+     seams:[], holes:[[{x:6,y:4},{x:9,y:4},{x:9,y:7},{x:6,y:7}]], marks:[]}
   ];
 
-  function shapeArea(s){
-    if(s.type==='rectangle') return s.w*s.h;
-    if(s.type==='triangle')  return 0.5*s.b*s.h;
+  // Round to 2 decimals and drop trailing zeros: 80.00 -> 80, 30.50 -> 30.5
+  function fmt(v){ return (Math.round(v*100)/100).toFixed(2).replace(/\.?0+$/,''); }
+
+  function partArea(s){
+    if(s.type==='rectangle')  return s.w*s.h;
+    if(s.type==='triangle')   return 0.5*s.b*s.h;
     if(s.type==='semicircle') return 0.5*Math.PI*s.r*s.r;
-    if(s.type==='circle')    return Math.PI*s.r*s.r;
     return 0;
   }
-  function areaLabel(s){
-    if(s.type==='rectangle') return 'A = l × w = '+s.w+' × '+s.h+' = '+(s.w*s.h);
-    if(s.type==='triangle')  return 'A = ½ × b × h = ½ × '+s.b+' × '+s.h+' = '+(0.5*s.b*s.h);
-    if(s.type==='semicircle') return 'A = ½πr² = ½π('+s.r+')² ≈ '+(0.5*Math.PI*s.r*s.r).toFixed(2);
-    return '';
-  }
-  function shapeLabel(s){
-    if(s.type==='rectangle') return 'Rectangle ('+s.w+' × '+s.h+')';
-    if(s.type==='triangle')  return 'Triangle (b='+s.b+', h='+s.h+')';
-    if(s.type==='semicircle') return 'Semicircle (r='+s.r+')';
+  function partLabel(s){
+    if(s.type==='rectangle')  return (s.w===s.h?'Square':'Rectangle')+' ('+s.w+' × '+s.h+')';
+    if(s.type==='triangle')   return 'Triangle (base '+s.b+', height '+s.h+')';
+    if(s.type==='semicircle') return 'Semicircle (radius '+s.r+')';
     return s.type;
+  }
+  function edges(p){
+    var o=p.outline, out=[];
+    for(var i=0;i<o.length;i++){
+      var a=o[i], b=o[(i+1)%o.length];
+      if(b.arc){ out.push({a:a,b:b,arc:b.arc,len:Math.PI*b.arc}); }
+      else { var dx=b.x-a.x, dy=b.y-a.y; out.push({a:a,b:b,len:Math.sqrt(dx*dx+dy*dy),slant:(dx!==0&&dy!==0)}); }
+    }
+    return out;
+  }
+  function areaOf(p){ return p.parts.reduce(function(t,s){return t+(s.sign<0?-1:1)*partArea(s);},0); }
+  function perimeterOf(p){ return edges(p).reduce(function(t,e){return t+e.len;},0); }
+  // Area enclosed by the outline itself (shoelace + outward semicircles). Must equal
+  // areaOf(p); exposed so a test can prove parts and outline describe the same figure.
+  function outlineArea(p){
+    var o=p.outline, s=0;
+    for(var i=0;i<o.length;i++){ var a=o[i], b=o[(i+1)%o.length]; s+=a.x*b.y-b.x*a.y; }
+    s=s/2;
+    edges(p).forEach(function(e){ if(e.arc) s+=0.5*Math.PI*e.arc*e.arc; });
+    return s;
+  }
+  function answer(p){
+    return p.task==='perimeter'
+      ? {name:'Perimeter', value:perimeterOf(p), unit:'units'}
+      : {name:'Area', value:areaOf(p), unit:'units²'};
+  }
+
+  function diagram(p){
+    var W=190, H=170, pad=28, E=edges(p), pts=p.outline, xs=[], ys=[];
+    pts.forEach(function(v){xs.push(v.x);ys.push(v.y);});
+    E.forEach(function(e){
+      if(!e.arc) return;
+      var dx=e.b.x-e.a.x, dy=e.b.y-e.a.y, L=Math.sqrt(dx*dx+dy*dy);
+      xs.push((e.a.x+e.b.x)/2+dy/L*e.arc); ys.push((e.a.y+e.b.y)/2-dx/L*e.arc);
+    });
+    var minx=Math.min.apply(null,xs), maxx=Math.max.apply(null,xs);
+    var miny=Math.min.apply(null,ys), maxy=Math.max.apply(null,ys);
+    var sc=Math.min((W-2*pad)/(maxx-minx),(H-2*pad)/(maxy-miny));
+    var ox=(W-(maxx-minx)*sc)/2, oy=(H-(maxy-miny)*sc)/2;
+    function X(x){return +(ox+(x-minx)*sc).toFixed(1);}
+    function Y(y){return +(H-oy-(y-miny)*sc).toFixed(1);}
+    function poly(list){return list.map(function(v){return X(v.x)+','+Y(v.y);}).join(' ');}
+
+    var svg='<svg class="comp-fig" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">';
+    // cut-out pieces: dashed ghost outside the solid shape
+    (p.holes||[]).forEach(function(hole){
+      svg+='<polygon points="'+poly(hole)+'" fill="#fdecea" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="4,3"/>';
+      // label sits just above the notch, clear of the edge lengths drawn inside it
+      var cx=hole.reduce(function(t,v){return t+v.x;},0)/hole.length, top=Math.max.apply(null,hole.map(function(v){return v.y;}));
+      svg+='<text x="'+X(cx)+'" y="'+(Y(top)-5)+'" font-size="9" font-family="sans-serif" fill="#c0392b" text-anchor="middle">cut out</text>';
+    });
+    // the solid figure
+    var d='M '+X(pts[0].x)+' '+Y(pts[0].y);
+    for(var i=1;i<=pts.length;i++){
+      var v=pts[i%pts.length];
+      if(v.arc) d+=' A '+(v.arc*sc).toFixed(1)+' '+(v.arc*sc).toFixed(1)+' 0 0 0 '+X(v.x)+' '+Y(v.y);
+      else d+=' L '+X(v.x)+' '+Y(v.y);
+    }
+    svg+='<path d="'+d+' Z" fill="#eaf3f8" stroke="#1d6a96" stroke-width="2" stroke-linejoin="round"/>';
+    // interior seams
+    (p.seams||[]).forEach(function(sm){
+      svg+='<line x1="'+X(sm[0])+'" y1="'+Y(sm[1])+'" x2="'+X(sm[2])+'" y2="'+Y(sm[3])+'" stroke="#1d6a96" stroke-width="1" stroke-dasharray="4,3" opacity="0.7"/>';
+    });
+    // interior measurements (height, radius)
+    (p.marks||[]).forEach(function(m){
+      svg+='<line x1="'+X(m.x1)+'" y1="'+Y(m.y1)+'" x2="'+X(m.x2)+'" y2="'+Y(m.y2)+'" stroke="#555" stroke-width="1" stroke-dasharray="2,2"/>';
+      svg+='<text x="'+(X((m.x1+m.x2)/2)+5)+'" y="'+(Y((m.y1+m.y2)/2)+3)+'" font-size="10" font-family="Georgia,serif" font-style="italic" fill="#333">'+m.text+'</text>';
+    });
+    // outside edge lengths, placed just outside each edge
+    E.forEach(function(e){
+      if(e.arc) return;
+      var dx=e.b.x-e.a.x, dy=e.b.y-e.a.y, L=Math.sqrt(dx*dx+dy*dy), nx=dy/L, ny=-dx/L;
+      var tx=X((e.a.x+e.b.x)/2)+nx*12, ty=Y((e.a.y+e.b.y)/2)-ny*12+3.5;
+      var txt=(Math.abs(e.len-Math.round(e.len))<1e-9)?String(Math.round(e.len)):'≈'+fmt(e.len);
+      svg+='<text x="'+tx.toFixed(1)+'" y="'+ty.toFixed(1)+'" font-size="10" font-family="sans-serif" fill="#1d6a96" text-anchor="middle">'+txt+'</text>';
+    });
+    return svg+'</svg>';
   }
 
   function makeCOMPSteps(p){
-    var total=p.shapes.reduce(function(sum,s){return sum+shapeArea(s);},0);
-    var ans=total.toFixed(2).replace(/\.00$/,'');
-    var off=total>20?5:2;
-    var mc=iMakeChoices(ans+' units²',[(total+off).toFixed(2).replace(/\.00$/,'')+' units²',(total-off).toFixed(2).replace(/\.00$/,'')+' units²',(total+off*2).toFixed(2).replace(/\.00$/,'')+' units²'].filter(function(d){return d!==ans+' units²';}));
-    return [{prompt:'Find the total area of the composite figure. Answer = ?',type:'choice',choices:mc.choices,correct:mc.correct}];
+    var ans=answer(p), v=ans.value, off=v>20?5:2, u=' '+ans.unit, right=fmt(v)+u;
+    var wrong=[fmt(v+off)+u, fmt(v-off)+u, fmt(v+off*2)+u];
+    if(p.task==='perimeter'){
+      // the classic mistake: counting the dashed inside lines as part of the perimeter
+      var seamLen=(p.seams||[]).reduce(function(t,sm){return t+Math.sqrt(Math.pow(sm[2]-sm[0],2)+Math.pow(sm[3]-sm[1],2));},0);
+      if(seamLen>0) wrong[2]=fmt(v+seamLen)+u;
+    } else if(p.parts.some(function(s){return s.sign<0;})){
+      // the classic mistake: adding the cut-out piece instead of subtracting it
+      var added=p.parts.reduce(function(t,s){return t+partArea(s);},0);
+      wrong[2]=fmt(added)+u;
+    }
+    var mc=iMakeChoices(right, wrong.filter(function(d,i,a){return d!==right && a.indexOf(d)===i;}));
+    return [{prompt:(p.task==='perimeter'?'Find the perimeter of the composite figure.':'Find the total area of the composite figure.')+' Answer = ?',type:'choice',choices:mc.choices,correct:mc.correct}];
   }
+
   function probHTML(p,idx){
-    var task=p.task, label=p.label;
-    var totalArea=p.shapes.reduce(function(sum,s){return sum+shapeArea(s);},0);
-    var lastIsRemoved=label.indexOf('removed')>=0;
+    var ans=answer(p), E=edges(p), cut=p.parts.some(function(s){return s.sign<0;});
+    var blank='<span class="blank sm"></span>';
     var h='<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
-    h+='<div class="prob-prompt">Find the <b>'+task+'</b> of the composite figure: <i>'+label+'</i>.</div>';
+    h+='<div class="prob-prompt">Find the <b>'+p.task+'</b> of the composite figure: <i>'+p.label+'</i>.</div>';
     h+='<div style="background:#f8f8f6;border:1px solid #e0e0e0;border-radius:4px;padding:8px 14px;margin-bottom:12px;font-size:11px;color:#555;font-style:italic;">'+
-       'Composite figures = two or more basic shapes combined or one shape removed from another. '+(task==='area'?'Add (or subtract) the individual areas.':'Add up the outer edge lengths only.')+'</div>';
+       'Composite figures are two or more basic shapes put together, or one shape with a piece cut out. '+
+       (p.task==='perimeter'?'Add the lengths of the outside edges only &mdash; the dashed lines are inside the figure and do not count.':'Add the areas of the pieces, and subtract any piece that was cut out.')+'</div>';
+    h+='<div class="prob-body"><div class="graph-area">'+diagram(p)+'</div>';
     h+='<div class="steps">';
 
-    h+='<div class="step"><div class="step-q"><b>Step 1.</b> Identify the individual shapes that make up the figure.</div>';
-    h+='<div style="margin-top:5px;font-size:12px;">';
-    p.shapes.forEach(function(s,si){
-      h+='Shape '+(si+1)+': <span style="font-weight:600;">'+shapeLabel(s)+'</span><br>';
-    });
-    h+='</div></div>';
-
-    if(task==='area'){
-      p.shapes.forEach(function(s,si){
-        h+='<div class="step"><div class="step-q"><b>Step '+(si+2)+'.</b> Find the area of '+shapeLabel(s)+'.</div>';
+    if(p.task==='perimeter'){
+      h+='<div class="step"><div class="step-q"><b>Step 1.</b> Trace the outside edge of the figure. Do <b>not</b> count the dashed lines inside it.</div></div>';
+      h+='<div class="step"><div class="step-q"><b>Step 2.</b> Write the length of every outside side.</div>';
+      h+='<div style="margin-top:5px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px;max-width:420px;font-size:12px;">';
+      E.forEach(function(e,ei){
+        var hint=e.arc?' (curved: ½ × π × diameter)':(e.slant?' (slanted: a² + b² = c²)':'');
+        h+='<div>Side '+(ei+1)+hint+': '+blank+'</div>';
+      });
+      h+='</div></div>';
+      h+='<div class="step"><div class="step-q"><b>Step 3.</b> Add all '+E.length+' outside side lengths.</div>';
+      h+='<div style="font-family:var(--math);font-size:13px;margin-top:5px;">P = '+E.map(function(){return blank;}).join(' + ')+' = <span class="blank lg"></span></div></div>';
+    } else {
+      h+='<div class="step"><div class="step-q"><b>Step 1.</b> Identify the pieces that make up the figure.</div>';
+      h+='<div style="margin-top:5px;font-size:12px;">';
+      p.parts.forEach(function(s,si){
+        h+=(s.sign<0?'Cut-out piece':'Shape '+(si+1))+': <span style="font-weight:600;">'+partLabel(s)+'</span><br>';
+      });
+      h+='</div></div>';
+      p.parts.forEach(function(s,si){
+        h+='<div class="step"><div class="step-q"><b>Step '+(si+2)+'.</b> Find the area of the '+(s.sign<0?'cut-out ':'')+partLabel(s)+'.</div>';
         h+='<div style="font-family:var(--math);font-size:13px;margin-top:5px;">';
-        if(s.type==='rectangle') h+='A = l × w = <span class="blank sm"></span> × <span class="blank sm"></span> = <span class="blank sm"></span>';
-        else if(s.type==='triangle') h+='A = ½ × b × h = ½ × <span class="blank sm"></span> × <span class="blank sm"></span> = <span class="blank sm"></span>';
-        else if(s.type==='semicircle') h+='A = ½πr² = ½ × π × (<span class="blank sm"></span>)² = <span class="blank sm"></span>';
+        if(s.type==='rectangle') h+='A = l × w = '+blank+' × '+blank+' = '+blank;
+        else if(s.type==='triangle') h+='A = ½ × b × h = ½ × '+blank+' × '+blank+' = '+blank;
+        else if(s.type==='semicircle') h+='A = ½πr² = ½ × π × ('+blank+')² = '+blank;
         h+='</div></div>';
       });
-      var finalStep=p.shapes.length+2;
-      h+='<div class="step"><div class="step-q"><b>Step '+finalStep+'.</b> '+(lastIsRemoved?'Subtract the removed area from the total:':'Add all areas together:')+'</div>';
-      h+='<div style="font-family:var(--math);font-size:13px;margin-top:5px;">';
-      h+='Total Area = ';
-      p.shapes.forEach(function(_,si){if(si>0)h+=lastIsRemoved?' &minus; ':' + ';h+='<span class="blank sm"></span>';});
-      h+=' = <span class="blank sm"></span>';
-      h+='</div></div>';
-    } else {
-      h+='<div class="step"><div class="step-q"><b>Step 2.</b> Identify all outer sides of the figure. Sketch and label each side length.</div>';
-      h+='<div style="margin-top:5px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:320px;">';
-      for(var s=0;s<6;s++) h+='<div style="font-size:12px;">Side '+(s+1)+': <span class="blank sm"></span></div>';
-      h+='</div></div></div>';
-      h+='<div class="step"><div class="step-q"><b>Step 3.</b> Add all outer side lengths.</div>';
-      h+='<div style="font-family:var(--math);font-size:13px;margin-top:5px;">P = <span class="blank sm"></span> + <span class="blank sm"></span> + <span class="blank sm"></span> + <span class="blank sm"></span> + <span class="blank sm"></span> + <span class="blank sm"></span> = <span class="blank lg"></span></div></div>';
+      h+='<div class="step"><div class="step-q"><b>Step '+(p.parts.length+2)+'.</b> '+(cut?'Subtract the cut-out piece from the whole shape:':'Add all the areas together:')+'</div>';
+      h+='<div style="font-family:var(--math);font-size:13px;margin-top:5px;">Total Area = ';
+      p.parts.forEach(function(s,si){ if(si>0) h+=(s.sign<0?' &minus; ':' + '); h+=blank; });
+      h+=' = <span class="blank lg"></span></div></div>';
     }
 
-    h+='</div>';
+    h+='</div></div>';
     h+=renderInteractiveSteps(makeCOMPSteps(p),'composite',idx);
-    h+='<div class="solution-box"><span class="sol-label">'+task.charAt(0).toUpperCase()+task.slice(1)+':</span><span class="math">'+totalArea.toFixed(2).replace(/\.00$/,'')+' units²</span></div>';
+    h+='<div class="solution-box"><span class="sol-label">'+ans.name+':</span><span class="math">'+fmt(ans.value)+' '+ans.unit+'</span></div>';
     h+='</div>'; return h;
   }
 
@@ -4687,6 +4793,7 @@ var COMP = (function(){
       h+='<span class="prow-num">'+(i+1)+'.</span>';
       h+='<input type="text" value="'+p.label+'" style="flex:1;padding:3px 6px;border:1px solid #ddd;border-radius:3px;font-size:12px;" oninput="COMP.setLabel('+i+',this.value)">';
       h+='<div class="pf"><label>Task</label><select onchange="COMP.setTask('+i+',this.value)"><option value="area"'+(p.task==='area'?' selected':'')+'>Area</option><option value="perimeter"'+(p.task==='perimeter'?' selected':'')+'>Perimeter</option></select></div>';
+      h+='<span style="font-size:10px;color:#aaa;align-self:center;margin-left:6px;">A='+fmt(areaOf(p))+' P='+fmt(perimeterOf(p))+'</span>';
       h+='<button class="pdel" onclick="COMP.del('+i+')">&#x2715;</button></div>';
       h+='</div>';
     });
@@ -4696,10 +4803,15 @@ var COMP = (function(){
   function render(){renderEditor();renderWS();}
   return{render:render,
     setLabel:function(i,v){problems[i].label=v;renderWS();},
-    setTask:function(i,v){problems[i].task=v;renderWS();},
-    addProblem:function(){problems.push({shapes:[{type:'rectangle',w:6,h:4},{type:'triangle',b:6,h:3}],task:'area',label:'Rectangle + Triangle'});render();},
+    setTask:function(i,v){problems[i].task=v;render();},
+    addProblem:function(){problems.push({label:'Rectangle + Triangle on top', task:'area',
+      parts:[{type:'rectangle',w:6,h:4,sign:1},{type:'triangle',b:6,h:3,sign:1}],
+      outline:[{x:0,y:0},{x:6,y:0},{x:6,y:4},{x:3,y:7},{x:0,y:4}],
+      seams:[[0,4,6,4]], holes:[], marks:[{x1:3,y1:4,x2:3,y2:7,text:'h = 3'}]});render();},
     del:function(i){problems.splice(i,1);render();},
-    clearAll:function(){problems=[];render();}};
+    clearAll:function(){problems=[];render();},
+    // read-only hooks for automated checks
+    _model:{list:function(){return problems;},areaOf:areaOf,perimeterOf:perimeterOf,outlineArea:outlineArea,edges:edges}};
 })();
 
 // ═══════════════════════════════════════════════
@@ -8566,7 +8678,9 @@ function normalizeAnswer(s){
     .replace(/[,$]/g,'')
     .replace(/[≈≠]/g,'')
     .replace(/[→⟶➞➝]/g,'') // arrows (multi-step "X → Y" becomes "XY")
-    .replace(/units?[2-3]?/g,'')
+    .replace(/units?[2-3²³]?/g,'')
+    // a squared/cubed unit (cm², ft³) is a unit, not an exponent: drop the mark with the word
+    .replace(/(?:square|cubic)?(?:units?|cm|mm|m|in|ft|yd|mi)[²³]/g,'')
     .replace(/(?:square|cubic)?(?:units?|cm|mm|m|in|ft|yd|mi|kg|g|lb|oz|s|min|hr|hrs|hours)/g,'')
     .replace(/[π]/g,'pi');
 }
@@ -8633,6 +8747,8 @@ function toValue(raw){
   var t=t0.replace(/&sup4;/g,'^4').replace(/&sup5;/g,'^5').replace(/&sup6;/g,'^6')
     .replace(/[$%]/g,'').replace(/[−–—]/g,'-').replace(/[×]/g,'*').replace(/[÷]/g,'/')
     .replace(/π/g,'pi').replace(/√/g,'sqrt')
+    // "54 units²" is 54, not 54^2: strip the mark off a unit word before superscripts become powers
+    .replace(/\b(units?|cm|mm|m|in|inches|ft|feet|yd|mi)\s*[²³]/g,'$1')
     .replace(/[²]/g,'^2').replace(/[³]/g,'^3').replace(/[⁴]/g,'^4').replace(/[⁵]/g,'^5').replace(/[⁶]/g,'^6')
     .replace(/[°]/g,'').replace(/\(\s*exact\s*\)/g,'')
     .replace(/\b(square|cubic)?\s*(units?|cm|mm|m|in|inches|ft|feet|yd|mi|kg|g|lb|oz|apples|crayons|books|marbles|rolls)\b/g,'')
