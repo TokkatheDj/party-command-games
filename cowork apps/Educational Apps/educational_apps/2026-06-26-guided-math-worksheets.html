@@ -2690,6 +2690,13 @@ var SLP = (function(){
     {x1:2,y1:1,x2:6,y2:9},{x1:-3,y1:5,x2:1,y2:-3},
     {x1:0,y1:4,x2:5,y2:4},{x1:-2,y1:-1,x2:3,y2:-6}
   ];
+  // Rise over run in lowest terms: "2" not "2/1", "-5/2" not "5/-2" (sign always on top).
+  function slopeFrac(n,d){
+    if(d===0) return 'undefined';
+    var g=gcd(Math.abs(n),Math.abs(d))||1; n/=g; d/=g;
+    if(d<0){n=-n;d=-d;}
+    return d===1?''+n:n+'/'+d;
+  }
   function makeSLPSteps(p){
     var dx=p.x2-p.x1, dy=p.y2-p.y1;
     var gg=gcd(Math.abs(dy),Math.abs(dx)||1);
@@ -2707,9 +2714,13 @@ var SLP = (function(){
       steps.push({prompt:'<b>Step 2.</b> Calculate the rise: Δy = y₂ − y₁ = '+p.y2+' − ('+p.y1+')',type:'choice',choices:c2c.choices,correct:c2c.correct});
       var c3=iMakeChoices('Δx = '+dx,['Δx = '+(-dx),'Δx = '+dy,'Δx = '+(dx+1)]);
       steps.push({prompt:'<b>Step 3.</b> Calculate the run: Δx = x₂ − x₁ = '+p.x2+' − ('+p.x1+')',type:'choice',choices:c3.choices,correct:c3.correct});
-      var slopeNum=dy/dx;
-      var slopeStr=Number.isInteger(slopeNum)?'m = '+slopeNum:'m = '+(dy/gg)+'/'+(dx/gg);
-      var c4=iMakeChoices(slopeStr,['m = '+(-slopeNum).toFixed(Number.isInteger(-slopeNum)?0:2),'m = '+(dx/gg)+'/'+(dy/gg),'m = '+(slopeNum>0?slopeNum+1:slopeNum-1)]);
+      var slopeStr='m = '+slopeFrac(dy,dx), wrong4=[];
+      // wrong choices, all in the same fraction style: wrong sign, run over rise, off by one; deduped
+      // because they coincide for slopes like 1 or -1
+      [slopeFrac(-dy,dx), slopeFrac(dx,dy), slopeFrac(dy+dx,dx), slopeFrac(dy-dx,dx), slopeFrac(dy+2*dx,dx)].forEach(function(v){
+        var e='m = '+v; if(e!==slopeStr && wrong4.indexOf(e)<0 && wrong4.length<3) wrong4.push(e);
+      });
+      var c4=iMakeChoices(slopeStr,wrong4);
       steps.push({prompt:'<b>Step 4.</b> Simplify: m = Δy / Δx = '+dy+' / '+dx,type:'choice',choices:c4.choices,correct:c4.correct});
     }
     return steps;
@@ -2717,7 +2728,7 @@ var SLP = (function(){
   function probHTML(p,idx){
     var dx=p.x2-p.x1, dy=p.y2-p.y1;
     var g=gcd(Math.abs(dy),Math.abs(dx)||1);
-    var sn=dx===0?'undefined':(dy===0?'0':(dy/g)+'/'+(dx/g));
+    var sn=slopeFrac(dy,dx);
     var h='<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
     h+='<div class="prob-prompt">Find the slope of the line passing through <span class="math">('+p.x1+', '+p.y1+')</span> and <span class="math">('+p.x2+', '+p.y2+')</span>.</div>';
     h+=renderInteractiveSteps(makeSLPSteps(p),'slp',idx);
@@ -2735,7 +2746,7 @@ var SLP = (function(){
       h+='<div class="pf"><label>x₂</label><input type="number" value="'+p.x2+'" oninput="SLP.set('+i+',\'x2\',this.value)"></div>';
       h+='<div class="pf"><label>y₂</label><input type="number" value="'+p.y2+'" oninput="SLP.set('+i+',\'y2\',this.value)"></div>';
       var dx=p.x2-p.x1,dy=p.y2-p.y1,g=gcd(Math.abs(dy),Math.abs(dx)||1);
-      var s=dx===0?'undef':dy===0?'0':(dy/g)+'/'+(dx/g);
+      var s=dx===0?'undef':slopeFrac(dy,dx);
       h+='<span style="font-size:10px;color:#aaa;margin-left:4px;">m = '+s+'</span>';
       h+='<button class="pdel" onclick="SLP.del('+i+')">&#x2715;</button></div>';
     });
