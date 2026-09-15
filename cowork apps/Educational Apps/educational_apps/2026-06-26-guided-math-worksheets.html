@@ -2911,22 +2911,31 @@ var CSQ = (function(){
     var half=b2/2, halfSq=half*half, rhs=halfSq-c2;
     var disc=b*b-4*a*c;
     function tStr(coef,exp,first){if(coef===0)return '';var s=coef<0?(first?'−':' − '):(first?'':' + ');var ac=Math.abs(coef);return s+(ac===1&&exp>0?'':ac)+(exp===0?'':(exp===1?'x':'x²'));}
+    // Clean signs in the choices: "x² − 4x = −1" and "(x − 2)²", not "x² + -4x = -1" and "(x + -2)²".
+    function num(n){n=+fmtN(n);return n<0?'−'+fmtN(-n):fmtN(n);}
+    function quad(bc,cc){return 'x²'+tStr(+fmtN(bc),1,false)+tStr(+fmtN(cc),0,false);}
+    function binom(h){h=+fmtN(h);return h===0?'x²':'(x'+(h<0?' − '+fmtN(-h):' + '+fmtN(h))+')²';}
     var steps=[];
     var si=0;
     if(a!==1){
       var newB=fmtN(b2), newC=fmtN(c2);
-      var c0=iMakeChoices('x² + '+newB+'x + '+newC+' = 0',['x² + '+b+'x + '+c+' = 0','x² + '+fmtN(b2+1)+'x + '+newC+' = 0','x² − '+newB+'x + '+newC+' = 0']);
+      var c0=iMakeChoices(quad(b2,c2)+' = 0',[quad(b,c)+' = 0',quad(b2+1,c2)+' = 0',quad(-b2,c2)+' = 0']);
       steps.push({prompt:'<b>Step 1.</b> Divide every term by <span class="math">'+a+'</span> to get leading coefficient 1:',type:'choice',choices:c0.choices,correct:c0.correct});
       si=1;
     }
-    var rhsConst=fmtN(-c2);
-    var c1=iMakeChoices('x² + '+fmtN(b2)+'x = '+rhsConst,['x² + '+fmtN(b2)+'x = '+fmtN(c2),'x² = '+rhsConst,'x² + '+fmtN(b2)+'x + '+fmtN(c2)+' = 0']);
+    var rhsConst=num(-c2);
+    var c1=iMakeChoices(quad(b2,0)+' = '+rhsConst,[quad(b2,0)+' = '+num(c2),'x² = '+rhsConst,quad(b2,c2)+' = 0']);
     steps.push({prompt:'<b>Step '+(si+1)+'.</b> Move the constant term to the right side:',type:'choice',choices:c1.choices,correct:c1.correct});
-    var halfStr=fmtN(half), halfSqStr=fmtN(halfSq);
-    var c2s=iMakeChoices('(b/2)² = '+halfSqStr,['(b/2)² = '+fmtN(b2),'(b/2)² = '+fmtN(halfSq+1),'(b/2)² = '+fmtN(b2/4)]);
-    steps.push({prompt:'<b>Step '+(si+2)+'.</b> Half of <i>b</i> = '+fmtN(b2)+' is '+halfStr+'. What is ('+halfStr+')²?',type:'choice',choices:c2s.choices,correct:c2s.correct});
-    var rhsFull=fmtN(rhs);
-    var c3=iMakeChoices('(x + '+halfStr+')² = '+rhsFull,['(x + '+fmtN(b2)+')² = '+rhsFull,'(x − '+halfStr+')² = '+rhsFull,'(x + '+halfStr+')² = '+fmtN(rhs+1)]);
+    var halfStr=num(half), halfSqStr=fmtN(halfSq);
+    // b and (b/2)² can be the same number (b = 4), so drop any wrong choice that repeats one already listed
+    var sqRight='(b/2)² = '+halfSqStr, sqWrong=[];
+    [num(b2),fmtN(halfSq+1),num(b2/4),fmtN(halfSq+2),num(-halfSq)].forEach(function(v){
+      var e='(b/2)² = '+v; if(e!==sqRight && sqWrong.indexOf(e)<0 && sqWrong.length<3) sqWrong.push(e);
+    });
+    var c2s=iMakeChoices(sqRight,sqWrong);
+    steps.push({prompt:'<b>Step '+(si+2)+'.</b> Half of <i>b</i> = '+num(b2)+' is '+halfStr+'. What is ('+halfStr+')²?',type:'choice',choices:c2s.choices,correct:c2s.correct});
+    var rhsFull=num(rhs);
+    var c3=iMakeChoices(binom(half)+' = '+rhsFull,[binom(b2)+' = '+rhsFull,binom(-half)+' = '+rhsFull,binom(half)+' = '+num(rhs+1)]);
     steps.push({prompt:'<b>Step '+(si+3)+'.</b> After adding '+halfSqStr+' to both sides, factor the left side:',type:'choice',choices:c3.choices,correct:c3.correct});
     if(disc<0){
       var c4=iMakeChoices('No real solutions — square root of a negative number',['Two real solutions','One real solution (double root)','Cannot determine']);
