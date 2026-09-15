@@ -2753,6 +2753,17 @@ var GLIN = (function(){
   var problems=[
     {a:1,b:-1,c:3},{a:2,b:1,c:6},{a:-3,b:1,c:-2},{a:0,b:1,c:-4}
   ];
+  // Write y = mx + b the way a teacher would: "x − 3", "−2x + 6", "3x", not "1x + -3".
+  // m and b arrive as display strings from frac(): "2", "-1", "-2/3", "0".
+  function isNeg(s){return s.charAt(0)==='-';}
+  function unsign(s){return isNeg(s)?s.slice(1):s;}
+  function flip(s){return s==='0'?'0':(isNeg(s)?s.slice(1):'-'+s);}
+  function slopeInt(mS,bS,xs){
+    xs=xs||'x';
+    var t=mS==='0'?'':mS==='1'?xs:mS==='-1'?'&minus;'+xs:(isNeg(mS)?'&minus;':'')+unsign(mS)+xs;
+    if(bS==='0') return t||'0';
+    return t?t+(isNeg(bS)?' &minus; ':' + ')+unsign(bS):(isNeg(bS)?'&minus;':'')+unsign(bS);
+  }
   function makePlane(a,b,c){
     // One square per unit, -8..8, sized to fill the 210px graph column so students can plot by hand.
     var W=210,H=210,cx=105,cy=105,r=92,sc=r/8;
@@ -2837,8 +2848,13 @@ var GLIN = (function(){
     } else {
       var mStr=frac(-a,b), bStr=frac(c,b);
       var mNum=-a/b, bNum=c/b;
-      var sifFull='y = '+mStr+'x + '+bStr;
-      var c1c=iMakeChoices(sifFull,['y = '+frac(a,b)+'x + '+bStr,'y = '+mStr+'x − '+bStr,'y = '+frac(c,a)+'x + '+bStr]);
+      var sifFull='y = '+slopeInt(mStr,bStr);
+      // wrong choices model real slips: slope sign, intercept sign, c/a as the slope. Once written
+      // cleanly two of them can coincide (or match the answer), so dedupe and top up from spares.
+      var wrong1=[], cand1=[slopeInt(frac(a,b),bStr), slopeInt(mStr,flip(bStr)), slopeInt(frac(c,a),bStr),
+                            slopeInt(flip(mStr),flip(bStr)), slopeInt(bStr==='0'?'1':bStr,mStr), slopeInt(mStr,bStr==='0'?'1':'0')];
+      cand1.forEach(function(e){ e='y = '+e; if(e!==sifFull && wrong1.indexOf(e)<0 && wrong1.length<3) wrong1.push(e); });
+      var c1c=iMakeChoices(sifFull,wrong1);
       steps.push({prompt:'<b>Step 1.</b> Rewrite in slope-intercept form <i>y = mx + b</i>. Solve for <i>y</i>:',type:'choice',choices:c1c.choices,correct:c1c.correct});
       var c2c=iMakeChoices('m = '+mStr,['m = '+frac(a,b),'m = '+bStr,'m = '+frac(c,a)]);
       steps.push({prompt:'<b>Step 2.</b> Identify the slope:',type:'choice',choices:c2c.choices,correct:c2c.correct});
@@ -2858,7 +2874,7 @@ var GLIN = (function(){
     var eqDisp=(a!==0?(Math.abs(a)===1?(a<0?'&minus;':''):''+a)+'<i>x</i>':'')+(b!==0?((b<0?' &minus; ':a!==0?' + ':'')+( Math.abs(b)===1?'':''+Math.abs(b))+'<i>y</i>'):'')+(c!==0?(' = '+c):'= 0');
     var mStr='',bStr='';
     if(!isVert&&!isHoriz){mStr=frac(-a,b);bStr=frac(c,b);}
-    var ansStr=isVert?('<i>x</i> = '+(c/a)):isHoriz?('<i>y</i> = '+(c/b)):('<i>y</i> = '+mStr+'<i>x</i> + '+bStr);
+    var ansStr=isVert?('<i>x</i> = '+(c/a)):isHoriz?('<i>y</i> = '+(c/b)):('<i>y</i> = '+slopeInt(mStr,bStr,'<i>x</i>'));
     var h='<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
     h+='<div class="prob-prompt">Graph the equation: <span class="math">'+eqDisp+'</span></div>';
     h+='<div class="prob-body"><div class="graph-area">'+makePlane(a,b,c)+'</div>';
