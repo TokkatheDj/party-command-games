@@ -394,6 +394,31 @@ body.student-mode #progress-panel{display:flex;}
   /* Answer key: hide blanks, show answers */
   body.answer-key-mode .blank{display:none!important;}
   body.answer-key-mode .blank-line .blank{display:none!important;}
+
+  /* Compact spacing so page 1 holds two problems under the header + tips box.
+     Spacing only; font sizes are unchanged. Before: 30 of 78 sections fit two
+     on page 1 (9 with the answer key); after: 62 (61). The rest have problems
+     taller than half a page and still start problem 2 on page 2. */
+  .ws-head{padding-bottom:6px!important;margin-bottom:10px!important;}
+  .ws-meta{line-height:1.45!important;}
+  .ws-tips{margin-bottom:10px!important;}
+  .ws-tips-header{padding:3px 12px!important;}
+  .ws-tips-body{padding:5px 12px!important;}
+  .ws-tips-body ul{display:block!important;columns:2;column-gap:22px;}
+  .ws-tips-body li{font-size:10.5px!important;line-height:1.35!important;margin-bottom:3px;break-inside:avoid;}
+  .problem{margin-bottom:12px!important;padding-bottom:12px!important;}
+  .prob-num{margin-bottom:3px!important;font-size:13px!important;}
+  .prob-prompt{margin-bottom:8px!important;}
+  .steps{gap:7px!important;}
+  .step-q{line-height:1.4!important;margin-bottom:2px!important;}
+  /* the multiple-choice step prints as one line instead of a padded card */
+  .interactive-step{padding:5px 10px!important;display:flex!important;flex-wrap:wrap;align-items:center;gap:4px 10px;}
+  .interactive-step.locked{display:none!important;} /* must stay: the flex rule above would otherwise print hidden steps */
+  .interactive-step .step-q{margin:0!important;}
+  .step-choices{margin-top:0!important;gap:5px!important;}
+  .choice-btn{padding:1px 9px!important;line-height:1.35!important;}
+  .prob-body{gap:14px!important;}
+  .solution-box{margin-top:6px!important;}
 }
 
 /* ── DIFFICULTY MODE ── */
@@ -2665,6 +2690,13 @@ var SLP = (function(){
     {x1:2,y1:1,x2:6,y2:9},{x1:-3,y1:5,x2:1,y2:-3},
     {x1:0,y1:4,x2:5,y2:4},{x1:-2,y1:-1,x2:3,y2:-6}
   ];
+  // Rise over run in lowest terms: "2" not "2/1", "-5/2" not "5/-2" (sign always on top).
+  function slopeFrac(n,d){
+    if(d===0) return 'undefined';
+    var g=gcd(Math.abs(n),Math.abs(d))||1; n/=g; d/=g;
+    if(d<0){n=-n;d=-d;}
+    return d===1?''+n:n+'/'+d;
+  }
   function makeSLPSteps(p){
     var dx=p.x2-p.x1, dy=p.y2-p.y1;
     var gg=gcd(Math.abs(dy),Math.abs(dx)||1);
@@ -2682,9 +2714,13 @@ var SLP = (function(){
       steps.push({prompt:'<b>Step 2.</b> Calculate the rise: Δy = y₂ − y₁ = '+p.y2+' − ('+p.y1+')',type:'choice',choices:c2c.choices,correct:c2c.correct});
       var c3=iMakeChoices('Δx = '+dx,['Δx = '+(-dx),'Δx = '+dy,'Δx = '+(dx+1)]);
       steps.push({prompt:'<b>Step 3.</b> Calculate the run: Δx = x₂ − x₁ = '+p.x2+' − ('+p.x1+')',type:'choice',choices:c3.choices,correct:c3.correct});
-      var slopeNum=dy/dx;
-      var slopeStr=Number.isInteger(slopeNum)?'m = '+slopeNum:'m = '+(dy/gg)+'/'+(dx/gg);
-      var c4=iMakeChoices(slopeStr,['m = '+(-slopeNum).toFixed(Number.isInteger(-slopeNum)?0:2),'m = '+(dx/gg)+'/'+(dy/gg),'m = '+(slopeNum>0?slopeNum+1:slopeNum-1)]);
+      var slopeStr='m = '+slopeFrac(dy,dx), wrong4=[];
+      // wrong choices, all in the same fraction style: wrong sign, run over rise, off by one; deduped
+      // because they coincide for slopes like 1 or -1
+      [slopeFrac(-dy,dx), slopeFrac(dx,dy), slopeFrac(dy+dx,dx), slopeFrac(dy-dx,dx), slopeFrac(dy+2*dx,dx)].forEach(function(v){
+        var e='m = '+v; if(e!==slopeStr && wrong4.indexOf(e)<0 && wrong4.length<3) wrong4.push(e);
+      });
+      var c4=iMakeChoices(slopeStr,wrong4);
       steps.push({prompt:'<b>Step 4.</b> Simplify: m = Δy / Δx = '+dy+' / '+dx,type:'choice',choices:c4.choices,correct:c4.correct});
     }
     return steps;
@@ -2692,7 +2728,7 @@ var SLP = (function(){
   function probHTML(p,idx){
     var dx=p.x2-p.x1, dy=p.y2-p.y1;
     var g=gcd(Math.abs(dy),Math.abs(dx)||1);
-    var sn=dx===0?'undefined':(dy===0?'0':(dy/g)+'/'+(dx/g));
+    var sn=slopeFrac(dy,dx);
     var h='<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
     h+='<div class="prob-prompt">Find the slope of the line passing through <span class="math">('+p.x1+', '+p.y1+')</span> and <span class="math">('+p.x2+', '+p.y2+')</span>.</div>';
     h+=renderInteractiveSteps(makeSLPSteps(p),'slp',idx);
@@ -2710,7 +2746,7 @@ var SLP = (function(){
       h+='<div class="pf"><label>x₂</label><input type="number" value="'+p.x2+'" oninput="SLP.set('+i+',\'x2\',this.value)"></div>';
       h+='<div class="pf"><label>y₂</label><input type="number" value="'+p.y2+'" oninput="SLP.set('+i+',\'y2\',this.value)"></div>';
       var dx=p.x2-p.x1,dy=p.y2-p.y1,g=gcd(Math.abs(dy),Math.abs(dx)||1);
-      var s=dx===0?'undef':dy===0?'0':(dy/g)+'/'+(dx/g);
+      var s=dx===0?'undef':slopeFrac(dy,dx);
       h+='<span style="font-size:10px;color:#aaa;margin-left:4px;">m = '+s+'</span>';
       h+='<button class="pdel" onclick="SLP.del('+i+')">&#x2715;</button></div>';
     });
@@ -2728,12 +2764,24 @@ var GLIN = (function(){
   var problems=[
     {a:1,b:-1,c:3},{a:2,b:1,c:6},{a:-3,b:1,c:-2},{a:0,b:1,c:-4}
   ];
+  // Write y = mx + b the way a teacher would: "x − 3", "−2x + 6", "3x", not "1x + -3".
+  // m and b arrive as display strings from frac(): "2", "-1", "-2/3", "0".
+  function isNeg(s){return s.charAt(0)==='-';}
+  function unsign(s){return isNeg(s)?s.slice(1):s;}
+  function flip(s){return s==='0'?'0':(isNeg(s)?s.slice(1):'-'+s);}
+  function slopeInt(mS,bS,xs){
+    xs=xs||'x';
+    var t=mS==='0'?'':mS==='1'?xs:mS==='-1'?'&minus;'+xs:(isNeg(mS)?'&minus;':'')+unsign(mS)+xs;
+    if(bS==='0') return t||'0';
+    return t?t+(isNeg(bS)?' &minus; ':' + ')+unsign(bS):(isNeg(bS)?'&minus;':'')+unsign(bS);
+  }
   function makePlane(a,b,c){
-    var W=186,H=186,cx=93,cy=93,r=74,sc=r/8;
+    // One square per unit, -8..8, sized to fill the 210px graph column so students can plot by hand.
+    var W=210,H=210,cx=105,cy=105,r=92,sc=r/8;
     function tx(x){return cx+x*sc;} function ty(y){return cy-y*sc;}
-    var s='<svg width="'+W+'" height="'+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
-    // grid
-    s+='<g stroke="#eee" stroke-width="0.5">';
+    var s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+    // grid: dark enough to survive printing
+    s+='<g stroke="#cfd8df" stroke-width="0.7">';
     for(var i=-8;i<=8;i++){s+='<line x1="'+tx(i)+'" y1="'+ty(-8)+'" x2="'+tx(i)+'" y2="'+ty(8)+'"/><line x1="'+tx(-8)+'" y1="'+ty(i)+'" x2="'+tx(8)+'" y2="'+ty(i)+'"/'+'>';}
     s+='</g>';
     // axes
@@ -2743,12 +2791,14 @@ var GLIN = (function(){
     s+='<polygon points="'+tx(8)+','+cy+' '+(tx(8)-6)+','+(cy-3)+' '+(tx(8)-6)+','+(cy+3)+'" fill="#444"/>';
     s+='<polygon points="'+cx+','+ty(8)+' '+(cx-3)+','+(ty(8)+6)+' '+(cx+3)+','+(ty(8)+6)+'" fill="#444"/>';
     // axis labels
-    s+='<g font-size="7" font-family="sans-serif" fill="#bbb" text-anchor="middle">';
-    [-8,-4,4,8].forEach(function(t){s+='<text x="'+tx(t)+'" y="'+(cy+10)+'">'+t+'</text><text x="'+(cx-7)+'" y="'+(ty(t)+3)+'" text-anchor="end">'+t+'</text>';});
+    s+='<g font-size="7" font-family="sans-serif" fill="#777" text-anchor="middle">';
+    [-8,-6,-4,-2,2,4,6].forEach(function(t){s+='<text x="'+tx(t)+'" y="'+(cy+10)+'">'+t+'</text><text x="'+(cx-7)+'" y="'+(ty(t)+3)+'" text-anchor="end">'+t+'</text>';});
     s+='</g>';
     s+='<text x="'+(tx(8)+4)+'" y="'+(cy+4)+'" font-size="9" fill="#555" font-family="sans-serif">x</text>';
     s+='<text x="'+(cx+4)+'" y="'+(ty(8)-2)+'" font-size="9" fill="#555" font-family="sans-serif">y</text>';
-    // line + intercepts
+    // Answer layer: the line and its intercepts. Hidden on the student copy until the last step is
+    // answered, always shown on the answer key, never on a student printout (see .gph-layer CSS).
+    s+='<g class="gph-layer gph-glinans">';
     if(b!==0){
       var m=-a/b, k=c/b;
       // clip to viewport
@@ -2771,7 +2821,7 @@ var GLIN = (function(){
       if(k>=-8&&k<=8){
         s+='<circle cx="'+cx+'" cy="'+ty(k)+'" r="4.5" fill="#fff" stroke="#1d6a96" stroke-width="2"/>';
         var kDisp=Number.isInteger(k)?k:k.toFixed(2);
-        s+='<text x="'+(cx+8)+'" y="'+(ty(k)-4)+'" font-size="9" font-family="sans-serif" fill="#1d6a96" font-weight="700">(0,'+kDisp+')</text>';
+        s+='<text x="'+(cx+8)+'" y="'+(ty(k)-4)+'" font-size="9" font-family="sans-serif" fill="#1d6a96" font-weight="700" stroke="#fff" stroke-width="3" paint-order="stroke">(0,'+kDisp+')</text>';
       }
       // x-intercept dot + label (only if m!=0)
       if(m!==0){
@@ -2779,14 +2829,15 @@ var GLIN = (function(){
         if(xi>=-8&&xi<=8&&xi!==0){
           s+='<circle cx="'+tx(xi)+'" cy="'+cy+'" r="4.5" fill="#fff" stroke="#c0392b" stroke-width="2"/>';
           var xiDisp=Number.isInteger(xi)?xi:xi.toFixed(2);
-          s+='<text x="'+tx(xi)+'" y="'+(cy+16)+'" font-size="9" font-family="sans-serif" fill="#c0392b" font-weight="700" text-anchor="middle">('+xiDisp+',0)</text>';
+          // above the axis, clear of the tick numbers underneath it; white halo keeps it legible over grid lines
+          s+='<text x="'+tx(xi)+'" y="'+(cy-8)+'" font-size="9" font-family="sans-serif" fill="#c0392b" font-weight="700" text-anchor="middle" stroke="#fff" stroke-width="3" paint-order="stroke">('+xiDisp+',0)</text>';
         }
       }
     } else if(a!==0){
       var xv=c/a;
       s+='<line x1="'+tx(xv)+'" y1="'+ty(-8)+'" x2="'+tx(xv)+'" y2="'+ty(8)+'" stroke="#1d6a96" stroke-width="2.2"/>';
     }
-    s+='</svg>';return s;
+    s+='</g></svg>';return s;
   }
   function makeGLINSteps(p){
     var a=p.a,b=p.b,c=p.c;
@@ -2808,8 +2859,13 @@ var GLIN = (function(){
     } else {
       var mStr=frac(-a,b), bStr=frac(c,b);
       var mNum=-a/b, bNum=c/b;
-      var sifFull='y = '+mStr+'x + '+bStr;
-      var c1c=iMakeChoices(sifFull,['y = '+frac(a,b)+'x + '+bStr,'y = '+mStr+'x − '+bStr,'y = '+frac(c,a)+'x + '+bStr]);
+      var sifFull='y = '+slopeInt(mStr,bStr);
+      // wrong choices model real slips: slope sign, intercept sign, c/a as the slope. Once written
+      // cleanly two of them can coincide (or match the answer), so dedupe and top up from spares.
+      var wrong1=[], cand1=[slopeInt(frac(a,b),bStr), slopeInt(mStr,flip(bStr)), slopeInt(frac(c,a),bStr),
+                            slopeInt(flip(mStr),flip(bStr)), slopeInt(bStr==='0'?'1':bStr,mStr), slopeInt(mStr,bStr==='0'?'1':'0')];
+      cand1.forEach(function(e){ e='y = '+e; if(e!==sifFull && wrong1.indexOf(e)<0 && wrong1.length<3) wrong1.push(e); });
+      var c1c=iMakeChoices(sifFull,wrong1);
       steps.push({prompt:'<b>Step 1.</b> Rewrite in slope-intercept form <i>y = mx + b</i>. Solve for <i>y</i>:',type:'choice',choices:c1c.choices,correct:c1c.correct});
       var c2c=iMakeChoices('m = '+mStr,['m = '+frac(a,b),'m = '+bStr,'m = '+frac(c,a)]);
       steps.push({prompt:'<b>Step 2.</b> Identify the slope:',type:'choice',choices:c2c.choices,correct:c2c.correct});
@@ -2819,6 +2875,7 @@ var GLIN = (function(){
       var c4=iMakeChoices('(0, '+fmtN(pt1y)+') and ('+pt2x+', '+fmtN(pt2y)+')',['(0, '+fmtN(mNum)+') and ('+pt2x+', '+fmtN(bNum)+')','('+fmtN(bNum)+', 0) and (0, '+fmtN(mNum)+')','(1, '+fmtN(mNum+bNum)+') and ('+fmtN(bNum)+', 1)']);
       steps.push({prompt:'<b>Step 4.</b> Plot the y-intercept and use slope to find a second point. Which two points are on the line?',type:'choice',choices:c4.choices,correct:c4.correct});
     }
+    if(steps.length) steps[steps.length-1].reveal='glinans';   // finishing the steps draws the line
     return steps;
   }
   function probHTML(p,idx){
@@ -2828,10 +2885,12 @@ var GLIN = (function(){
     var eqDisp=(a!==0?(Math.abs(a)===1?(a<0?'&minus;':''):''+a)+'<i>x</i>':'')+(b!==0?((b<0?' &minus; ':a!==0?' + ':'')+( Math.abs(b)===1?'':''+Math.abs(b))+'<i>y</i>'):'')+(c!==0?(' = '+c):'= 0');
     var mStr='',bStr='';
     if(!isVert&&!isHoriz){mStr=frac(-a,b);bStr=frac(c,b);}
-    var ansStr=isVert?('<i>x</i> = '+(c/a)):isHoriz?('<i>y</i> = '+(c/b)):('<i>y</i> = '+mStr+'<i>x</i> + '+bStr);
+    var ansStr=isVert?('<i>x</i> = '+(c/a)):isHoriz?('<i>y</i> = '+(c/b)):('<i>y</i> = '+slopeInt(mStr,bStr,'<i>x</i>'));
     var h='<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
     h+='<div class="prob-prompt">Graph the equation: <span class="math">'+eqDisp+'</span></div>';
+    h+='<div class="prob-body"><div class="graph-area">'+makePlane(a,b,c)+'</div>';
     h+=renderInteractiveSteps(makeGLINSteps(p),'glin',idx);
+    h+='</div>';
     h+='<div class="solution-box"><span class="sol-label">Equation:</span><span class="math">'+ansStr+'</span></div>';
     h+='</div>';return h;
   }
@@ -2863,22 +2922,31 @@ var CSQ = (function(){
     var half=b2/2, halfSq=half*half, rhs=halfSq-c2;
     var disc=b*b-4*a*c;
     function tStr(coef,exp,first){if(coef===0)return '';var s=coef<0?(first?'−':' − '):(first?'':' + ');var ac=Math.abs(coef);return s+(ac===1&&exp>0?'':ac)+(exp===0?'':(exp===1?'x':'x²'));}
+    // Clean signs in the choices: "x² − 4x = −1" and "(x − 2)²", not "x² + -4x = -1" and "(x + -2)²".
+    function num(n){n=+fmtN(n);return n<0?'−'+fmtN(-n):fmtN(n);}
+    function quad(bc,cc){return 'x²'+tStr(+fmtN(bc),1,false)+tStr(+fmtN(cc),0,false);}
+    function binom(h){h=+fmtN(h);return h===0?'x²':'(x'+(h<0?' − '+fmtN(-h):' + '+fmtN(h))+')²';}
     var steps=[];
     var si=0;
     if(a!==1){
       var newB=fmtN(b2), newC=fmtN(c2);
-      var c0=iMakeChoices('x² + '+newB+'x + '+newC+' = 0',['x² + '+b+'x + '+c+' = 0','x² + '+fmtN(b2+1)+'x + '+newC+' = 0','x² − '+newB+'x + '+newC+' = 0']);
+      var c0=iMakeChoices(quad(b2,c2)+' = 0',[quad(b,c)+' = 0',quad(b2+1,c2)+' = 0',quad(-b2,c2)+' = 0']);
       steps.push({prompt:'<b>Step 1.</b> Divide every term by <span class="math">'+a+'</span> to get leading coefficient 1:',type:'choice',choices:c0.choices,correct:c0.correct});
       si=1;
     }
-    var rhsConst=fmtN(-c2);
-    var c1=iMakeChoices('x² + '+fmtN(b2)+'x = '+rhsConst,['x² + '+fmtN(b2)+'x = '+fmtN(c2),'x² = '+rhsConst,'x² + '+fmtN(b2)+'x + '+fmtN(c2)+' = 0']);
+    var rhsConst=num(-c2);
+    var c1=iMakeChoices(quad(b2,0)+' = '+rhsConst,[quad(b2,0)+' = '+num(c2),'x² = '+rhsConst,quad(b2,c2)+' = 0']);
     steps.push({prompt:'<b>Step '+(si+1)+'.</b> Move the constant term to the right side:',type:'choice',choices:c1.choices,correct:c1.correct});
-    var halfStr=fmtN(half), halfSqStr=fmtN(halfSq);
-    var c2s=iMakeChoices('(b/2)² = '+halfSqStr,['(b/2)² = '+fmtN(b2),'(b/2)² = '+fmtN(halfSq+1),'(b/2)² = '+fmtN(b2/4)]);
-    steps.push({prompt:'<b>Step '+(si+2)+'.</b> Half of <i>b</i> = '+fmtN(b2)+' is '+halfStr+'. What is ('+halfStr+')²?',type:'choice',choices:c2s.choices,correct:c2s.correct});
-    var rhsFull=fmtN(rhs);
-    var c3=iMakeChoices('(x + '+halfStr+')² = '+rhsFull,['(x + '+fmtN(b2)+')² = '+rhsFull,'(x − '+halfStr+')² = '+rhsFull,'(x + '+halfStr+')² = '+fmtN(rhs+1)]);
+    var halfStr=num(half), halfSqStr=fmtN(halfSq);
+    // b and (b/2)² can be the same number (b = 4), so drop any wrong choice that repeats one already listed
+    var sqRight='(b/2)² = '+halfSqStr, sqWrong=[];
+    [num(b2),fmtN(halfSq+1),num(b2/4),fmtN(halfSq+2),num(-halfSq)].forEach(function(v){
+      var e='(b/2)² = '+v; if(e!==sqRight && sqWrong.indexOf(e)<0 && sqWrong.length<3) sqWrong.push(e);
+    });
+    var c2s=iMakeChoices(sqRight,sqWrong);
+    steps.push({prompt:'<b>Step '+(si+2)+'.</b> Half of <i>b</i> = '+num(b2)+' is '+halfStr+'. What is ('+halfStr+')²?',type:'choice',choices:c2s.choices,correct:c2s.correct});
+    var rhsFull=num(rhs);
+    var c3=iMakeChoices(binom(half)+' = '+rhsFull,[binom(b2)+' = '+rhsFull,binom(-half)+' = '+rhsFull,binom(half)+' = '+num(rhs+1)]);
     steps.push({prompt:'<b>Step '+(si+3)+'.</b> After adding '+halfSqStr+' to both sides, factor the left side:',type:'choice',choices:c3.choices,correct:c3.correct});
     if(disc<0){
       var c4=iMakeChoices('No real solutions — square root of a negative number',['Two real solutions','One real solution (double root)','Cannot determine']);
@@ -3532,7 +3600,10 @@ var RADICALS = (function(){
     } else if(p.type==='rationalize'){
       var rc=p.coeff,rr=p.radicand;
       var rg=gcd(rc,rr),rsn=rc/rg,rsd=rr/rg;
-      var c1r=iMakeChoices('&radic;'+rr+' / &radic;'+rr,['1 / &radic;'+rr,'&radic;'+rr,''+rr+' / '+rr]);
+      // The question asks what top AND bottom are each multiplied by, so the answer is the radical
+      // itself. √r/√r is kept out of the choices: it is the same move written as a fraction, and
+      // offering both made a correct "√r" look wrong.
+      var c1r=iMakeChoices('&radic;'+rr,[''+rr,'1 / &radic;'+rr,''+(rc!==rr?rc:rr+1)]);
       steps.push({prompt:'<b>Step 1.</b> What factor do you multiply top <em>and</em> bottom by to rationalize?',type:'choice',choices:c1r.choices,correct:c1r.correct});
       var c2r=iMakeChoices(''+rr,[''+(rr+1),''+(rr>1?rr-1:rr+2),'&radic;'+rr]);
       steps.push({prompt:'<b>Step 2.</b> Simplify the denominator: &radic;'+rr+' &middot; &radic;'+rr+' = ?',type:'choice',choices:c2r.choices,correct:c2r.correct});
@@ -4597,85 +4668,191 @@ var ANGLES = (function(){
 // MODULE 22: COMPOSITE FIGURES
 // ═══════════════════════════════════════════════
 var COMP = (function(){
+  // Each problem stores ONE geometric model. The area, the perimeter, the diagram and
+  // the answer key are all computed from it, so none of them can drift from the others.
+  // (Before 2026-09-15 the answer was always the SUM of the shape areas: a perimeter
+  // problem showed its area as the answer, and a cut-out piece was added, not subtracted.)
+  //   parts   - decomposition used for AREA. sign:+1 adds, sign:-1 is a cut-out piece.
+  //   outline - counter-clockwise outer boundary used for PERIMETER and the drawing.
+  //             A vertex carrying arc:r means the edge ARRIVING at it is a semicircle
+  //             of radius r that bulges outward.
+  //   seams   - dashed interior lines showing how the figure splits. Never in the perimeter.
+  //   holes   - cut-out pieces, drawn dashed and shaded outside the solid shape.
+  //   marks   - measurements that are not edges, e.g. a triangle's height.
   var problems=[
-    {shapes:[{type:'rectangle',w:10,h:6},{type:'triangle',b:10,h:4}],task:'area',label:'Rectangle + Triangle on top'},
-    {shapes:[{type:'rectangle',w:8,h:5},{type:'semicircle',r:4}],task:'area',label:'Rectangle + Semicircle on top'},
-    {shapes:[{type:'rectangle',w:12,h:4},{type:'rectangle',w:6,h:3}],task:'perimeter',label:'L-shaped figure'},
-    {shapes:[{type:'rectangle',w:9,h:7},{type:'rectangle',w:3,h:3}],task:'area',label:'Rectangle with square removed'}
+    {label:'Rectangle + Triangle on top', task:'area',
+     parts:[{type:'rectangle',w:10,h:6,sign:1},{type:'triangle',b:10,h:4,sign:1}],
+     outline:[{x:0,y:0},{x:10,y:0},{x:10,y:6},{x:5,y:10},{x:0,y:6}],
+     seams:[[0,6,10,6]], holes:[], marks:[{x1:5,y1:6,x2:5,y2:10,text:'h = 4'}]},
+    {label:'Rectangle + Semicircle on top', task:'area',
+     parts:[{type:'rectangle',w:8,h:5,sign:1},{type:'semicircle',r:4,sign:1}],
+     outline:[{x:0,y:0},{x:8,y:0},{x:8,y:5},{x:0,y:5,arc:4}],
+     seams:[[0,5,8,5]], holes:[], marks:[{x1:4,y1:5,x2:4,y2:9,text:'r = 4'}]},
+    {label:'L-shaped figure', task:'perimeter',
+     parts:[{type:'rectangle',w:12,h:4,sign:1},{type:'rectangle',w:6,h:3,sign:1}],
+     outline:[{x:0,y:0},{x:12,y:0},{x:12,y:4},{x:6,y:4},{x:6,y:7},{x:0,y:7}],
+     seams:[[0,4,6,4]], holes:[], marks:[]},
+    {label:'Rectangle with a square cut out of the corner', task:'area',
+     parts:[{type:'rectangle',w:9,h:7,sign:1},{type:'rectangle',w:3,h:3,sign:-1}],
+     outline:[{x:0,y:0},{x:9,y:0},{x:9,y:4},{x:6,y:4},{x:6,y:7},{x:0,y:7}],
+     seams:[], holes:[[{x:6,y:4},{x:9,y:4},{x:9,y:7},{x:6,y:7}]], marks:[]}
   ];
 
-  function shapeArea(s){
-    if(s.type==='rectangle') return s.w*s.h;
-    if(s.type==='triangle')  return 0.5*s.b*s.h;
+  // Round to 2 decimals and drop trailing zeros: 80.00 -> 80, 30.50 -> 30.5
+  function fmt(v){ return (Math.round(v*100)/100).toFixed(2).replace(/\.?0+$/,''); }
+
+  function partArea(s){
+    if(s.type==='rectangle')  return s.w*s.h;
+    if(s.type==='triangle')   return 0.5*s.b*s.h;
     if(s.type==='semicircle') return 0.5*Math.PI*s.r*s.r;
-    if(s.type==='circle')    return Math.PI*s.r*s.r;
     return 0;
   }
-  function areaLabel(s){
-    if(s.type==='rectangle') return 'A = l × w = '+s.w+' × '+s.h+' = '+(s.w*s.h);
-    if(s.type==='triangle')  return 'A = ½ × b × h = ½ × '+s.b+' × '+s.h+' = '+(0.5*s.b*s.h);
-    if(s.type==='semicircle') return 'A = ½πr² = ½π('+s.r+')² ≈ '+(0.5*Math.PI*s.r*s.r).toFixed(2);
-    return '';
-  }
-  function shapeLabel(s){
-    if(s.type==='rectangle') return 'Rectangle ('+s.w+' × '+s.h+')';
-    if(s.type==='triangle')  return 'Triangle (b='+s.b+', h='+s.h+')';
-    if(s.type==='semicircle') return 'Semicircle (r='+s.r+')';
+  function partLabel(s){
+    if(s.type==='rectangle')  return (s.w===s.h?'Square':'Rectangle')+' ('+s.w+' × '+s.h+')';
+    if(s.type==='triangle')   return 'Triangle (base '+s.b+', height '+s.h+')';
+    if(s.type==='semicircle') return 'Semicircle (radius '+s.r+')';
     return s.type;
+  }
+  function edges(p){
+    var o=p.outline, out=[];
+    for(var i=0;i<o.length;i++){
+      var a=o[i], b=o[(i+1)%o.length];
+      if(b.arc){ out.push({a:a,b:b,arc:b.arc,len:Math.PI*b.arc}); }
+      else { var dx=b.x-a.x, dy=b.y-a.y; out.push({a:a,b:b,len:Math.sqrt(dx*dx+dy*dy),slant:(dx!==0&&dy!==0)}); }
+    }
+    return out;
+  }
+  function areaOf(p){ return p.parts.reduce(function(t,s){return t+(s.sign<0?-1:1)*partArea(s);},0); }
+  function perimeterOf(p){ return edges(p).reduce(function(t,e){return t+e.len;},0); }
+  // Area enclosed by the outline itself (shoelace + outward semicircles). Must equal
+  // areaOf(p); exposed so a test can prove parts and outline describe the same figure.
+  function outlineArea(p){
+    var o=p.outline, s=0;
+    for(var i=0;i<o.length;i++){ var a=o[i], b=o[(i+1)%o.length]; s+=a.x*b.y-b.x*a.y; }
+    s=s/2;
+    edges(p).forEach(function(e){ if(e.arc) s+=0.5*Math.PI*e.arc*e.arc; });
+    return s;
+  }
+  function answer(p){
+    return p.task==='perimeter'
+      ? {name:'Perimeter', value:perimeterOf(p), unit:'units'}
+      : {name:'Area', value:areaOf(p), unit:'units²'};
+  }
+
+  function diagram(p){
+    var W=190, H=170, pad=28, E=edges(p), pts=p.outline, xs=[], ys=[];
+    pts.forEach(function(v){xs.push(v.x);ys.push(v.y);});
+    E.forEach(function(e){
+      if(!e.arc) return;
+      var dx=e.b.x-e.a.x, dy=e.b.y-e.a.y, L=Math.sqrt(dx*dx+dy*dy);
+      xs.push((e.a.x+e.b.x)/2+dy/L*e.arc); ys.push((e.a.y+e.b.y)/2-dx/L*e.arc);
+    });
+    var minx=Math.min.apply(null,xs), maxx=Math.max.apply(null,xs);
+    var miny=Math.min.apply(null,ys), maxy=Math.max.apply(null,ys);
+    var sc=Math.min((W-2*pad)/(maxx-minx),(H-2*pad)/(maxy-miny));
+    var ox=(W-(maxx-minx)*sc)/2, oy=(H-(maxy-miny)*sc)/2;
+    function X(x){return +(ox+(x-minx)*sc).toFixed(1);}
+    function Y(y){return +(H-oy-(y-miny)*sc).toFixed(1);}
+    function poly(list){return list.map(function(v){return X(v.x)+','+Y(v.y);}).join(' ');}
+
+    var svg='<svg class="comp-fig" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">';
+    // cut-out pieces: dashed ghost outside the solid shape
+    (p.holes||[]).forEach(function(hole){
+      svg+='<polygon points="'+poly(hole)+'" fill="#fdecea" stroke="#c0392b" stroke-width="1.2" stroke-dasharray="4,3"/>';
+      // label sits just above the notch, clear of the edge lengths drawn inside it
+      var cx=hole.reduce(function(t,v){return t+v.x;},0)/hole.length, top=Math.max.apply(null,hole.map(function(v){return v.y;}));
+      svg+='<text x="'+X(cx)+'" y="'+(Y(top)-5)+'" font-size="9" font-family="sans-serif" fill="#c0392b" text-anchor="middle">cut out</text>';
+    });
+    // the solid figure
+    var d='M '+X(pts[0].x)+' '+Y(pts[0].y);
+    for(var i=1;i<=pts.length;i++){
+      var v=pts[i%pts.length];
+      if(v.arc) d+=' A '+(v.arc*sc).toFixed(1)+' '+(v.arc*sc).toFixed(1)+' 0 0 0 '+X(v.x)+' '+Y(v.y);
+      else d+=' L '+X(v.x)+' '+Y(v.y);
+    }
+    svg+='<path d="'+d+' Z" fill="#eaf3f8" stroke="#1d6a96" stroke-width="2" stroke-linejoin="round"/>';
+    // interior seams
+    (p.seams||[]).forEach(function(sm){
+      svg+='<line x1="'+X(sm[0])+'" y1="'+Y(sm[1])+'" x2="'+X(sm[2])+'" y2="'+Y(sm[3])+'" stroke="#1d6a96" stroke-width="1" stroke-dasharray="4,3" opacity="0.7"/>';
+    });
+    // interior measurements (height, radius)
+    (p.marks||[]).forEach(function(m){
+      svg+='<line x1="'+X(m.x1)+'" y1="'+Y(m.y1)+'" x2="'+X(m.x2)+'" y2="'+Y(m.y2)+'" stroke="#555" stroke-width="1" stroke-dasharray="2,2"/>';
+      svg+='<text x="'+(X((m.x1+m.x2)/2)+5)+'" y="'+(Y((m.y1+m.y2)/2)+3)+'" font-size="10" font-family="Georgia,serif" font-style="italic" fill="#333">'+m.text+'</text>';
+    });
+    // outside edge lengths, placed just outside each edge
+    E.forEach(function(e){
+      if(e.arc) return;
+      var dx=e.b.x-e.a.x, dy=e.b.y-e.a.y, L=Math.sqrt(dx*dx+dy*dy), nx=dy/L, ny=-dx/L;
+      var tx=X((e.a.x+e.b.x)/2)+nx*12, ty=Y((e.a.y+e.b.y)/2)-ny*12+3.5;
+      var txt=(Math.abs(e.len-Math.round(e.len))<1e-9)?String(Math.round(e.len)):'≈'+fmt(e.len);
+      svg+='<text x="'+tx.toFixed(1)+'" y="'+ty.toFixed(1)+'" font-size="10" font-family="sans-serif" fill="#1d6a96" text-anchor="middle">'+txt+'</text>';
+    });
+    return svg+'</svg>';
   }
 
   function makeCOMPSteps(p){
-    var total=p.shapes.reduce(function(sum,s){return sum+shapeArea(s);},0);
-    var ans=total.toFixed(2).replace(/\.00$/,'');
-    var off=total>20?5:2;
-    var mc=iMakeChoices(ans+' units²',[(total+off).toFixed(2).replace(/\.00$/,'')+' units²',(total-off).toFixed(2).replace(/\.00$/,'')+' units²',(total+off*2).toFixed(2).replace(/\.00$/,'')+' units²'].filter(function(d){return d!==ans+' units²';}));
-    return [{prompt:'Find the total area of the composite figure. Answer = ?',type:'choice',choices:mc.choices,correct:mc.correct}];
+    var ans=answer(p), v=ans.value, off=v>20?5:2, u=' '+ans.unit, right=fmt(v)+u;
+    var wrong=[fmt(v+off)+u, fmt(v-off)+u, fmt(v+off*2)+u];
+    if(p.task==='perimeter'){
+      // the classic mistake: counting the dashed inside lines as part of the perimeter
+      var seamLen=(p.seams||[]).reduce(function(t,sm){return t+Math.sqrt(Math.pow(sm[2]-sm[0],2)+Math.pow(sm[3]-sm[1],2));},0);
+      if(seamLen>0) wrong[2]=fmt(v+seamLen)+u;
+    } else if(p.parts.some(function(s){return s.sign<0;})){
+      // the classic mistake: adding the cut-out piece instead of subtracting it
+      var added=p.parts.reduce(function(t,s){return t+partArea(s);},0);
+      wrong[2]=fmt(added)+u;
+    }
+    var mc=iMakeChoices(right, wrong.filter(function(d,i,a){return d!==right && a.indexOf(d)===i;}));
+    return [{prompt:(p.task==='perimeter'?'Find the perimeter of the composite figure.':'Find the total area of the composite figure.')+' Answer = ?',type:'choice',choices:mc.choices,correct:mc.correct}];
   }
+
   function probHTML(p,idx){
-    var task=p.task, label=p.label;
-    var totalArea=p.shapes.reduce(function(sum,s){return sum+shapeArea(s);},0);
-    var lastIsRemoved=label.indexOf('removed')>=0;
+    var ans=answer(p), E=edges(p), cut=p.parts.some(function(s){return s.sign<0;});
+    var blank='<span class="blank sm"></span>';
     var h='<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
-    h+='<div class="prob-prompt">Find the <b>'+task+'</b> of the composite figure: <i>'+label+'</i>.</div>';
+    h+='<div class="prob-prompt">Find the <b>'+p.task+'</b> of the composite figure: <i>'+p.label+'</i>.</div>';
     h+='<div style="background:#f8f8f6;border:1px solid #e0e0e0;border-radius:4px;padding:8px 14px;margin-bottom:12px;font-size:11px;color:#555;font-style:italic;">'+
-       'Composite figures = two or more basic shapes combined or one shape removed from another. '+(task==='area'?'Add (or subtract) the individual areas.':'Add up the outer edge lengths only.')+'</div>';
+       'Composite figures are two or more basic shapes put together, or one shape with a piece cut out. '+
+       (p.task==='perimeter'?'Add the lengths of the outside edges only &mdash; the dashed lines are inside the figure and do not count.':'Add the areas of the pieces, and subtract any piece that was cut out.')+'</div>';
+    h+='<div class="prob-body"><div class="graph-area">'+diagram(p)+'</div>';
     h+='<div class="steps">';
 
-    h+='<div class="step"><div class="step-q"><b>Step 1.</b> Identify the individual shapes that make up the figure.</div>';
-    h+='<div style="margin-top:5px;font-size:12px;">';
-    p.shapes.forEach(function(s,si){
-      h+='Shape '+(si+1)+': <span style="font-weight:600;">'+shapeLabel(s)+'</span><br>';
-    });
-    h+='</div></div>';
-
-    if(task==='area'){
-      p.shapes.forEach(function(s,si){
-        h+='<div class="step"><div class="step-q"><b>Step '+(si+2)+'.</b> Find the area of '+shapeLabel(s)+'.</div>';
+    if(p.task==='perimeter'){
+      h+='<div class="step"><div class="step-q"><b>Step 1.</b> Trace the outside edge of the figure. Do <b>not</b> count the dashed lines inside it.</div></div>';
+      h+='<div class="step"><div class="step-q"><b>Step 2.</b> Write the length of every outside side.</div>';
+      h+='<div style="margin-top:5px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px;max-width:420px;font-size:12px;">';
+      E.forEach(function(e,ei){
+        var hint=e.arc?' (curved: ½ × π × diameter)':(e.slant?' (slanted: a² + b² = c²)':'');
+        h+='<div>Side '+(ei+1)+hint+': '+blank+'</div>';
+      });
+      h+='</div></div>';
+      h+='<div class="step"><div class="step-q"><b>Step 3.</b> Add all '+E.length+' outside side lengths.</div>';
+      h+='<div style="font-family:var(--math);font-size:13px;margin-top:5px;">P = '+E.map(function(){return blank;}).join(' + ')+' = <span class="blank lg"></span></div></div>';
+    } else {
+      h+='<div class="step"><div class="step-q"><b>Step 1.</b> Identify the pieces that make up the figure.</div>';
+      h+='<div style="margin-top:5px;font-size:12px;">';
+      p.parts.forEach(function(s,si){
+        h+=(s.sign<0?'Cut-out piece':'Shape '+(si+1))+': <span style="font-weight:600;">'+partLabel(s)+'</span><br>';
+      });
+      h+='</div></div>';
+      p.parts.forEach(function(s,si){
+        h+='<div class="step"><div class="step-q"><b>Step '+(si+2)+'.</b> Find the area of the '+(s.sign<0?'cut-out ':'')+partLabel(s)+'.</div>';
         h+='<div style="font-family:var(--math);font-size:13px;margin-top:5px;">';
-        if(s.type==='rectangle') h+='A = l × w = <span class="blank sm"></span> × <span class="blank sm"></span> = <span class="blank sm"></span>';
-        else if(s.type==='triangle') h+='A = ½ × b × h = ½ × <span class="blank sm"></span> × <span class="blank sm"></span> = <span class="blank sm"></span>';
-        else if(s.type==='semicircle') h+='A = ½πr² = ½ × π × (<span class="blank sm"></span>)² = <span class="blank sm"></span>';
+        if(s.type==='rectangle') h+='A = l × w = '+blank+' × '+blank+' = '+blank;
+        else if(s.type==='triangle') h+='A = ½ × b × h = ½ × '+blank+' × '+blank+' = '+blank;
+        else if(s.type==='semicircle') h+='A = ½πr² = ½ × π × ('+blank+')² = '+blank;
         h+='</div></div>';
       });
-      var finalStep=p.shapes.length+2;
-      h+='<div class="step"><div class="step-q"><b>Step '+finalStep+'.</b> '+(lastIsRemoved?'Subtract the removed area from the total:':'Add all areas together:')+'</div>';
-      h+='<div style="font-family:var(--math);font-size:13px;margin-top:5px;">';
-      h+='Total Area = ';
-      p.shapes.forEach(function(_,si){if(si>0)h+=lastIsRemoved?' &minus; ':' + ';h+='<span class="blank sm"></span>';});
-      h+=' = <span class="blank sm"></span>';
-      h+='</div></div>';
-    } else {
-      h+='<div class="step"><div class="step-q"><b>Step 2.</b> Identify all outer sides of the figure. Sketch and label each side length.</div>';
-      h+='<div style="margin-top:5px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:320px;">';
-      for(var s=0;s<6;s++) h+='<div style="font-size:12px;">Side '+(s+1)+': <span class="blank sm"></span></div>';
-      h+='</div></div></div>';
-      h+='<div class="step"><div class="step-q"><b>Step 3.</b> Add all outer side lengths.</div>';
-      h+='<div style="font-family:var(--math);font-size:13px;margin-top:5px;">P = <span class="blank sm"></span> + <span class="blank sm"></span> + <span class="blank sm"></span> + <span class="blank sm"></span> + <span class="blank sm"></span> + <span class="blank sm"></span> = <span class="blank lg"></span></div></div>';
+      h+='<div class="step"><div class="step-q"><b>Step '+(p.parts.length+2)+'.</b> '+(cut?'Subtract the cut-out piece from the whole shape:':'Add all the areas together:')+'</div>';
+      h+='<div style="font-family:var(--math);font-size:13px;margin-top:5px;">Total Area = ';
+      p.parts.forEach(function(s,si){ if(si>0) h+=(s.sign<0?' &minus; ':' + '); h+=blank; });
+      h+=' = <span class="blank lg"></span></div></div>';
     }
 
-    h+='</div>';
+    h+='</div></div>';
     h+=renderInteractiveSteps(makeCOMPSteps(p),'composite',idx);
-    h+='<div class="solution-box"><span class="sol-label">'+task.charAt(0).toUpperCase()+task.slice(1)+':</span><span class="math">'+totalArea.toFixed(2).replace(/\.00$/,'')+' units²</span></div>';
+    h+='<div class="solution-box"><span class="sol-label">'+ans.name+':</span><span class="math">'+fmt(ans.value)+' '+ans.unit+'</span></div>';
     h+='</div>'; return h;
   }
 
@@ -4687,6 +4864,7 @@ var COMP = (function(){
       h+='<span class="prow-num">'+(i+1)+'.</span>';
       h+='<input type="text" value="'+p.label+'" style="flex:1;padding:3px 6px;border:1px solid #ddd;border-radius:3px;font-size:12px;" oninput="COMP.setLabel('+i+',this.value)">';
       h+='<div class="pf"><label>Task</label><select onchange="COMP.setTask('+i+',this.value)"><option value="area"'+(p.task==='area'?' selected':'')+'>Area</option><option value="perimeter"'+(p.task==='perimeter'?' selected':'')+'>Perimeter</option></select></div>';
+      h+='<span style="font-size:10px;color:#aaa;align-self:center;margin-left:6px;">A='+fmt(areaOf(p))+' P='+fmt(perimeterOf(p))+'</span>';
       h+='<button class="pdel" onclick="COMP.del('+i+')">&#x2715;</button></div>';
       h+='</div>';
     });
@@ -4696,10 +4874,15 @@ var COMP = (function(){
   function render(){renderEditor();renderWS();}
   return{render:render,
     setLabel:function(i,v){problems[i].label=v;renderWS();},
-    setTask:function(i,v){problems[i].task=v;renderWS();},
-    addProblem:function(){problems.push({shapes:[{type:'rectangle',w:6,h:4},{type:'triangle',b:6,h:3}],task:'area',label:'Rectangle + Triangle'});render();},
+    setTask:function(i,v){problems[i].task=v;render();},
+    addProblem:function(){problems.push({label:'Rectangle + Triangle on top', task:'area',
+      parts:[{type:'rectangle',w:6,h:4,sign:1},{type:'triangle',b:6,h:3,sign:1}],
+      outline:[{x:0,y:0},{x:6,y:0},{x:6,y:4},{x:3,y:7},{x:0,y:4}],
+      seams:[[0,4,6,4]], holes:[], marks:[{x1:3,y1:4,x2:3,y2:7,text:'h = 3'}]});render();},
     del:function(i){problems.splice(i,1);render();},
-    clearAll:function(){problems=[];render();}};
+    clearAll:function(){problems=[];render();},
+    // read-only hooks for automated checks
+    _model:{list:function(){return problems;},areaOf:areaOf,perimeterOf:perimeterOf,outlineArea:outlineArea,edges:edges}};
 })();
 
 // ═══════════════════════════════════════════════
@@ -8566,7 +8749,9 @@ function normalizeAnswer(s){
     .replace(/[,$]/g,'')
     .replace(/[≈≠]/g,'')
     .replace(/[→⟶➞➝]/g,'') // arrows (multi-step "X → Y" becomes "XY")
-    .replace(/units?[2-3]?/g,'')
+    .replace(/units?[2-3²³]?/g,'')
+    // a squared/cubed unit (cm², ft³) is a unit, not an exponent: drop the mark with the word
+    .replace(/(?:square|cubic)?(?:units?|cm|mm|m|in|ft|yd|mi)[²³]/g,'')
     .replace(/(?:square|cubic)?(?:units?|cm|mm|m|in|ft|yd|mi|kg|g|lb|oz|s|min|hr|hrs|hours)/g,'')
     .replace(/[π]/g,'pi');
 }
@@ -8633,6 +8818,8 @@ function toValue(raw){
   var t=t0.replace(/&sup4;/g,'^4').replace(/&sup5;/g,'^5').replace(/&sup6;/g,'^6')
     .replace(/[$%]/g,'').replace(/[−–—]/g,'-').replace(/[×]/g,'*').replace(/[÷]/g,'/')
     .replace(/π/g,'pi').replace(/√/g,'sqrt')
+    // "54 units²" is 54, not 54^2: strip the mark off a unit word before superscripts become powers
+    .replace(/\b(units?|cm|mm|m|in|inches|ft|feet|yd|mi)\s*[²³]/g,'$1')
     .replace(/[²]/g,'^2').replace(/[³]/g,'^3').replace(/[⁴]/g,'^4').replace(/[⁵]/g,'^5').replace(/[⁶]/g,'^6')
     .replace(/[°]/g,'').replace(/\(\s*exact\s*\)/g,'')
     .replace(/\b(square|cubic)?\s*(units?|cm|mm|m|in|inches|ft|feet|yd|mi|kg|g|lb|oz|apples|crayons|books|marbles|rolls)\b/g,'')
