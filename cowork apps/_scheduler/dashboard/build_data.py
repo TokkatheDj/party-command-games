@@ -13,6 +13,18 @@ MANIFEST = ROOT / "_scheduler" / "manifest.json"
 
 QUARANTINE = "dj_music_apps"
 
+# Two tasks guard the schedule but generate nothing. They live outside
+# manifest.json because their own scripts register them (Register-CatchUpTask.ps1,
+# Setup-PollutionCheck.ps1), so the manifest alone under-reports the day.
+WATCHDOGS = [
+    {"safeName": "PollutionCheck", "label": "Pollution check", "at": "07:00",
+     "log": "dj_pollution_check.log", "root": True,
+     "what": "confirms dj_music_apps has not re-grown its mirrored folders"},
+    {"safeName": "CatchUp", "label": "Catch-up sweep", "at": "20:10",
+     "log": "_CatchUp.log", "root": False,
+     "what": "reruns routines that produced nothing, serially, capped at 3"},
+]
+
 # Folder keys are internal vocabulary. The page is public, so it shows readable
 # names; the raw folder stays available as a tooltip for operating the thing.
 CAT_LABEL = {
@@ -216,13 +228,53 @@ near.sort(key=lambda x: (not x["sameDay"], x["cat"]))
 
 real_counts = {k: v for k, v in counts.items() if k != QUARANTINE}
 
+# ---------- watchdogs + the last catch-up sweep ----------
+watchdogs = []
+for w in WATCHDOGS:
+    log = (ROOT / w["log"]) if w["root"] else (LOGS / w["log"])
+    last, detail = None, ""
+    if log.exists():
+        lines = [l for l in log.read_text(encoding="utf-8", errors="replace").splitlines() if l.strip()]
+        if lines:
+            m = re.search(r"(\d{4}-\d{2}-\d{2})", lines[-1])
+            last = m.group(1) if m else None
+            detail = lines[-1][:150]
+    watchdogs.append({**{k: w[k] for k in ("safeName", "label", "at", "what")},
+                      "lastDate": last, "detail": detail})
+
+# The last completed sweep, so the page can show whether recovery actually works
+# rather than just asserting that a task exists.
+sweep = None
+cl = LOGS / "_CatchUp.log"
+if cl.exists():
+    lines = cl.read_text(encoding="utf-8", errors="replace").splitlines()
+    runs = []
+    for l in lines:
+        m = re.match(r"^(\d{4}-\d{2}-\d{2}) \d{2}:\d{2}:\d{2}\s+=== catch-up DONE '([^']+)' exit=(\d+)(?: \(([\w-]+)\))?", l)
+        if m:
+            runs.append({"date": m.group(1), "name": m.group(2),
+                         "exit": int(m.group(3)), "why": m.group(4) or ""})
+    fin = [l for l in lines if "catch-up finished:" in l]
+    if runs:
+        last_date = runs[-1]["date"]
+        sweep = {"date": last_date,
+                 "runs": [r for r in runs if r["date"] == last_date],
+                 "summary": (fin[-1].split("  ", 1)[-1] if fin else "")}
+
+# Cleaned 2026-08-31: 86 files relocated to their real categories, 9 near-identical
+# duplicates deleted. What remains is genuine DJ output, not the mirrored shape.
+quarantine_resolved = counts.get(QUARANTINE, 0) < 20 and len(cross_dj) == 0
+
 data = {
     "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
     "totalApps": len(rows),
     "undated": len(undated),
     "realApps": sum(real_counts.values()),
     "quarantine": {"cat": QUARANTINE, "label": catlabel(QUARANTINE),
-                   "count": counts.get(QUARANTINE, 0), "crossSlugs": len(cross_dj)},
+                   "count": counts.get(QUARANTINE, 0), "crossSlugs": len(cross_dj),
+                   "resolved": quarantine_resolved, "peak": 90, "cleaned": "2026-08-31"},
+    "watchdogs": watchdogs,
+    "sweep": sweep,
     "categories": sorted(({"name": k, "label": catlabel(k), "count": v}
                           for k, v in real_counts.items()),
                          key=lambda x: -x["count"]),
