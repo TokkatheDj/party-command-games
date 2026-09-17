@@ -391,7 +391,10 @@ THEME_ROOT_VARS = """
     --warn: #A8690F;
     --accent-rgb: 58, 132, 255;
     --accent2-rgb: 210, 54, 76;
-    --f-display: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    /* Headings in the same system sans as the Amigo watch page, which is
+       where this palette came from. Georgia belonged to the desktop chat
+       page's warm theme and read oddly once the colours went blue. */
+    --f-display: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --f-body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --f-mono: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", monospace;
   }
