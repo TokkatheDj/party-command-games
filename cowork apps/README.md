@@ -146,7 +146,7 @@ Reports open at `test_reports\index.html`.
 
 | Task | What it does |
 |---|---|
-| `CoworkApp` | Starts the server at logon |
+| `CoworkApp` | **Retired 18 Sep 2026 — should be Disabled.** A redundant second server launcher; the Startup-folder `Cowork Apps Server.vbs` is the one that runs. Changing it needs an admin prompt: `schtasks /Change /TN CoworkApp /Disable` |
 | `CoworkApps-DailyCheck` | Daily AI pass over the notes |
 | `CoworkApps-PollutionCheck` | Watches for the generator writing into the wrong folders |
 | `CoworkApps-DailyDJApp` | **Paused.** Built one DJ app per day |
