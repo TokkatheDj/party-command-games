@@ -37,8 +37,9 @@ Write-Host "  ╚═════════════════════
 Write-Host ""
 Write-Host "  Starting server..." -ForegroundColor Gray
 
-# Open the local browser
-Start-Process "http://localhost:$Port"
+# No browser is opened here any more. The installed AppVerse app already
+# opens at sign-in (Chrome's "Start app when you sign in"), so this line
+# was putting a second copy up in a regular tab beside it every login.
 
 # Start Python server — auto-restart on crash, stop on Ctrl+C
 Set-Location $AppsDir
