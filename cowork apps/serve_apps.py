@@ -380,16 +380,20 @@ THEME_ROOT_VARS = """
      has one belly -- it reads 3.2:1 on the light ground and 5.6:1 on the dark,
      which is why it paints fills, borders and labels but never body copy. */
   :root {
-    --bg: #F2F5FA;          /* Amigo /w, light ground */
-    --surface: #FFFFFF;
-    --border: #C6D0E4;      /* Amigo /w, light input border */
+    /* Light mode's neutrals are silver -- his body, #CED4DE, stepped lighter -- rather than
+       the blue-tinted whites of Amigo /w (#F2F5FA ground, #C6D0E4 border), so light mode
+       reads blue-on-silver like the watch. The ground is the lightest silver that keeps the
+       accent at 3:1 for labels sitting on it (3.02; #E3E7EC would drop it to 2.85). */
+    --bg: #EAEDF0;          /* silver ground */
+    --surface: #F8F9FB;     /* near-white silver cards */
+    --border: #C3C9D2;      /* silver edge */
     --accent: #3A84FF;      /* his belly */
     --accent2: #D2364C;     /* NOT part of the coqui, and deliberately so: this
                                is the alarm hue -- hearts, errors, delete, the
                                NEW badge. In blue it would stop being a signal. */
     --text: #121E46;        /* Amigo /w, light ink */
-    --muted: #5A6B8C;       /* Amigo /w, light h1 */
-    --card-hover: #E6EDF7;
+    --muted: #586273;       /* neutral grey; 5.2:1 on the ground, 5.9:1 on cards */
+    --card-hover: #EDF0F3;  /* a step of silver */
     --tint: #DEE9FB;        /* the "this one is yours" wash */
     --ok: #1F7A5A;
     --warn: #A8690F;
@@ -3922,7 +3926,7 @@ def make_manifest():
         #
         # Dark, because the saved theme is server-side and global and his is
         # dark: this is the ground the installed app actually opens on. If the
-        # hub is ever switched to light for good, flip this to #F2F5FA.
+        # hub is ever switched to light for good, flip this to #EAEDF0 (the silver ground).
         "background_color": "#060912",
         "theme_color": "#3A84FF",
         "icons": [
