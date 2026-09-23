@@ -7438,6 +7438,291 @@ var G6 = (function(){
   return api;
 })();
 
+// ── 6th GRADE LESSONS (begin) ──
+// ── Unit 1: Numerical Expressions and Factors ──
+(function(){
+  var fmt=G6.fmt;
+  function sup(n){ return pemSup(String(n)); }                 // 4 -> ⁴ (plain text the grader reads)
+  function isPrime(n){ if(n<2) return false; for(var d=2; d*d<=n; d++) if(n%d===0) return false; return true; }
+  function primeFactors(n){ var out=[], d=2; while(n>1){ while(n%d===0){ out.push(d); n/=d; } d++; } return out; }
+  // [2,2,3,7] -> "2² × 3 × 7"
+  function expForm(fs){
+    var cnt={}, order=[];
+    fs.forEach(function(p){ if(!cnt[p]){ cnt[p]=0; order.push(p); } cnt[p]++; });
+    return order.map(function(p){ return cnt[p]>1 ? p+sup(cnt[p]) : ''+p; }).join(' × ');
+  }
+  function product(fs){ return fs.reduce(function(a,b){ return a*b; },1); }
+  // Student answer written as primes (2^2*3*7, 2×2×3×7, 2²·3·7)? Returns the product, or null.
+  function primeProduct(t){
+    var s=String(t).replace(/[−–—]/g,'-').replace(/[·•x*]/gi,'×').replace(/\s+/g,'')
+      .replace(/[²³⁴⁵⁶⁷⁸⁹]/g, function(c){ return '^'+'⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(c); });
+    if(!s) return null;
+    var prod=1, ok=true;
+    s.split('×').forEach(function(part){
+      var m=part.match(/^(\d+)(?:\^(\d+))?$/);
+      if(!m || !isPrime(+m[1])){ ok=false; return; }
+      prod*=Math.pow(+m[1], m[2]? +m[2] : 1);
+    });
+    return ok? prod : null;
+  }
+  // A factor-tree SVG. Circles and branches always show (students fill them in on paper);
+  // the numbers are one layer that appears when the last step is answered and on the key.
+  function factorTree(n){
+    var fs=primeFactors(n), rows=[], cur=n;
+    fs.slice(0,-1).forEach(function(p){ rows.push([p, cur/p]); cur/=p; });
+    var W=200, dy=36, H=34+rows.length*dy+10, x=70, y=20;
+    var s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+    var nums='<g class="gph-layer gph-g6tree">';
+    s+='<text x="'+x+'" y="'+(y+4)+'" font-size="13" font-weight="700" font-family="Georgia,serif" text-anchor="middle" fill="#111">'+n+'</text>';
+    rows.forEach(function(r,i){
+      var y1=y+i*dy+8, y2=y1+dy-14, lx=x-22, rx=x+22;
+      s+='<line x1="'+x+'" y1="'+y1+'" x2="'+lx+'" y2="'+(y2-10)+'" stroke="#888" stroke-width="1.2"/>';
+      s+='<line x1="'+x+'" y1="'+y1+'" x2="'+rx+'" y2="'+(y2-10)+'" stroke="#888" stroke-width="1.2"/>';
+      s+='<circle cx="'+lx+'" cy="'+(y2-2)+'" r="10" fill="#fff" stroke="#1d6a96" stroke-width="1.6"/>';
+      var last=i===rows.length-1;
+      if(last) s+='<circle cx="'+rx+'" cy="'+(y2-2)+'" r="10" fill="#fff" stroke="#1d6a96" stroke-width="1.6"/>';
+      else s+='<rect x="'+(rx-13)+'" y="'+(y2-12)+'" width="26" height="18" rx="3" fill="#fff" stroke="#bbb" stroke-dasharray="3,2"/>';
+      nums+='<text x="'+lx+'" y="'+(y2+2)+'" font-size="11" font-weight="700" font-family="sans-serif" text-anchor="middle" fill="#1d6a96">'+r[0]+'</text>';
+      nums+='<text x="'+rx+'" y="'+(y2+2)+'" font-size="11" font-weight="700" font-family="sans-serif" text-anchor="middle" fill="'+(last?'#1d6a96':'#333')+'">'+r[1]+'</text>';
+      x=rx;
+    });
+    return s+nums+'</g></svg>';
+  }
+
+  // 1.1 Powers and Exponents
+  G6.lesson({
+    id:'g6_1_1', count:6,
+    tips:['<b>Power:</b> the <b>base</b> is the number being multiplied; the <b>exponent</b> says how many times it is used as a factor.',
+          '<b>Not multiplication:</b> 5<sup>3</sup> = 5 × 5 × 5 = 125, not 5 × 3 = 15.',
+          '<b>Powers of 10:</b> the exponent is the number of zeros after the 1: 10<sup>4</sup> = 10,000.'],
+    gen:function(r,i){
+      var type=['eval','write','ten'][i%3];
+      if(type==='ten') return {type:type, b:10, e:r.int(2,6)};
+      var e=r.int(2,4), b= e===4? r.int(2,5) : e===3? r.int(2,9) : r.int(3,12);
+      return {type:type, b:b, e:e};
+    },
+    prompt:function(p){
+      if(p.type==='write') return 'Write the product as a power, then evaluate it: <span class="math">'+Array(p.e+1).join(p.b+' × ').slice(0,-3)+'</span>';
+      return 'Evaluate the power: <span class="math">'+p.b+'<sup>'+p.e+'</sup></span>';
+    },
+    steps:function(p){
+      var v=Math.pow(p.b,p.e), rep=Array(p.e+1).join(p.b+' × ').slice(0,-3), st=[];
+      if(p.type==='write'){
+        st.push({q:'Which number is repeated as a factor? That is the <b>base</b>.', ans:''+p.b, wrong:[''+p.e, ''+(p.b*p.e), ''+(p.b+1)]});
+        st.push({q:'How many times is it used as a factor? That is the <b>exponent</b>.', ans:''+p.e, wrong:[''+p.b, ''+(p.e+1), ''+(p.e-1)]});
+        st.push({q:'Write the product as a power.', ans:p.b+sup(p.e), wrong:[p.e+sup(p.b), p.b+' × '+p.e, ''+(p.b*p.e)], formMatters:true});
+      } else {
+        st.push({q:'What is the <b>base</b>?', ans:''+p.b, wrong:[''+p.e, ''+(p.b*p.e), ''+v]});
+        st.push({q:'What is the <b>exponent</b>?', ans:''+p.e, wrong:[''+p.b, ''+(p.e+1), ''+(p.e+2)]});
+        st.push({q:'Write it as repeated multiplication.', ans:rep, wrong:[p.b+' × '+p.e, Array(p.e+1).join(p.b+' + ').slice(0,-3), Array(p.b+1).join(p.e+' × ').slice(0,-3)], formMatters:true});
+        if(p.type==='ten') st.push({q:'How many zeros follow the 1?', ans:''+p.e, wrong:[''+(p.e+1), ''+(p.e-1), '10']});
+      }
+      st.push({q:'Multiply to evaluate.', ans:fmt(v), wrong:[fmt(p.b*p.e), fmt(Math.pow(p.e,p.b)), fmt(p.b+p.e)]});
+      return st;
+    },
+    answer:function(p){ return fmt(Math.pow(p.b,p.e)); },
+    alts:function(p){ return [String(Math.pow(p.b,p.e)), p.b+'^'+p.e]; },
+    rejects:function(p){ return p.b*p.e!==Math.pow(p.b,p.e) ? [String(p.b*p.e)] : []; }
+  });
+
+  // 1.2 Order of Operations — expressions from templates whose tempting wrong first move is known,
+  // evaluated by the app's own pemDerive(), so every step is the true next operation.
+  function ops(){ return {
+    mul:function(a,b){ return a+' × '+b; }, div:function(a,b){ return a+' ÷ '+b; },
+    add:function(a,b){ return a+' + '+b; }, sub:function(a,b){ return a+' − '+b; }
+  }; }
+  var TEMPLATES=[
+    function(r,o){ var a=r.int(2,20), b=r.int(2,9), c=r.int(2,9);
+      return {expr:o.add(a,o.mul(b,c)), traps:[o.add(a,b)]}; },
+    function(r,o){ var a=r.int(2,9), b=r.int(1,9), c=r.int(2,6), d=r.int(1,(a+b)*c-1);
+      return {expr:'('+o.add(a,b)+') × '+o.sub(c,d), traps:[o.mul(b,c), o.sub(c,d)]}; },
+    function(r,o){ var d=r.int(2,5), c=r.int(1,5), b=c+d*r.int(1,4), a=d*r.int(1,6);
+      return {expr:a+' × ('+o.sub(b,c)+') ÷ '+d, traps:[o.mul(a,b)]}; },
+    function(r,o){ var a=r.int(1,20), b=r.int(2,5), c=r.int(2,5);
+      return {expr:o.add(a, b+'² × '+c), traps:[o.add(a,b), b+' × '+c]}; },
+    function(r,o){ var b=r.int(1,6), a=b+r.int(1,5), d=r.int(2,5), c=d*r.int(1,8);
+      return {expr:'('+o.sub(a,b)+')² + '+o.div(c,d), traps:[o.div(c,d), o.add(b+'²',o.div(c,d))]}; },
+    function(r,o){ var b=r.int(2,6), c=r.int(2,5), a=b*r.int(2,9), d=r.int(1,15);
+      return {expr:o.add(o.mul(o.div(a,b),c),d), traps:[o.mul(b,c), o.add(c,d)]}; },
+    function(r,o){ var a=r.int(12,40), b=r.int(2,a-2), c=r.int(1,9);
+      return {expr:o.add(o.sub(a,b),c), traps:[o.add(b,c)]}; },
+    function(r,o){ var a=r.int(2,4), b=r.int(2,3), c=r.int(2,9);
+      return {expr:a+'³ − '+o.mul(b,c), traps:[a+' × 3', o.sub(a,b)]}; }
+  ];
+  G6.lesson({
+    id:'g6_1_2', count:6,
+    tips:['<b>Order:</b> Parentheses → Exponents → Multiply and Divide (left to right) → Add and Subtract (left to right).',
+          '<b>Left to right:</b> × and ÷ are equal partners, and so are + and −. Do whichever comes first reading left to right.',
+          '<b>Rewrite</b> the expression after every step so you never lose track.'],
+    gen:function(r,i){
+      var o=ops();
+      for(var t=0;t<40;t++){
+        var T=TEMPLATES[(i+t)%TEMPLATES.length](r,o), d=pemDerive(T.expr);
+        if(!d || !d.steps.length) continue;
+        var fin=d.answers[d.answers.length-1];
+        var clean=d.answers.every(function(v){ return v>=0 && Math.abs(v-Math.round(v))<1e-9; });
+        if(clean && fin<=200) return {expr:T.expr, traps:T.traps.filter(Boolean), d:d};
+      }
+      var e='3 + 4 × 5'; return {expr:e, traps:['3 + 4'], d:pemDerive(e)};
+    },
+    prompt:function(p){ return 'Evaluate using the order of operations: <span class="math">'+p.expr+'</span>'; },
+    steps:function(p){
+      var st=[{q:'Which operation do you do <b>first</b>?', ans:p.d.steps[0], wrong:p.traps.concat(p.d.steps.slice(1)), formMatters:true}];
+      p.d.steps.forEach(function(lab,k){
+        var v=p.d.answers[k];
+        st.push({q:(k===p.d.steps.length-1?'Finally, evaluate ':'Next, evaluate ')+'<span class="math">'+lab+'</span>.', ans:fmt(v)});
+      });
+      return st;
+    },
+    check:function(p){ var v=safeEval(p.expr.replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/²/g,'^2').replace(/³/g,'^3'));
+      return Math.abs(v-p.d.answers[p.d.answers.length-1])<1e-9 ? '' : 'pemDerive '+p.d.answers[p.d.answers.length-1]+' vs '+v; },
+    answer:function(p){ return fmt(p.d.answers[p.d.answers.length-1]); }
+  });
+
+  // 1.3 Prime Factorization
+  G6.lesson({
+    id:'g6_1_3', count:4, formMatters:true,
+    tips:['<b>Prime:</b> exactly two factors, 1 and itself (2, 3, 5, 7, 11, 13 …). <b>Composite:</b> more than two.',
+          '<b>Factor tree:</b> split off the smallest prime you can, circle it, and keep going until every branch ends in a prime.',
+          '<b>Write it with exponents:</b> 2 × 2 × 2 × 3 = 2<sup>3</sup> × 3.'],
+    gen:function(r){
+      for(var t=0;t<60;t++){
+        var fs=[], k=r.int(3,5);
+        for(var j=0;j<k;j++) fs.push(r.pick([2,2,2,3,3,5,7,11,13]));
+        fs.sort(function(a,b){ return a-b; });
+        var n=product(fs);
+        if(n>=24 && n<=300) return {n:n};
+      }
+      return {n:84};
+    },
+    prompt:function(p){ return 'Write the prime factorization of <span class="math">'+p.n+'</span>. Use a factor tree.'; },
+    svg:function(p){ return factorTree(p.n); },
+    steps:function(p){
+      var fs=primeFactors(p.n), cur=p.n, st=[];
+      fs.slice(0,-1).forEach(function(pr, i){
+        var q=cur/pr, other=primeFactors(q).filter(function(x){ return x!==pr; })[0];
+        var wrong=[pr+' × '+(q+1)];
+        if(cur%4===0) wrong.push('4 × '+(cur/4));
+        // a different split is a real mistake ("3 × 28" for 84), but on the last split it is just
+        // the same two primes swapped ("7 × 2" for 14) — arguably right, so leave it out
+        if(other && !isPrime(cur/other)) wrong.push(other+' × '+(cur/other));
+        wrong.push((pr+1)+' × '+q, '1 × '+cur);
+        st.push({q:(i===0?'Split ':'Now split ')+'<b>'+cur+'</b> into its <b>smallest</b> prime factor times another number.', ans:pr+' × '+q, wrong:wrong,
+          paper:(i===0?'Split ':'Now split ')+'<b>'+cur+'</b> into its smallest prime factor times another number.'});
+        cur=q;
+      });
+      var ans=expForm(fs), n=p.n;
+      var w1=fs.slice(1), w2=fs.concat([fs[0]]);
+      var fake=[2,3,5].map(function(pp){ return fs.indexOf(pp)<0 ? expForm(fs.slice(0,-1).concat([pp]).sort(function(a,b){return a-b;})) : null; }).filter(Boolean);
+      st.push({q:'Write the prime factorization using exponents.', ans:ans, reveal:'g6tree',
+        wrong:[expForm(w1), expForm(w2.sort(function(a,b){return a-b;}))].concat(fake).concat(n%4===0 ? ['4 × '+(n/4)] : [])});
+      return st;
+    },
+    answer:function(p){ return expForm(primeFactors(p.n)); },
+    alts:function(p){ return [primeFactors(p.n).join(' × '), primeFactors(p.n).join('*'), expForm(primeFactors(p.n)).replace(/ /g,'')]; },
+    rejects:function(p){ var fs=primeFactors(p.n); return [String(p.n), (fs[0]*fs[1])+' × '+(p.n/(fs[0]*fs[1]))]; },
+    grade:function(t,p){ return primeProduct(t)===p.n; }
+  });
+
+  // 1.4 Greatest Common Factor (and 6.NS.4: factor a sum with the GCF)
+  function pairWithGcf(r, maxN){
+    for(var t=0;t<80;t++){
+      var g=r.int(2,15), m=r.int(1,9), n=r.int(1,9);
+      if(m===n || gcd(m,n)!==1) continue;
+      var a=g*m, b=g*n;
+      if(a>maxN || b>maxN || a<6 || b<6) continue;
+      return a<b? {a:a,b:b,g:g} : {a:b,b:a,g:g};
+    }
+    return {a:12,b:18,g:6};
+  }
+  var GCF_NOUNS=['kits','bouquets','teams'];
+  var GCF_STORIES=[
+    function(a,b){ return 'A teacher has '+a+' pencils and '+b+' erasers to pack into identical supply kits with nothing left over. What is the greatest number of kits she can make?'; },
+    function(a,b){ return 'A florist has '+a+' roses and '+b+' tulips. Each bouquet must be the same, using every flower. What is the greatest number of bouquets?'; },
+    function(a,b){ return 'A coach splits '+a+' sixth graders and '+b+' fifth graders into equal teams, each with the same mix of grades. What is the greatest number of teams?'; }
+  ];
+  G6.lesson({
+    id:'g6_1_4', count:6,
+    tips:['<b>GCF:</b> the greatest number that divides into both numbers evenly.',
+          '<b>Prime factors:</b> write both prime factorizations, circle the primes they share, and multiply the shared primes.',
+          '<b>Factor a sum:</b> 36 + 8 = 4 × 9 + 4 × 2 = 4(9 + 2). Pull out the GCF.'],
+    gen:function(r,i){
+      var type=['plain','story','distribute'][i%3], q=pairWithGcf(r, 100);
+      q.type=type; if(type==='story') q.story=r.int(0,GCF_STORIES.length-1);
+      return q;
+    },
+    prompt:function(p){
+      if(p.type==='story') return GCF_STORIES[p.story](p.a,p.b);
+      if(p.type==='distribute') return 'Use the GCF to write the sum as a product: <span class="math">'+p.a+' + '+p.b+'</span>';
+      return 'Find the greatest common factor (GCF) of <span class="math">'+p.a+'</span> and <span class="math">'+p.b+'</span>.';
+    },
+    steps:function(p){
+      var fa=primeFactors(p.a), fb=primeFactors(p.b), shared=primeFactors(p.g);
+      var st=[
+        {q:'Prime factorization of <b>'+p.a+'</b>:', ans:expForm(fa), wrong:[expForm(fa.slice(1)), expForm(fa.concat([fa[0]]).sort(function(x,y){return x-y;})), expForm(fb)], formMatters:true},
+        {q:'Prime factorization of <b>'+p.b+'</b>:', ans:expForm(fb), wrong:[expForm(fb.slice(1)), expForm(fb.concat([fb[0]]).sort(function(x,y){return x-y;})), expForm(fa)], formMatters:true},
+        {q:'Which prime factors do they <b>share</b>?', ans:shared.join(' × '), wrong:[shared.slice(1).join(' × ')||'none', fa.concat(fb).filter(function(x,k,arr){return arr.indexOf(x)===k;}).join(' × '), shared.concat([shared[0]]).join(' × ')], formMatters:true}
+      ];
+      var gw=[G6.lcm(p.a,p.b), p.a*p.b, shared.length>1? p.g/shared[0] : 1, p.b-p.a];
+      if(p.type==='distribute'){
+        st.push({q:'Multiply the shared primes. What is the GCF?', ans:''+p.g, wrong:gw.map(String)});
+        st.push({q:'Divide each number by the GCF and write the product.', ans:p.g+'('+(p.a/p.g)+' + '+(p.b/p.g)+')',
+          wrong:[(p.a/p.g)+'('+p.g+' + '+p.b+')', p.g+'('+p.a+' + '+p.b+')', p.g+'('+(p.a/p.g)+' × '+(p.b/p.g)+')', (p.g*2)+'('+(p.a/p.g)+' + '+(p.b/p.g)+')'], formMatters:true});
+      } else {
+        st.push({q:(p.type==='story'?'Multiply the shared primes. What is the greatest number of '+GCF_NOUNS[p.story]+'?':'Multiply the shared primes. What is the GCF?'), ans:''+p.g, wrong:gw.map(String)});
+      }
+      return st;
+    },
+    answer:function(p){ return p.type==='distribute' ? p.g+'('+(p.a/p.g)+' + '+(p.b/p.g)+')' : ''+p.g; },
+    alts:function(p){ return p.type==='distribute' ? [p.g+'('+(p.a/p.g)+'+'+(p.b/p.g)+')', p.g+' × ('+(p.a/p.g)+' + '+(p.b/p.g)+')'] : [String(p.g)]; },
+    rejects:function(p){ return p.type==='distribute' ? [String(p.a+p.b), '1('+p.a+' + '+p.b+')'] : [String(G6.lcm(p.a,p.b))]; },
+    // "Write as a product" means the GCF outside the parentheses, not just the total.
+    grade:function(t,p,dflt){
+      if(p.type!=='distribute') return dflt;
+      var m=String(t).replace(/\s+/g,'').replace(/[×*·]/g,'').match(/^(\d+)\((\d+)\+(\d+)\)$/);
+      return !!m && +m[1]===p.g && ((+m[2]===p.a/p.g && +m[3]===p.b/p.g) || (+m[3]===p.a/p.g && +m[2]===p.b/p.g));
+    }
+  });
+
+  // 1.5 Least Common Multiple
+  var LCM_STORIES=[
+    function(a,b){ return 'Bus A leaves the station every '+a+' minutes and Bus B every '+b+' minutes. They just left together. In how many minutes will they leave together again?'; },
+    function(a,b){ return 'Hot dogs come in packs of '+a+' and buns in packs of '+b+'. What is the least number of hot dogs you can buy to have exactly the same number of buns?'; },
+    function(a,b){ return 'One light blinks every '+a+' seconds and another every '+b+' seconds. They blink together now. After how many seconds will they blink together again?'; }
+  ];
+  G6.lesson({
+    id:'g6_1_5', count:6,
+    tips:['<b>LCM:</b> the least number that is a multiple of both numbers.',
+          '<b>List multiples:</b> 4, 8, 12, 16 … and 6, 12, 18 … — the first number in both lists is the LCM (12).',
+          '<b>Not the product:</b> 4 × 6 = 24 is a common multiple, but not the least one.'],
+    gen:function(r,i){
+      for(var t=0;t<60;t++){
+        var a=r.int(2,12), b=r.int(2,12);
+        if(a===b || a%b===0 || b%a===0) continue;
+        if(i%2===0 && gcd(a,b)===1 && r.chance(0.6)) continue;   // mostly pairs where the product is NOT the LCM
+        if(a>b){ var x=a; a=b; b=x; }
+        return {a:a, b:b, story: i%2? r.int(0,LCM_STORIES.length-1) : -1};
+      }
+      return {a:4, b:6, story:-1};
+    },
+    prompt:function(p){ return p.story>=0 ? LCM_STORIES[p.story](p.a,p.b) : 'Find the least common multiple (LCM) of <span class="math">'+p.a+'</span> and <span class="math">'+p.b+'</span>.'; },
+    steps:function(p){
+      var L=G6.lcm(p.a,p.b);
+      function mult(n, upto){ var out=[]; for(var k=n; k<=upto; k+=n) out.push(k); return out.join(', '); }
+      function factors(n){ var out=[]; for(var k=1;k<=n;k++) if(n%k===0) out.push(k); return out.join(', '); }
+      var st=[
+        {q:'List the multiples of <b>'+p.a+'</b> up to '+L+'.', ans:mult(p.a,L), wrong:[factors(p.a), mult(p.a+1,L), mult(p.b,L)], formMatters:true},
+        {q:'List the multiples of <b>'+p.b+'</b> up to '+L+'.', ans:mult(p.b,L), wrong:[factors(p.b), mult(p.b+1,L), mult(p.a,L)], formMatters:true},
+        {q:'What is the <b>least</b> number in both lists?', ans:''+L, wrong:[String(p.a*p.b), String(gcd(p.a,p.b)), String(L*2), String(p.a+p.b)]}
+      ];
+      return st;
+    },
+    answer:function(p){ return ''+G6.lcm(p.a,p.b); },
+    rejects:function(p){ var L=G6.lcm(p.a,p.b); return L!==p.a*p.b ? [String(p.a*p.b)] : [String(gcd(p.a,p.b))]; }
+  });
+})();
+
+// ── 6th GRADE LESSONS (end) ──
 G6.init();
 
 // Override updateAllMeta with ALL module keys
