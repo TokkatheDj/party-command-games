@@ -339,6 +339,24 @@ body.student-mode #progress-panel{display:flex;}
 .prob-body{display:grid;grid-template-columns:210px 1fr;gap:18px;align-items:start;}
 .prob-body.no-graph{grid-template-columns:1fr;}
 .graph-area{display:flex;flex-direction:column;gap:5px;}
+/* Graphing Linear Equations: the graph column runs as long as the steps. Under the grid, a
+   key-ideas card and a points table fill the space (the table's rows stretch to the bottom). */
+.prob-body.glin-body{align-items:stretch;}
+.glin-body .graph-area{gap:10px;}
+.glin-card{border:1px solid #d6e4ee;background:#f4f9fc;border-radius:6px;padding:8px 10px;font-size:11px;line-height:1.5;color:#333;}
+.glin-card b{color:#1d6a96;}
+.glin-card .glin-card-title{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#1d6a96;margin-bottom:3px;}
+.glin-table-wrap{flex:1;display:flex;flex-direction:column;min-height:0;}
+.glin-table-wrap .glin-card-title{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#555;margin-bottom:4px;}
+.glin-table{flex:1;width:100%;border-collapse:collapse;font-family:var(--math);font-size:13px;text-align:center;}
+.glin-table th{background:#eef3f6;font-style:italic;font-weight:700;padding:3px 0;border:1px solid #c9d6de;}
+.glin-table td{border:1px solid #c9d6de;padding:5px 0;min-height:24px;}
+.glin-fill{display:inline-block;width:46px;border-bottom:1.5px solid #111;height:15px;vertical-align:bottom;}
+.glin-ans{display:none;color:#b5451b;font-weight:700;}
+body.answer-key-mode .glin-fill{display:none;}
+body.answer-key-mode .glin-ans{display:inline;}
+@media print{body.answer-key-mode .glin-fill{display:none!important;}body.answer-key-mode .glin-ans{display:inline!important;}}
+.glin-steps-col{min-width:0;}
 .graph-label{font-size:10px;color:#888;text-align:center;}
 
 /* systems method badges */
@@ -2898,6 +2916,32 @@ var GLIN = (function(){
     if(steps.length) steps[steps.length-1].reveal='glinans';   // finishing the steps draws the line
     return steps;
   }
+  // Under the grid: a key-ideas card for this kind of line, then a table of points to plot.
+  // Students fill the blank column; the answer key shows the values.
+  function sidePanel(a,b,c){
+    function fr(n,d){var g=gcd(Math.abs(n),Math.abs(d))||1;n/=g;d/=g;if(d<0){n=-n;d=-d;}return d===1?''+n:n+'/'+d;}
+    function ask(v){return '<span class="glin-fill"></span><span class="glin-ans">'+String(v).replace('-','&minus;')+'</span>';}
+    function show(v){return String(v).replace('-','&minus;');}
+    var card, rows=[];
+    if(b===0){                                   // vertical: x is fixed, pick three y values
+      card='<b>x = '+show(fr(c,a))+'</b> is a vertical line. Every point on it has the same <i>x</i>.';
+      [-2,0,2].forEach(function(y){rows.push([ask(fr(c,a)),show(y)]);});
+    } else {
+      if(a===0) card='<b>y = '+show(fr(c,b))+'</b> is a horizontal line. Every point on it has the same <i>y</i>; slope is 0.';
+      else card='<b>y = mx + b</b><br><b>b</b> = where the line crosses the y-axis<br><b>m</b> = rise &divide; run: go up (+) or down (&minus;), then right';
+      // x values one run apart (slope in lowest terms), kept on the -8..8 grid
+      var gs=gcd(Math.abs(a),Math.abs(b))||1, run=a===0?1:Math.abs(b/gs), xs=[];
+      [0,run,-run,2*run,-2*run,3*run].forEach(function(x){
+        var y=(c-a*x)/b;
+        if(Math.abs(x)<=8&&Math.abs(y)<=8&&xs.length<3) xs.push(x);
+      });
+      xs.sort(function(p,q){return p-q;}).forEach(function(x){rows.push([show(x),ask(fr(c-a*x,b))]);});
+    }
+    var h='<div class="glin-card"><div class="glin-card-title">Key ideas</div>'+card+'</div>';
+    h+='<div class="glin-table-wrap"><div class="glin-card-title">Points to plot</div><table class="glin-table"><tr><th>x</th><th>y</th></tr>';
+    rows.forEach(function(r){h+='<tr><td>'+r[0]+'</td><td>'+r[1]+'</td></tr>';});
+    return h+'</table></div>';
+  }
   function probHTML(p,idx){
     var a=p.a,b=p.b,c=p.c;
     var isVert=b===0,isHoriz=a===0;
@@ -2908,8 +2952,9 @@ var GLIN = (function(){
     var ansStr=isVert?('<i>x</i> = '+(c/a)):isHoriz?('<i>y</i> = '+(c/b)):('<i>y</i> = '+slopeInt(mStr,bStr,'<i>x</i>'));
     var h='<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
     h+='<div class="prob-prompt">Graph the equation: <span class="math">'+eqDisp+'</span></div>';
-    h+='<div class="prob-body"><div class="graph-area">'+makePlane(a,b,c)+'</div>';
-    h+=renderInteractiveSteps(makeGLINSteps(p),'glin',idx);
+    h+='<div class="prob-body glin-body"><div class="graph-area">'+makePlane(a,b,c)+sidePanel(a,b,c)+'</div>';
+    // steps and their score badge share one column, so the badge can't drop under the graph
+    h+='<div class="glin-steps-col">'+renderInteractiveSteps(makeGLINSteps(p),'glin',idx)+'</div>';
     h+='</div>';
     h+='<div class="solution-box"><span class="sol-label">Equation:</span><span class="math">'+ansStr+'</span></div>';
     h+='</div>';return h;
