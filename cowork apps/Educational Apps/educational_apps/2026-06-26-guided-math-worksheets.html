@@ -2820,17 +2820,19 @@ var GLIN = (function(){
       // y-intercept dot + label
       if(k>=-8&&k<=8){
         s+='<circle cx="'+cx+'" cy="'+ty(k)+'" r="4.5" fill="#fff" stroke="#1d6a96" stroke-width="2"/>';
-        var kDisp=Number.isInteger(k)?k:k.toFixed(2);
-        s+='<text x="'+(cx+8)+'" y="'+(ty(k)-4)+'" font-size="9" font-family="sans-serif" fill="#1d6a96" font-weight="700" stroke="#fff" stroke-width="3" paint-order="stroke">(0,'+kDisp+')</text>';
+        var kDisp=Number.isInteger(k)?k:+k.toFixed(2);
+        s+='<text x="'+(cx+8)+'" y="'+(ty(k)-4)+'" font-size="12" font-family="sans-serif" fill="#1d6a96" font-weight="700" stroke="#fff" stroke-width="3.5" paint-order="stroke">(0,'+kDisp+')</text>';
       }
       // x-intercept dot + label (only if m!=0)
       if(m!==0){
         var xi=-k/m;
         if(xi>=-8&&xi<=8&&xi!==0){
           s+='<circle cx="'+tx(xi)+'" cy="'+cy+'" r="4.5" fill="#fff" stroke="#c0392b" stroke-width="2"/>';
-          var xiDisp=Number.isInteger(xi)?xi:xi.toFixed(2);
-          // above the axis, clear of the tick numbers underneath it; white halo keeps it legible over grid lines
-          s+='<text x="'+tx(xi)+'" y="'+(cy-8)+'" font-size="9" font-family="sans-serif" fill="#c0392b" font-weight="700" text-anchor="middle" stroke="#fff" stroke-width="3" paint-order="stroke">('+xiDisp+',0)</text>';
+          var xiDisp=Number.isInteger(xi)?xi:+xi.toFixed(2);   // 7.5, not 7.50
+          // above the axis, clear of the tick numbers underneath it; white halo keeps it legible over
+          // grid lines. Near either edge, anchor the label inward so the larger text is not cut off.
+          var xiAnchor=xi>4?'end':xi<-4?'start':'middle', xiX=tx(xi)+(xi>4?6:xi<-4?-6:0);
+          s+='<text x="'+xiX+'" y="'+(cy-9)+'" font-size="12" font-family="sans-serif" fill="#c0392b" font-weight="700" text-anchor="'+xiAnchor+'" stroke="#fff" stroke-width="3.5" paint-order="stroke">('+xiDisp+',0)</text>';
         }
       }
     } else if(a!==0){
@@ -2871,9 +2873,27 @@ var GLIN = (function(){
       steps.push({prompt:'<b>Step 2.</b> Identify the slope:',type:'choice',choices:c2c.choices,correct:c2c.correct});
       var c3=iMakeChoices('b = '+bStr,['b = '+mStr,'b = '+frac(-c,b),'b = '+frac(a,c||1)]);
       steps.push({prompt:'<b>Step 3.</b> Identify the y-intercept:',type:'choice',choices:c3.choices,correct:c3.correct});
-      var pt1x=0,pt1y=bNum,pt2x=b,pt2y=bNum+mNum*b;
-      var c4=iMakeChoices('(0, '+fmtN(pt1y)+') and ('+pt2x+', '+fmtN(pt2y)+')',['(0, '+fmtN(mNum)+') and ('+pt2x+', '+fmtN(bNum)+')','('+fmtN(bNum)+', 0) and (0, '+fmtN(mNum)+')','(1, '+fmtN(mNum+bNum)+') and ('+fmtN(bNum)+', 1)']);
-      steps.push({prompt:'<b>Step 4.</b> Plot the y-intercept and use slope to find a second point. Which two points are on the line?',type:'choice',choices:c4.choices,correct:c4.correct});
+      // Step 4 in two parts: (a) plot the y-intercept, (b) rise over run from it to a second point.
+      function pt(x,yStr){return '('+x+', '+yStr+')';}
+      function pickWrong(right,cands,extraBad){var w=[];cands.forEach(function(e){if(e!==right&&w.indexOf(e)<0&&w.length<3&&!(extraBad&&extraBad(e)))w.push(e);});return w;}
+      var yInt=pt(0,bStr);
+      var c4a=iMakeChoices(yInt,pickWrong(yInt,[pt(bStr,0),pt(0,mStr),pt(0,flip(bStr)),pt(mStr,bStr),pt(0,frac(c,a)),
+        pt(0,frac(c+b,b)),pt(0,frac(c-b,b)),pt(1,bStr)]));   // spares: several coincide when b = 0
+      steps.push({prompt:'<b>Step 4a.</b> Plot the y-intercept. Which point is it?',type:'choice',choices:c4a.choices,correct:c4a.correct});
+      // slope in lowest terms n/d with d > 0: from (0, b) go up n (down if negative), right d
+      var gs=gcd(Math.abs(a),Math.abs(b))||1, rn=-a/gs, rd=b/gs; if(rd<0){rn=-rn;rd=-rd;}
+      function yAt(num){return frac(num,b);}        // y value (num)/b, reduced
+      var second=pt(rd,yAt(c+rn*b));
+      // a wrong choice that also lies on the line would be a second right answer: drop it
+      function onLine(s){var m2=s.match(/^\((-?\d+), (-?\d+)(?:\/(\d+))?\)$/);if(!m2)return false;var x=+m2[1],y=+m2[2]/(m2[3]?+m2[3]:1);return Math.abs(a*x+b*y-c)<1e-9;}
+      var c4b=iMakeChoices(second,pickWrong(second,[
+        pt(rn,yAt(c+rd*b)),        // rise and run swapped
+        pt(rd,yAt(c-rn*b)),        // went the wrong way vertically
+        pt(rd,''+rn),              // started from the origin instead of the y-intercept
+        pt(-rd,yAt(c+rn*b)),       // went left instead of right
+        pt(rd+1,yAt(c+rn*b))
+      ],onLine));
+      steps.push({prompt:'<b>Step 4b.</b> From the y-intercept, use the slope <i>m</i> = '+mStr+' (rise over run) to find a second point:',type:'choice',choices:c4b.choices,correct:c4b.correct});
     }
     if(steps.length) steps[steps.length-1].reveal='glinans';   // finishing the steps draws the line
     return steps;
