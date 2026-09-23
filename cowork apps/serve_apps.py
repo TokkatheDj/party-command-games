@@ -180,6 +180,10 @@ def md_to_html(text):
     in_list = False
 
     def inline(s):
+        # Escape first. Reviews quote HTML in code spans (e.g. `<title>`); pasted raw, a
+        # <title> or <textarea> swallows the rest of the page as text -- on 2026-09-09 that ate
+        # the app's main <script>, so no category tile or tab worked. No review uses real HTML.
+        s = html.escape(s, quote=False)
         s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s)
         s = re.sub(r"_(.+?)_", r"<em>\1</em>", s)
         s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
@@ -3140,6 +3144,7 @@ function showGrid() {{
   document.getElementById('view-home').classList.add('hidden');
   document.getElementById('view-grid').classList.remove('hidden');
   document.getElementById('search-global').value = '';
+  if (location.hash.startsWith('#cat/')) setCatHash('');
 }}
 
 function showHome() {{
@@ -3148,6 +3153,7 @@ function showHome() {{
   document.getElementById('view-grid').classList.add('hidden');
   document.getElementById('view-home').classList.remove('hidden');
   document.getElementById('search-global').value = '';
+  if (location.hash.startsWith('#cat/')) setCatHash('');
 }}
 
 function showCat(safeCat) {{
@@ -3176,8 +3182,25 @@ function showCat(safeCat) {{
 }}
 
 document.querySelectorAll('.cat-tile').forEach(tile => {{
-  tile.addEventListener('click', () => showCat(tile.dataset.cat));
+  tile.addEventListener('click', () => {{ showCat(tile.dataset.cat); setCatHash(tile.dataset.cat); }});
 }});
+
+// Category deep links: /#cat/<data-cat>, e.g. /#cat/kids-apps. The URL follows the open
+// category (replaceState, so Back is not filled with category hops), and loading or pasting
+// such a link opens that category. Unknown names are ignored rather than showing an empty view.
+function setCatHash(cat) {{
+  history.replaceState(null, '', cat ? '#cat/' + cat : location.pathname + location.search);
+}}
+function openCatFromHash() {{
+  const m = location.hash.match(/^#cat[/]([a-z0-9-]+)$/);
+  if (!m || !document.querySelector('.cat-tile[data-cat="' + m[1] + '"]')) return false;
+  if (panels.apps && panels.apps.style.display === 'none') switchTab('apps');
+  showCat(m[1]);
+  setCatHash(m[1]);   // switchTab('apps') clears the hash; put it back
+  return true;
+}}
+openCatFromHash();
+window.addEventListener('hashchange', openCatFromHash);
 
 let searchReturnView = 'home';
 const searchGlobal = document.getElementById('search-global');
