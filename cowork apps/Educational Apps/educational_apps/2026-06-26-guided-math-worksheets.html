@@ -8386,6 +8386,191 @@ var G6 = (function(){
   });
 })();
 
+// ── Unit 4: Percents ──
+(function(){
+  function fr(n,d){ return '<span class="frac"><span class="num">'+n+'</span><span class="den">'+d+'</span></span>'; }
+  function trim(x){ return String(+(+x).toFixed(8)); }
+  function firstNum(t){ var m=String(t).replace(/,/g,'').replace(/[−–—]/g,'-').match(/-?\d+(?:\.\d+)?/); return m? parseFloat(m[0]) : null; }
+  function lowestTerms(t){ var re=/(\d+)\s*\/\s*(\d+)/g, m, ok=true; while((m=re.exec(String(t)))){ if(gcd(+m[1],+m[2])!==1) ok=false; } return ok; }
+  // "writes a percent": the number, with a % sign
+  function pctGrade(val){ return function(t){ return /%|percent/i.test(t) && Math.abs(firstNum(t)-val)<1e-9; }; }
+  function decGrade(val){ return function(t){ return !/%/.test(t) && Math.abs((toValue(t)==null?NaN:toValue(t))-val)<1e-9; }; }
+
+  // 10 × 10 grid; `k` squares shaded, as a reveal layer when `hidden`
+  function hundredGrid(k, hidden){
+    var c=15, s='<svg width="154" height="154" viewBox="0 0 154 154" xmlns="http://www.w3.org/2000/svg" style="display:block;">', shade='';
+    for(var i=0;i<100;i++){
+      var x=2+(i%10)*c, y=2+Math.floor(i/10)*c;
+      s+='<rect x="'+x+'" y="'+y+'" width="'+c+'" height="'+c+'" fill="#fff" stroke="#9fb4c2" stroke-width="0.8"/>';
+      if(i<k) shade+='<rect x="'+x+'" y="'+y+'" width="'+c+'" height="'+c+'" fill="#1d6a96" opacity="0.55"/>';
+    }
+    return s+(hidden? '<g class="gph-layer gph-g6grid">'+shade+'</g>' : shade)+'</svg>';
+  }
+  var DENS=[2,4,5,10,20,25,50];
+
+  // 4.1 Percents and Fractions
+  G6.lesson({
+    id:'g6_4_1', count:6,
+    tips:['<b>Percent</b> means "per hundred": 37% = 37/100.',
+          '<b>Fraction → percent:</b> make an equivalent fraction with denominator 100: 3/5 = 60/100 = 60%.',
+          '<b>Percent → fraction:</b> write it over 100, then simplify: 45% = 45/100 = 9/20.'],
+    gen:function(r,i){
+      for(;;){ var d=r.pick(DENS), n=r.int(1,d-1); if(gcd(n,d)!==1) continue; return {toPct: i%2===0, n:n, d:d}; }
+    },
+    prompt:function(p){
+      var pc=p.n*100/p.d;
+      return p.toPct ? 'Write the fraction as a percent: <span class="math">'+fr(p.n,p.d)+'</span>'
+                     : 'Write the percent as a fraction in simplest form: <span class="math">'+pc+'%</span>';
+    },
+    svg:function(p){ return hundredGrid(p.n*100/p.d, p.toPct); },
+    steps:function(p){
+      var k=100/p.d, pc=p.n*k;
+      if(p.toPct) return [
+        {q:'What do you multiply '+p.d+' by to get 100?', ans:''+k, wrong:[''+(100-p.d), ''+(k*2), ''+(k+1)]},
+        {q:'Multiply the numerator by '+k+' too: '+fr(p.n,p.d)+' = '+fr('?',100)+'.', ans:fr(pc,100), wrong:[fr(p.n+k,100), fr(p.n,100), fr(pc+1,100)], formMatters:true},
+        {q:'Write '+fr(pc,100)+' as a percent.', ans:pc+'%', reveal:'g6grid', wrong:[(pc/100)+'%', p.n+'%', (pc+1)+'%']}];
+      var g=gcd(pc,100);
+      return [
+        {q:'Write '+pc+'% as a fraction over 100.', ans:fr(pc,100), wrong:[fr(100,pc), fr(pc,10), fr(pc,1000)], formMatters:true},
+        {q:'What is the GCF of '+pc+' and 100?', ans:''+g, wrong:[''+(g===5?10:5), ''+(g*2<=100?g*2:1), '1']},
+        {q:'Divide the numerator and denominator by '+g+'.', ans:fr(p.n,p.d), wrong:[fr(pc,100), fr(p.d,p.n), fr(p.n+1,p.d)], formMatters:true}];
+    },
+    answer:function(p){ return p.toPct ? (p.n*100/p.d)+'%' : fr(p.n,p.d); },
+    alts:function(p){ return p.toPct ? [(p.n*100/p.d)+' %', (p.n*100/p.d)+' percent'] : [p.n+'/'+p.d]; },
+    rejects:function(p){ return p.toPct ? [String(p.n*100/p.d), p.n+'%'] : [(p.n*100/p.d)+'/100']; },
+    grade:function(t,p,dflt){ return p.toPct ? pctGrade(p.n*100/p.d)(t) : (dflt && lowestTerms(t) && !/%/.test(t)); }
+  });
+
+  // 4.2 Percents and Decimals
+  G6.lesson({
+    id:'g6_4_2', count:6,
+    tips:['<b>Decimal → percent:</b> multiply by 100 — move the decimal point 2 places to the RIGHT: 0.35 = 35%.',
+          '<b>Percent → decimal:</b> divide by 100 — move it 2 places to the LEFT: 8% = 0.08.',
+          '<b>Careful with small ones:</b> 0.5 = 50%, but 0.05 = 5%, and 125% = 1.25.'],
+    gen:function(r,i){
+      // a mix: two-digit percents, over 100%, one-digit (0.07 = 7%), and halves (37.5%)
+      var kind=r.int(0,4), h = kind<2 ? r.int(10,99) : kind===2 ? r.int(101,250) : kind===3 ? r.int(1,9) : r.int(10,99)+0.5;
+      return {toPct: i%2===0, pc:h};            // percent value; the decimal is pc/100
+    },
+    prompt:function(p){ return p.toPct ? 'Write the decimal as a percent: <span class="math">'+trim(p.pc/100)+'</span>'
+                                       : 'Write the percent as a decimal: <span class="math">'+trim(p.pc)+'%</span>'; },
+    steps:function(p){
+      var dec=trim(p.pc/100), pc=trim(p.pc);
+      return [
+        {q:p.toPct ? 'Decimal to percent: which way do you move the decimal point?' : 'Percent to decimal: which way do you move the decimal point?',
+         ans:p.toPct ? '2 places to the right' : '2 places to the left', wrong:[p.toPct ? '2 places to the left' : '2 places to the right', '1 place to the right', '3 places to the left'], formMatters:true},
+        p.toPct ? {q:'Write '+dec+' as a percent.', ans:pc+'%', wrong:[trim(p.pc/10)+'%', trim(p.pc*10)+'%', dec+'%']}
+                : {q:'Write '+pc+'% as a decimal.', ans:dec, wrong:[trim(p.pc/10), trim(p.pc/1000), pc]}];
+    },
+    answer:function(p){ return p.toPct ? trim(p.pc)+'%' : trim(p.pc/100); },
+    rejects:function(p){ return p.toPct ? [trim(p.pc/10)+'%', trim(p.pc/100)] : [trim(p.pc/10), trim(p.pc)]; },
+    grade:function(t,p){ return p.toPct ? pctGrade(p.pc)(t) : decGrade(p.pc/100)(t); }
+  });
+
+  // 4.3 Comparing and Ordering Fractions, Decimals, and Percents
+  function formVal(f){ return f.k==='f' ? f.n/f.d : f.k==='p' ? f.v/100 : f.v; }
+  function formText(f){ return f.k==='f' ? f.n+'/'+f.d : f.k==='p' ? trim(f.v)+'%' : trim(f.v); }
+  function formHTML(f){ return f.k==='f' ? fr(f.n,f.d) : formText(f); }
+  G6.lesson({
+    id:'g6_4_3', count:4,
+    tips:['<b>Same form first:</b> change every number to a decimal (or every number to a percent), then compare.',
+          '<b>Fractions:</b> divide numerator by denominator: 3/8 = 0.375.',
+          '<b>Line them up</b> by place value to order them; keep the original forms in your answer.'],
+    gen:function(r){
+      for(var t=0;t<300;t++){
+        var forms=[], vals={};
+        var kinds=r.shuffle(['f','d','p','f']);
+        kinds.forEach(function(k){
+          var f;
+          if(k==='f'){ var d=r.pick([2,4,5,8,10,20,25]), n=r.int(1,d-1); if(gcd(n,d)!==1) return; f={k:'f',n:n,d:d}; }
+          else if(k==='p'){ f={k:'p', v:r.int(5,95)}; }
+          else { f={k:'d', v:r.int(5,95)/100}; }
+          var v=Math.round(formVal(f)*10000);
+          if(vals[v]) return; vals[v]=1; forms.push(f);
+        });
+        if(forms.length!==4) continue;
+        var sorted=forms.slice().sort(function(a,b){ return formVal(a)-formVal(b); });
+        if(formVal(sorted[3])-formVal(sorted[0])>0.45) continue;   // close together, so converting matters
+        return {forms:forms, greatest: r.chance(0.3)};
+      }
+      return {forms:[{k:'f',n:3,d:5},{k:'d',v:0.55},{k:'p',v:62},{k:'f',n:1,d:2}], greatest:false};
+    },
+    prompt:function(p){ return 'Order the numbers from '+(p.greatest?'<b>greatest to least</b>':'<b>least to greatest</b>')+': <span class="math">'+p.forms.map(formHTML).join(', &nbsp;')+'</span>'; },
+    steps:function(p){
+      var st=p.forms.filter(function(f){ return f.k!=='d'; }).map(function(f){
+        var v=formVal(f);
+        return {q:'Write '+formHTML(f)+' as a decimal.', ans:trim(v), wrong:[trim(v*10), trim(v/10), f.k==='f'? trim(f.d/f.n>=10?f.n/10:Math.round(f.d/f.n*100)/100) : trim(v+0.1)]};
+      });
+      var order=p.forms.slice().sort(function(a,b){ return formVal(a)-formVal(b); });
+      if(p.greatest) order.reverse();
+      var ans=order.map(formText).join(', ');
+      var wrong1=order.slice().reverse().map(formText).join(', ');
+      var byLook=p.forms.slice().sort(function(a,b){ return parseFloat(formText(a))-parseFloat(formText(b)); }); if(p.greatest) byLook.reverse();
+      var swap=order.slice(); var t0=swap[1]; swap[1]=swap[2]; swap[2]=t0;
+      st.push({q:'Order them '+(p.greatest?'from greatest to least':'from least to greatest')+'.', ans:ans, wrong:[wrong1, byLook.map(formText).join(', '), swap.map(formText).join(', ')], formMatters:true});
+      return st;
+    },
+    answer:function(p){ var o=p.forms.slice().sort(function(a,b){ return formVal(a)-formVal(b); }); if(p.greatest) o.reverse(); return o.map(formText).join(', '); },
+    alts:function(p){ var o=p.forms.slice().sort(function(a,b){ return formVal(a)-formVal(b); }); if(p.greatest) o.reverse(); return [o.map(function(f){ return trim(formVal(f)); }).join(', ')]; },
+    rejects:function(p){ var o=p.forms.slice().sort(function(a,b){ return formVal(a)-formVal(b); }); if(!p.greatest) o.reverse(); return [o.map(formText).join(', ')]; },
+    // the numbers in the right order (any equivalent form of each)
+    grade:function(t,p){
+      var o=p.forms.slice().sort(function(a,b){ return formVal(a)-formVal(b); }); if(p.greatest) o.reverse();
+      var parts=String(t).split(/,|<|>|;|\s{2,}/).map(function(x){ return x.trim(); }).filter(Boolean);
+      if(parts.length!==4) return false;
+      return parts.every(function(x,i){ var v=toValue(x); return v!=null && Math.abs(v-formVal(o[i]))<1e-9; });
+    }
+  });
+
+  // 4.4 Solving Percent Problems
+  var P_STORIES={
+    part:[function(p){ return 'A class has '+p.W+' students. '+p.pc+'% of them ride the bus. How many students ride the bus?'; },
+          function(p){ return 'A jacket costs $'+p.W+'. It is on sale for '+p.pc+'% off. How many dollars do you save?'; },
+          function(p){ return 'A team played '+p.W+' games and won '+p.pc+'% of them. How many games did they win?'; }],
+    whole:[function(p){ return p.P+' students chose pizza for lunch. That is '+p.pc+'% of the class. How many students are in the class?'; },
+           function(p){ return 'You have read '+p.P+' pages, which is '+p.pc+'% of the book. How many pages is the book?'; }],
+    pct:[function(p){ return 'You answered '+p.P+' of '+p.W+' questions correctly. What percent did you get right?'; },
+         function(p){ return 'A garden has '+p.W+' plants and '+p.P+' of them are tomatoes. What percent are tomatoes?'; }]
+  };
+  G6.lesson({
+    id:'g6_4_4', count:6,
+    tips:['<b>Part = percent × whole.</b> Write the percent as a decimal or fraction first: 30% of 40 = 0.3 × 40 = 12.',
+          '<b>Find the whole:</b> whole = part ÷ percent: 12 is 30% of 12 ÷ 0.3 = 40.',
+          '<b>Find the percent:</b> part ÷ whole, then write it as a percent: 12 ÷ 40 = 0.3 = 30%.'],
+    gen:function(r,i){
+      var type=['part','whole','pct'][i%3];
+      for(;;){
+        var pc=r.pick([5,10,15,20,25,30,40,50,60,75,80,90]), W=r.int(2,30)*r.pick([2,4,5,10]);
+        var P=pc*W/100;
+        if(P!==Math.floor(P) || P<1 || W>200) continue;
+        return {type:type, pc:pc, W:W, P:P, story:r.int(0, P_STORIES[type].length-1)};
+      }
+    },
+    prompt:function(p){ return P_STORIES[p.type][p.story](p); },
+    steps:function(p){
+      var dec=trim(p.pc/100);
+      if(p.type==='part') return [
+        {q:'Write '+p.pc+'% as a decimal.', ans:dec, wrong:[trim(p.pc/10), ''+p.pc, trim(p.pc/1000)]},
+        {q:'Part = percent × whole: '+dec+' × '+p.W+'.', ans:trim(p.P), wrong:[trim(p.W-p.P), trim(p.P*10), trim(p.P+1)]}];
+      if(p.type==='whole') return [
+        {q:'Write '+p.pc+'% as a decimal.', ans:dec, wrong:[trim(p.pc/10), ''+p.pc, trim(p.pc/1000)]},
+        {q:'Whole = part ÷ percent. Which calculation?', ans:p.P+' ÷ '+dec, wrong:[p.P+' × '+dec, dec+' ÷ '+p.P, p.P+' ÷ '+p.pc], formMatters:true},
+        {q:'Divide: '+p.P+' ÷ '+dec+'.', ans:trim(p.W), wrong:[trim(p.P*p.pc/100), trim(p.W+p.P), trim(p.W*10)]}];
+      return [
+        {q:'Divide the part by the whole: '+p.P+' ÷ '+p.W+'.', ans:dec, wrong:[trim(p.W/p.P), trim(p.P/p.W*10), trim(dec*1+0.1)]},
+        {q:'Write '+dec+' as a percent.', ans:p.pc+'%', wrong:[dec+'%', (p.pc*10)+'%', (p.pc/10)+'%']}];
+    },
+    answer:function(p){ return p.type==='part' ? trim(p.P) : p.type==='whole' ? trim(p.W) : p.pc+'%'; },
+    alts:function(p){ return p.type==='pct' ? [p.pc+' %', p.pc+' percent'] : []; },
+    // the classic slip: the other part (at 50% it equals the answer, so it is only a slip otherwise)
+    rejects:function(p){ if(p.type==='pct') return [trim(p.pc/100)+'%']; var w=p.type==='part'? p.W-p.P : p.P, a=p.type==='part'? p.P : p.W; return w!==a ? [trim(w)] : [trim(a+1)]; },
+    grade:function(t,p){
+      if(p.type==='pct') return pctGrade(p.pc)(t);
+      var v=firstNum(t); return v!=null && Math.abs(v-(p.type==='part'?p.P:p.W))<1e-9;
+    }
+  });
+})();
+
 // ── 6th GRADE LESSONS (end) ──
 G6.init();
 
