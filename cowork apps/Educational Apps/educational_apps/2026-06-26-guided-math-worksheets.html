@@ -643,6 +643,11 @@ body.answer-key-mode .gph-layer{opacity:1;}
 .g6-ans{font-size:11px;color:#2d6a4f;font-weight:700;margin:0 8px;white-space:nowrap;align-self:center;}
 .act.g6-re{padding:2px 9px;}
 .g6-count{margin:0 6px 0 -2px;font-size:12px;}
+/* ratio / data tables in 6th grade lessons; a lettered or ? cell is a blank to find */
+.g6-table{border-collapse:collapse;font-family:var(--math);font-size:13px;margin:6px 0;}
+.g6-table th{background:#eef3f6;font:600 10px var(--ui);text-align:left;padding:4px 8px;border:1px solid #c9d6de;max-width:96px;}
+.g6-table td{border:1px solid #c9d6de;padding:4px 10px;text-align:center;min-width:26px;}
+.g6-table td.g6-blank{color:#b5451b;font-weight:700;background:#fffbe6;font-style:italic;}
 .g6-soon{border:1.5px dashed #b9cfd6;background:#f4f9fb;color:#35505a;border-radius:8px;padding:20px 24px;font-size:13px;line-height:1.6;}
 /* Printed lessons use the write-in steps: blanks for students, answers filled in on the key. */
 @media print{
@@ -8078,6 +8083,306 @@ var G6 = (function(){
       return Math.abs(n/v-q)<1e-9 ? '' : 'quotient mismatch '+n+'/'+v+'!='+q;
     },
     grade:function(t,p,dflt){ return exactGrade(t,p,dflt, p.q.i/Math.pow(10,p.q.d)); }
+  });
+})();
+
+// ── Unit 3: Ratios and Rates ──
+(function(){
+  var fmt=G6.fmt;
+  // ── drawing helpers shared with later units (tape diagrams, tables, first-quadrant grids) ──
+  var SVG = G6.svg = G6.svg || {};
+  function open(W,H){ return '<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;max-width:100%;">'; }
+  function txt(x,y,t,o){ o=o||{}; return '<text x="'+x+'" y="'+y+'" font-size="'+(o.size||11)+'" font-family="'+(o.font||'sans-serif')+'" text-anchor="'+(o.anchor||'middle')+'" fill="'+(o.fill||'#333')+'"'+(o.bold?' font-weight="700"':'')+'>'+t+'</text>'; }
+  // Tape diagram: rows [{label, parts, text?}]; each part is a box. `fill` (per-part value) is one
+  // layer that appears on the last step / answer key. `brace` = {text} spanning all rows' total.
+  SVG.tape = function(rows, o){
+    o=o||{};
+    // boxes shrink for long bars so the value written after a bar still fits in 210px
+    var most=Math.max.apply(null, rows.map(function(r){ return r.parts; })), left=62, box=Math.min(22, Math.floor((210-left-34)/most));
+    var W=left+box*most+34, H=rows.length*34+(o.top?22:6);
+    var s=open(W,H), y0=o.top?22:6, layer='<g class="gph-layer gph-'+(o.layer||'g6tape')+'">';
+    if(o.top) s+=txt(left+box*(o.topParts||rows[0].parts)/2, 14, o.top, {bold:true, fill:'#1d6a96'});
+    rows.forEach(function(r,k){
+      var y=y0+k*34;
+      s+=txt(left-6, y+15, r.label, {anchor:'end', size:10});
+      for(var j=0;j<r.parts;j++){
+        s+='<rect x="'+(left+j*box)+'" y="'+y+'" width="'+box+'" height="22" fill="#eef5fa" stroke="#1d6a96" stroke-width="1.2"/>';
+        if(o.fill!=null) layer+=txt(left+j*box+box/2, y+15, o.fill, {size:10, bold:true, fill:'#b5451b'});
+      }
+      if(r.text) s+=txt(left+r.parts*box+6, y+15, r.text, {anchor:'start', bold:true, fill:'#1d6a96'});
+    });
+    return s+layer+'</g></svg>';
+  };
+  // A two-row ratio table as HTML: rows [{label, cells:[...]}]; a cell of '?' or a letter is a blank.
+  SVG.table = function(rows){
+    var h='<table class="g6-table">';
+    rows.forEach(function(r){
+      h+='<tr><th>'+r.label+'</th>'+r.cells.map(function(c){
+        return /^[a-z?]$/.test(String(c)) ? '<td class="g6-blank">'+c+'</td>' : '<td>'+c+'</td>';
+      }).join('')+'</tr>';
+    });
+    return h+'</table>';
+  };
+  // First-quadrant grid; `points` go in a layer that appears on the last step / answer key.
+  SVG.grid1 = function(o){
+    var W=210, H=200, L=30, B=26, T=8, R=10, gw=W-L-R, gh=H-B-T;
+    function X(x){ return L+x/o.xmax*gw; } function Y(y){ return H-B-y/o.ymax*gh; }
+    var s=open(W,H);
+    for(var x=0;x<=o.xmax;x+=o.xstep){ s+='<line x1="'+X(x)+'" y1="'+Y(0)+'" x2="'+X(x)+'" y2="'+Y(o.ymax)+'" stroke="#dde3e8" stroke-width="0.8"/>'+txt(X(x), H-B+12, x, {size:8, fill:'#666'}); }
+    for(var y=0;y<=o.ymax;y+=o.ystep){ s+='<line x1="'+X(0)+'" y1="'+Y(y)+'" x2="'+X(o.xmax)+'" y2="'+Y(y)+'" stroke="#dde3e8" stroke-width="0.8"/>'+txt(L-4, Y(y)+3, y, {size:8, fill:'#666', anchor:'end'}); }
+    s+='<line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+X(o.xmax)+'" y2="'+Y(0)+'" stroke="#444" stroke-width="1.2"/><line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+X(0)+'" y2="'+Y(o.ymax)+'" stroke="#444" stroke-width="1.2"/>';
+    s+=txt(L+gw/2, H-2, o.xlabel, {size:9, fill:'#1d6a96', bold:true});
+    s+='<text transform="translate(9,'+(T+gh/2)+') rotate(-90)" font-size="9" font-family="sans-serif" text-anchor="middle" fill="#1d6a96" font-weight="700">'+o.ylabel+'</text>';
+    var layer='<g class="gph-layer gph-'+(o.layer||'g6pts')+'">';
+    if(o.line) layer+='<line x1="'+X(0)+'" y1="'+Y(0)+'" x2="'+X(o.line[0])+'" y2="'+Y(o.line[1])+'" stroke="#1d6a96" stroke-width="1.2" stroke-dasharray="4,3"/>';
+    (o.points||[]).forEach(function(p){ layer+='<circle cx="'+X(p[0])+'" cy="'+Y(p[1])+'" r="3.6" fill="#1d6a96"/>'; });
+    return s+layer+'</g></svg>';
+  };
+
+  function money(c){ return '$'+(c/100).toFixed(2); }
+  // Grading by the number the student wrote, ignoring units and $ ("36 inches", "$3.25/lb").
+  function firstNum(t){ var m=String(t).replace(/,/g,'').replace(/[−–—]/g,'-').match(/-?\d+(?:\.\d+)?/); return m? parseFloat(m[0]) : null; }
+  function numGrade(val){ return function(t){ var v=firstNum(t); return v!=null && Math.abs(v-val)<1e-9; }; }
+  function ratioStr(a,b){ return a+' : '+b; }
+
+  // 3.1 Ratios
+  var SHAPES={
+    circle:function(x,y){ return '<circle cx="'+x+'" cy="'+y+'" r="7.5" fill="#eef5fa" stroke="#1d6a96" stroke-width="1.6"/>'; },
+    triangle:function(x,y){ return '<polygon points="'+x+','+(y-8)+' '+(x+8)+','+(y+7)+' '+(x-8)+','+(y+7)+'" fill="#fbeee6" stroke="#b5451b" stroke-width="1.6"/>'; },
+    square:function(x,y){ return '<rect x="'+(x-7)+'" y="'+(y-7)+'" width="14" height="14" fill="#eaf5ee" stroke="#2d6a4f" stroke-width="1.6"/>'; }
+  };
+  G6.lesson({
+    id:'g6_3_1', count:6,
+    tips:['<b>Ratio:</b> compares two quantities: 2 : 3, 2 to 3, or 2/3. Order matters — the first quantity named comes first.',
+          '<b>Part to part</b> compares two groups; <b>part to whole</b> compares one group to the total.',
+          '<b>Ratio language:</b> "for every 2 circles there are 3 triangles". <b>Simplify</b> by dividing both numbers by their GCF.'],
+    gen:function(r,i){
+      var names=r.shuffle(['circle','triangle','square']).slice(0,2);
+      for(;;){ var a=r.int(2,9), b=r.int(2,9); if(a===b) continue; if(r.chance(0.6) && gcd(a,b)===1) continue;
+        return {A:names[0], B:names[1], a:a, b:b, type: i%3===2 ? 'pw' : 'pp'}; }
+    },
+    prompt:function(p){
+      return p.type==='pw' ? 'Write the ratio of <b>'+p.A+'s</b> to <b>all the shapes</b>, in simplest form.'
+                           : 'Write the ratio of <b>'+p.A+'s</b> to <b>'+p.B+'s</b>, in simplest form.';
+    },
+    svg:function(p){
+      var W=200, rows=[[p.A,p.a],[p.B,p.b]], s=open(W,70);
+      rows.forEach(function(rw,k){ for(var j=0;j<rw[1];j++) s+=SHAPES[rw[0]](14+j*21, 18+k*34); });
+      return s+'</svg>';
+    },
+    steps:function(p){
+      var second = p.type==='pw' ? p.a+p.b : p.b, g=gcd(p.a,second), st=[];
+      st.push({q:'How many '+p.A+'s are there?', ans:''+p.a, wrong:[''+p.b, ''+(p.a+1), ''+(p.a+p.b)]});
+      if(p.type==='pw') st.push({q:'How many shapes are there in all?', ans:''+(p.a+p.b), wrong:[''+p.b, ''+(p.a+p.b+1), ''+(p.a*p.b)]});
+      else st.push({q:'How many '+p.B+'s are there?', ans:''+p.b, wrong:[''+p.a, ''+(p.b+1), ''+(p.a+p.b)]});
+      var noun = p.type==='pw' ? 'shapes in all' : p.B+'s';
+      st.push({q:'Which sentence describes the ratio?', ans:'For every '+p.a+' '+p.A+'s there are '+second+' '+noun+'.',
+        wrong:['For every '+second+' '+p.A+'s there are '+p.a+' '+noun+'.', 'The ratio of '+(p.type==='pw'?'all the shapes':p.B+'s')+' to '+p.A+'s is '+p.a+' : '+second+'.', 'For every '+p.a+' '+noun+' there are '+second+' '+p.A+'s.'], formMatters:true});
+      st.push({q:'Write the ratio, first quantity first.', ans:ratioStr(p.a,second), wrong:[ratioStr(second,p.a), ratioStr(p.a, p.type==='pw'?p.b:p.a+p.b), ratioStr(p.a+1,second)], formMatters:true});
+      if(g>1) st.push({q:'Divide both numbers by their GCF, '+g+', to simplify.', ans:ratioStr(p.a/g,second/g), wrong:[ratioStr(second/g,p.a/g), ratioStr(p.a,second), ratioStr(p.a/g,second)], formMatters:true});
+      return st;
+    },
+    answer:function(p){ var s2=p.type==='pw'?p.a+p.b:p.b, g=gcd(p.a,s2); return ratioStr(p.a/g,s2/g); },
+    alts:function(p){ var s2=p.type==='pw'?p.a+p.b:p.b, g=gcd(p.a,s2); return [p.a/g+':'+s2/g, p.a/g+' to '+s2/g, p.a/g+'/'+s2/g]; },
+    rejects:function(p){ var s2=p.type==='pw'?p.a+p.b:p.b, g=gcd(p.a,s2); var out=[s2/g+':'+p.a/g]; if(g>1) out.push(p.a+':'+s2); return out; },
+    // simplest form, in the order asked
+    grade:function(t,p){
+      var s2=p.type==='pw'?p.a+p.b:p.b, g=gcd(p.a,s2);
+      var m=String(t).match(/^\s*(\d+)\s*(?::|to|\/)\s*(\d+)\s*$/i);
+      return !!m && +m[1]===p.a/g && +m[2]===s2/g;
+    }
+  });
+
+  // 3.2 Using Tape Diagrams
+  var PAIRS=[['boys','girls','students in the club'],['cats','dogs','animals at the shelter'],['red marbles','blue marbles','marbles in the bag'],
+             ['fiction books','nonfiction books','books on the shelf'],['apple trees','pear trees','trees in the orchard']];
+  G6.lesson({
+    id:'g6_3_2', count:6,
+    tips:['<b>Draw one bar per quantity</b> with one box per part of the ratio: 3 : 4 means 3 boxes and 4 boxes.',
+          '<b>Find one box:</b> divide the amount you know by the number of boxes it covers.',
+          '<b>Then multiply</b> one box by the number of boxes you need.'],
+    gen:function(r,i){
+      var type=['total','part','diff'][i%3], pr=r.pick(PAIRS);
+      for(;;){ var a=r.int(1,7), b=r.int(2,8); if(a===b || gcd(a,b)!==1) continue; if(type==='diff' && a>=b) continue;
+        return {type:type, a:a, b:b, k:r.int(2,12), X:pr[0], Y:pr[1], all:pr[2], ask:r.chance(0.5)?0:1}; }
+    },
+    prompt:function(p){
+      var ratio='The ratio of '+p.X+' to '+p.Y+' is <b>'+p.a+' : '+p.b+'</b>. ';
+      if(p.type==='total') return ratio+'There are '+(p.a+p.b)*p.k+' '+p.all+'. How many '+(p.ask?p.Y:p.X)+' are there?';
+      if(p.type==='part') return ratio+'There are '+p.a*p.k+' '+p.X+'. How many '+p.Y+' are there?';
+      return ratio+'There are '+(p.b-p.a)*p.k+' more '+p.Y+' than '+p.X+'. How many '+(p.ask?p.Y:p.X)+' are there?';
+    },
+    svg:function(p){
+      var rows=[{label:p.X.split(' ')[0], parts:p.a, text: p.type==='part'? ''+p.a*p.k : ''},{label:p.Y.split(' ')[0], parts:p.b, text:''}];
+      var top = p.type==='total' ? 'total: '+(p.a+p.b)*p.k : p.type==='diff' ? (p.b-p.a)*p.k+' more' : '';
+      return SVG.tape(rows, {fill:p.k, top:top, topParts: p.type==='total'? Math.max(p.a,p.b) : p.b});
+    },
+    steps:function(p){
+      var st=[], want = p.type==='part' ? p.b : (p.ask? p.b : p.a), name = p.type==='part' ? p.Y : (p.ask? p.Y : p.X);
+      if(p.type==='total'){
+        st.push({q:'How many boxes (parts) are in the tape diagram altogether?', ans:''+(p.a+p.b), wrong:[''+(p.a*p.b), ''+p.b, ''+(p.a+p.b+1)]});
+        st.push({q:'Each box is worth the total ÷ the number of boxes: '+(p.a+p.b)*p.k+' ÷ '+(p.a+p.b)+'.', ans:''+p.k, wrong:[''+(p.k+1), ''+(p.a+p.b), ''+((p.a+p.b)*p.k-(p.a+p.b))]});
+      } else if(p.type==='part'){
+        st.push({q:'The '+p.X+' bar has '+p.a+' box'+(p.a>1?'es':'')+' worth '+p.a*p.k+'. What is one box worth?', ans:''+p.k, wrong:[''+(p.a*p.k*p.a), ''+(p.k+1), ''+(p.a*p.k-p.a)]});
+      } else {
+        st.push({q:'How many more boxes does the '+p.Y+' bar have?', ans:''+(p.b-p.a), wrong:[''+p.b, ''+(p.a+p.b), ''+(p.b-p.a+1)]});
+        st.push({q:(p.b-p.a>1 ? 'Those '+(p.b-p.a)+' boxes are' : 'That 1 box is')+' worth '+(p.b-p.a)*p.k+'. What is one box worth?', ans:''+p.k, wrong:[''+(p.k+1), ''+(p.b-p.a)*p.k, ''+(p.k*2)]});
+      }
+      st.push({q:'How many '+name+'? Multiply '+want+' box'+(want>1?'es':'')+' × '+p.k+'.', ans:''+want*p.k, reveal:'g6tape',
+        wrong:[''+(want===p.a?p.b:p.a)*p.k, ''+(p.a+p.b)*p.k, ''+(want*p.k+p.k)]});
+      return st;
+    },
+    answer:function(p){ var want = p.type==='part' ? p.b : (p.ask? p.b : p.a); return ''+want*p.k; }
+  });
+
+  // 3.3 Using Ratio Tables
+  var TABLE_CTX=[['cups of flour','cups of sugar'],['minutes','pages read'],['cans of paint','rooms painted'],['hours worked','dollars earned'],['cups of juice','cups of water']];
+  G6.lesson({
+    id:'g6_3_3', count:6,
+    tips:['<b>Equivalent ratios:</b> multiply (or divide) BOTH quantities by the same number.',
+          '<b>Find the multiplier</b> from the number you know in that column: 3 → 12 is × 4.',
+          '<b>Check:</b> every column of a ratio table simplifies to the same ratio.'],
+    gen:function(r){
+      var c=r.pick(TABLE_CTX);
+      for(;;){
+        var x=r.int(1,9), y=r.int(2,12); if(x===y || gcd(x,y)!==1) continue;
+        var ms=r.shuffle([2,3,4,5,6,7,8,9,10]).slice(0,3).sort(function(a,b){ return a-b; });
+        if(x*ms[2]>120 || y*ms[2]>120) continue;
+        return {x:x, y:y, m:ms, X:c[0], Y:c[1]};
+      }
+    },
+    prompt:function(p){ return 'The table shows equivalent ratios of '+p.X+' to '+p.Y+'. Find the values of <b>a</b> and <b>b</b>.'; },
+    svg:function(p){ return SVG.table([
+      {label:p.X, cells:[p.x, p.x*p.m[0], p.x*p.m[1], 'b']},
+      {label:p.Y, cells:[p.y, p.y*p.m[0], 'a', p.y*p.m[2]]}]); },
+    steps:function(p){
+      return [
+        {q:'Column 3: what do you multiply '+p.x+' by to get '+p.x*p.m[1]+'?', ans:'× '+p.m[1], wrong:['× '+(p.m[1]+1), '+ '+(p.x*p.m[1]-p.x), '× '+p.m[0]], formMatters:true},
+        {q:'So <b>a</b> = '+p.y+' × '+p.m[1]+'.', ans:''+p.y*p.m[1], wrong:[''+(p.y+p.x*p.m[1]-p.x), ''+p.y*(p.m[1]+1), ''+p.x*p.m[1]]},
+        {q:'Column 4: what do you multiply '+p.y+' by to get '+p.y*p.m[2]+'?', ans:'× '+p.m[2], wrong:['× '+(p.m[2]-1), '+ '+(p.y*p.m[2]-p.y), '× '+p.m[1]], formMatters:true},
+        {q:'So <b>b</b> = '+p.x+' × '+p.m[2]+'.', ans:''+p.x*p.m[2], wrong:[''+(p.x+p.y*p.m[2]-p.y), ''+p.x*(p.m[2]+1), ''+p.y*p.m[2]]}
+      ];
+    },
+    lastStepNotFinal:true,
+    answer:function(p){ return 'a = '+p.y*p.m[1]+', b = '+p.x*p.m[2]; },
+    alts:function(p){ return [p.y*p.m[1]+', '+p.x*p.m[2], 'a='+p.y*p.m[1]+' b='+p.x*p.m[2]]; },
+    rejects:function(p){ return [p.x*p.m[2]+', '+p.y*p.m[1]]; },
+    // both values, a first
+    grade:function(t,p){ var n=String(t).match(/\d+(?:\.\d+)?/g)||[]; return n.length===2 && +n[0]===p.y*p.m[1] && +n[1]===p.x*p.m[2]; }
+  });
+
+  // 3.4 Graphing Ratio Relationships
+  var GRAPH_CTX=[['cups of rice','cups of water'],['hours','miles hiked'],['tickets','dollars'],['packs','markers'],['minutes','laps swum']];
+  G6.lesson({
+    id:'g6_3_4', count:4,
+    tips:['<b>Ordered pairs</b> come from the table: (first quantity, second quantity).',
+          '<b>Plot</b> each pair; the points of a ratio relationship line up on a line through (0, 0).',
+          '<b>Extend</b> the pattern to find values that are not in the table.'],
+    gen:function(r){
+      var c=r.pick(GRAPH_CTX);
+      for(;;){ var x=r.int(1,4), y=r.int(1,6); if(x===y || gcd(x,y)!==1) continue; return {x:x, y:y, X:c[0], Y:c[1], miss:r.int(2,3), ext:5}; }
+    },
+    prompt:function(p){
+      var cells=[1,2,3,4].map(function(k){ return k===p.miss ? '?' : p.y*k; });
+      return 'The ratio of '+p.X+' to '+p.Y+' is <b>'+p.x+' : '+p.y+'</b>. Complete the table, graph the pairs, and extend the pattern.'
+        + SVG.table([{label:p.X, cells:[p.x,2*p.x,3*p.x,4*p.x]},{label:p.Y, cells:cells}]);
+    },
+    svg:function(p){
+      var ymax=p.y*6, ystep=ymax>24?Math.ceil(ymax/12/2)*2:2;
+      return SVG.grid1({xmax:p.x*6, ymax:ymax, xstep:p.x*6>12?2:1, ystep:ystep, xlabel:p.X, ylabel:p.Y,
+        points:[1,2,3,4,5].map(function(k){ return [p.x*k, p.y*k]; }), line:[p.x*6, p.y*6]});
+    },
+    steps:function(p){
+      var k=p.miss;
+      return [
+        {q:'Complete the table: '+p.x*k+' '+p.X+' → ? '+p.Y+'.', ans:''+p.y*k, wrong:[''+(p.y*k+p.y), ''+p.x*k, ''+(p.y*k+1)]},
+        {q:'Which ordered pair is a point on the graph?', ans:'('+2*p.x+', '+2*p.y+')', wrong:['('+2*p.y+', '+2*p.x+')', '('+2*p.x+', '+(2*p.y+1)+')', '('+p.x+', '+2*p.y+')'], formMatters:true},
+        {q:'Extend the pattern: how many '+p.Y+' for '+p.ext*p.x+' '+p.X+'?', ans:''+p.ext*p.y, reveal:'g6pts', wrong:[''+(p.ext*p.y+p.y), ''+p.ext*p.x, ''+(4*p.y+1)]}
+      ];
+    },
+    answer:function(p){ return ''+p.ext*p.y; }
+  });
+
+  // 3.5 Rates and Unit Rates
+  var ITEMS=[['pounds of apples','pound'],['bottles of water','bottle'],['notebooks','notebook'],['yards of fabric','yard'],['bags of chips','bag']];
+  G6.lesson({
+    id:'g6_3_5', count:6,
+    tips:['<b>Rate:</b> a ratio of two different units, like 150 miles in 3 hours.',
+          '<b>Unit rate:</b> the amount for ONE unit — divide: 150 ÷ 3 = 50 miles per hour.',
+          '<b>Better buy:</b> compare unit prices; the lower price per unit is the better buy.'],
+    gen:function(r,i){
+      var type=['unit','speed','better','use'][i%4], it=r.pick(ITEMS);
+      if(type==='speed'){ var h=r.int(2,8), mph=r.int(3,13)*5; return {type:type, h:h, mph:mph}; }
+      if(type==='better'){
+        for(;;){ var n1=r.int(2,8), n2=r.int(2,8), u1=r.int(40,400), u2=r.int(40,400);
+          if(n1===n2 || u1===u2 || Math.abs(u1-u2)<6) continue;
+          return {type:type, n1:n1, n2:n2, u1:u1, u2:u2, item:it}; }
+      }
+      var n=r.int(2,9), u=r.int(25,500); if(u%5) u+=5-u%5;
+      return {type:type, n:n, u:u, m:r.int(2,12), item:it};
+    },
+    prompt:function(p){
+      if(p.type==='speed') return 'A car travels '+p.h*p.mph+' miles in '+p.h+' hours at a constant speed. What is its speed in miles per hour?';
+      if(p.type==='better') return 'Store A sells '+p.n1+' '+p.item[0]+' for '+money(p.n1*p.u1)+'. Store B sells '+p.n2+' for '+money(p.n2*p.u2)+'. Which store has the better buy?';
+      if(p.type==='use') return p.n+' '+p.item[0]+' cost '+money(p.n*p.u)+'. At that rate, how much do '+p.m+' cost?';
+      return p.n+' '+p.item[0]+' cost '+money(p.n*p.u)+'. What is the unit price (the cost per '+p.item[1]+')?';
+    },
+    steps:function(p){
+      if(p.type==='speed') return [
+        {q:'Which division gives miles per ONE hour?', ans:(p.h*p.mph)+' ÷ '+p.h, wrong:[p.h+' ÷ '+(p.h*p.mph), (p.h*p.mph)+' × '+p.h, (p.h*p.mph)+' − '+p.h], formMatters:true},
+        {q:'Divide.', ans:p.mph+' mph', wrong:[(p.mph+5)+' mph', (p.h*p.mph-p.h)+' mph', (p.mph*2)+' mph']}];
+      if(p.type==='better') return [
+        {q:'Store A unit price: '+money(p.n1*p.u1)+' ÷ '+p.n1+'.', ans:money(p.u1), wrong:[money(p.u1+10), money(p.u2), money(p.n1*p.u1-p.n1*100>0?p.n1*p.u1-p.n1*100:p.u1+25)]},
+        {q:'Store B unit price: '+money(p.n2*p.u2)+' ÷ '+p.n2+'.', ans:money(p.u2), wrong:[money(p.u2+10), money(p.u1), money(p.u2+25)]},
+        {q:'Which store has the lower price per '+p.item[1]+'?', ans:p.u1<p.u2?'Store A':'Store B', wrong:[p.u1<p.u2?'Store B':'Store A', 'They are the same', 'The store with the lower total'], formMatters:true}];
+      var st=[{q:'Which division gives the price of ONE '+p.item[1]+'?', ans:money(p.n*p.u)+' ÷ '+p.n, wrong:[p.n+' ÷ '+money(p.n*p.u), money(p.n*p.u)+' × '+p.n, money(p.n*p.u)+' − '+p.n], formMatters:true},
+              {q:'Find the unit price: '+money(p.n*p.u)+' ÷ '+p.n+'.', ans:money(p.u), wrong:[money(p.u+10), money(p.u*2), money(p.n*p.u-p.n)]}];
+      if(p.type==='use') st.push({q:'Multiply the unit price by '+p.m+'.', ans:money(p.u*p.m), wrong:[money(p.u*(p.m+1)), money(p.n*p.u*p.m), money(p.u*p.m+100)]});
+      return st;
+    },
+    answer:function(p){
+      if(p.type==='speed') return p.mph+' mph';
+      if(p.type==='better') return p.u1<p.u2?'Store A':'Store B';
+      return money(p.type==='use' ? p.u*p.m : p.u);
+    },
+    alts:function(p){ if(p.type==='better') return [p.u1<p.u2?'A':'B', p.u1<p.u2?'store a':'store b']; if(p.type==='speed') return [String(p.mph), p.mph+' miles per hour']; var v=(p.type==='use'?p.u*p.m:p.u)/100; return [v.toFixed(2), '$'+v.toFixed(2)]; },
+    rejects:function(p){ if(p.type==='better') return [p.u1<p.u2?'B':'A']; if(p.type==='speed') return [String(p.mph+5)]; var v=(p.type==='use'?p.u*p.m:p.u)/100; return [(v+0.1).toFixed(2)]; },
+    grade:function(t,p,dflt){
+      if(p.type==='better'){ var w=String(t).toLowerCase().replace(/store/g,'').replace(/[^a-z]/g,''); return w===(p.u1<p.u2?'a':'b'); }
+      var val = p.type==='speed' ? p.mph : (p.type==='use'?p.u*p.m:p.u)/100;
+      return numGrade(val)(t);
+    }
+  });
+
+  // 3.6 Converting Measures
+  var SING={feet:'foot', yards:'yard', pounds:'pound', pints:'pint', quarts:'quart', gallons:'gallon', meters:'meter',
+            kilometers:'kilometer', kilograms:'kilogram', liters:'liter', hours:'hour', minutes:'minute'};
+  var UNITS=[['feet','inches',12],['yards','feet',3],['pounds','ounces',16],['pints','cups',2],['quarts','pints',2],['gallons','quarts',4],
+             ['meters','centimeters',100],['kilometers','meters',1000],['kilograms','grams',1000],['liters','milliliters',1000],['hours','minutes',60],['minutes','seconds',60]];
+  G6.lesson({
+    id:'g6_3_6', count:6,
+    tips:['<b>Know the fact:</b> 12 in = 1 ft, 3 ft = 1 yd, 16 oz = 1 lb, 2 c = 1 pt, 2 pt = 1 qt, 4 qt = 1 gal, 100 cm = 1 m, 1,000 m = 1 km, 1,000 g = 1 kg.',
+          '<b>Big unit → small unit:</b> you need MORE of them, so multiply.',
+          '<b>Small unit → big unit:</b> you need FEWER of them, so divide.'],
+    gen:function(r,i){ var u=r.pick(UNITS), n=r.int(2, u[2]>=100 ? 9 : 15); return {big:u[0], small:u[1], f:u[2], n:n, down: i%2===0}; },
+    prompt:function(p){
+      return p.down ? 'Convert: <span class="math">'+p.n+' '+p.big+' = ? '+p.small+'</span>'
+                    : 'Convert: <span class="math">'+(p.n*p.f).toLocaleString('en-US')+' '+p.small+' = ? '+p.big+'</span>';
+    },
+    answerLabel:'Answer',
+    steps:function(p){
+      return [
+        {q:'How many '+p.small+' are in 1 '+SING[p.big]+'?', ans:''+p.f, wrong:[''+(p.f===12?10:p.f*10), ''+(p.f===2?4:p.f/2===Math.floor(p.f/2)?p.f/2:p.f+2), ''+(p.f+1)]},
+        {q:p.down ? 'Going from a bigger unit to a smaller unit — multiply or divide?' : 'Going from a smaller unit to a bigger unit — multiply or divide?',
+          ans:p.down ? 'Multiply by '+p.f : 'Divide by '+p.f, wrong:[p.down ? 'Divide by '+p.f : 'Multiply by '+p.f, 'Add '+p.f, 'Subtract '+p.f], formMatters:true},
+        {q:p.down ? p.n+' × '+p.f+' = ?' : (p.n*p.f)+' ÷ '+p.f+' = ?', ans: p.down ? (p.n*p.f)+' '+p.small : p.n+' '+p.big,
+          wrong: p.down ? [(p.n*p.f+p.f)+' '+p.small, (p.n+p.f)+' '+p.small, p.n+' '+p.small] : [(p.n+1)+' '+p.big, (p.n*p.f*p.f)+' '+p.big, (p.n*p.f-p.f)+' '+p.big]}
+      ];
+    },
+    answer:function(p){ return p.down ? (p.n*p.f)+' '+p.small : p.n+' '+p.big; },
+    alts:function(p){ return [String(p.down ? p.n*p.f : p.n)]; },
+    rejects:function(p){ return [String(p.down ? p.n : p.n*p.f)]; },
+    grade:function(t,p){ return numGrade(p.down ? p.n*p.f : p.n)(t); }
   });
 })();
 
