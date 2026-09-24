@@ -7341,7 +7341,9 @@ var G6 = (function(){
   function makeSet(id, n, seed){
     var s=specs[id], r=helpers(rng(seed)), out=[], seen={};
     for(var t=0; t<n*10 && out.length<n; t++){
-      var p=s.gen(r, out.length), k=key(s.prompt(p));
+      // duplicates by the problem's numbers, not its wording: many lessons ask the same question
+      // ("Find the area of the triangle.") about different figures
+      var p=s.gen(r, out.length), k=JSON.stringify(p);
       if(seen[k]) continue;
       seen[k]=1; out.push(p);
     }
@@ -8971,6 +8973,291 @@ var G6 = (function(){
     answer:function(p){ return ''+p.k*p.n; },
     rejects:function(p){ return [''+(p.k+p.n)]; },
     grade:function(t,p){ return solGrade(p.k*p.n)(t); }
+  });
+})();
+
+// ── Unit 7: Area, Surface Area, and Volume ──
+(function(){
+  function fr(n,d){ return '<span class="frac"><span class="num">'+n+'</span><span class="den">'+d+'</span></span>'; }
+  function red(n,d){ var g=gcd(n,d)||1; return [n/g,d/g]; }
+  function simp(n,d){ var r=red(n,d); n=r[0]; d=r[1]; if(d===1) return ''+n; var w=Math.floor(n/d); return w? w+' '+fr(n-w*d,d) : fr(n,d); }
+  function trim(x){ return String(+(+x).toFixed(8)); }
+  // grade a measurement by value: accepts "54", "54 units²", "22.5", "22 1/2"
+  function valGrade(v){ return function(t){ var x=toValue(String(t).replace(/square|cubic|sq\.?/gi,'')); return x!=null && Math.abs(x-v)<1e-9; }; }
+  var TRIPLES=[[3,4,5],[4,3,5],[6,8,10],[8,6,10],[5,12,13],[12,5,13],[9,12,15],[12,9,15]];
+
+  // ── 2-D shapes: fit polygon to the drawing box, label sides, dashed height ──
+  function draw2d(pts, o){
+    var W=200, H=150, pad=26, xs=pts.map(function(p){ return p[0]; }).concat(o.extraX||[]), ys=pts.map(function(p){ return p[1]; });
+    var minx=Math.min.apply(null,xs), maxx=Math.max.apply(null,xs), miny=Math.min.apply(null,ys), maxy=Math.max.apply(null,ys);
+    var sc=Math.min((W-2*pad)/(maxx-minx||1), (H-2*pad)/(maxy-miny||1));
+    function X(x){ return pad+(x-minx)*sc+((W-2*pad)-(maxx-minx)*sc)/2; } function Y(y){ return H-pad-(y-miny)*sc; }
+    var s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+    s+='<polygon points="'+pts.map(function(p){ return X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1); }).join(' ')+'" fill="#eef5fa" stroke="#1d6a96" stroke-width="2"/>';
+    (o.dashed||[]).forEach(function(d){ s+='<line x1="'+X(d[0])+'" y1="'+Y(d[1])+'" x2="'+X(d[2])+'" y2="'+Y(d[3])+'" stroke="#555" stroke-width="1.2" stroke-dasharray="4,3"/>'; });
+    (o.right||[]).forEach(function(q){ var x=X(q[0]), y=Y(q[1]), k=7*(q[2]||1); s+='<polyline points="'+x+','+(y-7)+' '+(x+k)+','+(y-7)+' '+(x+k)+','+y+'" fill="none" stroke="#555" stroke-width="1"/>'; });
+    (o.labels||[]).forEach(function(l){ s+='<text x="'+(X(l[0])+(l[3]||0))+'" y="'+(Y(l[1])+(l[4]||0))+'" font-size="11" font-family="sans-serif" text-anchor="middle" fill="'+(l[5]||'#1d6a96')+'" font-weight="700">'+l[2]+'</text>'; });
+    return s+'</svg>';
+  }
+
+  // 7.1 Areas of Parallelograms
+  G6.lesson({
+    id:'g6_7_1', count:6,
+    summary:function(p){ return 'parallelogram: base '+p.b+', height '+p.h+(p.missing?' (find h)':''); },
+    tips:['<b>A = bh:</b> base × height.',
+          '<b>The height</b> is the straight-up (perpendicular) distance — the dashed line — NOT the slanted side.',
+          '<b>Missing dimension:</b> divide the area by the dimension you know: h = A ÷ b.'],
+    gen:function(r,i){ var T=r.pick(TRIPLES); return {o:T[0], h:T[1], s:T[2], b:r.int(Math.max(6,T[0]+2), 20), missing: i%3===2}; },
+    prompt:function(p){ return p.missing ? 'A parallelogram has an area of <b>'+p.b*p.h+' square units</b> and a base of <b>'+p.b+'</b> units. Find its height.'
+                                         : 'Find the area of the parallelogram.'; },
+    svg:function(p){ return draw2d([[0,0],[p.b,0],[p.b+p.o,p.h],[p.o,p.h]], {dashed:[[p.o,0,p.o,p.h]], right:[[p.o,0]],
+      labels:[[p.b/2,0,''+p.b,0,15],[p.o,p.h/2, p.missing?'h':''+p.h, -9,4,'#b5451b'],[p.b+p.o/2,p.h/2,''+p.s,14,4,'#555']]}); },
+    steps:function(p){
+      if(p.missing) return [
+        {q:'Which formula connects area, base and height?', ans:'A = bh', wrong:['A = ½bh','A = b + h','A = 2b + 2h'], formMatters:true},
+        {q:'Substitute: '+p.b*p.h+' = '+p.b+' × h. Divide '+p.b*p.h+' ÷ '+p.b+'.', ans:p.h+' units', wrong:[p.s+' units', (p.b*p.h-p.b)+' units', (p.h+1)+' units']}];
+      return [
+        {q:'What is the base?', ans:''+p.b, wrong:[''+p.h, ''+p.s, ''+(p.b+p.o)]},
+        {q:'What is the height? (the dashed line, not the slanted side)', ans:''+p.h, wrong:[''+p.s, ''+p.b, ''+p.o]},
+        {q:'A = bh = '+p.b+' × '+p.h+'.', ans:(p.b*p.h)+' units²', wrong:[(p.b*p.s)+' units²', (p.b*p.h/2)+' units²', (2*(p.b+p.s))+' units²']}];
+    },
+    answer:function(p){ return p.missing ? p.h+' units' : (p.b*p.h)+' units²'; },
+    alts:function(p){ return [String(p.missing?p.h:p.b*p.h)]; },
+    rejects:function(p){ return [String(p.missing?p.s:p.b*p.s)]; },
+    grade:function(t,p){ return valGrade(p.missing?p.h:p.b*p.h)(t); }
+  });
+
+  // 7.2 Areas of Triangles
+  G6.lesson({
+    id:'g6_7_2', count:6,
+    summary:function(p){ return p.kind+' triangle: base '+p.b+', height '+p.h+(p.missing?' (find h)':''); },
+    tips:['<b>A = ½bh:</b> a triangle is half of a parallelogram with the same base and height.',
+          '<b>The height</b> meets the base (or its extension) at a right angle. For an obtuse triangle it can fall OUTSIDE the triangle.',
+          '<b>Missing dimension:</b> A = ½bh, so h = 2A ÷ b.'],
+    gen:function(r,i){
+      var kind=['right','acute','obtuse'][i%3], T=r.pick(TRIPLES), b=r.int(4,16);
+      if(kind==='acute' && b<=T[0]+1) b=T[0]+r.int(2,8);
+      return {kind:kind, b:b, h:T[1], o:T[0], s:T[2], missing: i>=3 && r.chance(0.4)};
+    },
+    prompt:function(p){ var A=p.b*p.h/2; return p.missing ? 'A triangle has an area of <b>'+trim(A)+' square units</b> and a base of <b>'+p.b+'</b> units. Find its height.'
+                                          : 'Find the area of the triangle.'; },
+    svg:function(p){
+      var apexX = p.kind==='right' ? 0 : p.kind==='acute' ? p.o : p.b+p.o;
+      var pts=[[0,0],[p.b,0],[apexX,p.h]], hl=p.missing?'h':''+p.h, o={labels:[[p.b/2,0,''+p.b,0,15]], dashed:[], right:[]};
+      if(p.kind==='right'){ o.right=[[0,0]]; o.labels.push([0,p.h/2,hl,-10,4,'#b5451b']); }
+      else if(p.kind==='acute'){ o.dashed=[[p.o,0,p.o,p.h]]; o.right=[[p.o,0]]; o.labels.push([p.o,p.h/2,hl,-9,4,'#b5451b'],[p.o/2,p.h/2,''+p.s,-12,0,'#555']); }
+      else { o.dashed=[[p.b,0,apexX,0],[apexX,0,apexX,p.h]]; o.right=[[apexX,0,-1]]; o.labels.push([apexX,p.h/2,hl,12,4,'#b5451b']); }
+      return draw2d(pts,o);
+    },
+    steps:function(p){
+      var A=p.b*p.h/2;
+      if(p.missing) return [
+        {q:'Multiply the area by 2: 2 × '+trim(A)+'.', ans:''+p.b*p.h, wrong:[trim(A/2), trim(A+2), ''+(p.b*p.h+p.b)]},
+        {q:'Divide by the base: '+p.b*p.h+' ÷ '+p.b+'.', ans:p.h+' units', wrong:[(p.h/2)+' units', p.s+' units', (p.h+1)+' units']}];
+      return [
+        {q:'What is the height? (perpendicular to the base)', ans:''+p.h, wrong:[''+(p.kind==='right'?p.b:p.s), ''+p.b, ''+(p.h+p.o)]},
+        {q:'Multiply base × height: '+p.b+' × '+p.h+'.', ans:''+p.b*p.h, wrong:[''+(p.b+p.h), ''+p.b*p.s, ''+(p.b*p.h+1)]},
+        {q:'Take half: ½ × '+p.b*p.h+'.', ans:trim(A)+' units²', wrong:[(p.b*p.h)+' units²', trim(A+0.5)+' units²', trim(p.b*p.s/2)+' units²']}];
+    },
+    answer:function(p){ return p.missing ? p.h+' units' : trim(p.b*p.h/2)+' units²'; },
+    alts:function(p){ return p.missing ? [String(p.h)] : [trim(p.b*p.h/2)]; },
+    rejects:function(p){ return p.missing ? [String(p.h/2)] : [String(p.b*p.h)]; },
+    grade:function(t,p){ return valGrade(p.missing?p.h:p.b*p.h/2)(t); }
+  });
+
+  // 7.3 Areas of Trapezoids and Kites
+  G6.lesson({
+    id:'g6_7_3', count:6,
+    summary:function(p){ return p.kind==='kite' ? 'kite: diagonals '+p.d1+' and '+p.d2 : 'trapezoid: bases '+p.b1+' and '+p.b2+', height '+p.h; },
+    tips:['<b>Trapezoid:</b> A = ½(b₁ + b₂)h — add the two parallel bases, multiply by the height, take half.',
+          '<b>Kite:</b> A = ½d₁d₂ — half the product of the diagonals.',
+          '<b>Or decompose</b> the shape into rectangles and triangles and add their areas.'],
+    gen:function(r,i){
+      if(i%2){ var d1=r.int(3,12)*2, d2=r.int(3,10); return {kind:'kite', d1:d1, d2:d2, top:r.int(2,Math.floor(d1/2)-1)}; }
+      for(;;){ var b1=r.int(8,20), b2=r.int(3,b1-2), h=r.int(3,12); if((b1+b2)*h%2) continue; return {kind:'trap', b1:b1, b2:b2, h:h, off:r.int(1,b1-b2-1)}; }
+    },
+    prompt:function(p){ return 'Find the area of the '+(p.kind==='kite'?'kite':'trapezoid')+'.'; },
+    svg:function(p){
+      if(p.kind==='trap') return draw2d([[0,0],[p.b1,0],[p.off+p.b2,p.h],[p.off,p.h]], {dashed:[[p.off,0,p.off,p.h]], right:[[p.off,0]],
+        labels:[[p.b1/2,0,''+p.b1,0,15],[p.off+p.b2/2,p.h,''+p.b2,0,-6],[p.off,p.h/2,''+p.h,-10,4,'#b5451b']]});
+      var c=p.d2/2;
+      return draw2d([[c,0],[p.d2,p.d1-p.top],[c,p.d1],[0,p.d1-p.top]], {dashed:[[c,0,c,p.d1],[0,p.d1-p.top,p.d2,p.d1-p.top]],
+        // labels outside the kite: d1 beside the bottom point, d2 left of the side corner
+        labels:[[c,0,''+p.d1,14,-2,'#b5451b'],[0,p.d1-p.top,''+p.d2,-12,4,'#b5451b']]});
+    },
+    steps:function(p){
+      if(p.kind==='kite'){ var P=p.d1*p.d2; return [
+        {q:'Which formula gives the area of a kite?', ans:'A = ½d₁d₂', wrong:['A = d₁d₂','A = ½(d₁ + d₂)','A = 2(d₁ + d₂)'], formMatters:true},
+        {q:'Multiply the diagonals: '+p.d1+' × '+p.d2+'.', ans:''+P, wrong:[''+(p.d1+p.d2), ''+(P+p.d1), ''+(2*P)]},
+        {q:'Take half: ½ × '+P+'.', ans:(P/2)+' units²', wrong:[P+' units²', (P/2+1)+' units²', ((p.d1+p.d2)/2)+' units²']}]; }
+      var S=p.b1+p.b2, A=S*p.h/2;
+      return [
+        {q:'Add the two parallel bases: '+p.b1+' + '+p.b2+'.', ans:''+S, wrong:[''+(p.b1-p.b2), ''+p.b1*p.b2, ''+(S+p.h)]},
+        {q:'Multiply by the height: '+S+' × '+p.h+'.', ans:''+S*p.h, wrong:[''+(S+p.h), ''+(p.b1*p.h), ''+(S*p.h+p.h)]},
+        {q:'Take half: ½ × '+S*p.h+'.', ans:A+' units²', wrong:[(S*p.h)+' units²', (p.b1*p.h/2)+' units²', (A+1)+' units²']}];
+    },
+    answer:function(p){ return (p.kind==='kite' ? p.d1*p.d2/2 : (p.b1+p.b2)*p.h/2)+' units²'; },
+    alts:function(p){ return [String(p.kind==='kite' ? p.d1*p.d2/2 : (p.b1+p.b2)*p.h/2)]; },
+    rejects:function(p){ return [String(p.kind==='kite' ? p.d1*p.d2 : (p.b1+p.b2)*p.h)]; },
+    grade:function(t,p){ return valGrade(p.kind==='kite' ? p.d1*p.d2/2 : (p.b1+p.b2)*p.h/2)(t); }
+  });
+
+  // ── 3-D figures (oblique drawings) ──
+  function solid(kind, dims){
+    var W=200, H=160, s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+    function L(a,b,dash){ return '<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+(dash?'#8aa':'#1d6a96')+'" stroke-width="'+(dash?1.1:1.8)+'"'+(dash?' stroke-dasharray="4,3"':'')+'/>'; }
+    function T(x,y,t,c){ return '<text x="'+x+'" y="'+y+'" font-size="11" font-family="sans-serif" text-anchor="middle" fill="'+(c||'#b5451b')+'" font-weight="700">'+t+'</text>'; }
+    var dx=38, dy=-26, lab=dims||{};
+    if(kind==='rect'){
+      var a=[40,130], b=[140,130], c=[140,70], d=[40,70];
+      var A=[a[0]+dx,a[1]+dy], B=[b[0]+dx,b[1]+dy], C=[c[0]+dx,c[1]+dy], D=[d[0]+dx,d[1]+dy];
+      s+='<polygon points="'+[a,b,c,d].map(String).join(' ')+'" fill="#eef5fa" stroke="none"/>';
+      s+=L(a,b)+L(b,c)+L(c,d)+L(d,a)+L(b,B)+L(c,C)+L(d,D)+L(D,C)+L(C,B)+L(a,A,1)+L(A,B,1)+L(A,D,1);
+      if(lab.l) s+=T(90,146,lab.l); if(lab.h) s+=T(28,104,lab.h); if(lab.w) s+=T(164,122,lab.w);
+    } else if(kind==='tri'){
+      var p1=[40,130], p2=[120,130], p3=[40,70];
+      var q1=[p1[0]+dx+20,p1[1]+dy], q2=[p2[0]+dx+20,p2[1]+dy], q3=[p3[0]+dx+20,p3[1]+dy];
+      s+='<polygon points="'+[p1,p2,p3].map(String).join(' ')+'" fill="#eef5fa" stroke="none"/>';
+      s+=L(p1,p2)+L(p2,p3)+L(p3,p1)+L(p2,q2)+L(p3,q3)+L(q2,q3)+L(p1,q1,1)+L(q1,q2,1)+L(q1,q3,1);
+      s+='<polyline points="40,122 48,122 48,130" fill="none" stroke="#555" stroke-width="1"/>';
+      if(lab.a) s+=T(80,146,lab.a); if(lab.b) s+=T(28,104,lab.b); if(lab.c) s+=T(90,96,lab.c); if(lab.L) s+=T(166,132,lab.L);
+    } else if(kind==='sqpyr' || kind==='tripyr'){
+      var base = kind==='sqpyr' ? [[40,130],[130,130],[130+dx,130+dy],[40+dx,130+dy]] : [[40,130],[140,130],[90+dx/2,130+dy]];
+      var cx=base.reduce(function(t,p){ return t+p[0]; },0)/base.length, cy=base.reduce(function(t,p){ return t+p[1]; },0)/base.length, apex=[cx,28];
+      s+=L(base[0],base[1]);
+      if(kind==='sqpyr'){ s+=L(base[1],base[2])+L(base[2],base[3],1)+L(base[3],base[0],1); s+=L(apex,base[0])+L(apex,base[1])+L(apex,base[2])+L(apex,base[3],1); }
+      else { s+=L(base[1],base[2],1)+L(base[2],base[0],1); s+=L(apex,base[0])+L(apex,base[1])+L(apex,base[2],1); }
+      var mid=[(base[0][0]+base[1][0])/2, base[0][1]];
+      if(lab.l){ s+=L(apex,mid,1)+T((apex[0]+mid[0])/2-10,(apex[1]+mid[1])/2,lab.l); }
+      if(lab.s) s+=T(mid[0],146,lab.s);
+    } else if(kind==='pentprism'){
+      // front pentagon, back copy shifted up-right; the hidden edges are the back-left/bottom ones
+      var f=[[34,132],[98,132],[116,92],[66,62],[16,92]], sh=[44,-24], bk=f.map(function(p){ return [p[0]+sh[0],p[1]+sh[1]]; });
+      s+='<polygon points="'+f.map(String).join(' ')+'" fill="#eef5fa" stroke="none"/>';
+      f.forEach(function(p,k){ s+=L(p,f[(k+1)%5]); });
+      s+=L(bk[1],bk[2])+L(bk[2],bk[3])+L(bk[3],bk[4],1)+L(bk[4],bk[0],1)+L(bk[0],bk[1],1);
+      s+=L(f[1],bk[1])+L(f[2],bk[2])+L(f[3],bk[3])+L(f[4],bk[4],1)+L(f[0],bk[0],1);
+    }
+    return s+'</svg>';
+  }
+  var FIGS=[
+    {id:'rect', name:'rectangular prism', base:'rectangle', F:6, E:12, V:8},
+    {id:'tri', name:'triangular prism', base:'triangle', F:5, E:9, V:6},
+    {id:'sqpyr', name:'square pyramid', base:'square', F:5, E:8, V:5},
+    {id:'tripyr', name:'triangular pyramid', base:'triangle', F:4, E:6, V:4},
+    {id:'pentprism', name:'pentagonal prism', base:'pentagon', F:7, E:15, V:10}
+  ];
+  // 7.4 Three-Dimensional Figures
+  G6.lesson({
+    id:'g6_7_4', count:5,
+    summary:function(p){ return FIGS[p.f].name; },
+    tips:['<b>Prism:</b> two identical parallel bases joined by rectangles. <b>Pyramid:</b> one base, triangles meeting at a point.',
+          '<b>Name</b> it by its base: a triangular prism has triangle bases.',
+          '<b>Faces</b> are flat surfaces, <b>edges</b> are where two faces meet, <b>vertices</b> are corners.'],
+    gen:function(r,i){ return {f:i%FIGS.length}; },
+    prompt:function(p){ return 'Name the solid, then count its faces, edges, and vertices.'; },
+    svg:function(p){ return solid(FIGS[p.f].id); },
+    steps:function(p){
+      var F=FIGS[p.f], others=FIGS.filter(function(x){ return x!==F; });
+      return [
+        {q:'What shape is the base?', ans:F.base, wrong:['rectangle','triangle','square','pentagon','circle'].filter(function(x){ return x!==F.base; }), formMatters:true},
+        {q:'Name the solid.', ans:F.name, wrong:others.map(function(x){ return x.name; }), formMatters:true},
+        {q:'How many faces?', ans:''+F.F, wrong:[''+F.V, ''+F.E, ''+(F.F+1)]},
+        {q:'How many edges?', ans:''+F.E, wrong:[''+F.F, ''+F.V, ''+(F.E-1)]},
+        {q:'How many vertices?', ans:''+F.V, wrong:[''+F.F, ''+F.E, ''+(F.V+1)]}];
+    },
+    lastStepNotFinal:true,
+    answer:function(p){ var F=FIGS[p.f]; return F.F+' faces, '+F.E+' edges, '+F.V+' vertices'; },
+    alts:function(p){ var F=FIGS[p.f]; return [F.F+', '+F.E+', '+F.V]; },
+    rejects:function(p){ var F=FIGS[p.f]; return [F.E+', '+F.F+', '+F.V]; },
+    grade:function(t,p){ var F=FIGS[p.f], n=String(t).match(/\d+/g)||[]; return n.length===3 && +n[0]===F.F && +n[1]===F.E && +n[2]===F.V; }
+  });
+
+  // 7.5 Surface Areas of Prisms
+  G6.lesson({
+    id:'g6_7_5', count:4,
+    summary:function(p){ return p.kind==='rect' ? 'rectangular prism '+p.l+' × '+p.w+' × '+p.h : 'triangular prism: legs '+p.a+', '+p.b+', length '+p.L; },
+    tips:['<b>Surface area</b> = the total area of all the faces (unfold it into a net).',
+          '<b>Rectangular prism:</b> three pairs of matching rectangles: S = 2lw + 2lh + 2wh.',
+          '<b>Triangular prism:</b> two triangles plus three rectangles, each as long as the prism.'],
+    gen:function(r,i){
+      if(i%2){ var T=r.pick([[3,4,5],[6,8,10],[5,12,13]]); return {kind:'tri', a:T[0], b:T[1], c:T[2], L:r.int(3,12)}; }
+      return {kind:'rect', l:r.int(3,12), w:r.int(2,9), h:r.int(2,10)};
+    },
+    prompt:function(p){ return 'Find the surface area of the '+(p.kind==='rect'?'rectangular':'triangular')+' prism.'; },
+    svg:function(p){ return p.kind==='rect' ? solid('rect',{l:p.l, w:p.w, h:p.h}) : solid('tri',{a:p.a, b:p.b, c:p.c, L:p.L}); },
+    steps:function(p){
+      if(p.kind==='rect'){ var lw=p.l*p.w, lh=p.l*p.h, wh=p.w*p.h, S=2*(lw+lh+wh); return [
+        {q:'Top and bottom: 2 × ('+p.l+' × '+p.w+').', ans:''+2*lw, wrong:[''+lw, ''+2*(p.l+p.w), ''+2*lh]},
+        {q:'Front and back: 2 × ('+p.l+' × '+p.h+').', ans:''+2*lh, wrong:[''+lh, ''+2*(p.l+p.h), ''+2*wh]},
+        {q:'The two sides: 2 × ('+p.w+' × '+p.h+').', ans:''+2*wh, wrong:[''+wh, ''+2*(p.w+p.h), ''+2*lw]},
+        {q:'Add all six faces.', ans:S+' units²', wrong:[(lw+lh+wh)+' units²', (p.l*p.w*p.h)+' units²', (S+2*wh)+' units²']}]; }
+      var tri=p.a*p.b/2, rects=(p.a+p.b+p.c)*p.L, S=2*tri+rects;
+      return [
+        {q:'One triangle base: ½ × '+p.a+' × '+p.b+'.', ans:''+tri, wrong:[''+p.a*p.b, ''+(p.a*p.c/2), ''+(tri+p.a)]},
+        {q:'Both triangles.', ans:''+2*tri, wrong:[''+tri, ''+4*tri, ''+(2*tri+1)]},
+        {q:'The three rectangles: ('+p.a+' + '+p.b+' + '+p.c+') × '+p.L+'.', ans:''+rects, wrong:[''+(p.a+p.b)*p.L, ''+3*p.c*p.L, ''+(rects+p.L)]},
+        {q:'Add the triangles and rectangles.', ans:S+' units²', wrong:[(tri+rects)+' units²', (tri*p.L)+' units²', (S+tri)+' units²']}];
+    },
+    answer:function(p){ return (p.kind==='rect' ? 2*(p.l*p.w+p.l*p.h+p.w*p.h) : p.a*p.b+(p.a+p.b+p.c)*p.L)+' units²'; },
+    rejects:function(p){ return [String(p.kind==='rect' ? p.l*p.w*p.h : p.a*p.b/2*p.L)]; },
+    grade:function(t,p){ return valGrade(p.kind==='rect' ? 2*(p.l*p.w+p.l*p.h+p.w*p.h) : p.a*p.b+(p.a+p.b+p.c)*p.L)(t); }
+  });
+
+  // 7.6 Surface Areas of Pyramids
+  G6.lesson({
+    id:'g6_7_6', count:4,
+    tips:['<b>Square pyramid:</b> one square base plus four matching triangles.',
+          '<b>Each triangle:</b> ½ × base edge × <b>slant height</b> (the height of the triangle face, the dashed line).',
+          '<b>Add</b> the base and all the triangles.'],
+    gen:function(r){ return {s:r.int(3,12), l:r.int(4,15)}; },
+    prompt:function(p){ return 'Find the surface area of the square pyramid. The base edge is <b>'+p.s+'</b> and the slant height is <b>'+p.l+'</b>.'; },
+    svg:function(p){ return solid('sqpyr',{s:p.s, l:p.l}); },
+    steps:function(p){
+      var base=p.s*p.s, tri=p.s*p.l/2, S=base+4*tri;
+      return [
+        {q:'Area of the square base: '+p.s+' × '+p.s+'.', ans:''+base, wrong:[''+2*p.s, ''+4*p.s, ''+(base+p.s)]},
+        {q:'Area of one triangle: ½ × '+p.s+' × '+p.l+'.', ans:trim(tri), wrong:[''+p.s*p.l, trim(tri+1), trim(p.s*p.s/2)]},
+        {q:'All four triangles: 4 × '+trim(tri)+'.', ans:trim(4*tri), wrong:[trim(3*tri), trim(tri), trim(4*tri+4)]},
+        {q:'Add the base and the triangles.', ans:trim(S)+' units²', wrong:[trim(4*tri)+' units²', trim(base+tri)+' units²', trim(base*p.l/3)+' units²']}];
+    },
+    answer:function(p){ return trim(p.s*p.s+2*p.s*p.l)+' units²'; },
+    rejects:function(p){ return [trim(p.s*p.s+p.s*p.l/2)]; },
+    grade:function(t,p){ return valGrade(p.s*p.s+2*p.s*p.l)(t); }
+  });
+
+  // 7.7 Volumes of Rectangular Prisms (with fractional edge lengths)
+  // each edge is n/2 (so halves like 2 1/2 appear); volume is an exact fraction over 8
+  G6.lesson({
+    id:'g6_7_7', count:6,
+    tips:['<b>V = ℓwh</b> (or V = Bh, the area of the base times the height).',
+          '<b>Fractional edges:</b> write mixed numbers as improper fractions, then multiply.',
+          '<b>Missing edge:</b> divide the volume by the other two edges multiplied together.'],
+    gen:function(r,i){
+      var e=[r.int(2,9)*2, r.int(2,6)*2, r.int(2,8)*2];             // halves: all whole to start
+      var k=r.int(0,2); e[k]=e[k]+1;                                 // one edge becomes a half (e.g. 7/2 = 3 1/2)
+      if(i%3===2){ var k2=(k+1)%3; e[k2]=e[k2]+1; }                  // sometimes two half edges
+      return {e:e, missing: i%4===3};
+    },
+    prompt:function(p){
+      var L=p.e.map(function(x){ return simp(x,2); });
+      if(p.missing) return 'A rectangular prism has a volume of <b>'+simp(p.e[0]*p.e[1]*p.e[2],8)+' cubic units</b>. Its length is '+L[0]+' and its width is '+L[1]+'. Find its height.';
+      return 'Find the volume of the rectangular prism: length '+L[0]+', width '+L[1]+', height '+L[2]+'.';
+    },
+    svg:function(p){ return solid('rect',{l:G6.plain(simp(p.e[0],2)), w:G6.plain(simp(p.e[1],2)), h:p.missing?'h':G6.plain(simp(p.e[2],2))}); },
+    steps:function(p){
+      var E=p.e, V8=E[0]*E[1]*E[2];
+      if(p.missing){ var B4=E[0]*E[1]; return [
+        {q:'Base area: '+simp(E[0],2)+' × '+simp(E[1],2)+'.', ans:simp(B4,4), wrong:[simp(E[0]+E[1],2), simp(B4,2), simp(B4+4,4)], formMatters:true},
+        {q:'Height = volume ÷ base area.', ans:simp(E[2],2)+' units', wrong:[simp(E[2]+1,2)+' units', simp(V8,4)+' units', simp(E[2]*2,2)+' units'], formMatters:true}]; }
+      return [
+        {q:'Write each edge as an improper fraction.', ans:E.map(function(x){ return x%2 ? fr(x,2) : ''+x/2; }).join(', '),
+          wrong:[E.map(function(x){ return fr(x,2); }).map(function(f,j){ return j===0? fr(E[0]+1,2) : f; }).join(', '), E.map(function(x){ return ''+Math.floor(x/2); }).join(', '), E.map(function(x){ return fr(x,4); }).join(', ')], formMatters:true},
+        {q:'Multiply ℓ × w × h.', ans:simp(V8,8)+' units³', wrong:[simp(V8,4)+' units³', simp(V8+8,8)+' units³', simp(E[0]*E[1]*Math.floor(E[2]/2)*2,8)+' units³'], formMatters:true}];
+    },
+    answer:function(p){ return p.missing ? simp(p.e[2],2)+' units' : simp(p.e[0]*p.e[1]*p.e[2],8)+' units³'; },
+    rejects:function(p){ var v=p.missing ? p.e[2]/2 : p.e[0]*p.e[1]*p.e[2]/8; return [trim(v+0.5)]; },
+    grade:function(t,p){ return valGrade(p.missing ? p.e[2]/2 : p.e[0]*p.e[1]*p.e[2]/8)(t); }
   });
 })();
 
