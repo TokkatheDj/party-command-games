@@ -648,6 +648,12 @@ body.answer-key-mode .gph-layer{opacity:1;}
 @media print{
   .g6-live{display:none!important;}
   .g6-paper{display:flex!important;flex-direction:column;}
+  /* one line per step: the blank (or the key's answer) sits to the right of its question,
+     which halves a lesson's printed height; a long question still wraps */
+  .g6-paper .step{display:flex;flex-wrap:wrap;align-items:flex-end;column-gap:12px;row-gap:2px;}
+  .g6-paper .step .step-q{flex:1 1 60%;margin:0!important;}
+  .g6-paper .step .blank-line{margin-top:0;flex:0 0 auto;}
+  .g6-paper .step .blank.lg{min-width:120px;}
   body.answer-key-mode .g6-ak{display:inline!important;margin-left:6px;color:#b5451b;font-weight:700;font-family:var(--math);}
 }
 </style>
@@ -7229,12 +7235,17 @@ var G6 = (function(){
 
   // ── text helpers ──
   function plain(s){
-    return String(s==null?'':s).replace(/<sup>([^<]*)<\/sup>/g,'^$1').replace(/<[^>]*>/g,'')
+    return String(s==null?'':s)
+      // stacked fractions read as a/b (otherwise 3 over 4 would flatten to "34")
+      .replace(/<span class="frac"><span class="num">([^<]*)<\/span><span class="den">([^<]*)<\/span><\/span>/g,'$1/$2')
+      .replace(/<sup>([^<]*)<\/sup>/g,'^$1').replace(/<[^>]*>/g,'')
       .replace(/&nbsp;/g,' ').replace(/&minus;/g,'−').replace(/&times;/g,'×').replace(/&divide;/g,'÷')
       .replace(/&middot;/g,'·').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&le;/g,'≤').replace(/&ge;/g,'≥')
       .replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
   }
-  function key(s){ return plain(s).replace(/−/g,'-').replace(/\s+/g,'').toLowerCase(); }
+  // Choice identity. Spaces don't matter ("2 × 3" = "2×3") except between digits, so the mixed
+  // number 2 1/3 and the fraction 21/3 stay different choices.
+  function key(s){ return plain(s).replace(/−/g,'-').replace(/(\d)\s+(?=\d)/g,'$1_').replace(/\s+/g,'').toLowerCase(); }
   function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   // Numbers for display: negatives with a real minus sign, no float noise ("0.30000000000000004").
   function fmt(v, d){
@@ -7729,6 +7740,344 @@ var G6 = (function(){
     },
     answer:function(p){ return ''+G6.lcm(p.a,p.b); },
     rejects:function(p){ var L=G6.lcm(p.a,p.b); return L!==p.a*p.b ? [String(p.a*p.b)] : [String(gcd(p.a,p.b))]; }
+  });
+})();
+
+// ── Unit 2: Fractions and Decimals ──
+(function(){
+  var fmt=G6.fmt;
+  // Fractions are always [numerator, denominator] integers; display is built from them.
+  function red(n,d){ var g=gcd(n,d)||1; n/=g; d/=g; if(d<0){ n=-n; d=-d; } return [n,d]; }
+  function fr(n,d){ return '<span class="frac"><span class="num">'+n+'</span><span class="den">'+d+'</span></span>'; }
+  // simplest form, as a mixed number when it is more than 1: 7/3 -> 2 1/3, 8/4 -> 2
+  function simp(n,d){
+    var r=red(n,d); n=r[0]; d=r[1];
+    if(d===1) return ''+n;
+    var w=Math.floor(n/d), rem=n-w*d;
+    return w ? w+' '+fr(rem,d) : fr(n,d);
+  }
+  // a proper fraction already in lowest terms (problems start from simplified fractions)
+  function pf(r,lo,hi){ for(;;){ var d=r.int(lo,hi), n=r.int(1,d-1); if(gcd(n,d)===1) return [n,d]; } }
+  function mx(w,n,d){ return (w? w+' ' : '')+fr(n,d); }            // a mixed number as written, not reduced
+  // Answers in simplest form only: every a/b the student wrote must be in lowest terms.
+  function lowestTerms(t){
+    var re=/(\d+)\s*\/\s*(\d+)/g, m, ok=true;
+    while((m=re.exec(String(t)))){ if(gcd(+m[1],+m[2])!==1) ok=false; }
+    return ok;
+  }
+  function gradeSimplest(t,p,dflt){ return dflt && lowestTerms(t); }
+  function fracAlts(n,d){ var r=red(n,d), out=[r[0]+'/'+r[1]]; if(r[1]!==1 && r[0]>r[1]) out.push(Math.floor(r[0]/r[1])+' '+(r[0]%r[1])+'/'+r[1]); return out; }
+  function fracRejects(n,d){ var r=red(n,d); var k=2; return r[1]===1 ? [String(r[0]+1)] : [(r[0]*k)+'/'+(r[1]*k)]; }
+
+  // 2.1 Multiplying Fractions
+  G6.lesson({
+    id:'g6_2_1', count:6,
+    tips:['<b>Multiply straight across:</b> numerator × numerator, denominator × denominator.',
+          '<b>Whole numbers:</b> write 6 as 6/1 first. <b>Mixed numbers:</b> change to improper fractions first.',
+          '<b>Simplify</b> the answer: divide the top and bottom by their GCF, and write improper fractions as mixed numbers.'],
+    gen:function(r,i){
+      var type=['ff','wf','mf'][i%3], f1=pf(r,2,10), f2=pf(r,2,10), a=f1[0], b=f1[1], c=f2[0], d=f2[1];
+      if(type==='wf') return {type:type, w:r.int(2,12), c:c, d:d};
+      if(type==='mf') return {type:type, A:r.int(1,4), a:a, b:b, c:c, d:d};
+      return {type:type, a:a, b:b, c:c, d:d};
+    },
+    prompt:function(p){
+      if(p.type==='wf') return 'Multiply. Write the answer in simplest form: <span class="math">'+p.w+' × '+fr(p.c,p.d)+'</span>';
+      if(p.type==='mf') return 'Multiply. Write the answer in simplest form: <span class="math">'+mx(p.A,p.a,p.b)+' × '+fr(p.c,p.d)+'</span>';
+      return 'Multiply. Write the answer in simplest form: <span class="math">'+fr(p.a,p.b)+' × '+fr(p.c,p.d)+'</span>';
+    },
+    steps:function(p){
+      var st=[], n1, d1;
+      if(p.type==='wf'){
+        n1=p.w; d1=1;
+        st.push({q:'Write '+p.w+' as a fraction.', ans:fr(p.w,1), wrong:[fr(1,p.w), fr(p.w,p.d), fr(p.w,10)], formMatters:true});
+      } else if(p.type==='mf'){
+        n1=p.A*p.b+p.a; d1=p.b;
+        st.push({q:'Write '+mx(p.A,p.a,p.b)+' as an improper fraction.', ans:fr(n1,d1), wrong:[fr(p.A*p.a+p.b,p.b), fr(p.A+p.a,p.b), fr(n1,p.A*p.b)], formMatters:true});
+      } else { n1=p.a; d1=p.b; }
+      var N=n1*p.c, D=d1*p.d;
+      st.push({q:'Multiply the numerators: '+n1+' × '+p.c+'.', ans:''+N, wrong:[''+(n1+p.c), ''+(n1*p.d), ''+(d1*p.c)]});
+      st.push({q:'Multiply the denominators: '+d1+' × '+p.d+'.', ans:''+D, wrong:[''+(d1+p.d), ''+(n1*p.d), ''+(d1*p.c)]});
+      st.push({q:'Write '+fr(N,D)+' in simplest form.', ans:simp(N,D), wrong:[fr(N,D), simp(n1*p.d, d1*p.c), simp(n1+p.c, d1+p.d), simp(N+1,D)], formMatters:true});
+      return st;
+    },
+    answer:function(p){ var n1=p.type==='wf'?p.w:p.type==='mf'?p.A*p.b+p.a:p.a, d1=p.type==='wf'?1:p.b; return simp(n1*p.c, d1*p.d); },
+    alts:function(p){ var n1=p.type==='wf'?p.w:p.type==='mf'?p.A*p.b+p.a:p.a, d1=p.type==='wf'?1:p.b; return fracAlts(n1*p.c, d1*p.d); },
+    rejects:function(p){ var n1=p.type==='wf'?p.w:p.type==='mf'?p.A*p.b+p.a:p.a, d1=p.type==='wf'?1:p.b; return fracRejects(n1*p.c, d1*p.d); },
+    grade:gradeSimplest
+  });
+
+  // 2.2 Dividing Fractions
+  G6.lesson({
+    id:'g6_2_2', count:6,
+    tips:['<b>Keep, Change, Flip:</b> keep the first fraction, change ÷ to ×, flip the second fraction (its reciprocal).',
+          '<b>Reciprocal:</b> swap numerator and denominator: the reciprocal of 3/4 is 4/3, and of 5 is 1/5.',
+          '<b>Check:</b> dividing by a number less than 1 makes the answer bigger.'],
+    gen:function(r,i){
+      var type=['ff','wf','fw'][i%3], f1=pf(r,2,10), f2=pf(r,2,10), a=f1[0], b=f1[1], c=f2[0], d=f2[1];
+      if(type==='wf') return {type:type, a:r.int(2,9), b:1, c:c, d:d, story:r.int(0,2)};
+      if(type==='fw') return {type:type, a:a, b:b, c:r.int(2,6), d:1, story:r.int(0,2)};
+      return {type:type, a:a, b:b, c:c, d:d};
+    },
+    prompt:function(p){
+      if(p.type==='wf') return [
+        'How many '+fr(p.c,p.d)+'-cup servings are in '+p.a+' cups of yogurt?',
+        'A ribbon is '+p.a+' feet long. How many pieces '+fr(p.c,p.d)+' foot long can be cut from it?',
+        'You have '+p.a+' pounds of trail mix. How many '+fr(p.c,p.d)+'-pound bags can you fill?'][p.story]+' <span class="math">'+p.a+' ÷ '+fr(p.c,p.d)+'</span>';
+      if(p.type==='fw') return [
+        p.c+' people share '+fr(p.a,p.b)+' pound of chocolate equally. How much does each person get?',
+        fr(p.a,p.b)+' of a pizza is split equally among '+p.c+' friends. What part of the whole pizza does each friend get?',
+        'A '+fr(p.a,p.b)+'-mile trail is divided into '+p.c+' equal sections. How long is each section?'][p.story]+' <span class="math">'+fr(p.a,p.b)+' ÷ '+p.c+'</span>';
+      return 'Divide. Write the answer in simplest form: <span class="math">'+fr(p.a,p.b)+' ÷ '+fr(p.c,p.d)+'</span>';
+    },
+    steps:function(p){
+      var first = p.b===1? fr(p.a,1) : fr(p.a,p.b), div = p.d===1? ''+p.c : fr(p.c,p.d);
+      var N=p.a*p.d, D=p.b*p.c;
+      return [
+        {q:'What is the reciprocal of the divisor, '+div+'?', ans:fr(p.d,p.c), wrong:[fr(p.c,p.d), fr(p.b,p.a), fr(p.d,p.c+1)], formMatters:true},
+        {q:'Rewrite the division as multiplication.', ans:first+' × '+fr(p.d,p.c), wrong:[fr(p.b,p.a)+' × '+fr(p.c,p.d), first+' × '+fr(p.c,p.d), fr(p.b,p.a)+' × '+fr(p.d,p.c)], formMatters:true},
+        {q:'Multiply the numerators and the denominators.', ans:fr(N,D), wrong:[fr(p.a*p.c,p.b*p.d), fr(D,N), fr(p.a+p.d,p.b+p.c)], formMatters:true},
+        {q:'Write '+fr(N,D)+' in simplest form.', ans:simp(N,D), wrong:[fr(N,D), simp(p.a*p.c,p.b*p.d), simp(D,N), simp(N+1,D)], formMatters:true}
+      ];
+    },
+    answer:function(p){ return simp(p.a*p.d, p.b*p.c); },
+    alts:function(p){ return fracAlts(p.a*p.d, p.b*p.c); },
+    rejects:function(p){ return fracRejects(p.a*p.d, p.b*p.c); },
+    grade:gradeSimplest
+  });
+
+  // 2.3 Dividing Mixed Numbers
+  G6.lesson({
+    id:'g6_2_3', count:6,
+    tips:['<b>First</b> change every mixed number to an improper fraction: 2 1/3 = (2 × 3 + 1)/3 = 7/3.',
+          '<b>Then</b> Keep, Change, Flip and multiply.',
+          '<b>Last</b> simplify and write the answer as a mixed number.'],
+    gen:function(r,i){
+      var type=['mm','mf','wm'][i%3], f1=pf(r,2,8), f2=pf(r,2,8), a=f1[0], b=f1[1], c=f2[0], d=f2[1];
+      if(type==='mm') return {type:type, A:r.int(1,5), a:a, b:b, C:r.int(1,3), c:c, d:d};
+      if(type==='mf') return {type:type, A:r.int(1,6), a:a, b:b, C:0, c:c, d:d};
+      return {type:type, A:r.int(2,12), a:0, b:1, C:r.int(1,3), c:c, d:d};
+    },
+    prompt:function(p){
+      var L = p.type==='wm' ? ''+p.A : mx(p.A,p.a,p.b), R = p.C ? mx(p.C,p.c,p.d) : fr(p.c,p.d);
+      return 'Divide. Write the answer in simplest form: <span class="math">'+L+' ÷ '+R+'</span>';
+    },
+    steps:function(p){
+      var n1=p.A*p.b+p.a, d1=p.b, n2=p.C*p.d+p.c, d2=p.d, st=[];
+      if(p.type==='wm') st.push({q:'Write '+p.A+' as a fraction.', ans:fr(p.A,1), wrong:[fr(1,p.A), fr(p.A,p.d), fr(p.A,2)], formMatters:true});
+      else st.push({q:'Write '+mx(p.A,p.a,p.b)+' as an improper fraction.', ans:fr(n1,d1), wrong:[fr(p.A*p.a+p.b,p.b), fr(p.A+p.a,p.b), fr(n1+1,d1)], formMatters:true});
+      if(p.C) st.push({q:'Write '+mx(p.C,p.c,p.d)+' as an improper fraction.', ans:fr(n2,d2), wrong:[fr(p.C*p.c+p.d,p.d), fr(p.C+p.c,p.d), fr(n2+1,d2)], formMatters:true});
+      var N=n1*d2, D=d1*n2;
+      st.push({q:'Keep, Change, Flip: rewrite as multiplication.', ans:fr(n1,d1)+' × '+fr(d2,n2), wrong:[fr(n1,d1)+' × '+fr(n2,d2), fr(d1,n1)+' × '+fr(n2,d2), fr(d1,n1)+' × '+fr(d2,n2)], formMatters:true});
+      st.push({q:'Multiply the numerators and the denominators.', ans:fr(N,D), wrong:[fr(n1*n2,d1*d2), fr(D,N), fr(N+1,D)], formMatters:true});
+      st.push({q:'Write '+fr(N,D)+' in simplest form.', ans:simp(N,D), wrong:[fr(N,D), simp(n1*n2,d1*d2), simp(D,N), simp(N+1,D)], formMatters:true});
+      return st;
+    },
+    answer:function(p){ return simp((p.A*p.b+p.a)*p.d, p.b*(p.C*p.d+p.c)); },
+    alts:function(p){ return fracAlts((p.A*p.b+p.a)*p.d, p.b*(p.C*p.d+p.c)); },
+    rejects:function(p){ return fracRejects((p.A*p.b+p.a)*p.d, p.b*(p.C*p.d+p.c)); },
+    grade:gradeSimplest
+  });
+
+  // 2.4 Adding and Subtracting Mixed Numbers (the curriculum map's 2.4)
+  var DENS=[2,3,4,5,6,8,10,12];
+  G6.lesson({
+    id:'g6_2_4', count:6,
+    tips:['<b>Common denominator:</b> rewrite both fractions with the least common denominator (LCD) first.',
+          '<b>Add:</b> add the fractions, then the whole numbers. An improper fraction part means regroup: 1 5/4 = 2 1/4.',
+          '<b>Subtract:</b> if the first fraction is smaller, regroup: take 1 whole from the whole number: 5 1/4 = 4 5/4.'],
+    gen:function(r,i){
+      var op = i%2 ? 'sub' : 'add';
+      for(var t=0;t<200;t++){
+        var b=r.pick(DENS), d=r.pick(DENS);
+        if(b===d || G6.lcm(b,d)>24) continue;
+        var a=r.int(1,b-1), c=r.int(1,d-1);
+        if(gcd(a,b)!==1 || gcd(c,d)!==1) continue;
+        var A=r.int(1,9), C=r.int(1,9), L=G6.lcm(b,d), a2=a*L/b, c2=c*L/d;
+        if(op==='sub'){
+          if(A<=C) continue;
+          if(a2===c2) continue;                          // equal fractions would leave a "0/12" step
+          if(r.chance(0.7) && a2>c2) continue;           // mostly problems that need regrouping
+        }
+        return {op:op, A:A, a:a, b:b, C:C, c:c, d:d};
+      }
+      return {op:'add', A:2, a:1, b:3, C:1, c:1, d:4};
+    },
+    prompt:function(p){ return (p.op==='add'?'Add':'Subtract')+'. Write the answer in simplest form: <span class="math">'+mx(p.A,p.a,p.b)+(p.op==='add'?' + ':' − ')+mx(p.C,p.c,p.d)+'</span>'; },
+    steps:function(p){
+      var L=G6.lcm(p.b,p.d), a2=p.a*L/p.b, c2=p.c*L/p.d, st=[], sym=p.op==='add'?' + ':' − ';
+      st.push({q:'What is the least common denominator of '+p.b+' and '+p.d+'?', ans:''+L, wrong:[''+(p.b*p.d), ''+(p.b+p.d), ''+Math.max(p.b,p.d)]});
+      st.push({q:'Rewrite both fractions with denominator '+L+'.', ans:mx(p.A,a2,L)+sym+mx(p.C,c2,L),
+        wrong:[mx(p.A,p.a,L)+sym+mx(p.C,p.c,L), mx(p.A,a2,L)+sym+mx(p.C,c2+1,L), mx(p.A,c2,L)+sym+mx(p.C,a2,L)], formMatters:true});
+      var total;
+      if(p.op==='add'){
+        var F=a2+c2, W=p.A+p.C;
+        st.push({q:'Add the fractions: '+fr(a2,L)+' + '+fr(c2,L)+'.', ans:fr(F,L), wrong:[fr(F,2*L), fr(p.a+p.c,p.b+p.d), fr(F+1,L)], formMatters:true});
+        st.push({q:'Add the whole numbers: '+p.A+' + '+p.C+'.', ans:''+W, wrong:[''+(W+1), ''+(W-1), ''+(p.A*p.C)]});
+        total=W*L+F;
+        st.push({q:'Write '+mx(W,F,L)+' in simplest form'+(F>=L?' (regroup the improper fraction)':'')+'.', ans:simp(total,L), wrong:[mx(W,F,L), simp(total-L,L), simp(total+L,L), mx(W,F+1,L)], formMatters:true});
+      } else {
+        var A=p.A, top=a2;
+        if(a2<c2){
+          A=p.A-1; top=a2+L;
+          st.push({q:fr(a2,L)+' is less than '+fr(c2,L)+', so regroup: rename '+mx(p.A,a2,L)+'.', ans:mx(A,top,L), wrong:[mx(p.A,top,L), mx(A,a2,L), mx(A,a2+10,L)], formMatters:true});
+        }
+        var F2=top-c2, W2=A-p.C;
+        st.push({q:'Subtract the fractions: '+fr(top,L)+' − '+fr(c2,L)+'.', ans:fr(F2,L), wrong:[fr(Math.abs(a2-c2),L), fr(top+c2,L), fr(F2+1,L)], formMatters:true});
+        st.push({q:'Subtract the whole numbers: '+A+' − '+p.C+'.', ans:''+W2, wrong:[''+(p.A-p.C===W2?W2+1:p.A-p.C), ''+(W2+2), ''+(A+p.C)]});
+        total=W2*L+F2;
+        st.push({q:'Write '+(W2? mx(W2,F2,L) : fr(F2,L))+' in simplest form.', ans:simp(total,L), wrong:[W2? mx(W2,F2,L) : fr(F2,L), simp(total+L,L), simp(total+1,L), simp((p.A-p.C)*L+Math.abs(a2-c2),L)], formMatters:true});
+      }
+      return st;
+    },
+    answer:function(p){ var L=G6.lcm(p.b,p.d); var v=(p.A*L+p.a*L/p.b)+(p.op==='add'?1:-1)*(p.C*L+p.c*L/p.d); return simp(v,L); },
+    alts:function(p){ var L=G6.lcm(p.b,p.d); var v=(p.A*L+p.a*L/p.b)+(p.op==='add'?1:-1)*(p.C*L+p.c*L/p.d); return fracAlts(v,L); },
+    rejects:function(p){ var L=G6.lcm(p.b,p.d); var v=(p.A*L+p.a*L/p.b)+(p.op==='add'?1:-1)*(p.C*L+p.c*L/p.d); return fracRejects(v,L); },
+    check:function(p){ var L=G6.lcm(p.b,p.d); var v=(p.A*L+p.a*L/p.b)+(p.op==='add'?1:-1)*(p.C*L+p.c*L/p.d); return v>0 ? '' : 'non-positive result'; },
+    grade:gradeSimplest
+  });
+
+  // Decimals as exact integers: {i, d} means i / 10^d.
+  function ds(i,d){ return d ? (i/Math.pow(10,d)).toFixed(d) : ''+i; }
+  function trim(x){ return String(+(+x).toFixed(8)); }
+  function exactGrade(t,p,dflt,val){ var v=toValue(t); return v!=null && Math.abs(v-val)<1e-9; }
+
+  // 2.5 Multiplying Decimals
+  G6.lesson({
+    id:'g6_2_5', count:6,
+    tips:['<b>Multiply</b> as if the decimal points were not there.',
+          '<b>Count</b> the digits after the decimal point in both factors.',
+          '<b>Place</b> the decimal point so the product has that many decimal places. Estimate to check: 2.9 × 4.1 is about 3 × 4 = 12.'],
+    gen:function(r,i){
+      var type=['dd','dw','money'][i%3];
+      function dec(dp, lo, hi){ for(;;){ var n=r.int(lo,hi); if(n%10) return {i:n, d:dp}; } }
+      if(type==='dw') return {type:type, x:dec(r.int(1,2), 11, 99), y:{i:r.int(3,12), d:0}};
+      if(type==='money') return {type:type, x:dec(2, 105, 999), y:{i:r.int(2,9), d:0}, item:r.pick(['notebooks','granola bars','gel pens','bottles of water'])};
+      return {type:type, x:dec(1, 11, 99), y:dec(r.int(1,2), 2, 99)};
+    },
+    prompt:function(p){
+      if(p.type==='money') return 'One of the '+p.item+' costs $'+ds(p.x.i,2)+'. How much do '+p.y.i+' of them cost? <span class="math">'+ds(p.x.i,2)+' × '+p.y.i+'</span>';
+      return 'Multiply: <span class="math">'+ds(p.x.i,p.x.d)+' × '+ds(p.y.i,p.y.d)+'</span>';
+    },
+    steps:function(p){
+      var P=p.x.i*p.y.i, D=p.x.d+p.y.d, ans=trim(P/Math.pow(10,D));
+      return [
+        {q:'Multiply without the decimal points: '+p.x.i+' × '+p.y.i+'.', ans:''+P, wrong:[''+(P+p.x.i), ''+(P-p.y.i), ''+(p.x.i+p.y.i)]},
+        {q:'How many decimal places are in the two factors altogether?', ans:''+D, wrong:[''+p.x.d, ''+(D+1), ''+(D>1?D-1:D+2)]},
+        {q:'Place the decimal point in '+P+' ('+D+' decimal place'+(D>1?'s':'')+').', ans:ans,
+          wrong:[trim(P/Math.pow(10,D-1)), trim(P/Math.pow(10,D+1)), ''+P]}
+      ];
+    },
+    answer:function(p){ return trim(p.x.i*p.y.i/Math.pow(10,p.x.d+p.y.d)); },
+    alts:function(p){ var v=p.x.i*p.y.i/Math.pow(10,p.x.d+p.y.d); return [v.toFixed(p.x.d+p.y.d)]; },
+    rejects:function(p){ var v=p.x.i*p.y.i/Math.pow(10,p.x.d+p.y.d); return [trim(v*10), (Math.round(v*10)/10)!==v ? trim(Math.round(v*10)/10) : trim(v+1)]; },
+    grade:function(t,p,dflt){ return exactGrade(t,p,dflt, p.x.i*p.y.i/Math.pow(10,p.x.d+p.y.d)); }
+  });
+
+  // 2.6 Dividing Whole Numbers (6.NS.2: the standard algorithm, 2-digit divisors)
+  function longDivision(N, D){
+    var digits=String(N).split('').map(Number), rounds=[], cur=0, k=0, q='';
+    while(k<digits.length && cur*10+digits[k]<D && k<digits.length-1){ cur=cur*10+digits[k]; k++; }
+    for(; k<digits.length; k++){
+      cur=cur*10+digits[k];
+      var dig=Math.floor(cur/D);
+      rounds.push({part:cur, digit:dig, sub:dig*D, left:cur-dig*D, next: k+1<digits.length ? digits[k+1] : null});
+      q+=dig; cur=cur-dig*D;
+    }
+    return {rounds:rounds, q:parseInt(q,10), r:cur};
+  }
+  G6.lesson({
+    id:'g6_2_6', count:6,
+    tips:['<b>Divide, Multiply, Subtract, Bring down</b> — repeat until there are no more digits.',
+          '<b>Estimate</b> each digit with rounded numbers: 23 into 98 is about 2 into 10, so try 4.',
+          '<b>Remainder:</b> what is left at the end must be less than the divisor.'],
+    gen:function(r,i){
+      var D=r.int(12,48);
+      for(var t=0;t<80;t++){
+        var q=r.int(12,199), rem = i%2 ? r.int(1,D-1) : 0, N=q*D+rem;
+        // word problems ask "how many left over?", so only problems with a remainder get one
+        if(N>=100 && N<=9999) return {N:N, D:D, story:(rem && r.chance(0.5))? r.int(0,2) : -1};
+      }
+      return {N:1035, D:23, story:-1};
+    },
+    prompt:function(p){
+      var st=[
+        'A school orders '+p.N+' pencils packed in boxes of '+p.D+'. How many full boxes is that, and how many pencils are left over?',
+        p.N+' people are going on a field trip. Each bus holds '+p.D+' people. How many buses are filled, and how many people are left?',
+        'A farm collects '+p.N+' eggs and packs them in cartons of '+p.D+'. How many full cartons, and how many eggs left over?'];
+      return (p.story>=0 ? st[p.story]+' ' : 'Divide using the standard algorithm: ')+'<span class="math">'+p.N+' ÷ '+p.D+'</span>';
+    },
+    steps:function(p){
+      var L=longDivision(p.N,p.D), st=[];
+      L.rounds.forEach(function(rd, k){
+        var q = k===0 ? 'How many times does '+p.D+' go into <b>'+rd.part+'</b>?'
+          : 'Subtract to get '+L.rounds[k-1].left+', bring down the next digit: <b>'+rd.part+'</b>. How many times does '+p.D+' go into '+rd.part+'?';
+        st.push({q:q, ans:''+rd.digit, wrong: rd.digit>=8 ? [''+(rd.digit-1), ''+(rd.digit-2), ''+(rd.digit-3)] : [''+(rd.digit+1), ''+(rd.digit>0?rd.digit-1:rd.digit+2), ''+(rd.digit+2)]});
+      });
+      var ans = L.r ? L.q+' R '+L.r : ''+L.q;
+      st.push({q:'Write the quotient'+(L.r?' and the remainder.':'.'), ans:ans,
+        wrong: L.r ? [L.q+' R '+(L.r+1), (L.q+1)+' R '+L.r, (L.q-1)+' R '+(L.r+p.D)] : [''+(L.q+1), ''+(L.q*10), ''+(L.q-1)], formMatters:true});
+      return st;
+    },
+    answer:function(p){ var L=longDivision(p.N,p.D); return L.r ? L.q+' R '+L.r : ''+L.q; },
+    alts:function(p){ var L=longDivision(p.N,p.D); return L.r ? [L.q+' R'+L.r, L.q+'r'+L.r, L.q+' remainder '+L.r] : [String(L.q)]; },
+    rejects:function(p){ var L=longDivision(p.N,p.D); return L.r ? [String(L.q), L.q+' R '+(L.r+1)] : [String(L.q+1)]; },
+    check:function(p){ var L=longDivision(p.N,p.D); return (L.q*p.D+L.r===p.N && L.r<p.D) ? '' : 'long division mismatch'; },
+    grade:function(t,p,dflt){
+      var L=longDivision(p.N,p.D);
+      if(!L.r) return dflt;
+      var m=String(t).match(/^\s*(\d+)\s*(?:r|rem|remainder)\.?\s*(\d+)\s*$/i);
+      return !!m && +m[1]===L.q && +m[2]===L.r;
+    }
+  });
+
+  // 2.7 Dividing Decimals
+  G6.lesson({
+    id:'g6_2_7', count:6,
+    tips:['<b>Make the divisor a whole number:</b> multiply the divisor and the dividend by the same power of 10 (move both decimal points the same number of places).',
+          '<b>Decimal ÷ whole number:</b> divide as usual and put the decimal point in the quotient right above the one in the dividend.',
+          '<b>Check:</b> quotient × divisor should give back the dividend.'],
+    gen:function(r,i){
+      var type=['dw','dd','wd'][i%3];
+      for(var t=0;t<200;t++){
+        var dvD = type==='dw' ? 0 : r.int(1,2), dvI = type==='dw' ? r.int(2,12) : r.int(2,dvD===1?45:250);
+        if(dvD && dvI%10===0) continue;
+        var qD=r.int(type==='wd'?0:1, 2), qI=r.int(2, qD? 400 : 60);
+        if(qD && qI%10===0) continue;
+        // dividend = divisor × quotient, as an exact integer over 10^(dvD+qD)
+        var nI=dvI*qI, nD=dvD+qD;
+        while(nD>0 && nI%10===0){ nI/=10; nD--; }
+        if(type==='wd' && nD!==0) continue;
+        if(type==='dw' && nI%dvI) continue;          // "divide without the decimal point" must come out whole
+        if(type!=='wd' && nD===0) continue;
+        if(nI/Math.pow(10,nD) > 999) continue;
+        if(nD>3) continue;                            // no dividends past thousandths (1.8164 ÷ 0.76 is too much)
+        return {type:type, n:{i:nI,d:nD}, v:{i:dvI,d:dvD}, q:{i:qI,d:qD}};
+      }
+      return {type:'dd', n:{i:156,d:2}, v:{i:12,d:1}, q:{i:13,d:1}};
+    },
+    prompt:function(p){ return 'Divide: <span class="math">'+ds(p.n.i,p.n.d)+' ÷ '+ds(p.v.i,p.v.d)+'</span>'; },
+    steps:function(p){
+      var ans=trim(p.q.i/Math.pow(10,p.q.d)), st=[];
+      if(p.v.d){
+        var k=Math.pow(10,p.v.d), N=trim(p.n.i/Math.pow(10,p.n.d)*k);
+        st.push({q:'Multiply the divisor and the dividend by what number to make the divisor a whole number?', ans:''+k, wrong:[''+(k*10), k>10?'10':'1000', '2']});
+        st.push({q:'Write the new division problem.', ans:N+' ÷ '+p.v.i, wrong:[ds(p.n.i,p.n.d)+' ÷ '+p.v.i, trim(+N*10)+' ÷ '+p.v.i, N+' ÷ '+ds(p.v.i,p.v.d)], formMatters:true});
+        st.push({q:'Divide: '+N+' ÷ '+p.v.i+'.', ans:ans, wrong:[trim(+ans*10), trim(+ans/10), trim(+ans+1)]});
+      } else {
+        var whole=p.n.i;   // the dividend without its decimal point
+        st.push({q:'Divide as if there were no decimal point: '+whole+' ÷ '+p.v.i+'.', ans:''+(whole/p.v.i), wrong:[''+(whole/p.v.i+1), ''+(whole/p.v.i*10), ''+(whole-p.v.i)]});
+        st.push({q:'Put the decimal point in the quotient directly above the one in '+ds(p.n.i,p.n.d)+'.', ans:ans, wrong:[trim(+ans*10), trim(+ans/10), ''+(whole/p.v.i)]});
+      }
+      return st;
+    },
+    answer:function(p){ return trim(p.q.i/Math.pow(10,p.q.d)); },
+    rejects:function(p){ var v=p.q.i/Math.pow(10,p.q.d); return [trim(v*10), trim(v/10)]; },
+    check:function(p){
+      var n=p.n.i/Math.pow(10,p.n.d), v=p.v.i/Math.pow(10,p.v.d), q=p.q.i/Math.pow(10,p.q.d);
+      return Math.abs(n/v-q)<1e-9 ? '' : 'quotient mismatch '+n+'/'+v+'!='+q;
+    },
+    grade:function(t,p,dflt){ return exactGrade(t,p,dflt, p.q.i/Math.pow(10,p.q.d)); }
   });
 })();
 
