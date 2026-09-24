@@ -9597,6 +9597,325 @@ var G6 = (function(){
   });
 })();
 
+// ── Unit 9: Statistical Measures ──
+(function(){
+  function trim(x){ return String(+(+x).toFixed(8)); }
+  function sum(a){ return a.reduce(function(t,x){ return t+x; },0); }
+  function sorted(a){ return a.slice().sort(function(x,y){ return x-y; }); }
+  function median(a){ var s=sorted(a), n=s.length; return n%2 ? s[(n-1)/2] : (s[n/2-1]+s[n/2])/2; }
+  function modes(a){ var c={}, best=0; a.forEach(function(x){ c[x]=(c[x]||0)+1; best=Math.max(best,c[x]); }); return Object.keys(c).filter(function(k){ return c[k]===best; }).map(Number); }
+  // quartiles by halves (the median is left out of both halves when n is odd)
+  function quartiles(a){ var s=sorted(a), n=s.length, lo=s.slice(0,Math.floor(n/2)), hi=s.slice(Math.ceil(n/2)); return {q1:median(lo), q3:median(hi), min:s[0], max:s[n-1], med:median(s)}; }
+  function list(a){ return a.join(', '); }
+  function valGrade(v){ return function(t){ var x=toValue(String(t).replace(/[−–—]/g,'-')); return x!=null && Math.abs(x-v)<1e-9; }; }
+  var SVG=G6.svg;
+  // dot plot: stacked dots over a number line
+  SVG.dotPlot = function(data, lo, hi){
+    var W=210, B=30, L=12, R=12, counts={}; data.forEach(function(x){ counts[x]=(counts[x]||0)+1; });
+    var most=Math.max.apply(null, Object.keys(counts).map(function(k){ return counts[k]; })), H=B+14+most*11;
+    function X(v){ return L+(v-lo)/(hi-lo)*(W-L-R); }
+    var s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+    s+='<line x1="'+(L-4)+'" y1="'+(H-B)+'" x2="'+(W-R+4)+'" y2="'+(H-B)+'" stroke="#444" stroke-width="1.3"/>';
+    var step=(hi-lo)>12 ? 2 : 1;
+    for(var v=lo; v<=hi; v++){ s+='<line x1="'+X(v)+'" y1="'+(H-B-3)+'" x2="'+X(v)+'" y2="'+(H-B+3)+'" stroke="#444"/>'; if((v-lo)%step===0) s+='<text x="'+X(v)+'" y="'+(H-B+14)+'" font-size="8" font-family="sans-serif" text-anchor="middle" fill="#555">'+v+'</text>'; }
+    Object.keys(counts).forEach(function(k){ for(var j=0;j<counts[k];j++) s+='<circle cx="'+X(+k)+'" cy="'+(H-B-8-j*11)+'" r="4.2" fill="#1d6a96"/>'; });
+    return s+'</svg>';
+  };
+
+  // 9.1 Introduction to Statistics
+  var QS=[
+    ['How many hours do the students in my class sleep each night?', true], ['How many hours did I sleep last night?', false],
+    ['What are the heights of the players on the team?', true], ['How tall is the school flagpole?', false],
+    ['How many pets do the students in our school have?', true], ['How many pets does my best friend have?', false],
+    ['How long does it take the students in my class to get to school?', true], ['What time does school start?', false],
+    ['What are the favorite colors of sixth graders?', true], ['How many days are in April?', false]
+  ];
+  G6.lesson({
+    id:'g6_9_1', count:6,
+    tips:['<b>Statistical question:</b> you expect the answers to VARY, so you collect data to answer it.',
+          '<b>Not statistical:</b> it has one fixed answer ("How many days are in April?").',
+          '<b>Dot plots</b> show each data value as a dot above a number line.'],
+    gen:function(r,i){
+      if(i%2===0) return {type:'q', k:r.int(0,QS.length-1)};
+      for(;;){ var lo=r.int(0,5), data=[]; var n=r.int(9,14); for(var j=0;j<n;j++) data.push(lo+Math.min(8, Math.floor(r.rand()*5+r.rand()*5))); if(modes(data).length===1) return {type:'dot', data:data, lo:lo}; }
+    },
+    prompt:function(p){ return p.type==='q' ? 'Is this a statistical question? <b>“'+QS[p.k][0]+'”</b>' : 'The dot plot shows the number of books each student read this month. What value appears most often (the mode)?'; },
+    svg:function(p){ return p.type==='dot' ? SVG.dotPlot(p.data, p.lo, p.lo+8) : ''; },
+    steps:function(p){
+      if(p.type==='q'){ var yes=QS[p.k][1]; return [
+        {q:'Would you expect different answers (variability)?', ans:yes?'Yes, the answers vary':'No, there is one answer', wrong:[yes?'No, there is one answer':'Yes, the answers vary','Only if you ask twice','It depends on the units'], formMatters:true},
+        {q:'So is it a statistical question?', ans:yes?'Yes':'No', wrong:[yes?'No':'Yes','Sometimes','Only with a survey'], formMatters:true}]; }
+      var m=modes(p.data)[0], counts={}; p.data.forEach(function(x){ counts[x]=(counts[x]||0)+1; });
+      return [
+        {q:'How many data values are in the dot plot?', ans:''+p.data.length, wrong:[''+(p.data.length+1), ''+Object.keys(counts).length, ''+(p.data.length-1)]},
+        {q:'Which value has the tallest stack of dots?', ans:''+m, wrong:[''+(m+1), ''+(m-1), ''+counts[m]]}];
+    },
+    answer:function(p){ return p.type==='q' ? (QS[p.k][1]?'Yes':'No') : ''+modes(p.data)[0]; },
+    rejects:function(p){ return p.type==='q' ? [QS[p.k][1]?'No':'Yes'] : [''+(modes(p.data)[0]+1)]; },
+    grade:function(t,p){ if(p.type==='q'){ var w=String(t).trim().toLowerCase(); return QS[p.k][1] ? /^y(es)?\b/.test(w) : /^no?\b/.test(w); } return valGrade(modes(p.data)[0])(t); }
+  });
+
+  // 9.2 Mean
+  var CTX=['quiz scores','points scored in each game','minutes spent reading each day','number of pages read','hours of practice each week'];
+  G6.lesson({
+    id:'g6_9_2', count:6,
+    tips:['<b>Mean</b> (average): add all the values, then divide by how many values there are.',
+          '<b>Check:</b> the mean is between the least and greatest values.',
+          '<b>Fair share:</b> the mean is what each would get if the total were shared equally.'],
+    gen:function(r){
+      for(;;){ var n=r.int(5,8), data=[]; for(var j=0;j<n;j++) data.push(r.int(4,30)); if(sum(data)%n===0) return {data:data, ctx:r.pick(CTX)}; }
+    },
+    prompt:function(p){ return 'Find the mean of the '+p.ctx+': <span class="math">'+list(p.data)+'</span>'; },
+    steps:function(p){ var S=sum(p.data), n=p.data.length; return [
+      {q:'Add the values.', ans:''+S, wrong:[''+(S+p.data[0]), ''+(S-1), ''+(S+10)]},
+      {q:'How many values are there?', ans:''+n, wrong:[''+(n+1), ''+(n-1), ''+Math.max.apply(null,p.data)]},
+      {q:'Divide: '+S+' ÷ '+n+'.', ans:''+S/n, wrong:[''+median(p.data), ''+(S/n+1), ''+Math.round(S/(n+1))]}]; },
+    answer:function(p){ return ''+sum(p.data)/p.data.length; },
+    rejects:function(p){ return [''+(sum(p.data)/p.data.length+1)]; },
+    grade:function(t,p){ return valGrade(sum(p.data)/p.data.length)(t); }
+  });
+
+  // 9.3 Measures of Center (median, mode)
+  G6.lesson({
+    id:'g6_9_3', count:6,
+    tips:['<b>Median:</b> the middle value when the data are in order. With an even count, it is the mean of the two middle values.',
+          '<b>Mode:</b> the value (or values) that occur most often.',
+          '<b>Put the data in order first</b> — always.'],
+    gen:function(r,i){
+      for(;;){ var n=r.pick([7,9,6,8]), data=[]; for(var j=0;j<n;j++) data.push(r.int(2,25));
+        var m=modes(data); if(i%2 && (m.length!==1 || data.filter(function(x){ return x===m[0]; }).length<2)) continue;
+        if(i%2===0 && median(data)!==Math.floor(median(data)) && r.chance(0.5)) continue;
+        return {data:data, ask: i%2 ? 'mode' : 'median'}; }
+    },
+    prompt:function(p){ return 'Find the <b>'+p.ask+'</b> of the data: <span class="math">'+list(p.data)+'</span>'; },
+    steps:function(p){
+      var s=sorted(p.data), med=median(p.data), wrongOrder=p.data.slice().reverse();
+      var st=[{q:'Write the data in order.', ans:list(s), wrong:[list(p.data), list(s.slice().reverse().slice(1).concat([s[s.length-1]])), list(sorted(p.data.slice(1)).concat([p.data[0]]))], formMatters:true}];
+      if(p.ask==='median'){ var n=s.length;
+        if(n%2===0) st.push({q:'There are '+n+' values, so average the two middle values: '+s[n/2-1]+' and '+s[n/2]+'.', ans:trim(med), wrong:[''+s[n/2-1], ''+s[n/2], trim(med+1)]});
+        else st.push({q:'Which value is in the middle?', ans:''+med, wrong:[''+p.data[(n-1)/2], ''+s[(n-1)/2-1], ''+s[(n+1)/2]]}); }
+      else st.push({q:'Which value occurs most often?', ans:''+modes(p.data)[0], wrong:[''+med, ''+s[0], ''+s[s.length-1]]});
+      return st;
+    },
+    answer:function(p){ return p.ask==='median' ? trim(median(p.data)) : ''+modes(p.data)[0]; },
+    rejects:function(p){ return p.ask==='median' ? [trim(median(p.data)+1)] : [''+(modes(p.data)[0]+1)]; },
+    grade:function(t,p){ return valGrade(p.ask==='median' ? median(p.data) : modes(p.data)[0])(t); }
+  });
+
+  // 9.4 Measures of Variation (range, IQR). n = 7 or 11 so each half has an odd count: whole-number quartiles
+  G6.lesson({
+    id:'g6_9_4', count:6,
+    tips:['<b>Range</b> = greatest − least.',
+          '<b>Quartiles:</b> Q1 is the median of the lower half, Q3 the median of the upper half (leave the middle value out when the count is odd).',
+          '<b>Interquartile range</b> IQR = Q3 − Q1: the spread of the middle half of the data.'],
+    gen:function(r,i){ var n=r.pick([7,11]), data=[]; for(var j=0;j<n;j++) data.push(r.int(3,40)); return {data:data, ask: i%2 ? 'range' : 'IQR'}; },
+    prompt:function(p){ return 'Find the <b>'+(p.ask==='IQR'?'interquartile range (IQR)':'range')+'</b> of the data: <span class="math">'+list(p.data)+'</span>'; },
+    steps:function(p){
+      var s=sorted(p.data), Q=quartiles(p.data);
+      var st=[{q:'Write the data in order.', ans:list(s), wrong:[list(p.data), list(s.slice().reverse()), list(sorted(p.data.slice(1)).concat([p.data[0]]))], formMatters:true}];
+      if(p.ask==='range'){ st.push({q:'Range = greatest − least: '+Q.max+' − '+Q.min+'.', ans:''+(Q.max-Q.min), wrong:[''+(Q.max+Q.min), ''+(Q.q3-Q.q1), ''+(Q.max-Q.min+1)]}); return st; }
+      st.push({q:'Q1: the median of the lower half.', ans:''+Q.q1, wrong:[''+Q.min, ''+Q.med, ''+(Q.q1+1)]});
+      st.push({q:'Q3: the median of the upper half.', ans:''+Q.q3, wrong:[''+Q.max, ''+Q.med, ''+(Q.q3-1)]});
+      st.push({q:'IQR = Q3 − Q1: '+Q.q3+' − '+Q.q1+'.', ans:''+(Q.q3-Q.q1), wrong:[''+(Q.max-Q.min), ''+(Q.q3+Q.q1), ''+(Q.q3-Q.q1+1)]});
+      return st;
+    },
+    answer:function(p){ var Q=quartiles(p.data); return ''+(p.ask==='range' ? Q.max-Q.min : Q.q3-Q.q1); },
+    rejects:function(p){ var Q=quartiles(p.data); var w=p.ask==='range' ? Q.q3-Q.q1 : Q.max-Q.min, a=p.ask==='range'? Q.max-Q.min : Q.q3-Q.q1; return w!==a ? [''+w] : [''+(a+1)]; },
+    grade:function(t,p){ var Q=quartiles(p.data); return valGrade(p.ask==='range' ? Q.max-Q.min : Q.q3-Q.q1)(t); }
+  });
+
+  // 9.5 Mean Absolute Deviation (whole-number mean; MAD to at most one decimal place)
+  G6.lesson({
+    id:'g6_9_5', count:4,
+    tips:['<b>MAD</b> = the average distance of the data values from the mean.',
+          '<b>Steps:</b> find the mean; find each value\'s distance from the mean (always positive); find the mean of those distances.',
+          '<b>A bigger MAD</b> means the data are more spread out.'],
+    gen:function(r){
+      for(;;){ var n=r.pick([5,6,8]), data=[]; for(var j=0;j<n;j++) data.push(r.int(2,20));
+        var S=sum(data); if(S%n) continue; var m=S/n, D=sum(data.map(function(x){ return Math.abs(x-m); }));
+        if((D*10)%n) continue; return {data:data}; }
+    },
+    prompt:function(p){ return 'Find the mean absolute deviation (MAD) of the data: <span class="math">'+list(p.data)+'</span>'; },
+    steps:function(p){
+      var n=p.data.length, m=sum(p.data)/n, dist=p.data.map(function(x){ return Math.abs(x-m); }), D=sum(dist), mad=D/n;
+      return [
+        {q:'Find the mean: '+sum(p.data)+' ÷ '+n+'.', ans:''+m, wrong:[''+median(p.data), ''+(m+1), ''+Math.round(sum(p.data)/(n+1))]},
+        {q:'Find each value\'s distance from '+m+'.', ans:list(dist), wrong:[list(p.data.map(function(x){ return x-m; })), list(dist.map(function(d){ return d+1; })), list(p.data)], formMatters:true},
+        {q:'Add the distances.', ans:''+D, wrong:[''+(D+2), ''+sum(p.data), ''+(D-1)]},
+        {q:'Divide by the number of values: '+D+' ÷ '+n+'.', ans:trim(mad), wrong:[trim(mad+1), ''+D, trim(D/(n-1))]}];
+    },
+    answer:function(p){ var n=p.data.length, m=sum(p.data)/n; return trim(sum(p.data.map(function(x){ return Math.abs(x-m); }))/n); },
+    rejects:function(p){ var n=p.data.length, m=sum(p.data)/n; return [trim(sum(p.data.map(function(x){ return Math.abs(x-m); })))]; },
+    grade:function(t,p){ var n=p.data.length, m=sum(p.data)/n; return valGrade(sum(p.data.map(function(x){ return Math.abs(x-m); }))/n)(t); }
+  });
+
+  G6.stats = {sum:sum, sorted:sorted, median:median, modes:modes, quartiles:quartiles, list:list, valGrade:valGrade, trim:trim};
+})();
+
+// ── Unit 10: Data Displays ──
+(function(){
+  var St=G6.stats, SVG=G6.svg, sum=St.sum, sorted=St.sorted, median=St.median, list=St.list, valGrade=St.valGrade, trim=St.trim;
+  function wordGrade(word){ return function(t){ return String(t).toLowerCase().indexOf(word)>=0; }; }
+
+  // stem-and-leaf plot as an HTML table
+  function stemLeaf(data){
+    var s=sorted(data), stems={}, lo=Math.floor(s[0]/10), hi=Math.floor(s[s.length-1]/10), h='<table class="g6-table g6-stem"><tr><th>Stem</th><th style="text-align:left">Leaf</th></tr>';
+    s.forEach(function(x){ var k=Math.floor(x/10); (stems[k]=stems[k]||[]).push(x%10); });
+    for(var k=lo;k<=hi;k++) h+='<tr><td>'+k+'</td><td style="text-align:left;letter-spacing:4px">'+(stems[k]||[]).join(' ')+'</td></tr>';
+    return h+'</table><div style="font-size:10px;color:#555;margin-top:2px">Key: '+lo+' | '+(s[0]%10)+' = '+(lo*10+s[0]%10)+'</div>';
+  }
+  // histogram from bins [{lo,hi,count}]
+  function histogram(bins, xlabel){
+    var W=210, H=160, L=26, B=30, T=8, most=Math.max.apply(null,bins.map(function(b){ return b.count; })), top=Math.max(4, most+1), bw=(W-L-8)/bins.length;
+    function Y(v){ return H-B-v/top*(H-B-T); }
+    var s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+    for(var v=0; v<=top; v++){ s+='<line x1="'+L+'" y1="'+Y(v)+'" x2="'+(W-8)+'" y2="'+Y(v)+'" stroke="#e3e8ec" stroke-width="0.8"/>'; if(v%Math.ceil(top/6)===0) s+='<text x="'+(L-4)+'" y="'+(Y(v)+3)+'" font-size="8" text-anchor="end" fill="#666" font-family="sans-serif">'+v+'</text>'; }
+    bins.forEach(function(b,k){ var x=L+k*bw; s+='<rect x="'+x+'" y="'+Y(b.count)+'" width="'+bw+'" height="'+(Y(0)-Y(b.count))+'" fill="#bcd6e6" stroke="#1d6a96" stroke-width="1.2"/>';
+      s+='<text x="'+(x+bw/2)+'" y="'+(H-B+11)+'" font-size="7.5" text-anchor="middle" fill="#444" font-family="sans-serif">'+b.lo+'–'+b.hi+'</text>'; });
+    s+='<line x1="'+L+'" y1="'+Y(0)+'" x2="'+(W-8)+'" y2="'+Y(0)+'" stroke="#444" stroke-width="1.2"/>';
+    s+='<text x="'+(L+(W-L-8)/2)+'" y="'+(H-4)+'" font-size="9" text-anchor="middle" fill="#1d6a96" font-weight="700" font-family="sans-serif">'+xlabel+'</text>';
+    return s+'</svg>';
+  }
+  // box-and-whisker plot in a reveal layer over a labeled axis
+  function boxPlot(Q, lo, hi){
+    var W=210, H=80, L=12, R=12, y=34;
+    function X(v){ return L+(v-lo)/(hi-lo)*(W-L-R); }
+    var s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+    s+='<line x1="'+L+'" y1="'+(y+26)+'" x2="'+(W-R)+'" y2="'+(y+26)+'" stroke="#444" stroke-width="1.2"/>';
+    var step=Math.ceil((hi-lo)/10/5)*5||5; for(var v=lo; v<=hi; v+=step){ s+='<line x1="'+X(v)+'" y1="'+(y+23)+'" x2="'+X(v)+'" y2="'+(y+29)+'" stroke="#444"/><text x="'+X(v)+'" y="'+(y+40)+'" font-size="8" text-anchor="middle" fill="#555" font-family="sans-serif">'+v+'</text>'; }
+    var g='<g class="gph-layer gph-g6box">';
+    g+='<line x1="'+X(Q.min)+'" y1="'+y+'" x2="'+X(Q.q1)+'" y2="'+y+'" stroke="#1d6a96" stroke-width="1.6"/><line x1="'+X(Q.q3)+'" y1="'+y+'" x2="'+X(Q.max)+'" y2="'+y+'" stroke="#1d6a96" stroke-width="1.6"/>';
+    g+='<rect x="'+X(Q.q1)+'" y="'+(y-12)+'" width="'+(X(Q.q3)-X(Q.q1))+'" height="24" fill="#eef5fa" stroke="#1d6a96" stroke-width="1.6"/>';
+    g+='<line x1="'+X(Q.med)+'" y1="'+(y-12)+'" x2="'+X(Q.med)+'" y2="'+(y+12)+'" stroke="#b5451b" stroke-width="2"/>';
+    [Q.min,Q.max].forEach(function(v){ g+='<line x1="'+X(v)+'" y1="'+(y-7)+'" x2="'+X(v)+'" y2="'+(y+7)+'" stroke="#1d6a96" stroke-width="1.6"/>'; });
+    return s+g+'</g></svg>';
+  }
+
+  // 10.1 Stem-and-Leaf Plots
+  G6.lesson({
+    id:'g6_10_1', count:4,
+    tips:['<b>Stem</b> = the tens digit, <b>leaf</b> = the ones digit: 4 | 7 means 47.',
+          '<b>Leaves are in order</b>, so the plot already lists the data from least to greatest.',
+          '<b>Read it</b> to find the least and greatest values, the median, and the range.'],
+    gen:function(r,i){ var n=r.pick([9,11,13]), base=r.int(1,5), data=[]; for(var j=0;j<n;j++) data.push(base*10+r.int(0,39)); return {data:data, ask: i%2 ? 'range' : 'median'}; },
+    prompt:function(p){ return 'The stem-and-leaf plot shows test scores. Find the <b>'+p.ask+'</b>.'; },
+    svg:function(p){ return stemLeaf(p.data); },
+    steps:function(p){
+      var s=sorted(p.data), n=s.length;
+      var st=[{q:'How many data values are shown?', ans:''+n, wrong:[''+(n+1), ''+(n-1), ''+(Math.floor(s[n-1]/10)-Math.floor(s[0]/10)+1)]},
+              {q:'What is the least value?', ans:''+s[0], wrong:[''+Math.floor(s[0]/10), ''+(s[0]%10), ''+s[1]]}];
+      if(p.ask==='range') st.push({q:'Greatest value '+s[n-1]+' − least value '+s[0]+'.', ans:''+(s[n-1]-s[0]), wrong:[''+(s[n-1]+s[0]), ''+(s[n-1]-s[1]), ''+(s[n-1]-s[0]+1)]});
+      else st.push({q:'Count to the middle value (value number '+((n+1)/2)+').', ans:''+median(s), wrong:[''+s[(n-1)/2-1], ''+s[(n+1)/2], ''+Math.round(sum(s)/n)]});
+      return st;
+    },
+    answer:function(p){ var s=sorted(p.data); return ''+(p.ask==='range' ? s[s.length-1]-s[0] : median(s)); },
+    rejects:function(p){ var s=sorted(p.data); return [''+(p.ask==='range' ? s[s.length-1]+s[0] : s[0])]; },
+    grade:function(t,p){ var s=sorted(p.data); return valGrade(p.ask==='range' ? s[s.length-1]-s[0] : median(s))(t); }
+  });
+
+  // 10.2 Histograms
+  var HCTX=[['minutes spent on homework','Minutes'],['heights of plants (cm)','Height (cm)'],['points scored per game','Points'],['ages of people at a concert','Age']];
+  G6.lesson({
+    id:'g6_10_2', count:4,
+    tips:['<b>Histogram:</b> bars show how many data values fall in each interval; the bars touch.',
+          '<b>Read a bar</b> by looking across to the frequency (count) axis.',
+          '<b>"At least" / "less than":</b> add the bars that fit.'],
+    gen:function(r,i){
+      var c=r.pick(HCTX), start=r.int(0,3)*10, bins=[];
+      for(var k=0;k<5;k++) bins.push({lo:start+10*k, hi:start+10*k+9, count:r.int(1,9)});
+      return {c:c, bins:bins, pick:r.int(0,4), cut:r.int(1,3), dir: i%2 ? 'least' : 'less'};
+    },
+    prompt:function(p){ var b=p.bins[p.cut]; return 'The histogram shows the '+p.c[0]+'. How many values are '+(p.dir==='least'?'<b>at least '+b.lo+'</b>':'<b>less than '+b.lo+'</b>')+'?'; },
+    svg:function(p){ return histogram(p.bins, p.c[1]); },
+    steps:function(p){
+      var b=p.bins[p.pick], use = p.dir==='least' ? p.bins.slice(p.cut) : p.bins.slice(0,p.cut), total=sum(use.map(function(x){ return x.count; }));
+      return [
+        {q:'How many values are in the '+b.lo+'–'+b.hi+' interval?', ans:''+b.count, wrong:[''+(b.count+1), ''+(b.count>1?b.count-1:b.count+2), ''+b.lo]},
+        {q:'Which intervals are '+(p.dir==='least'?'at least '+p.bins[p.cut].lo:'less than '+p.bins[p.cut].lo)+'?', ans:use.map(function(x){ return x.lo+'–'+x.hi; }).join(', '),
+          wrong:[(p.dir==='least'?p.bins.slice(0,p.cut):p.bins.slice(p.cut)).map(function(x){ return x.lo+'–'+x.hi; }).join(', '), (p.dir==='least'?p.bins.slice(p.cut+1):p.bins.slice(0,p.cut+1)).map(function(x){ return x.lo+'–'+x.hi; }).join(', ')||'none', p.bins.map(function(x){ return x.lo+'–'+x.hi; }).join(', ')], formMatters:true},
+        {q:'Add those bars.', ans:''+total, wrong:[''+(sum(p.bins.map(function(x){ return x.count; }))-total), ''+(total+1), ''+use.length]}];
+    },
+    answer:function(p){ var use = p.dir==='least' ? p.bins.slice(p.cut) : p.bins.slice(0,p.cut); return ''+sum(use.map(function(x){ return x.count; })); },
+    grade:function(t,p){ var use = p.dir==='least' ? p.bins.slice(p.cut) : p.bins.slice(0,p.cut); return valGrade(sum(use.map(function(x){ return x.count; })))(t); }
+  });
+
+  // 10.3 Shapes of Distributions
+  var SHAPES={
+    'symmetric':[1,3,6,3,1], 'skewed left':[1,1,2,4,7], 'skewed right':[7,4,2,1,1]
+  };
+  G6.lesson({
+    id:'g6_10_3', count:6,
+    tips:['<b>Symmetric:</b> the left and right sides are mirror images; the mean and median are about the same.',
+          '<b>Skewed left:</b> the tail stretches to the left (most data on the right). <b>Skewed right:</b> the tail stretches to the right.',
+          '<b>Skewed data:</b> use the median to describe the center; for symmetric data use the mean.'],
+    gen:function(r,i){
+      var name=['symmetric','skewed left','skewed right'][i%3], base=SHAPES[name].map(function(c){ return Math.max(1, c+r.int(-1,1)); });
+      if(name==='symmetric'){ base[3]=base[1]; base[4]=base[0]; }
+      return {name:name, bins:base.map(function(c,k){ return {lo:10*k, hi:10*k+9, count:c}; })};
+    },
+    prompt:function(p){ return 'Describe the shape of the distribution, and choose the best measure of center.'; },
+    svg:function(p){ return histogram(p.bins, 'Score'); },
+    steps:function(p){
+      var best = p.name==='symmetric' ? 'mean' : 'median';
+      return [
+        {q:'Where are most of the data?', ans:p.name==='symmetric'?'in the middle':p.name==='skewed left'?'on the right':'on the left', wrong:['in the middle','on the right','on the left','spread evenly'].filter(function(x){ return x!==(p.name==='symmetric'?'in the middle':p.name==='skewed left'?'on the right':'on the left'); }), formMatters:true},
+        {q:'Which measure best describes the center?', ans:best, wrong:[best==='mean'?'median':'mean','range','mode only'], formMatters:true},
+        {q:'What is the shape?', ans:p.name, wrong:['symmetric','skewed left','skewed right','uniform'].filter(function(x){ return x!==p.name; }), formMatters:true}];
+    },
+    answer:function(p){ return p.name; },
+    rejects:function(p){ return [p.name==='skewed left'?'skewed right':'skewed left']; },
+    grade:function(t,p){ var w=String(t).toLowerCase(); if(p.name==='symmetric') return /symmetric/.test(w); var dir=p.name.split(' ')[1]; return /skew/.test(w) && w.indexOf(dir)>=0 && w.indexOf(dir==='left'?'right':'left')<0; }
+  });
+
+  // 10.4 Choosing Appropriate Measures (an outlier pulls the mean)
+  G6.lesson({
+    id:'g6_10_4', count:4,
+    tips:['<b>An outlier</b> is a value much greater or much less than the others.',
+          '<b>Outliers pull the mean</b> toward them; the median barely moves.',
+          '<b>With an outlier</b>, the median describes the center better.'],
+    gen:function(r){
+      for(;;){ var n=r.pick([5,7]), data=[]; for(var j=0;j<n-1;j++) data.push(r.int(10,20)); var out=r.int(60,95); data.push(out);
+        data=r.shuffle(data); if(sum(data)%n===0) return {data:data, out:out}; }
+    },
+    prompt:function(p){ return 'The data are the number of minutes some students spent on homework: <span class="math">'+list(p.data)+'</span>. Which measure of center better describes the data, the mean or the median?'; },
+    steps:function(p){
+      var m=sum(p.data)/p.data.length, med=median(p.data);
+      return [
+        {q:'Which value is the outlier?', ans:''+p.out, wrong:[''+sorted(p.data)[0], ''+med, ''+m]},
+        {q:'Find the mean.', ans:''+m, wrong:[''+med, ''+(m+1), ''+Math.round(sum(p.data)/(p.data.length+1))]},
+        {q:'Find the median.', ans:''+med, wrong:[''+m, ''+sorted(p.data)[0], ''+(med+1)]},
+        {q:'Which measure better describes the data?', ans:'median', wrong:['mean','range','they are the same'], formMatters:true}];
+    },
+    answer:function(p){ return 'median'; },
+    rejects:function(){ return ['mean']; },
+    grade:function(t){ return wordGrade('median')(t) && String(t).toLowerCase().indexOf('mean')<0; }
+  });
+
+  // 10.5 Box-and-Whisker Plots (n = 7 or 11: whole-number quartiles)
+  G6.lesson({
+    id:'g6_10_5', count:4,
+    tips:['<b>Five-number summary:</b> least value, Q1, median, Q3, greatest value.',
+          '<b>The box</b> goes from Q1 to Q3 with a line at the median; the <b>whiskers</b> reach the least and greatest values.',
+          '<b>Each part</b> (whisker or half-box) holds about one quarter of the data.'],
+    gen:function(r){ var n=r.pick([7,11]), data=[]; for(var j=0;j<n;j++) data.push(r.int(10,60)); return {data:data}; },
+    prompt:function(p){ return 'Make a box-and-whisker plot of the data: <span class="math">'+list(p.data)+'</span>. Write the five-number summary.'; },
+    svg:function(p){ return boxPlot(St.quartiles(p.data), 10, 60); },
+    steps:function(p){
+      var s=sorted(p.data), Q=St.quartiles(p.data);
+      return [
+        {q:'Order the data.', ans:list(s), wrong:[list(p.data), list(s.slice().reverse()), list(sorted(p.data.slice(1)).concat([p.data[0]]))], formMatters:true},
+        {q:'Least and greatest values.', ans:Q.min+' and '+Q.max, wrong:[s[1]+' and '+s[s.length-2], p.data[0]+' and '+p.data[p.data.length-1], Q.q1+' and '+Q.q3], formMatters:true},
+        {q:'The median.', ans:''+Q.med, wrong:[''+Math.round(sum(s)/s.length)===''+Q.med?''+(Q.med+1):''+Math.round(sum(s)/s.length), ''+p.data[(s.length-1)/2], ''+(Q.med+1)]},
+        {q:'Q1 and Q3.', ans:Q.q1+' and '+Q.q3, reveal:'g6box', wrong:[Q.min+' and '+Q.max, (Q.q1+1)+' and '+(Q.q3-1), Q.q3+' and '+Q.q1], formMatters:true}];
+    },
+    lastStepNotFinal:true,
+    answer:function(p){ var Q=St.quartiles(p.data); return [Q.min,Q.q1,Q.med,Q.q3,Q.max].join(', '); },
+    rejects:function(p){ var Q=St.quartiles(p.data); return [[Q.min,Q.med,Q.q1,Q.q3,Q.max].join(', ')]; },
+    grade:function(t,p){ var Q=St.quartiles(p.data), want=[Q.min,Q.q1,Q.med,Q.q3,Q.max], n=(String(t).match(/\d+(?:\.\d+)?/g)||[]).map(Number);
+      return n.length===5 && n.every(function(v,k){ return v===want[k]; }); }
+  });
+})();
+
 // ── 6th GRADE LESSONS (end) ──
 G6.init();
 
