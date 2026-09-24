@@ -8814,6 +8814,166 @@ var G6 = (function(){
   });
 })();
 
+// ── Unit 6: Equations ──
+(function(){
+  function trim(x){ return String(+(+x).toFixed(8)); }
+  function num(v){ return (v<0?'−':'')+trim(Math.abs(v)); }
+  // An equation answer must match on BOTH sides (either way round). The default grader only looks
+  // after the last "=", which would accept "x − 12 = 30" for "x + 12 = 30".
+  function clean(t){ return String(t).replace(/÷/g,'/').replace(/[×·]/g,'*').replace(/[−–—]/g,'-'); }
+  function sidesEqual(a,b){
+    function same(x,y){ x=x.trim(); y=y.trim(); if(symbolicallyEqual(x,y)) return true; var vx=toValue(x), vy=toValue(y); return vx!=null && vy!=null && Math.abs(vx-vy)<1e-9; }
+    var A=clean(a).split('='), B=clean(b).split('=');
+    if(A.length!==2 || B.length!==2) return false;
+    return (same(A[0],B[0]) && same(A[1],B[1])) || (same(A[0],B[1]) && same(A[1],B[0]));
+  }
+  // "x = 12" or "12": the solution value, exactly
+  function solGrade(v){ return function(t){ var s=String(t), k=s.lastIndexOf('='); var val=toValue(k>=0 ? s.slice(k+1) : s); return val!=null && Math.abs(val-v)<1e-9; }; }
+
+  // 6.1 Writing Equations in One Variable (+ checking a solution, 6.EE.5)
+  var SENT=[
+    function(v,a,b){ return {w:'The sum of a number '+v+' and '+a+' is '+b+'.', e:v+' + '+a+' = '+b, bad:[v+' − '+a+' = '+b, a+v+' = '+b, v+' + '+b+' = '+a]}; },
+    function(v,a,b){ return {w:'A number '+v+' decreased by '+a+' equals '+b+'.', e:v+' − '+a+' = '+b, bad:[a+' − '+v+' = '+b, v+' + '+a+' = '+b, v+' − '+b+' = '+a]}; },
+    function(v,a,b){ return {w:a+' times a number '+v+' is '+(a*b)+'.', e:a+v+' = '+(a*b), bad:[v+' + '+a+' = '+(a*b), v+' ÷ '+a+' = '+(a*b), (a*b)+v+' = '+a]}; },
+    function(v,a,b){ return {w:'A number '+v+' divided by '+a+' is '+b+'.', e:v+' ÷ '+a+' = '+b, bad:[a+' ÷ '+v+' = '+b, a+v+' = '+b, v+' − '+a+' = '+b]}; },
+    function(v,a,b){ return {w:'You spend $'+a+' at the store and have $'+b+' left. Write an equation for '+v+', the money you started with.', e:v+' − '+a+' = '+b, bad:[v+' + '+a+' = '+b, a+' − '+v+' = '+b, v+' = '+b+' − '+a]}; },
+    function(v,a,b){ return {w:'Each pack has '+a+' pencils. '+v+' packs hold '+(a*b)+' pencils in all. Write an equation.', e:a+v+' = '+(a*b), bad:[v+' + '+a+' = '+(a*b), v+' ÷ '+a+' = '+(a*b), a+' + '+v+' = '+(a*b)]}; }
+  ];
+  G6.lesson({
+    id:'g6_6_1', count:6,
+    tips:['<b>Equation:</b> two expressions that are equal. "is", "equals" and "the result is" mean =.',
+          '<b>Translate piece by piece:</b> the words before "is" become the left side, the words after it the right side.',
+          '<b>Is it a solution?</b> Substitute the value; if both sides come out equal, it is a solution.'],
+    gen:function(r,i){
+      var v=r.pick(['x','n','y','k']), a=r.int(2,12), b;
+      do { b=r.int(3,40); } while(b===a);
+      if(i%3===2){ var c=r.int(2,9), sol=r.int(1,9), d=r.int(1,15); var yes=r.chance(0.5);
+        return {type:'check', v:v, c:c, d:d, rhs:c*sol+d, test: yes? sol : sol+r.pick([1,2,-1].filter(function(q){ return sol+q>0; }))}; }
+      return {type:'write', k:r.int(0,SENT.length-1), v:v, a:a, b:b};
+    },
+    prompt:function(p){
+      if(p.type==='check') return 'Is <span class="math">'+p.v+' = '+p.test+'</span> a solution of <span class="math">'+p.c+p.v+' + '+p.d+' = '+p.rhs+'</span>?';
+      var S=SENT[p.k](p.v,p.a,p.b); return S.w.indexOf('Write an equation')>=0 ? S.w : 'Write an equation: <b>'+S.w+'</b>';
+    },
+    steps:function(p){
+      if(p.type==='check'){
+        var L=p.c*p.test+p.d, yes=L===p.rhs;
+        return [
+          {q:'Substitute '+p.test+' for '+p.v+'.', ans:p.c+' × '+p.test+' + '+p.d, wrong:[p.c+''+p.test+' + '+p.d, p.c+' + '+p.test+' + '+p.d, p.c+' × '+p.d+' + '+p.test], formMatters:true},
+          {q:'Evaluate the left side.', ans:''+L, wrong:[''+(L+1), ''+(p.c+p.test+p.d), ''+(p.c*(p.test+p.d))]},
+          {q:'Does '+L+' equal '+p.rhs+'? Is '+p.test+' a solution?', ans:yes?'Yes':'No', wrong:[yes?'No':'Yes', 'Only if '+p.v+' is even', 'There is not enough information'], formMatters:true}];
+      }
+      var S=SENT[p.k](p.v,p.a,p.b), op=[' + ',' − ',' × ',' ÷ ',' − ',' × '][p.k];
+      return [
+        {q:'Which operation is described?', ans:{' + ':'addition',' − ':'subtraction',' × ':'multiplication',' ÷ ':'division'}[op], wrong:['addition','subtraction','multiplication','division'].filter(function(o){ return o!=={' + ':'addition',' − ':'subtraction',' × ':'multiplication',' ÷ ':'division'}[op]; }), formMatters:true},
+        {q:'Write the equation.', ans:S.e, wrong:S.bad, formMatters:true}];
+    },
+    answer:function(p){ if(p.type==='check') return p.c*p.test+p.d===p.rhs ? 'Yes' : 'No'; return SENT[p.k](p.v,p.a,p.b).e; },
+    rejects:function(p){ if(p.type==='check') return [p.c*p.test+p.d===p.rhs ? 'No' : 'Yes']; return [SENT[p.k](p.v,p.a,p.b).bad[0]]; },
+    grade:function(t,p){
+      if(p.type==='check'){ var w=String(t).trim().toLowerCase(); return (p.c*p.test+p.d===p.rhs) ? /^y(es)?\b/.test(w) : /^no?\b/.test(w); }
+      return sidesEqual(t, SENT[p.k](p.v,p.a,p.b).e);
+    }
+  });
+
+  // 6.2 Solving Equations Using Addition or Subtraction
+  var ADD_STORIES=[
+    function(p){ return 'After spending $'+num(p.a)+', you have $'+num(p.b)+' left. <span class="math">'+p.v+' − '+num(p.a)+' = '+num(p.b)+'</span>. How much did you start with?'; },
+    function(p){ return 'A plant grew '+num(p.a)+' cm and is now '+num(p.b)+' cm tall. <span class="math">'+p.v+' + '+num(p.a)+' = '+num(p.b)+'</span>. How tall was it before?'; }
+  ];
+  G6.lesson({
+    id:'g6_6_2', count:6,
+    tips:['<b>Undo it:</b> addition and subtraction are inverse operations.',
+          '<b>Same to both sides:</b> x + 7 = 20 → subtract 7 from both sides → x = 13.',
+          '<b>Check:</b> put your answer back in the equation — both sides should match.'],
+    gen:function(r,i){
+      var v=r.pick(['x','n','y','k']), dec=r.chance(0.3), op=i%2 ? 'sub' : 'add';
+      var a=dec? r.int(11,99)/10 : r.int(2,40), x=dec? r.int(11,99)/10 : r.int(1,50);
+      a=+a.toFixed(1); x=+x.toFixed(1);
+      var b = op==='add' ? +(x+a).toFixed(1) : +(x-a).toFixed(1);
+      if(b<=0){ op='add'; b=+(x+a).toFixed(1); }
+      return {v:v, op:op, a:a, x:x, b:b, story: (i%3===2 && !dec) ? (op==='sub'?0:1) : -1, flip: op==='add' && r.chance(0.3)};
+    },
+    prompt:function(p){
+      if(p.story>=0) return ADD_STORIES[p.story](p);
+      var lhs = p.op==='sub' ? p.v+' − '+num(p.a) : (p.flip ? num(p.a)+' + '+p.v : p.v+' + '+num(p.a));
+      return 'Solve: <span class="math">'+lhs+' = '+num(p.b)+'</span>';
+    },
+    steps:function(p){
+      var add=p.op==='add';
+      return [
+        {q:'What do you do to both sides to get '+p.v+' by itself?', ans:add?'Subtract '+num(p.a):'Add '+num(p.a), wrong:[add?'Add '+num(p.a):'Subtract '+num(p.a), 'Multiply by '+num(p.a), 'Divide by '+num(p.a)], formMatters:true},
+        {q:add ? num(p.b)+' − '+num(p.a)+' = ?' : num(p.b)+' + '+num(p.a)+' = ?', ans:p.v+' = '+num(p.x),
+          wrong:[p.v+' = '+num(add? p.b+p.a : Math.abs(p.b-p.a)), p.v+' = '+num(+(p.x+1).toFixed(1)), p.v+' = '+num(p.b)]}];
+    },
+    answer:function(p){ return p.v+' = '+num(p.x); },
+    alts:function(p){ return [trim(p.x)]; },
+    rejects:function(p){ return [trim(p.op==='add'? p.b+p.a : Math.abs(p.b-p.a))]; },
+    grade:function(t,p){ return solGrade(p.x)(t); }
+  });
+
+  // 6.3 Solving Equations Using Multiplication or Division
+  G6.lesson({
+    id:'g6_6_3', count:6,
+    tips:['<b>Undo it:</b> multiplication and division are inverse operations.',
+          '<b>4x = 28:</b> divide both sides by 4 → x = 7. <b>x ÷ 3 = 5:</b> multiply both sides by 3 → x = 15.',
+          '<b>Check</b> by substituting your answer back in.'],
+    gen:function(r,i){
+      var v=r.pick(['x','n','y','k']), a=r.int(2,12), x=r.int(2,15);
+      if(r.chance(0.25) && i%2===0) x=r.int(11,99)/10;      // some decimal solutions (6.EE.7: nonnegative rationals)
+      return {v:v, mul: i%2===0, a:a, x:+x.toFixed(1), story: i%3===2 ? r.int(0,1) : -1};
+    },
+    prompt:function(p){
+      if(p.mul){
+        var b=+(p.a*p.x).toFixed(1);
+        if(p.story===0) return p.a+' friends share the cost of a gift equally. The gift costs $'+num(b)+'. Solve <span class="math">'+p.a+p.v+' = '+num(b)+'</span> to find what each friend pays.';
+        return 'Solve: <span class="math">'+p.a+p.v+' = '+num(b)+'</span>';
+      }
+      return 'Solve: <span class="math">'+p.v+' ÷ '+p.a+' = '+num(p.x)+'</span>';
+    },
+    steps:function(p){
+      if(p.mul){ var b=+(p.a*p.x).toFixed(1); return [
+        {q:'What do you do to both sides to get '+p.v+' by itself?', ans:'Divide by '+p.a, wrong:['Multiply by '+p.a, 'Subtract '+p.a, 'Add '+p.a], formMatters:true},
+        {q:num(b)+' ÷ '+p.a+' = ?', ans:p.v+' = '+num(p.x), wrong:[p.v+' = '+num(+(b-p.a).toFixed(1)), p.v+' = '+num(+(b*p.a).toFixed(1)), p.v+' = '+num(+(p.x+1).toFixed(1))]}]; }
+      var X=+(p.a*p.x).toFixed(1);
+      return [
+        {q:'What do you do to both sides to get '+p.v+' by itself?', ans:'Multiply by '+p.a, wrong:['Divide by '+p.a, 'Add '+p.a, 'Subtract '+p.a], formMatters:true},
+        {q:num(p.x)+' × '+p.a+' = ?', ans:p.v+' = '+num(X), wrong:[p.v+' = '+num(+(p.x/p.a).toFixed(3)), p.v+' = '+num(+(p.x+p.a).toFixed(1)), p.v+' = '+num(+(X+p.a).toFixed(1))]}];
+    },
+    answer:function(p){ return p.v+' = '+num(p.mul ? p.x : +(p.a*p.x).toFixed(1)); },
+    alts:function(p){ return [trim(p.mul ? p.x : +(p.a*p.x).toFixed(1))]; },
+    rejects:function(p){ return [trim(p.mul ? +(p.a*p.x-p.a).toFixed(1) : +(p.x+p.a).toFixed(1))]; },
+    grade:function(t,p){ return solGrade(p.mul ? p.x : +(p.a*p.x).toFixed(1))(t); }
+  });
+  // 6.4 Writing Equations in Two Variables
+  var TWO=[
+    {ind:'h', dep:'d', w:function(k){ return 'You earn $'+k+' for each hour you work. Let h be the hours worked and d the dollars earned.'; }, q:'dollars for', unit:'hours'},
+    {ind:'t', dep:'p', w:function(k){ return 'A printer prints '+k+' pages per minute. Let t be the minutes and p the pages printed.'; }, q:'pages in', unit:'minutes'},
+    {ind:'b', dep:'c', w:function(k){ return 'Each box holds '+k+' crayons. Let b be the number of boxes and c the number of crayons.'; }, q:'crayons in', unit:'boxes'},
+    {ind:'w', dep:'e', w:function(k){ return 'Tickets cost $'+k+' each. Let w be the number of tickets and e the total cost in dollars.'; }, q:'dollars for', unit:'tickets'}
+  ];
+  G6.lesson({
+    id:'g6_6_4', count:4,
+    tips:['<b>Independent variable:</b> the one you choose or that changes on its own (hours, tickets).',
+          '<b>Dependent variable:</b> the one that depends on it (earnings, total cost).',
+          '<b>Write it:</b> dependent = rate × independent, like d = 12h. Then substitute to find values.'],
+    gen:function(r){ return {c:r.int(0,TWO.length-1), k:r.int(3,15), n:r.int(4,12)}; },
+    prompt:function(p){ var T=TWO[p.c]; return T.w(p.k)+' Write an equation, then find the '+T.q.split(' ')[0]+' for '+p.n+' '+T.unit+'.'; },
+    svg:function(p){ var T=TWO[p.c]; return G6.svg.table([{label:T.ind, cells:[1,2,3,4]},{label:T.dep, cells:[p.k, 2*p.k, '?', 4*p.k]}]); },
+    steps:function(p){
+      var T=TWO[p.c];
+      return [
+        {q:'Which is the <b>independent</b> variable?', ans:T.ind, wrong:[T.dep, 'both', 'neither'], formMatters:true},
+        {q:'Complete the table: '+T.ind+' = 3.', ans:''+3*p.k, wrong:[''+(3+p.k), ''+(2*p.k+1), ''+4*p.k]},
+        {q:'Write the equation.', ans:T.dep+' = '+p.k+T.ind, wrong:[T.ind+' = '+p.k+T.dep, T.dep+' = '+T.ind+' + '+p.k, T.dep+' = '+p.k+' + '+T.ind], formMatters:true},
+        {q:'Substitute '+T.ind+' = '+p.n+': '+T.dep+' = '+p.k+' × '+p.n+'.', ans:''+p.k*p.n, wrong:[''+(p.k+p.n), ''+p.k*(p.n+1), ''+(p.k*p.n+p.k+1)]}];
+    },
+    answer:function(p){ return ''+p.k*p.n; },
+    rejects:function(p){ return [''+(p.k+p.n)]; },
+    grade:function(t,p){ return solGrade(p.k*p.n)(t); }
+  });
+})();
+
 // ── 6th GRADE LESSONS (end) ──
 G6.init();
 
