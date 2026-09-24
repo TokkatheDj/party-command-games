@@ -9261,6 +9261,342 @@ var G6 = (function(){
   });
 })();
 
+// ── Unit 8: Integers, Number Lines, and the Coordinate Plane ──
+(function(){
+  function fr(n,d){ return '<span class="frac"><span class="num">'+n+'</span><span class="den">'+d+'</span></span>'; }
+  function trim(x){ return String(+(+x).toFixed(8)); }
+  function sn(v){ return (v<0?'−':'')+trim(Math.abs(v)); }               // signed number with a real minus
+  function norm(t){ return String(t).replace(/[−–—]/g,'-'); }
+  function numsIn(t){ return (norm(t).match(/-?\d+(?:\.\d+)?(?:\s*\/\s*\d+)?/g)||[]).map(function(x){ return toValue(x); }); }
+  function exact(v){ return function(t){ var x=toValue(norm(t)); return x!=null && Math.abs(x-v)<1e-9; }; }
+  // ordered pair graded in order: (3, -2) is not (-2, 3)
+  function pairGrade(x,y){ return function(t){ var n=numsIn(t); return n.length===2 && Math.abs(n[0]-x)<1e-9 && Math.abs(n[1]-y)<1e-9; }; }
+  function pair(x,y){ return '('+sn(x)+', '+sn(y)+')'; }
+
+  // number line from lo..hi; points [{v,label}] ; `ray` {v, dir:'>'|'<', closed} drawn in a reveal layer
+  function numberLine(lo,hi,pts,ray,layerName){
+    var W=210, H=60, L=14, R=14, y=30;
+    function X(v){ return L+(v-lo)/(hi-lo)*(W-L-R); }
+    var s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+    s+='<line x1="'+(L-8)+'" y1="'+y+'" x2="'+(W-R+8)+'" y2="'+y+'" stroke="#444" stroke-width="1.4"/>';
+    s+='<polygon points="'+(W-R+10)+','+y+' '+(W-R+3)+','+(y-4)+' '+(W-R+3)+','+(y+4)+'" fill="#444"/><polygon points="'+(L-10)+','+y+' '+(L-3)+','+(y-4)+' '+(L-3)+','+(y+4)+'" fill="#444"/>';
+    var step=(hi-lo)>12 ? 2 : 1;
+    for(var v=lo; v<=hi; v++){
+      s+='<line x1="'+X(v)+'" y1="'+(y-4)+'" x2="'+X(v)+'" y2="'+(y+4)+'" stroke="#444" stroke-width="1"/>';
+      if((v-lo)%step===0) s+='<text x="'+X(v)+'" y="'+(y+16)+'" font-size="8" font-family="sans-serif" text-anchor="middle" fill="#555">'+sn(v)+'</text>';
+    }
+    (pts||[]).forEach(function(p){
+      s+='<circle cx="'+X(p.v)+'" cy="'+y+'" r="3.6" fill="#1d6a96"/>';
+      if(p.label) s+='<text x="'+X(p.v)+'" y="'+(y-9)+'" font-size="10" font-family="sans-serif" text-anchor="middle" fill="#1d6a96" font-weight="700">'+p.label+'</text>';
+    });
+    if(ray){
+      var g='<g class="gph-layer gph-'+(layerName||'g6ray')+'">', x0=X(ray.v), x1= ray.dir==='>' ? W-R+6 : L-6;
+      g+='<line x1="'+x0+'" y1="'+y+'" x2="'+x1+'" y2="'+y+'" stroke="#b5451b" stroke-width="3"/>';
+      g+='<circle cx="'+x0+'" cy="'+y+'" r="4.5" fill="'+(ray.closed?'#b5451b':'#fff')+'" stroke="#b5451b" stroke-width="2"/>';
+      s+=g+'</g>';
+    }
+    return s+'</svg>';
+  }
+  // four-quadrant grid −6..6 with labeled points (optionally in a reveal layer)
+  function grid4(pts, o){
+    o=o||{}; var W=200, H=200, n=6, c=W/2, u=(W-24)/(2*n);
+    function X(x){ return c+x*u; } function Y(y){ return H/2-y*u; }
+    var s='<svg width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="display:block;">';
+    for(var i=-n;i<=n;i++){ s+='<line x1="'+X(i)+'" y1="'+Y(-n)+'" x2="'+X(i)+'" y2="'+Y(n)+'" stroke="#dde3e8" stroke-width="0.8"/><line x1="'+X(-n)+'" y1="'+Y(i)+'" x2="'+X(n)+'" y2="'+Y(i)+'" stroke="#dde3e8" stroke-width="0.8"/>'; }
+    s+='<line x1="'+X(-n)+'" y1="'+Y(0)+'" x2="'+X(n)+'" y2="'+Y(0)+'" stroke="#444" stroke-width="1.3"/><line x1="'+X(0)+'" y1="'+Y(-n)+'" x2="'+X(0)+'" y2="'+Y(n)+'" stroke="#444" stroke-width="1.3"/>';
+    [-6,-4,-2,2,4,6].forEach(function(t){ s+='<text x="'+X(t)+'" y="'+(Y(0)+11)+'" font-size="7" font-family="sans-serif" text-anchor="middle" fill="#777">'+sn(t)+'</text><text x="'+(X(0)-4)+'" y="'+(Y(t)+3)+'" font-size="7" font-family="sans-serif" text-anchor="end" fill="#777">'+sn(t)+'</text>'; });
+    s+='<text x="'+(X(n)-2)+'" y="'+(Y(0)-4)+'" font-size="9" fill="#555" font-family="sans-serif">x</text><text x="'+(X(0)+4)+'" y="'+(Y(n)+8)+'" font-size="9" fill="#555" font-family="sans-serif">y</text>';
+    if(o.poly) s+='<polygon points="'+o.poly.map(function(p){ return X(p[0])+','+Y(p[1]); }).join(' ')+'" fill="#1d6a96" fill-opacity="0.12" stroke="#1d6a96" stroke-width="1.6"/>';
+    function dots(list){ return (list||[]).map(function(p){ return '<circle cx="'+X(p.x)+'" cy="'+Y(p.y)+'" r="3.8" fill="'+(p.color||'#1d6a96')+'"/><text x="'+(X(p.x)+6)+'" y="'+(Y(p.y)-5)+'" font-size="10" font-weight="700" font-family="sans-serif" fill="'+(p.color||'#1d6a96')+'">'+p.label+'</text>'; }).join(''); }
+    // `pts` always show; `o.hidden` points appear on the last step / answer key
+    s+=dots(pts);
+    if(o.hidden) s+='<g class="gph-layer gph-'+(o.layer||'g6pt')+'">'+dots(o.hidden)+'</g>';
+    return s+'</svg>';
+  }
+
+  // 8.1 Integers
+  var SITS=[
+    function(n){ return {t:n+' feet below sea level', v:-n}; }, function(n){ return {t:'a gain of '+n+' yards', v:n}; },
+    function(n){ return {t:'a withdrawal of $'+n, v:-n}; }, function(n){ return {t:n+' degrees above zero', v:n}; },
+    function(n){ return {t:'a loss of '+n+' points', v:-n}; }, function(n){ return {t:'a deposit of $'+n, v:n}; },
+    function(n){ return {t:n+' degrees below zero', v:-n}; }, function(n){ return {t:n+' meters above sea level', v:n}; }
+  ];
+  G6.lesson({
+    id:'g6_8_1', count:6,
+    tips:['<b>Positive</b> numbers are greater than 0 (above, gain, deposit); <b>negative</b> numbers are less than 0 (below, loss, withdrawal).',
+          '<b>Opposites</b> are the same distance from 0 on opposite sides: 7 and −7. The opposite of 0 is 0.',
+          '<b>The opposite of the opposite</b> is the number itself: −(−3) = 3.'],
+    gen:function(r,i){ return {k:r.int(0,SITS.length-1), n:r.int(2,60), opp: i%3===2}; },
+    prompt:function(p){ var S=SITS[p.k](p.n); return p.opp ? 'Write an integer for <b>'+S.t+'</b>. Then write its opposite.' : 'Write an integer to represent <b>'+S.t+'</b>.'; },
+    steps:function(p){
+      var S=SITS[p.k](p.n);
+      var st=[{q:'Is the amount above or below zero (positive or negative)?', ans:S.v>0?'positive':'negative', wrong:[S.v>0?'negative':'positive','zero','it depends on the units'], formMatters:true},
+              {q:'Write the integer.', ans:sn(S.v), wrong:[sn(-S.v), sn(S.v+1*(S.v>0?1:-1)), '0']}];
+      if(p.opp) st.push({q:'What is the opposite of '+sn(S.v)+'?', ans:sn(-S.v), wrong:[sn(S.v), '0', sn(-S.v+(S.v>0?-1:1))]});
+      return st;
+    },
+    answer:function(p){ var v=SITS[p.k](p.n).v; return sn(p.opp? -v : v); },
+    alts:function(p){ var v=SITS[p.k](p.n).v; return [String(p.opp? -v : v)]; },
+    rejects:function(p){ var v=SITS[p.k](p.n).v; return [String(p.opp? v : -v)]; },
+    grade:function(t,p){ var v=SITS[p.k](p.n).v; return exact(p.opp? -v : v)(t); }
+  });
+
+  // 8.2 Comparing and Ordering Numbers (integers)
+  G6.lesson({
+    id:'g6_8_2', count:6,
+    tips:['<b>On a number line</b>, numbers get greater to the right: −3 > −7 because −3 is to the right of −7.',
+          '<b>Any positive</b> number is greater than any negative number.',
+          '<b>Negative numbers:</b> the one closer to 0 is greater: −2 > −9.'],
+    gen:function(r,i){
+      if(i%2===0){ var a, b; do { a=r.int(-9,9); b=r.int(-9,9); } while(a===b || (a>=0 && b>=0)); return {type:'cmp', a:a, b:b}; }
+      var set={}, xs=[]; while(xs.length<5){ var v=r.int(-9,9); if(!set[v]){ set[v]=1; xs.push(v); } }
+      if(xs.every(function(v){ return v>=0; })) xs[0]=-r.int(1,9);
+      return {type:'ord', xs:xs, desc:r.chance(0.3)};
+    },
+    prompt:function(p){
+      if(p.type==='cmp') return 'Compare using &lt; or &gt;: <span class="math">'+sn(p.a)+' ? '+sn(p.b)+'</span>';
+      return 'Order from '+(p.desc?'<b>greatest to least</b>':'<b>least to greatest</b>')+': <span class="math">'+p.xs.map(sn).join(', ')+'</span>';
+    },
+    svg:function(p){ var vs=p.type==='cmp'?[p.a,p.b]:p.xs; return numberLine(-10,10,vs.map(function(v){ return {v:v}; })); },
+    steps:function(p){
+      if(p.type==='cmp'){ var right = p.a>p.b ? p.a : p.b, sym=p.a>p.b?'>':'<'; return [
+        {q:'Which number is farther to the <b>right</b> on the number line?', ans:sn(right), wrong:[sn(right===p.a?p.b:p.a), '0', sn(-right)]},
+        {q:'Write the comparison.', ans:sn(p.a)+' '+sym+' '+sn(p.b), wrong:[sn(p.a)+' '+(sym==='>'?'<':'>')+' '+sn(p.b), sn(p.a)+' = '+sn(p.b), sn(p.b)+' '+sym+' '+sn(p.a)], formMatters:true}]; }
+      var o=p.xs.slice().sort(function(a,b){ return a-b; }); if(p.desc) o.reverse();
+      var byAbs=p.xs.slice().sort(function(a,b){ return Math.abs(a)-Math.abs(b); }); if(p.desc) byAbs.reverse();
+      var rev=o.slice().reverse(), sw=o.slice(); var t=sw[0]; sw[0]=sw[1]; sw[1]=t;
+      return [
+        {q:'Which number is the least (farthest left)?', ans:sn(Math.min.apply(null,p.xs)), wrong:[sn(Math.max.apply(null,p.xs)), sn(byAbs[0]), '0']},
+        {q:'Write them in order.', ans:o.map(sn).join(', '), wrong:[rev.map(sn).join(', '), byAbs.map(sn).join(', '), sw.map(sn).join(', ')], formMatters:true}];
+    },
+    answer:function(p){ if(p.type==='cmp') return sn(p.a)+' '+(p.a>p.b?'>':'<')+' '+sn(p.b); var o=p.xs.slice().sort(function(a,b){ return a-b; }); if(p.desc) o.reverse(); return o.map(sn).join(', '); },
+    alts:function(p){ return p.type==='cmp' ? [p.a>p.b?'>':'<'] : []; },
+    rejects:function(p){ if(p.type==='cmp') return [p.a>p.b?'<':'>']; var o=p.xs.slice().sort(function(a,b){ return a-b; }); if(!p.desc) o.reverse(); return [o.map(sn).join(', ')]; },
+    grade:function(t,p){
+      if(p.type==='cmp'){ var sym=p.a>p.b?'>':'<', s=String(t).replace(/&gt;/g,'>').replace(/&lt;/g,'<');
+        var n=numsIn(s); if(n.length===2 && Math.abs(n[0]-p.b)<1e-9 && Math.abs(n[1]-p.a)<1e-9) sym = sym==='>'?'<':'>';   // written the other way round
+        return s.indexOf(sym)>=0 && s.indexOf(sym==='>'?'<':'>')<0; }
+      var o=p.xs.slice().sort(function(a,b){ return a-b; }); if(p.desc) o.reverse();
+      var n2=numsIn(t); return n2.length===o.length && n2.every(function(v,k){ return Math.abs(v-o[k])<1e-9; });
+    }
+  });
+
+  // 8.3 Rational Numbers (negative fractions and decimals on a number line)
+  G6.lesson({
+    id:'g6_8_3', count:4,
+    tips:['<b>Rational numbers</b> include fractions and decimals, positive and negative: −2.5, −3/4, 1 1/2.',
+          '<b>Change to decimals</b> to compare: −3/4 = −0.75.',
+          '<b>Negative numbers:</b> −0.75 > −1.25 because it is closer to 0 (farther right).'],
+    gen:function(r){
+      for(var t=0;t<200;t++){
+        var forms=[], seen={};
+        for(var k=0;k<4;k++){
+          var f = r.chance(0.5) ? {d:r.pick([2,4,5,10])} : {d:0};
+          if(f.d){ f.n=r.int(-3*f.d, 3*f.d); if(f.n===0 || gcd(Math.abs(f.n),f.d)!==1) continue; f.v=f.n/f.d; }
+          else { f.v=r.int(-30,30)/10; if(f.v===0) continue; }
+          var key=Math.round(f.v*1000); if(seen[key]) continue; seen[key]=1; forms.push(f);
+        }
+        if(forms.length===4 && forms.some(function(f){ return f.v<0; })) return {forms:forms};
+      }
+      return {forms:[{v:-1.5,d:0},{v:-0.75,n:-3,d:4},{v:0.5,d:0},{v:-2,d:0}]};
+    },
+    prompt:function(p){ return 'Order from <b>least to greatest</b>: <span class="math">'+p.forms.map(show).join(', &nbsp;')+'</span>'; },
+    svg:function(p){ return numberLine(-3,3,p.forms.map(function(f){ return {v:f.v, label:''}; })); },
+    steps:function(p){
+      var st=p.forms.filter(function(f){ return f.d; }).map(function(f){ return {q:'Write '+show(f)+' as a decimal.', ans:sn(f.v), wrong:[sn(-f.v), sn(f.v*10), sn(+(f.v+0.5).toFixed(2))]}; });
+      var o=p.forms.slice().sort(function(a,b){ return a.v-b.v; }), byAbs=p.forms.slice().sort(function(a,b){ return Math.abs(a.v)-Math.abs(b.v); });
+      st.push({q:'Write them from least to greatest.', ans:o.map(txt).join(', '), wrong:[o.slice().reverse().map(txt).join(', '), byAbs.map(txt).join(', '), [o[1],o[0],o[2],o[3]].map(txt).join(', ')], formMatters:true});
+      return st;
+    },
+    answer:function(p){ return p.forms.slice().sort(function(a,b){ return a.v-b.v; }).map(txt).join(', '); },
+    alts:function(p){ return [p.forms.slice().sort(function(a,b){ return a.v-b.v; }).map(function(f){ return String(f.v); }).join(', ')]; },
+    rejects:function(p){ return [p.forms.slice().sort(function(a,b){ return b.v-a.v; }).map(txt).join(', ')]; },
+    grade:function(t,p){ var o=p.forms.slice().sort(function(a,b){ return a.v-b.v; }), n=numsIn(t); return n.length===4 && n.every(function(v,k){ return v!=null && Math.abs(v-o[k].v)<1e-9; }); }
+  });
+  function show(f){ return f.d ? (f.n<0?'−':'')+fr(Math.abs(f.n),f.d) : sn(f.v); }
+  function txt(f){ return f.d ? (f.n<0?'−':'')+Math.abs(f.n)+'/'+f.d : sn(f.v); }
+
+  // 8.4 Absolute Value
+  var AV_STORIES=[
+    function(v){ return {q:'A bank account balance is '+sn(v)+' dollars. How many dollars of debt is that?', v:v}; },
+    function(v){ return {q:'A diver is at '+sn(v)+' feet (below sea level). How far is the diver from the surface?', v:v}; },
+    function(v){ return {q:'The temperature is '+sn(v)+' °F. How many degrees is that from 0?', v:v}; }
+  ];
+  G6.lesson({
+    id:'g6_8_4', count:6,
+    tips:['<b>Absolute value</b> |a| is the distance from 0 on the number line, so it is never negative: |−8| = 8.',
+          '<b>Opposites</b> have the same absolute value: |5| = |−5| = 5.',
+          '<b>In real life</b>, absolute value is the size: a balance of −$30 is a debt of $30.'],
+    gen:function(r,i){
+      var type=['eval','cmp','story'][i%3];
+      if(type==='cmp'){ var a,b; do { a=r.int(-15,15); b=r.int(-15,15); } while(Math.abs(a)===Math.abs(b) || a===0 || b===0 || (a>0 && b>0)); return {type:type, a:a, b:b}; }
+      return {type:type, v:-r.int(2,60)*(type==='eval' && r.chance(0.3) ? -1 : 1), k:r.int(0,AV_STORIES.length-1)};
+    },
+    prompt:function(p){
+      if(p.type==='eval') return 'Find the absolute value: <span class="math">|'+sn(p.v)+'|</span>';
+      if(p.type==='cmp') return 'Which has the greater absolute value, <span class="math">'+sn(p.a)+'</span> or <span class="math">'+sn(p.b)+'</span>?';
+      return AV_STORIES[p.k](p.v).q;
+    },
+    steps:function(p){
+      if(p.type==='cmp'){ var big=Math.abs(p.a)>Math.abs(p.b)?p.a:p.b; return [
+        {q:'|'+sn(p.a)+'| = ?', ans:''+Math.abs(p.a), wrong:[sn(-Math.abs(p.a)), '0', ''+(Math.abs(p.a)+1)]},
+        {q:'|'+sn(p.b)+'| = ?', ans:''+Math.abs(p.b), wrong:[sn(-Math.abs(p.b)), '0', ''+(Math.abs(p.b)+1)]},
+        {q:'Which number has the greater absolute value?', ans:sn(big), wrong:[sn(big===p.a?p.b:p.a), sn(-big), 'They are equal'], formMatters:true}]; }
+      return [
+        {q:'How far is '+sn(p.v)+' from 0 on the number line?', ans:''+Math.abs(p.v), wrong:[sn(-Math.abs(p.v)), '0', ''+(Math.abs(p.v)+1)]},
+        {q:'So '+(p.type==='story'?'the answer':'|'+sn(p.v)+'|')+' is:', ans:''+Math.abs(p.v), wrong:[sn(-Math.abs(p.v)), ''+(Math.abs(p.v)*2), ''+(Math.abs(p.v)-1)]}];
+    },
+    answer:function(p){ if(p.type==='cmp') return sn(Math.abs(p.a)>Math.abs(p.b)?p.a:p.b); return ''+Math.abs(p.v); },
+    rejects:function(p){ if(p.type==='cmp') return [sn(Math.abs(p.a)>Math.abs(p.b)?p.b:p.a)]; return [String(-Math.abs(p.v))]; },
+    grade:function(t,p){ return exact(p.type==='cmp' ? (Math.abs(p.a)>Math.abs(p.b)?p.a:p.b) : Math.abs(p.v))(t); }
+  });
+
+  // 8.5 The Coordinate Plane
+  G6.lesson({
+    id:'g6_8_5', count:6,
+    tips:['<b>(x, y):</b> move left/right first (x), then up/down (y).',
+          '<b>Quadrants</b> go counterclockwise from the top right: I (+, +), II (−, +), III (−, −), IV (+, −).',
+          '<b>Reflect</b> across the x-axis: change the sign of y. Across the y-axis: change the sign of x.'],
+    gen:function(r,i){
+      var x,y; do { x=r.int(-6,6); y=r.int(-6,6); } while(x===0 || y===0 || Math.abs(x)===Math.abs(y));
+      return {type:['read','quad','reflect'][i%3], x:x, y:y, axis:r.pick(['x','y'])};
+    },
+    prompt:function(p){
+      if(p.type==='read') return 'What are the coordinates of point <b>A</b>?';
+      if(p.type==='quad') return 'In which quadrant is the point <span class="math">'+pair(p.x,p.y)+'</span>?';
+      return 'Point <b>A</b> is at <span class="math">'+pair(p.x,p.y)+'</span>. Reflect it across the <b>'+p.axis+'-axis</b>. What are the coordinates of the image?';
+    },
+    svg:function(p){
+      if(p.type==='read') return grid4([{x:p.x,y:p.y,label:'A'}]);
+      if(p.type==='quad') return grid4([], {hidden:[{x:p.x,y:p.y,label:'P'}]});
+      var rx=p.axis==='x'?p.x:-p.x, ry=p.axis==='x'?-p.y:p.y;
+      return grid4([{x:p.x,y:p.y,label:'A'}], {hidden:[{x:rx,y:ry,label:'A′',color:'#b5451b'}]});
+    },
+    steps:function(p){
+      var Q = p.x>0 ? (p.y>0?'I':'IV') : (p.y>0?'II':'III');
+      if(p.type==='read') return [
+        {q:'How far left or right of the origin is A? (the x-coordinate)', ans:sn(p.x), wrong:[sn(p.y), sn(-p.x), sn(p.x+1)]},
+        {q:'How far up or down? (the y-coordinate)', ans:sn(p.y), wrong:[sn(p.x), sn(-p.y), sn(p.y+1)]},
+        {q:'Write the ordered pair.', ans:pair(p.x,p.y), wrong:[pair(p.y,p.x), pair(-p.x,p.y), pair(p.x,-p.y)], formMatters:true}];
+      if(p.type==='quad') return [
+        {q:'What are the signs of x and y?', ans:'('+(p.x>0?'+':'−')+', '+(p.y>0?'+':'−')+')', wrong:['('+(p.x>0?'−':'+')+', '+(p.y>0?'+':'−')+')', '('+(p.x>0?'+':'−')+', '+(p.y>0?'−':'+')+')', '('+(p.x>0?'−':'+')+', '+(p.y>0?'−':'+')+')'], formMatters:true},
+        {q:'Which quadrant?', ans:'Quadrant '+Q, reveal:'g6pt', wrong:['Quadrant I','Quadrant II','Quadrant III','Quadrant IV'].filter(function(x){ return x!=='Quadrant '+Q; }), formMatters:true}];
+      var rx=p.axis==='x'?p.x:-p.x, ry=p.axis==='x'?-p.y:p.y;
+      return [
+        {q:'Reflecting across the '+p.axis+'-axis changes the sign of which coordinate?', ans:p.axis==='x'?'y':'x', wrong:[p.axis==='x'?'x':'y','both','neither'], formMatters:true},
+        {q:'Write the coordinates of the image A′.', ans:pair(rx,ry), reveal:'g6pt', wrong:[pair(p.axis==='x'?-p.x:p.x, p.axis==='x'?p.y:-p.y), pair(-p.x,-p.y), pair(p.y,p.x)], formMatters:true}];
+    },
+    answer:function(p){ if(p.type==='quad'){ return 'Quadrant '+(p.x>0 ? (p.y>0?'I':'IV') : (p.y>0?'II':'III')); } if(p.type==='read') return pair(p.x,p.y); return pair(p.axis==='x'?p.x:-p.x, p.axis==='x'?-p.y:p.y); },
+    alts:function(p){ if(p.type==='quad') return [(p.x>0 ? (p.y>0?'I':'IV') : (p.y>0?'II':'III'))]; return []; },
+    rejects:function(p){ if(p.type==='quad') return ['Quadrant '+(p.x>0 ? (p.y>0?'II':'III') : (p.y>0?'I':'IV'))]; if(p.type==='read') return [pair(p.y,p.x)]; return [pair(-p.x,-p.y)]; },
+    grade:function(t,p){
+      if(p.type==='quad'){ var Q=(p.x>0 ? (p.y>0?'I':'IV') : (p.y>0?'II':'III')); var w=String(t).toUpperCase().replace(/QUADRANT/,'').trim();
+        var arabic={'1':'I','2':'II','3':'III','4':'IV'}; return (arabic[w]||w)===Q; }
+      if(p.type==='read') return pairGrade(p.x,p.y)(t);
+      return pairGrade(p.axis==='x'?p.x:-p.x, p.axis==='x'?-p.y:p.y)(t);
+    }
+  });
+
+  // 8.6 Polygons in the Coordinate Plane
+  G6.lesson({
+    id:'g6_8_6', count:4,
+    tips:['<b>Same x-coordinate:</b> the distance between the points is the difference of the y-coordinates (use absolute values across the axis).',
+          '<b>Across an axis:</b> from (2, −3) to (2, 4) is |−3| + |4| = 7 units.',
+          '<b>Then</b> use the side lengths to find perimeter or area.'],
+    gen:function(r,i){
+      var x1=r.int(-6,-1), x2=r.int(1,6), y1=r.int(-6,-1), y2=r.int(1,6);
+      if(r.chance(0.3)){ x1=r.int(-6,2); x2=x1+r.int(2,4); }
+      return {x1:x1, x2:x2, y1:y1, y2:y2, ask: i%2 ? 'perimeter' : 'area'};
+    },
+    prompt:function(p){ return 'The vertices of a rectangle are <span class="math">'+pair(p.x1,p.y1)+', '+pair(p.x2,p.y1)+', '+pair(p.x2,p.y2)+', '+pair(p.x1,p.y2)+'</span>. Find its <b>'+p.ask+'</b>.'; },
+    svg:function(p){ return grid4([], {poly:[[p.x1,p.y1],[p.x2,p.y1],[p.x2,p.y2],[p.x1,p.y2]]}); },
+    steps:function(p){
+      var w=p.x2-p.x1, h=p.y2-p.y1, ans = p.ask==='area' ? w*h : 2*(w+h);
+      return [
+        {q:'Width: distance from x = '+sn(p.x1)+' to x = '+sn(p.x2)+'.', ans:w+' units', wrong:[Math.abs(p.x2+p.x1)+' units', (w+1)+' units', Math.abs(p.x2)+' units']},
+        {q:'Height: distance from y = '+sn(p.y1)+' to y = '+sn(p.y2)+'.', ans:h+' units', wrong:[Math.abs(p.y2+p.y1)+' units', (h+1)+' units', Math.abs(p.y2)+' units']},
+        {q:p.ask==='area' ? 'Area = width × height.' : 'Perimeter = 2 × (width + height).', ans:ans+(p.ask==='area'?' units²':' units'),
+          wrong: p.ask==='area' ? [2*(w+h)+' units²', (w+h)+' units²', (w*h+w)+' units²'] : [w*h+' units', (w+h)+' units', (2*(w+h)+2)+' units']}];
+    },
+    answer:function(p){ var w=p.x2-p.x1, h=p.y2-p.y1; return p.ask==='area' ? w*h+' units²' : 2*(w+h)+' units'; },
+    rejects:function(p){ var w=p.x2-p.x1, h=p.y2-p.y1; return [String(p.ask==='area' ? 2*(w+h) : w*h)].filter(function(x){ return +x!==(p.ask==='area'?w*h:2*(w+h)); }); },
+    grade:function(t,p){ var w=p.x2-p.x1, h=p.y2-p.y1, x=toValue(norm(t)); return x!=null && x===(p.ask==='area' ? w*h : 2*(w+h)); }
+  });
+
+  // inequalities: {v, sym, c}; sym one of > < ≥ ≤
+  var FLIP={'>':'<','<':'>','≥':'≤','≤':'≥'};
+  function ineqText(v,sym,c){ return v+' '+sym+' '+sn(c); }
+  function ineqGrade(v,sym,c){
+    return function(t){
+      var s=norm(t).replace(/>=|=>/g,'≥').replace(/<=|=</g,'≤').replace(/\s+/g,'').replace(/&gt;/g,'>').replace(/&lt;/g,'<');
+      var m=s.match(/^([a-z])([<>≤≥])(-?\d+(?:\.\d+)?(?:\/\d+)?)$/i), sy, val;
+      if(m){ if(m[1].toLowerCase()!==v) return false; sy=m[2]; val=toValue(m[3]); }
+      else { m=s.match(/^(-?\d+(?:\.\d+)?(?:\/\d+)?)([<>≤≥])([a-z])$/i); if(!m || m[3].toLowerCase()!==v) return false; sy=FLIP[m[2]]; val=toValue(m[1]); }
+      return sy===sym && val!=null && Math.abs(val-c)<1e-9;
+    };
+  }
+  // 8.7 Writing and Graphing Inequalities
+  var PHR=[
+    {w:function(v,c){ return 'You must be at least '+c+' years old. ('+v+' = age)'; }, sym:'≥'},
+    {w:function(v,c){ return 'The speed limit is '+c+' miles per hour: your speed '+v+' can be at most '+c+'.'; }, sym:'≤'},
+    {w:function(v,c){ return 'A number '+v+' is greater than '+sn(c)+'.'; }, sym:'>'},
+    {w:function(v,c){ return 'A number '+v+' is less than '+sn(c)+'.'; }, sym:'<'},
+    {w:function(v,c){ return 'The temperature '+v+' stayed below '+sn(c)+' °F.'; }, sym:'<'},
+    {w:function(v,c){ return 'A number '+v+' is no more than '+sn(c)+'.'; }, sym:'≤'}
+  ];
+  G6.lesson({
+    id:'g6_8_7', count:6,
+    tips:['<b>Symbols:</b> &gt; greater than, &lt; less than, ≥ at least / no less than, ≤ at most / no more than.',
+          '<b>Graph:</b> open circle for &lt; or &gt; (the number is NOT included), closed circle for ≤ or ≥ (it IS included).',
+          '<b>Direction:</b> shade right for greater, left for less.'],
+    gen:function(r){ var k=r.int(0,PHR.length-1); var c = k<2 ? r.int(5,70) : r.int(-8,8); return {k:k, v:r.pick(['x','n','t','a']), c:c}; },
+    prompt:function(p){ return 'Write an inequality and graph it: '+PHR[p.k].w(p.v,p.c); },
+    svg:function(p){ var sym=PHR[p.k].sym, lo, hi; if(Math.abs(p.c)<=8){ lo=-10; hi=10; } else { lo=p.c-8; hi=p.c+8; }
+      return numberLine(lo,hi,[],{v:p.c, dir:(sym==='>'||sym==='≥')?'>':'<', closed:(sym==='≥'||sym==='≤')}); },
+    steps:function(p){
+      var sym=PHR[p.k].sym, closed=(sym==='≥'||sym==='≤');
+      return [
+        {q:'Which symbol matches the words?', ans:sym, wrong:['>','<','≥','≤'].filter(function(x){ return x!==sym; }), formMatters:true},
+        {q:'Open or closed circle at '+sn(p.c)+'?', ans:closed?'closed (included)':'open (not included)', wrong:[closed?'open (not included)':'closed (included)', 'no circle', 'a circle at 0'], formMatters:true},
+        {q:'Write the inequality.', ans:ineqText(p.v,sym,p.c), reveal:'g6ray', wrong:[ineqText(p.v,FLIP[sym],p.c), ineqText(p.v,closed?sym.replace('≥','>').replace('≤','<'):(sym==='>'?'≥':'≤'),p.c), ineqText(p.v,sym,-p.c)], formMatters:true}];
+    },
+    answer:function(p){ return ineqText(p.v,PHR[p.k].sym,p.c); },
+    alts:function(p){ var sym=PHR[p.k].sym; return [p.v+({'≥':'>=','≤':'<='}[sym]||sym)+p.c, sn(p.c)+' '+FLIP[sym]+' '+p.v]; },
+    rejects:function(p){ var sym=PHR[p.k].sym; return [ineqText(p.v,FLIP[sym],p.c)]; },
+    grade:function(t,p){ return ineqGrade(p.v,PHR[p.k].sym,p.c)(t); }
+  });
+
+  // 8.8 Solving Inequalities (one step, positive coefficients)
+  G6.lesson({
+    id:'g6_8_8', count:6,
+    tips:['<b>Solve like an equation:</b> use the inverse operation on both sides.',
+          '<b>x + 4 &gt; 9</b> → subtract 4 → x &gt; 5. <b>3x ≤ 12</b> → divide by 3 → x ≤ 4.',
+          '<b>Graph</b> the solution and check a number from the shaded part.'],
+    gen:function(r,i){
+      var v=r.pick(['x','n','t','a']), sym=r.pick(['>','<','≥','≤']), type=['add','sub','mul','div'][i%4], x=r.int(-5,12), a=r.int(2,9);
+      var b = type==='add' ? x+a : type==='sub' ? x-a : type==='mul' ? a*x : null;
+      if(type==='div'){ b=r.int(-3,6); x=a*b; }
+      return {v:v, sym:sym, type:type, a:a, b:b, x:x};
+    },
+    prompt:function(p){
+      var lhs = p.type==='add' ? p.v+' + '+p.a : p.type==='sub' ? p.v+' − '+p.a : p.type==='mul' ? p.a+p.v : p.v+' ÷ '+p.a;
+      return 'Solve and graph: <span class="math">'+lhs+' '+p.sym+' '+sn(p.b)+'</span>';
+    },
+    // a line centered on the solution, so large solutions don't crowd the ticks
+    svg:function(p){ return numberLine(p.x-8, p.x+8, [], {v:p.x, dir:(p.sym==='>'||p.sym==='≥')?'>':'<', closed:(p.sym==='≥'||p.sym==='≤')}); },
+    steps:function(p){
+      var inv={add:'Subtract '+p.a, sub:'Add '+p.a, mul:'Divide by '+p.a, div:'Multiply by '+p.a}[p.type];
+      return [
+        {q:'What do you do to both sides?', ans:inv, wrong:['Subtract '+p.a,'Add '+p.a,'Divide by '+p.a,'Multiply by '+p.a].filter(function(x){ return x!==inv; }), formMatters:true},
+        {q:'Solve.', ans:ineqText(p.v,p.sym,p.x), reveal:'g6ray', wrong:[ineqText(p.v,FLIP[p.sym],p.x), ineqText(p.v,p.sym,p.type==='add'?p.b+p.a:p.type==='sub'?p.b-p.a:p.type==='mul'?p.b*p.a:p.b/p.a), ineqText(p.v,p.sym,p.x+1)], formMatters:true}];
+    },
+    answer:function(p){ return ineqText(p.v,p.sym,p.x); },
+    alts:function(p){ return [sn(p.x)+' '+FLIP[p.sym]+' '+p.v]; },
+    rejects:function(p){ return [ineqText(p.v,FLIP[p.sym],p.x)]; },
+    grade:function(t,p){ return ineqGrade(p.v,p.sym,p.x)(t); }
+  });
+})();
+
 // ── 6th GRADE LESSONS (end) ──
 G6.init();
 
