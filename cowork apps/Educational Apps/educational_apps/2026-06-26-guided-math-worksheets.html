@@ -449,6 +449,16 @@ body.streamlined-mode .prob-check-bar .show-answer { display: none !important; }
 /* Scaffolded, stepped problems answer via the steps — hide the redundant "Type final answer" box. */
 body.student-mode:not(.streamlined-mode) .problem:has(.steps) .prob-check-bar { display: none !important; }
 body.streamlined-mode .solution-box { margin-top: 18px; }
+/* Streamlined hides every step and the on-screen answer box is not printed, so a printed
+   streamlined sheet used to be just the questions. Each problem gets working lines and an
+   answer line (added by addPrintWorkAreas), shown only on a streamlined student copy. */
+.print-work{display:none;}
+@media print{
+  body.streamlined-mode:not(.answer-key-mode) .print-work{display:block!important;margin-top:8px;}
+  .print-work .rule{border-bottom:1px solid #cfcfcf;height:24px;}
+  .print-work .ans{margin-top:10px;font-family:var(--math);font-size:13px;}
+  .print-work .ans .fill{display:inline-block;min-width:200px;border-bottom:1.5px solid #111;height:15px;vertical-align:-3px;}
+}
 body.streamlined-mode .problem {
   padding-bottom: 18px;
   margin-bottom: 18px;
@@ -10832,11 +10842,29 @@ function importSavedSets(input) {
 // (hides editor strips; teacher can toggle off if needed)
 setTimeout(function(){ if(!studentMode) toggleStudentMode(); }, 100);
 
+// ── Streamlined print: give every problem room to work and an answer line ──
+// Modules re-render their problems (New set, edits), so this runs again right before printing.
+function addPrintWorkAreas(){
+  document.querySelectorAll('.worksheet .problem').forEach(function(prob){
+    if(prob.querySelector(':scope > .print-work')) return;
+    var w=document.createElement('div');
+    w.className='print-work';
+    w.innerHTML='<div class="rule"></div><div class="rule"></div><div class="ans">Answer: <span class="fill"></span></div>';
+    prob.appendChild(w);
+  });
+}
+window.addEventListener('beforeprint', addPrintWorkAreas);
+(function(){
+  var setDiff=setDifficulty;
+  setDifficulty=function(mode){ setDiff.apply(this, arguments); if(mode==='streamlined') addPrintWorkAreas(); };
+})();
+
 // ── 6th grade course: lesson tips and randomizers (MODULE_TIPS / RANDOMIZERS exist by now) ──
 G6.registerExtras();
 // URL hooks, mainly for automated checks and printing a specific lesson:
 //   ?topic=g6_1_3   open that lesson (after any saved state is restored)
 //   ?ak=1           start with the Answer Key on
+//   ?mode=streamlined  start in Streamlined mode (no guided steps)
 //   ?g6selftest=1   run G6.selfTest(100) and write the JSON result into <pre id="g6-selftest">
 (function(){
   var q = new URLSearchParams(location.search);
@@ -10848,6 +10876,7 @@ G6.registerExtras();
     });
   }
   if(q.get('ak')==='1' && !answerKeyOn) toggleAnswerKey();
+  if(q.get('mode')==='streamlined') setDifficulty('streamlined');
   if(q.get('g6selftest')==='1'){
     var pre = document.createElement('pre');
     pre.id = 'g6-selftest';
