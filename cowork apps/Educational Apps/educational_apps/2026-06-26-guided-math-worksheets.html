@@ -8571,6 +8571,249 @@ var G6 = (function(){
   });
 })();
 
+// ── Unit 5: Algebraic Expressions and Properties ──
+(function(){
+  var VARS=['x','n','y','k','a','b'];     // never m, s, g or "in": the grader strips those as units
+  // term text: coefficient and variable, e.g. (1,'x') -> x, (3,'x') -> 3x, (5,'') -> 5
+  function term(c,v){ if(!v) return ''+c; return c===1 ? v : c+v; }
+  // join signed terms: [[3,'x'],[-5,'']] -> "3x − 5"
+  function expr(terms){
+    var out='';
+    terms.forEach(function(t,i){
+      var c=t[0], v=t[1];
+      if(c===0) return;
+      if(out==='') out=(c<0?'−':'')+term(Math.abs(c),v);
+      else out+=(c<0?' − ':' + ')+term(Math.abs(c),v);
+    });
+    return out||'0';
+  }
+  // A simplified expression: no parentheses, at most one constant term and one term per variable.
+  function simplified(t){
+    var s=String(t).replace(/\s+/g,'').replace(/[−–—]/g,'-');
+    if(/[()]/.test(s)) return false;
+    var parts=s.replace(/^-/,'').split(/[+-]/).filter(Boolean), consts=0, seen={};
+    for(var i=0;i<parts.length;i++){
+      var v=parts[i].replace(/[^a-z]/gi,'').toLowerCase();
+      if(!v){ consts++; continue; }
+      if(seen[v]) return false; seen[v]=1;
+    }
+    return consts<=1;
+  }
+  function eqGrade(ans){ return function(t,p,dflt){ return (dflt || symbolicallyEqual(t, ans)) && simplified(t); }; }
+
+  // 5.1 Algebraic Expressions (evaluate; name the parts)
+  G6.lesson({
+    id:'g6_5_1', count:6,
+    tips:['<b>Evaluate:</b> substitute the value for the variable, then follow the order of operations.',
+          '<b>Parts:</b> a <b>term</b> is a part added or subtracted; a <b>coefficient</b> is the number multiplying a variable; a <b>constant</b> has no variable.',
+          '<b>Write the multiplication:</b> 3x means 3 × x, so if x = 4, 3x = 3 × 4 = 12.'],
+    gen:function(r,i){
+      var v=r.pick(['x','n','y','k']);
+      if(i%3===2){ var v2=v==='y'?'x':'y'; return {type:'parts', v:v, v2:v2, a:r.int(2,9), b:r.int(2,9), c:r.int(1,15)}; }
+      var t=r.int(0,4), a=r.int(2,9), val=r.int(1,9);
+      // subtraction keeps the value positive: the number subtracted is less than a × value
+      var b = t===1 ? r.int(1, a*val-1) : r.int(1,12);
+      return {type:'eval', t:t, v:v, a:a, b:b, val:val, v2:v==='y'?'x':'y', val2:r.int(1,9)};
+    },
+    prompt:function(p){
+      if(p.type==='parts') return 'Identify the parts of the expression <span class="math">'+p.a+p.v+' + '+p.b+p.v2+' + '+p.c+'</span>.';
+      var e=['ax+b','ax-b','x2+b','a(x+b)','ax+by'][p.t];
+      var shown={ 'ax+b':p.a+p.v+' + '+p.b, 'ax-b':p.a+p.v+' − '+p.b, 'x2+b':p.v+'<sup>2</sup> + '+p.b, 'a(x+b)':p.a+'('+p.v+' + '+p.b+')', 'ax+by':p.a+p.v+' + '+p.b+p.v2 }[e];
+      return 'Evaluate <span class="math">'+shown+'</span> when <span class="math">'+p.v+' = '+p.val+(e==='ax+by'?', '+p.v2+' = '+p.val2:'')+'</span>.';
+    },
+    steps:function(p){
+      if(p.type==='parts') return [
+        {q:'How many terms does the expression have?', ans:'3', wrong:['2','4','6']},
+        {q:'What is the coefficient of '+p.v+'?', ans:''+p.a, wrong:[''+p.b, ''+p.c, p.v]},
+        {q:'What is the constant term?', ans:''+p.c, wrong:[''+p.a, ''+p.b, ''+(p.a+p.b+p.c)]},
+        {q:'What is the coefficient of '+p.v2+'?', ans:''+p.b, wrong:[''+p.a, ''+p.c, '1']}];
+      var a=p.a,b=p.b,x=p.val;
+      switch(p.t){
+        case 0: return [
+          {q:'Substitute '+x+' for '+p.v+'.', ans:a+' × '+x+' + '+b, wrong:[a+''+x+' + '+b, a+' + '+x+' + '+b, a+' × '+b+' + '+x], formMatters:true},
+          {q:'Multiply: '+a+' × '+x+'.', ans:''+a*x, wrong:[''+(a+x), ''+(a*x+b), a+''+x]},
+          {q:'Add: '+a*x+' + '+b+'.', ans:''+(a*x+b), wrong:[''+(a*(x+b)), ''+(a+x+b), ''+(a*x+b+1)]}];
+        case 1: return [
+          {q:'Substitute '+x+' for '+p.v+'.', ans:a+' × '+x+' − '+b, wrong:[a+''+x+' − '+b, a+' − '+x+' − '+b, a+' × '+b+' − '+x], formMatters:true},
+          {q:'Multiply: '+a+' × '+x+'.', ans:''+a*x, wrong:[''+(a+x), ''+(a*x-b), a+''+x]},
+          {q:'Subtract: '+a*x+' − '+b+'.', ans:''+(a*x-b), wrong:[''+(a*x+b), ''+(a*(x-b)>0?a*(x-b):a*x-b+2), ''+(a*x-b+1)]}];
+        case 2: return [
+          {q:'Substitute '+x+' for '+p.v+'.', ans:'('+x+')² + '+b, wrong:[x+' × 2 + '+b, '2('+x+') + '+b, '('+b+')² + '+x], formMatters:true},
+          {q:'Square: '+x+'² = '+x+' × '+x+'.', ans:''+x*x, wrong:[''+2*x, ''+(x+2), ''+(x*x+1)]},
+          {q:'Add: '+x*x+' + '+b+'.', ans:''+(x*x+b), wrong:[''+(2*x+b), ''+((x+b)*(x+b)), ''+(x*x+b+1)]}];
+        case 3: return [
+          {q:'Substitute '+x+' for '+p.v+'.', ans:a+'('+x+' + '+b+')', wrong:[a+' × '+x+' + '+b, a+''+x+' + '+b, a+'('+b+' + '+b+')'], formMatters:true},
+          {q:'Parentheses first: '+x+' + '+b+'.', ans:''+(x+b), wrong:[''+(x*b), ''+(a*x), ''+(x+b+1)]},
+          {q:'Multiply: '+a+' × '+(x+b)+'.', ans:''+a*(x+b), wrong:[''+(a*x+b), ''+(a+x+b), ''+(a*(x+b)+a)]}];
+        default: return [
+          {q:'Multiply: '+a+' × '+x+'.', ans:''+a*x, wrong:[''+(a+x), a+''+x, ''+a*p.val2]},
+          {q:'Multiply: '+b+' × '+p.val2+'.', ans:''+b*p.val2, wrong:[''+(b+p.val2), b+''+p.val2, ''+b*x]},
+          {q:'Add the products.', ans:''+(a*x+b*p.val2), wrong:[''+(a*x*b*p.val2), ''+(a+b+x+p.val2), ''+(a*x+b*p.val2+1)]}];
+      }
+    },
+    answer:function(p){
+      if(p.type==='parts') return ''+p.b;
+      var a=p.a,b=p.b,x=p.val;
+      return ''+[a*x+b, a*x-b, x*x+b, a*(x+b), a*x+b*p.val2][p.t];
+    },
+    check:function(p){ return p.type==='eval' && p.t===1 && p.a*p.val-p.b<=0 ? 'not positive' : ''; }
+  });
+
+  // 5.2 Writing Expressions
+  var PHRASES=[
+    function(v,a,b){ return {w:'the sum of '+v+' and '+a, e:v+' + '+a, bad:[a+v, v+' − '+a, a+' − '+v], op:'addition'}; },
+    function(v,a,b){ return {w:a+' less than '+v, e:v+' − '+a, bad:[a+' − '+v, v+' + '+a, a+v], op:'subtraction'}; },
+    function(v,a,b){ return {w:'the product of '+a+' and '+v, e:a+v, bad:[v+' + '+a, a+' − '+v, v+' ÷ '+a], op:'multiplication'}; },
+    function(v,a,b){ return {w:b+' more than '+a+' times '+v, e:a+v+' + '+b, bad:[b+v+' + '+a, a+'('+v+' + '+b+')', a+v+' − '+b], op:'multiplication, then addition'}; },
+    function(v,a,b){ return {w:'the quotient of '+v+' and '+a, e:v+' ÷ '+a, bad:[a+' ÷ '+v, a+v, v+' − '+a], op:'division'}; },
+    function(v,a,b){ return {w:a+' times the sum of '+v+' and '+b, e:a+'('+v+' + '+b+')', bad:[a+v+' + '+b, b+'('+v+' + '+a+')', a+' + '+v+' + '+b], op:'addition in parentheses, then multiplication'}; },
+    function(v,a,b){ return {w:(a*5)+' decreased by '+v, e:(a*5)+' − '+v, bad:[v+' − '+(a*5), (a*5)+' + '+v, (a*5)+v], op:'subtraction'}; },
+    function(v,a,b){ return {w:'You have $'+(a*5)+' and spend $'+v+'. How much money is left?', e:(a*5)+' − '+v, bad:[v+' − '+(a*5), (a*5)+' + '+v, (a*5)+v], op:'subtraction', story:true}; },
+    function(v,a,b){ return {w:'Tickets cost $'+a+' each. What is the cost of '+v+' tickets?', e:a+v, bad:[a+' + '+v, v+' ÷ '+a, a+' − '+v], op:'multiplication', story:true}; }
+  ];
+  G6.lesson({
+    id:'g6_5_2', count:6,
+    tips:['<b>Key words:</b> sum, more than, increased by → +; difference, less than, decreased by → −; product, times, twice → ×; quotient, divided by → ÷.',
+          '<b>"Less than" flips:</b> "5 less than x" is x − 5, not 5 − x.',
+          '<b>"Times the sum"</b> means the sum goes in parentheses: 3 times the sum of n and 2 = 3(n + 2).'],
+    gen:function(r,i){ var a=r.int(2,9), b; do { b=r.int(2,15); } while(b===a);     // equal numbers would make a swap look right
+      return {k:(i+r.int(0,8))%PHRASES.length, v:r.pick(['x','n','y','k']), a:a, b:b}; },
+    prompt:function(p){ var P=PHRASES[p.k](p.v,p.a,p.b); return P.story ? P.w+' Write an expression.' : 'Write an expression for: <b>'+P.w+'</b>'; },
+    steps:function(p){
+      var P=PHRASES[p.k](p.v,p.a,p.b);
+      var ops=['addition','subtraction','multiplication','division','multiplication, then addition','addition, then multiplication','addition in parentheses, then multiplication','subtraction, then multiplication'];
+      var wrongOps=ops.filter(function(o){ return o!==P.op; });
+      if(P.op.indexOf(',')<0) wrongOps=wrongOps.filter(function(o){ return o.indexOf(',')<0; });   // one-step phrases get one-word choices
+      wrongOps=wrongOps.slice(0,3);
+      return [
+        {q:'Which operation(s) do the words describe?', ans:P.op, wrong:wrongOps, formMatters:true},
+        {q:'Write the expression.', ans:P.e, wrong:P.bad, formMatters:true}];
+    },
+    answer:function(p){ return PHRASES[p.k](p.v,p.a,p.b).e; },
+    rejects:function(p){ return [PHRASES[p.k](p.v,p.a,p.b).bad[0].replace('÷','/')]; },
+    grade:function(t,p,dflt){ var e=PHRASES[p.k](p.v,p.a,p.b).e; return dflt || symbolicallyEqual(String(t).replace(/÷/g,'/'), e.replace(/÷/g,'/')); }
+  });
+
+  // 5.3 Properties of Addition and Multiplication
+  var PROPS=['Commutative Property of Addition','Associative Property of Addition','Commutative Property of Multiplication','Associative Property of Multiplication','Identity Property of Addition','Identity Property of Multiplication'];
+  G6.lesson({
+    id:'g6_5_3', count:6,
+    tips:['<b>Commutative:</b> change the ORDER: a + b = b + a, a × b = b × a.',
+          '<b>Associative:</b> change the GROUPING: (a + b) + c = a + (b + c).',
+          '<b>Identity:</b> a + 0 = a and a × 1 = a. Use the properties to put numbers together and simplify.'],
+    gen:function(r,i){
+      var v=r.pick(['x','n','y','k']);
+      if(i%3===2) return {type:'name', which:r.int(0,5), v:v, a:r.int(2,9), b:r.int(2,9)};
+      return {type:'simp', t:r.int(0,3), v:v, a:r.int(2,9), b:r.int(2,12)};
+    },
+    prompt:function(p){
+      if(p.type==='name'){
+        var v=p.v, a=p.a, b=p.b;
+        var eq=[v+' + '+a+' = '+a+' + '+v, '('+v+' + '+a+') + '+b+' = '+v+' + ('+a+' + '+b+')', a+' · '+v+' = '+v+' · '+a,
+                '('+a+' · '+b+') · '+v+' = '+a+' · ('+b+' · '+v+')', v+' + 0 = '+v, '1 · '+v+' = '+v][p.which];
+        return 'Which property does this show? <span class="math">'+eq+'</span>';
+      }
+      var e=['('+p.v+' + '+p.a+') + '+p.b, p.a+' + '+p.v+' + '+p.b, p.a+'('+p.b+p.v+')', '('+p.v+' · '+p.a+') · '+p.b][p.t];
+      return 'Simplify the expression: <span class="math">'+e+'</span>';
+    },
+    steps:function(p){
+      if(p.type==='name'){
+        var others=PROPS.filter(function(x,k){ return k!==p.which; });
+        return [{q:'Did the order change, the grouping change, or was 0 / 1 used?', ans:['the order','the grouping','the order','the grouping','adding 0','multiplying by 1'][p.which], wrong:['the order','the grouping','adding 0','multiplying by 1'].filter(function(x){ return x!==['the order','the grouping','the order','the grouping','adding 0','multiplying by 1'][p.which]; }), formMatters:true},
+                {q:'Name the property.', ans:PROPS[p.which], wrong:[others[p.which%others.length], others[(p.which+2)%others.length], others[(p.which+4)%others.length]], formMatters:true}];
+      }
+      var v=p.v, a=p.a, b=p.b;
+      if(p.t<2) return [
+        {q:'Which property lets you put the numbers together?', ans:p.t===0?'Associative Property of Addition':'Commutative Property of Addition', wrong:[p.t===0?'Commutative Property of Multiplication':'Associative Property of Multiplication', 'Identity Property of Addition', 'Distributive Property'], formMatters:true},
+        {q:'Add the numbers: '+a+' + '+b+'.', ans:''+(a+b), wrong:[''+a*b, ''+(a+b+1), a+''+b]},
+        {q:'Write the simplified expression.', ans:v+' + '+(a+b), wrong:[(a+b)+v, v+' + '+(a*b), (a+b+1)+' + '+v], formMatters:true}];
+      return [
+        {q:'Which property lets you put the numbers together?', ans:'Associative Property of Multiplication', wrong:['Associative Property of Addition','Identity Property of Multiplication','Distributive Property'], formMatters:true},
+        {q:'Multiply the numbers: '+a+' × '+b+'.', ans:''+a*b, wrong:[''+(a+b), ''+(a*b+1), a+''+b]},
+        {q:'Write the simplified expression.', ans:(a*b)+v, wrong:[(a+b)+v, a*b+' + '+v, (a*b+1)+v], formMatters:true}];
+    },
+    answer:function(p){ if(p.type==='name') return PROPS[p.which]; return p.t<2 ? p.v+' + '+(p.a+p.b) : (p.a*p.b)+p.v; },
+    alts:function(p){ if(p.type==='name') return [PROPS[p.which].toLowerCase()]; return p.t<2 ? [(p.a+p.b)+' + '+p.v] : [(p.a*p.b)+' '+p.v]; },
+    rejects:function(p){ if(p.type==='name') return [PROPS[(p.which+1)%6]]; return p.t<2 ? [p.v+' + '+p.a+' + '+p.b] : [p.a+'('+p.b+p.v+')']; },
+    grade:function(t,p,dflt){
+      if(p.type==='name'){ var s=String(t).toLowerCase(), want=PROPS[p.which].toLowerCase().split(' ');
+        return s.indexOf(want[0])>=0 && s.indexOf(want[3])>=0; }
+      var ans = p.t<2 ? p.v+' + '+(p.a+p.b) : (p.a*p.b)+p.v;
+      return eqGrade(ans)(t,p,dflt);
+    }
+  });
+
+  // 5.4 The Distributive Property
+  function distAnswer(p){ var sgn=p.type==='minus'?-1:1; return expr([[p.a*p.b+(p.type==='combine'?p.d:0),p.v],[sgn*p.a*p.c,'']]); }
+  G6.lesson({
+    id:'g6_5_4', count:6,
+    tips:['<b>Distribute:</b> multiply the number outside by EVERY term inside: a(b + c) = ab + ac.',
+          '<b>Keep the sign:</b> 3(2x − 5) = 6x − 15.',
+          '<b>Then combine like terms:</b> 4(x + 2) + 3x = 4x + 8 + 3x = 7x + 8.'],
+    gen:function(r,i){
+      var v=r.pick(['x','n','y','k']), type=['plain','minus','combine'][i%3];
+      return {type:type, v:v, a:r.int(2,9), b:r.int(1,6), c:r.int(1,12), d:r.int(1,9)};
+    },
+    prompt:function(p){
+      var inside = p.type==='minus' ? term(p.b,p.v)+' − '+p.c : term(p.b,p.v)+' + '+p.c;
+      return 'Use the Distributive Property to simplify: <span class="math">'+p.a+'('+inside+')'+(p.type==='combine'?' + '+term(p.d,p.v):'')+'</span>';
+    },
+    steps:function(p){
+      var sgn=p.type==='minus'?-1:1, first=p.a*p.b, second=sgn*p.a*p.c;
+      var st=[
+        {q:'Multiply '+p.a+' × '+term(p.b,p.v)+'.', ans:term(first,p.v), wrong:[term(p.a+p.b,p.v), term(p.b,p.v), ''+first], formMatters:true},
+        {q:'Multiply '+p.a+' × '+(sgn<0?'(−'+p.c+')':p.c)+'.', ans:(second<0?'−':'')+Math.abs(second), wrong:[(sgn<0?'−':'')+(p.a+p.c), ''+p.c, (sgn<0?'':'−')+Math.abs(second)]},
+        {q:'Write the distributed expression.', ans:expr([[first,p.v],[second,'']]), wrong:[expr([[first,p.v],[sgn*p.c,'']]), expr([[p.b,p.v],[second,'']]), expr([[first,p.v],[-second,'']])], formMatters:true}];
+      if(p.type==='combine') st.push({q:'Combine like terms: '+term(first,p.v)+' + '+term(p.d,p.v)+'.', ans:expr([[first+p.d,p.v],[second,'']]),
+        wrong:[expr([[first,p.v],[second+p.d,'']]), expr([[first*p.d,p.v],[second,'']]), expr([[first+p.d+1,p.v],[second,'']])], formMatters:true});
+      return st;
+    },
+    answer:distAnswer,
+    alts:function(p){ var sgn=p.type==='minus'?-1:1, c=p.a*p.b+(p.type==='combine'?p.d:0); return [(c===1?'':c)+p.v+(sgn<0?'-':'+')+p.a*p.c]; },
+    rejects:function(p){ var inside=term(p.b,p.v)+(p.type==='minus'?' - ':' + ')+p.c; return [p.a+'('+inside+')'+(p.type==='combine'?' + '+term(p.d,p.v):'')]; },
+    // equivalent AND fully distributed and combined
+    grade:function(t,p,dflt){ return eqGrade(distAnswer(p))(t,p,dflt); }
+  });
+
+  // 5.5 Factoring Expressions
+  G6.lesson({
+    id:'g6_5_5', count:6,
+    tips:['<b>Find the GCF</b> of the numbers in all the terms.',
+          '<b>Divide each term</b> by the GCF; those quotients go inside the parentheses.',
+          '<b>Check</b> by distributing: 6(2x + 3) = 12x + 18.'],
+    gen:function(r,i){
+      var v=r.pick(['x','n','y','k']);
+      for(;;){ var g=r.int(2,9), b=r.int(1,6), c=r.int(1,9); if(gcd(b,c)!==1) continue;
+        return {v:v, g:g, b:b, c:c, constFirst: i%3===2}; }
+    },
+    prompt:function(p){
+      var A=term(p.g*p.b,p.v), B=''+p.g*p.c;
+      return 'Factor the expression using the GCF: <span class="math">'+(p.constFirst ? B+' + '+A : A+' + '+B)+'</span>';
+    },
+    steps:function(p){
+      var A=p.g*p.b, B=p.g*p.c, inner = p.constFirst ? p.c+' + '+term(p.b,p.v) : term(p.b,p.v)+' + '+p.c;
+      var lesser = p.g>2 ? [2,3,5].filter(function(x){ return p.g%x===0 && x<p.g; })[0] : null;
+      return [
+        {q:'What is the GCF of '+A+' and '+B+'?', ans:''+p.g, wrong:[''+(lesser||p.g+1), ''+(A*B/p.g), '1']},
+        {q:'Divide '+term(A,p.v)+' by '+p.g+'.', ans:term(p.b,p.v), wrong:[term(A-p.g,p.v), ''+p.b, term(p.b+1,p.v)], formMatters:true},
+        {q:'Divide '+B+' by '+p.g+'.', ans:''+p.c, wrong:[''+(B-p.g), ''+(p.c+1), ''+B]},
+        // factoring out a smaller common factor (or 1) is equal in value but not factored by the GCF,
+        // which is exactly the slip this step checks — so say which factor goes outside
+        {q:'Write the factored expression with the GCF, '+p.g+', outside the parentheses.', ans:p.g+'('+inner+')', wrong:[p.g+'('+term(A,p.v)+' + '+B+')', (lesser||1)+'('+(p.constFirst? (B/(lesser||1))+' + '+term(A/(lesser||1),p.v) : term(A/(lesser||1),p.v)+' + '+(B/(lesser||1)))+')', p.g+'('+term(p.b,p.v)+' + '+(p.c+1)+')'], formMatters:true}];
+    },
+    answer:function(p){ return p.g+'('+(p.constFirst ? p.c+' + '+term(p.b,p.v) : term(p.b,p.v)+' + '+p.c)+')'; },
+    alts:function(p){ return [p.g+'('+term(p.b,p.v)+'+'+p.c+')', p.g+' × ('+p.c+' + '+term(p.b,p.v)+')']; },
+    rejects:function(p){ return [term(p.g*p.b,p.v)+' + '+p.g*p.c, '1('+term(p.g*p.b,p.v)+' + '+p.g*p.c+')']; },
+    // the GCF outside, what is left inside, and nothing left to factor
+    grade:function(t,p){
+      var s=String(t).replace(/\s+/g,'').replace(/[×*·]/g,'');
+      var m=s.match(/^(\d+)\((.+)\)$/);
+      if(!m || +m[1]!==p.g) return false;
+      return symbolicallyEqual(m[2], term(p.b,p.v)+'+'+p.c);
+    }
+  });
+})();
+
 // ── 6th GRADE LESSONS (end) ──
 G6.init();
 
