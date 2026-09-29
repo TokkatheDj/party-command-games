@@ -1,6 +1,6 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 function buildPrompt(criteria: any, requesterName: string) {
   const mechanics = (criteria.mechanics || []).join(", ");
@@ -134,6 +134,59 @@ async function deployHtmlToSite(token: string, site: any, html: string) {
   return liveUrl;
 }
 
+// ---------------------------------------------------------------- guards
+// Added 29 Sep 2026. This endpoint spends Anthropic credit and creates
+// Netlify sites, and it was open to anyone who found it. Three gates, all
+// before any money is spent:
+//   1. an ORDER CODE - Lance texts it to a customer after they pay. Set it as
+//      BUILD_ORDER_CODE in Netlify's environment; with none set, ordering is
+//      closed rather than open.
+//   2. DAILY LIMITS - BUILD_DAILY_LIMIT builds a day in total (default 10) and
+//      BUILD_PERSON_LIMIT per visitor address (default 3).
+//   3. SANE INPUT - a build id we have never seen (so nobody can overwrite
+//      someone else's build) and every field cut to the page's own lengths.
+
+function sameCode(given: string, want: string) {
+  // hashed first so the comparison takes the same time whatever the input;
+  // capitals ignored, because a customer typing "green-dragon" is right
+  const a = createHash("sha256").update((given || "").toUpperCase()).digest();
+  const b = createHash("sha256").update((want || "").trim().toUpperCase()).digest();
+  return timingSafeEqual(a, b);
+}
+
+function clip(v: any, n: number) {
+  return typeof v === "string" ? v.slice(0, n) : "";
+}
+
+function cleanCriteria(c: any) {
+  return {
+    app_type: clip(c.app_type, 40),
+    theme: clip(c.theme, 60),
+    age_range: clip(c.age_range, 30),
+    color_vibe: clip(c.color_vibe, 40),
+    idea: clip(c.idea, 200),
+    difficulty: clip(c.difficulty, 20),
+    mechanics: (Array.isArray(c.mechanics) ? c.mechanics : []).slice(0, 12).map((m: any) => clip(m, 40)),
+    tech_requests: clip(c.tech_requests, 300),
+    inspired_by: clip(c.inspired_by, 100),
+  };
+}
+
+async function underLimits(ip: string) {
+  const limits = getStore("build-limits");
+  const day = new Date().toISOString().slice(0, 10);
+  const perDay = Number(Netlify.env.get("BUILD_DAILY_LIMIT") || 10);
+  const perPerson = Number(Netlify.env.get("BUILD_PERSON_LIMIT") || 3);
+  const ipKey = createHash("sha256").update(ip || "unknown").digest("hex").slice(0, 16);
+  const total = Number((await limits.get(`${day}/total`)) || 0);
+  const mine = Number((await limits.get(`${day}/ip-${ipKey}`)) || 0);
+  if (total >= perDay) return "Today's builds are all used up. Please try again tomorrow.";
+  if (mine >= perPerson) return "You've reached today's build limit. Please try again tomorrow.";
+  await limits.set(`${day}/total`, String(total + 1));
+  await limits.set(`${day}/ip-${ipKey}`, String(mine + 1));
+  return null;
+}
+
 export default async (req: Request, context: Context) => {
   const store = getStore("build-requests");
   let body: any;
@@ -142,8 +195,28 @@ export default async (req: Request, context: Context) => {
   } catch {
     return;
   }
-  const { id, criteria, requester_name, skip_publish } = body || {};
-  if (!id || !criteria || !criteria.idea) return;
+  const { id, requester_name, skip_publish, order_code } = body || {};
+  // a fresh id only: never write over a build somebody else started
+  if (typeof id !== "string" || !/^[A-Za-z0-9-]{8,80}$/.test(id)) return;
+  if (await store.get(id)) return;
+  if (!body.criteria || !body.criteria.idea) return;
+  const criteria = cleanCriteria(body.criteria);
+  if (!criteria.idea.trim()) return;
+
+  const wantCode = Netlify.env.get("BUILD_ORDER_CODE");
+  if (!wantCode) {
+    await store.setJSON(id, { status: "error", message: "Orders are paused right now. Please check back soon." });
+    return;
+  }
+  if (!sameCode(String(order_code || "").trim(), wantCode)) {
+    await store.setJSON(id, { status: "error", message: "That order code isn't right. It's the code you were sent after paying." });
+    return;
+  }
+  const limited = await underLimits(context.ip || "");
+  if (limited) {
+    await store.setJSON(id, { status: "error", message: limited });
+    return;
+  }
 
   await store.setJSON(id, { status: "pending", startedAt: Date.now() });
 
@@ -154,7 +227,7 @@ export default async (req: Request, context: Context) => {
       return;
     }
 
-    const prompt = buildPrompt(criteria, requester_name || "");
+    const prompt = buildPrompt(criteria, clip(requester_name, 30));
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
