@@ -57,7 +57,7 @@ if ($Remote) {
     if (-not $OutDir) { $OutDir = 'G:\My Drive\AppVerse Review' }
     if (-not $BaseUrl) {
         # Tailscale over LAN: it survives the Surface moving between networks,
-        # which the 192.168.x address does not.
+        # which a plain LAN address does not.
         $ts = (Get-NetIPAddress -AddressFamily IPv4 -EA SilentlyContinue |
                Where-Object { $_.IPAddress -like '100.*' } |
                Select-Object -First 1).IPAddress

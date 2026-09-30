@@ -20,7 +20,11 @@ if ($existing) {
     exit
 }
 
-$env:PUBLIC_URL = "https://desktop-lance.tail476695.ts.net"
+# The Tailscale address is looked up at start-up, not written here: this file is
+# in a public repo, and the tailnet name stays private.
+$tsName = $null
+try { $tsName = ((& tailscale status --json 2>$null) | ConvertFrom-Json).Self.DNSName.TrimEnd('.') } catch {}
+if ($tsName) { $env:PUBLIC_URL = "https://$tsName" }
 
 Write-Host ""
 Write-Host "  ╔══════════════════════════════════════════╗" -ForegroundColor DarkCyan

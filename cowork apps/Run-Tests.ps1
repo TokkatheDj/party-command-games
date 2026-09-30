@@ -3,7 +3,7 @@
 param(
     [string]$Category  = "",   # e.g. "kids", "music"
     [string]$App       = "",   # e.g. "star catcher"
-    [string]$ServerUrl = "",   # e.g. "http://192.168.0.248:8080"
+    [string]$ServerUrl = "",   # e.g. "http://localhost:8080"
     [switch]$Install           # Run first-time setup
 )
 

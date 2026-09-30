@@ -7,7 +7,7 @@
  *   node test_apps.js                  # Test all apps
  *   node test_apps.js --category kids  # Test one category
  *   node test_apps.js --app "star"     # Test apps matching name
- *   node test_apps.js --url http://192.168.0.248:8080  # Test against running server
+ *   node test_apps.js --url http://localhost:8080  # Test against running server
  *
  * First run: npx playwright install chromium
  */
