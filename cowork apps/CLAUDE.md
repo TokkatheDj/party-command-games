@@ -156,7 +156,7 @@ Build the full app in one pass. Do not produce skeleton code or placeholders.
 
 ## Server and testing
 
-- Server is already running at `http://192.168.0.248:8080` when `Start-AppServer.ps1` is active
+- Server is already running at `http://localhost:8080` (or this PC's LAN address) when `Start-AppServer.ps1` is active
 - To run Playwright tests: `.\Run-Tests.ps1` from the apps folder
 - Test a single category: `.\Run-Tests.ps1 -Category kids`
 - Test reports open at `test_reports\index.html`
