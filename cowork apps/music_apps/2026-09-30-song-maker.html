@@ -1,0 +1,251 @@
+<!-- CONCEPT: A kid-friendly loop maker - tap squares on an 8-beat grid of happy notes and drums, press play, and save your songs. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Song Maker</title>
+<style>
+  /* Song Maker (30 Sep 2026) - a clean rewrite. The old song-maker.html was a
+     bundled React build that never opened. Every note row uses the same
+     five-note scale, so there is no wrong answer: anything you tap sounds
+     like music. That is the whole point for a three-year-old. */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --sky: #FFF4D6; --ink: #3A2A5C; --card: #FFFFFF; --soft: #8C7FB0;
+    --r1: #FF5A6E; --r2: #FF9A3D; --r3: #FFD23F; --r4: #3DDC84; --r5: #3DB2FF;
+    --d1: #8A5CF6; --d2: #E052C8; --d3: #5B6B8C;
+    --off: #EFE7FF; --beat: #FFE7A8;
+  }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    touch-action: manipulation; user-select: none; -webkit-user-select: none;
+    background: radial-gradient(circle at 20% 10%, #FFE3F1, transparent 45%),
+                radial-gradient(circle at 90% 90%, #D9F3FF, transparent 45%), var(--sky);
+    color: var(--ink);
+    font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+    overflow: hidden;
+  }
+  .app { height: 100%; display: flex; flex-direction: column; gap: 10px; padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); max-width: 820px; margin: 0 auto; }
+  h1 {
+    margin: 2px 0 0; text-align: center; font-size: clamp(24px, 7vw, 40px);
+    background: linear-gradient(90deg, var(--r1), var(--r2), var(--r4), var(--r5), var(--d1));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .grid {
+    flex: 1; min-height: 0; display: grid; grid-template-columns: 44px repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr); gap: 5px; background: var(--card); border-radius: 22px;
+    padding: 8px; box-shadow: 0 6px 24px rgba(90, 60, 160, .15);
+  }
+  .lab { display: flex; align-items: center; justify-content: center; font-size: clamp(20px, 5vw, 30px); }
+  .cell {
+    border: none; border-radius: 10px; background: var(--off); cursor: pointer; padding: 0; min-height: 30px;
+    transition: transform .08s ease, background .15s ease;
+  }
+  .cell.beat4 { box-shadow: inset 3px 0 0 rgba(58, 42, 92, .12); }
+  .cell.on { transform: scale(.92); }
+  .cell.now { outline: 4px solid var(--beat); outline-offset: -2px; }
+  .cell.on.now { transform: scale(1.08); filter: brightness(1.12); }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-items: center; }
+  .btn {
+    min-height: 60px; min-width: 60px; padding: 0 18px; border: none; border-radius: 30px; cursor: pointer;
+    font: inherit; font-weight: 700; font-size: clamp(16px, 4.4vw, 21px); color: #fff; background: var(--d1);
+    box-shadow: 0 4px 0 rgba(0, 0, 0, .15);
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .15); }
+  .btn:focus-visible, .cell:focus-visible, .slot:focus-visible { outline: 4px solid var(--r5); outline-offset: 2px; }
+  .btn.play { background: var(--r4); min-width: 120px; font-size: clamp(20px, 5.5vw, 26px); }
+  .btn.play.stop { background: var(--r1); }
+  .btn.alt { background: var(--r2); }
+  .btn.ghost { background: var(--soft); }
+  .tempo { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+  .tempo input { width: 120px; accent-color: var(--d1); height: 44px; }
+  .slots { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .slot {
+    min-width: 60px; min-height: 60px; border-radius: 16px; border: 3px dashed var(--soft); background: var(--card);
+    font: inherit; font-size: 24px; cursor: pointer; color: var(--ink);
+  }
+  .slot.full { border-style: solid; border-color: var(--d1); background: #F3ECFF; }
+  .hint { text-align: center; font-size: clamp(12px, 3.3vw, 15px); color: var(--soft); margin: 0; }
+  @media (prefers-reduced-motion: reduce) { .cell, .btn { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Song Maker</h1>
+  <div class="grid" id="grid" aria-label="Song grid: 8 beats across, notes and drums down"></div>
+  <div class="controls">
+    <button class="btn play" id="play" aria-label="Play">▶ Play</button>
+    <button class="btn alt" id="surprise" aria-label="Surprise me - make a random song">🎲</button>
+    <button class="btn ghost" id="demo" aria-label="Play a ready-made song">🎵</button>
+    <button class="btn ghost" id="clear" aria-label="Clear the grid">🧽</button>
+    <label class="tempo">🐢<input id="tempo" type="range" min="70" max="170" value="110" aria-label="Speed">🐇</label>
+  </div>
+  <div class="slots" id="slots" aria-label="Saved songs: tap to load, hold to save"></div>
+  <p class="hint">Tap squares to make a song. Hold a star box to save it there, tap it to play it back.</p>
+</div>
+
+<script>
+const ROWS = [
+  // top to bottom: high notes to low, then drums. Pentatonic, so it always fits.
+  { icon: "⭐", kind: "note", freq: 783.99, color: "--r1" },
+  { icon: "🌙", kind: "note", freq: 659.25, color: "--r2" },
+  { icon: "☀️", kind: "note", freq: 587.33, color: "--r3" },
+  { icon: "🌈", kind: "note", freq: 523.25, color: "--r4" },
+  { icon: "☁️", kind: "note", freq: 392.00, color: "--r5" },
+  { icon: "👏", kind: "clap", color: "--d2" },
+  { icon: "🥁", kind: "kick", color: "--d1" },
+  { icon: "✨", kind: "tick", color: "--d3" },
+];
+const STEPS = 8;
+const KEY = "cowork-song-maker-";
+const DEMOS = [
+  [[0,0,0,0,1,0,0,0],[0,0,1,0,0,0,1,0],[0,1,0,0,0,1,0,0],[1,0,0,1,0,0,0,1],[0,0,0,0,0,0,0,0],[0,0,1,0,0,0,1,0],[1,0,0,0,1,0,0,0],[1,1,1,1,1,1,1,1]],
+  [[1,0,0,0,0,0,0,0],[0,1,0,0,0,0,0,0],[0,0,1,0,1,0,0,0],[0,0,0,1,0,1,0,1],[0,0,0,0,0,0,1,0],[0,0,0,0,1,0,0,0],[1,0,0,1,0,0,1,0],[0,1,0,1,0,1,0,1]],
+];
+let pattern = ROWS.map(() => Array(STEPS).fill(0));
+let step = -1, playing = false, timer = null, ctx = null, demoN = 0;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// ---------------------------------------------------------------- the grid
+const grid = document.getElementById("grid");
+const cells = [];
+ROWS.forEach((row, r) => {
+  const lab = document.createElement("div");
+  lab.className = "lab"; lab.textContent = row.icon; lab.setAttribute("aria-hidden", "true");
+  grid.appendChild(lab);
+  cells[r] = [];
+  for (let s = 0; s < STEPS; s++) {
+    const b = document.createElement("button");
+    b.className = "cell" + (s === 4 ? " beat4" : "");
+    b.setAttribute("aria-label", `${row.icon} beat ${s + 1}`);
+    b.addEventListener("click", () => {
+      pattern[r][s] = pattern[r][s] ? 0 : 1;
+      paintCell(r, s);
+      if (pattern[r][s]) { audio(); sound(r, ctx.currentTime); }
+    });
+    grid.appendChild(b);
+    cells[r][s] = b;
+  }
+});
+function paintCell(r, s) {
+  const on = !!pattern[r][s];
+  const b = cells[r][s];
+  b.classList.toggle("on", on);
+  b.style.background = on ? css(ROWS[r].color) : "";
+  b.setAttribute("aria-pressed", String(on));
+}
+const paintAll = () => ROWS.forEach((_, r) => { for (let s = 0; s < STEPS; s++) paintCell(r, s); });
+
+// ---------------------------------------------------------------- sound
+function audio() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === "suspended") ctx.resume();
+}
+function env(g, t, peak, len) {
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+}
+function noise(len) {
+  const b = ctx.createBuffer(1, Math.floor(ctx.sampleRate * len), ctx.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource(); src.buffer = b; return src;
+}
+function sound(r, t) {
+  const row = ROWS[r];
+  if (row.kind === "note") {
+    [1, 2].forEach((mult, i) => {                 // a soft marimba-ish tone
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = i ? "sine" : "triangle"; o.frequency.value = row.freq * mult;
+      env(g, t, i ? 0.06 : 0.28, i ? 0.25 : 0.5);
+      o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.55);
+    });
+  } else if (row.kind === "kick") {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.18);
+    env(g, t, 0.9, 0.3); o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 0.32);
+  } else {
+    const n = noise(row.kind === "clap" ? 0.2 : 0.06), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    f.type = row.kind === "clap" ? "bandpass" : "highpass";
+    f.frequency.value = row.kind === "clap" ? 1400 : 7000;
+    env(g, t, row.kind === "clap" ? 0.5 : 0.18, row.kind === "clap" ? 0.18 : 0.05);
+    n.connect(f).connect(g).connect(ctx.destination); n.start(t);
+  }
+}
+
+// ---------------------------------------------------------------- playing
+function tick() {
+  const prev = step;
+  step = (step + 1) % STEPS;
+  const t = ctx.currentTime + 0.02;
+  ROWS.forEach((_, r) => {
+    if (prev >= 0) cells[r][prev].classList.remove("now");
+    cells[r][step].classList.add("now");
+    if (pattern[r][step]) sound(r, t);
+  });
+}
+function beatMs() { return 60000 / +document.getElementById("tempo").value / 2; }  // eighth notes
+function start() {
+  audio(); playing = true; step = -1; tick();
+  timer = setInterval(tick, beatMs());
+  const b = document.getElementById("play"); b.textContent = "■ Stop"; b.classList.add("stop"); b.setAttribute("aria-label", "Stop");
+}
+function stop() {
+  playing = false; clearInterval(timer);
+  cells.flat().forEach(c => c.classList.remove("now"));
+  const b = document.getElementById("play"); b.textContent = "▶ Play"; b.classList.remove("stop"); b.setAttribute("aria-label", "Play");
+}
+document.getElementById("play").addEventListener("click", () => playing ? stop() : start());
+document.getElementById("tempo").addEventListener("input", () => {
+  if (playing) { clearInterval(timer); timer = setInterval(tick, beatMs()); }
+});
+document.getElementById("clear").addEventListener("click", () => {
+  pattern = ROWS.map(() => Array(STEPS).fill(0)); paintAll();
+});
+document.getElementById("surprise").addEventListener("click", () => {
+  pattern = ROWS.map((row, r) => Array.from({ length: STEPS }, (_, s) => {
+    if (row.kind === "kick") return s % 4 === 0 ? 1 : +(Math.random() < 0.15);
+    if (row.kind === "clap") return s % 4 === 2 ? 1 : 0;
+    if (row.kind === "tick") return +(Math.random() < 0.5);
+    return +(Math.random() < 0.22);
+  }));
+  paintAll(); if (!playing) start();
+});
+document.getElementById("demo").addEventListener("click", () => {
+  pattern = DEMOS[demoN++ % DEMOS.length].map(r => r.slice()); paintAll(); if (!playing) start();
+});
+
+// ---------------------------------------------------------------- saving
+// Tap a star box to load it; press and hold to save the grid into it.
+const slots = document.getElementById("slots");
+const SLOT_ICONS = ["🐸", "🦖", "🚀", "🐳", "🍓"];
+function readSlot(i) { try { return JSON.parse(localStorage.getItem(KEY + "slot" + i)); } catch (e) { return null; } }
+function drawSlots() {
+  slots.innerHTML = "";
+  SLOT_ICONS.forEach((icon, i) => {
+    const b = document.createElement("button");
+    const full = !!readSlot(i);
+    b.className = "slot" + (full ? " full" : "");
+    b.textContent = full ? icon : "☆";
+    b.setAttribute("aria-label", full ? `Saved song ${i + 1}: tap to load, hold to save over it` : `Empty box ${i + 1}: hold to save your song here`);
+    let hold = null, saved = false;
+    const down = () => { saved = false; hold = setTimeout(() => {
+      try { localStorage.setItem(KEY + "slot" + i, JSON.stringify(pattern)); } catch (e) {}
+      saved = true; drawSlots(); if (navigator.vibrate) navigator.vibrate(40);
+    }, 600); };
+    const up = () => { clearTimeout(hold);
+      if (!saved) { const p = readSlot(i); if (p) { pattern = p; paintAll(); if (!playing) start(); } }
+    };
+    b.addEventListener("pointerdown", down);
+    b.addEventListener("pointerup", up);
+    b.addEventListener("pointerleave", () => clearTimeout(hold));
+    b.addEventListener("keydown", e => { if (e.key === "Enter" && e.shiftKey) { e.preventDefault(); try { localStorage.setItem(KEY + "slot" + i, JSON.stringify(pattern)); } catch (x) {} drawSlots(); } });
+    slots.appendChild(b);
+  });
+}
+drawSlots();
+paintAll();
+</script>
+</body>
+</html>
