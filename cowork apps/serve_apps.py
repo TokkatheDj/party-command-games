@@ -98,6 +98,12 @@ CATEGORY_ICONS = {
     "Crafts": "\U0001f9f6",
     "Inspirational": "\U0001f31f",
     "Music Production": "\U0001f39b️",
+    # VR (A-Frame / WebXR) categories, added 2026-09-24. Keys are the .title() of the
+    # folder names (vr_educational_apps -> "Vr Educational Apps"), so "Vr", not "VR".
+    "Vr Educational Apps": "\U0001f97d",
+    "Vr Platformer Apps": "\U0001f9d7",
+    "Vr Health Wellness Apps": "\U0001f33f",
+    "Vr Puzzle Apps": "\U0001f9ca",
     "Shooting Games": "\U0001f3af",
     # FIX 2026-08-08: "Cloud APPS" folder (new since 2026-07-19) title-cases to
     # "Cloud Apps" and had no icon entry, rendering the generic fallback on the hub grid.
