@@ -11695,6 +11695,9 @@ function toValue(raw){
     .replace(/\b(units?|cm|mm|m|in|inches|ft|feet|yd|mi)\s*[²³]/g,'$1')
     .replace(/[²]/g,'^2').replace(/[³]/g,'^3').replace(/[⁴]/g,'^4').replace(/[⁵]/g,'^5').replace(/[⁶]/g,'^6')
     .replace(/[°]/g,'').replace(/\(\s*exact\s*\)/g,'')
+    // rates first ("ft/s", "cm/min"): removing "ft" alone left "-3/4/s", which is not a number (Oct 2026)
+    .replace(/\b(cm|mm|m|km|in|inches|ft|feet|yd|mi|miles|units?)\s*\/\s*(s|sec|second|min|minute|h|hr|hour)s?\b/g,'')
+    .replace(/\b(mph|kph|km\/h|mi\/h)\b/g,'')   // "20 mph" is 20 (was rejected, Oct 2026)
     .replace(/\b(square|cubic)?\s*(units?|cm|mm|m|in|inches|ft|feet|yd|mi|kg|g|lb|oz|apples|crayons|books|marbles|rolls)\b/g,'')
     .replace(/\s+/g,'');
   if(t==='') return null;
@@ -11826,6 +11829,15 @@ function symbolicallyEqual(student, expected){
 
 function answersMatch(student, expected){
   if(!student || !expected) return false;
+  // Same text, ignoring case and spaces, is always right. (normalizeAnswer strips unit words
+  // anywhere - every "s" - so the correct "SSS" became "" and could never match; Oct 2026.)
+  var plain = function(t){ return String(t).toLowerCase().replace(/\s+/g,'').replace(/[−–—]/g,'-'); };
+  if(plain(student) === plain(expected)) return true;
+  // "x > 5 or x < -1" is the same answer as "x < -1 or x > 5": the parts of an "or" have no order.
+  if(/\bor\b/i.test(expected) && /[<>≤≥]/.test(expected)){
+    var orParts = function(t){ return String(t).split(/\bor\b|,/i).map(plain).filter(Boolean).sort().join('|'); };
+    if(orParts(student) === orParts(expected)) return true;
+  }
   var s = normalizeAnswer(student), e = normalizeAnswer(expected);
   if(!s||!e) return false;
   if(s===e) return true;
