@@ -819,7 +819,17 @@ body {
     }
 ];
 </script>
-    <script>class GameManager {
+    <script>
+    // Saved progress, or {} if missing or damaged ('null' got past the old try/catch and broke the map).
+    function readProgress() {
+        try {
+            const p = JSON.parse(localStorage.getItem('hw_progress') || '{}');
+            return p && typeof p === 'object' && !Array.isArray(p) ? p : {};
+        } catch (e) {
+            return {};
+        }
+    }
+    class GameManager {
     constructor() {
         this.currentLevel = null;
         this.foundItems = [];
@@ -925,7 +935,14 @@ body {
             const isDecoy = this.decoyObjects.includes(obj);
             div.addEventListener('click', (e) => {
                 e.stopPropagation(); // prevent wrong tap
-                if (isDecoy) {
+                // On phones the 48px minimum makes tap areas overlap, and a decoy drawn on
+                // top could cover a listed object completely (Desert Oasis: the hat over the
+                // telescope), so the level could never be finished. The tap goes to the
+                // nearest listed object whose tap area contains it.
+                const hit = this.listedObjectAt(e.clientX, e.clientY);
+                if (hit) {
+                    this.correctTap(hit.obj, hit.el);
+                } else if (isDecoy) {
                     this.wrongTap(obj.x, obj.y);
                 } else {
                     this.correctTap(obj, div);
@@ -934,6 +951,20 @@ body {
 
             layer.appendChild(div);
         });
+    }
+
+    listedObjectAt(x, y) {
+        let best = null, bestDist = Infinity;
+        for (const obj of this.checklistObjects) {
+            if (this.foundItems.includes(obj.id)) continue;
+            const el = document.getElementById(`obj-${obj.id}`);
+            if (!el) continue;
+            const r = el.getBoundingClientRect();
+            if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+            const dist = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+            if (dist < bestDist) { bestDist = dist; best = { obj, el }; }
+        }
+        return best;
     }
 
     correctTap(obj, element) {
@@ -1103,9 +1134,12 @@ body {
         stars = Math.max(1, stars);
 
         // Save progress
-        let progress = {};
-        try { progress = JSON.parse(localStorage.getItem('hw_progress') || '{}'); } catch (e) { progress = {}; }
-        progress[this.currentLevel.id] = { stars: stars, time: this.timer };
+        const progress = readProgress();
+        // Keep the best result: a slower replay must not take stars away.
+        const prev = progress[this.currentLevel.id];
+        if (!prev || stars > prev.stars || (stars === prev.stars && this.timer < prev.time)) {
+            progress[this.currentLevel.id] = { stars: stars, time: this.timer };
+        }
         localStorage.setItem('hw_progress', JSON.stringify(progress));
 
         // Show modal
@@ -1161,8 +1195,7 @@ body {
         const nodesContainer = document.querySelector('.level-nodes');
         nodesContainer.innerHTML = '';
 
-        let progress = {};
-        try { progress = JSON.parse(localStorage.getItem('hw_progress') || '{}'); } catch (e) { progress = {}; }
+        const progress = readProgress();
 
         let nextUpAssigned = false;
 

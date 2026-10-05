@@ -146,6 +146,7 @@ header {
 .left-controls,
 .right-controls {
   display: flex;
+  flex-wrap: wrap;  /* the mode + rank pickers ran off a 390px phone */
   align-items: center;
   gap: 0.75rem;
 }
@@ -1514,6 +1515,8 @@ class MemoryGame {
   }
 
   startGame() {
+    if (this._boardTimers) { this._boardTimers.forEach(id => clearTimeout(id)); }
+    this._boardTimers = [];
     window.sounds.playGameStart();
     this.stopConfetti();
     this.victoryOverlay.classList.remove('active');
@@ -1778,6 +1781,15 @@ class MemoryGame {
     }
   }
 
+  // Match/mismatch timers belong to one board. startGame() cancels them, or a timer from the
+  // old board fires after firstCard/secondCard were reset and crashes on null.classList
+  // (flip a pair, then Next/Restart within a second) - leaving the board locked.
+  _defer(fn, ms) {
+    const id = setTimeout(fn, ms);
+    (this._boardTimers || (this._boardTimers = [])).push(id);
+    return id;
+  }
+
   checkMatch() {
     this.moves++;
     this.movesVal.textContent = this.moves;
@@ -1797,7 +1809,7 @@ class MemoryGame {
         // Temporarily render the blended color on both cards before they lock as matched!
         const mixStyle = this.getMixColorStyle(mixed);
         
-        setTimeout(() => {
+        this._defer(() => {
           const front1 = this.firstCard.querySelector('.card-front');
           const front2 = this.secondCard.querySelector('.card-front');
           
@@ -1813,7 +1825,7 @@ class MemoryGame {
           window.sounds.playMatch();
         }, 150);
 
-        setTimeout(() => {
+        this._defer(() => {
           this.firstCard.classList.add('matched');
           this.secondCard.classList.add('matched');
 
@@ -1834,13 +1846,13 @@ class MemoryGame {
         // Mismatch!
         this.isBoardLocked = true;
 
-        setTimeout(() => {
+        this._defer(() => {
           this.firstCard.classList.add('mismatched');
           this.secondCard.classList.add('mismatched');
           window.sounds.playMismatch();
         }, 250);
 
-        setTimeout(() => {
+        this._defer(() => {
           this.firstCard.classList.remove('flipped', 'mismatched');
           this.secondCard.classList.remove('flipped', 'mismatched');
           this.firstCard = null;
@@ -1858,7 +1870,7 @@ class MemoryGame {
     if (matchId1 === matchId2) {
       // Success Match
       this.isBoardLocked = true;
-      setTimeout(() => {
+      this._defer(() => {
         this.firstCard.classList.add('matched');
         this.secondCard.classList.add('matched');
 
@@ -1882,13 +1894,13 @@ class MemoryGame {
       // Mismatch
       this.isBoardLocked = true;
 
-      setTimeout(() => {
+      this._defer(() => {
         this.firstCard.classList.add('mismatched');
         this.secondCard.classList.add('mismatched');
         window.sounds.playMismatch();
       }, 250);
 
-      setTimeout(() => {
+      this._defer(() => {
         this.firstCard.classList.remove('flipped', 'mismatched');
         this.secondCard.classList.remove('flipped', 'mismatched');
         this.firstCard = null;
