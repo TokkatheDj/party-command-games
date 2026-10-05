@@ -1389,11 +1389,7 @@ class MemoryGame {
     this.maxRankReached = parseInt(localStorage.getItem(`memory_game_max_rank_${this.currentMode}`)) || 1;
     this.currentRank = this.maxRankReached;
 
-    try {
-      this.bestTimes = JSON.parse(localStorage.getItem(`memory_game_best_times_${this.currentMode}`)) || {};
-    } catch (e) {
-      this.bestTimes = {};
-    }
+    this.bestTimes = this.readBestTimes();
 
     // Mute visual state sync
     this.updateMuteButtonVisual();
@@ -1405,16 +1401,27 @@ class MemoryGame {
     localStorage.setItem(`memory_game_best_times_${this.currentMode}`, JSON.stringify(this.bestTimes));
   }
 
+  // Saved best times as { rank: seconds }; anything damaged is dropped instead of
+  // crashing the timer display (a non-number used to throw 'toFixed is not a function').
+  readBestTimes() {
+    const clean = {};
+    try {
+      const saved = JSON.parse(localStorage.getItem(`memory_game_best_times_${this.currentMode}`));
+      if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+        for (const [rank, secs] of Object.entries(saved)) {
+          if (typeof secs === 'number' && Number.isFinite(secs)) clean[rank] = secs;
+        }
+      }
+    } catch (e) { /* damaged save: start fresh */ }
+    return clean;
+  }
+
   bindEvents() {
     this.modeSelector.addEventListener('change', (e) => {
       this.currentMode = e.target.value;
       this.maxRankReached = parseInt(localStorage.getItem(`memory_game_max_rank_${this.currentMode}`)) || 1;
       this.currentRank = this.maxRankReached;
-      try {
-        this.bestTimes = JSON.parse(localStorage.getItem(`memory_game_best_times_${this.currentMode}`)) || {};
-      } catch (err) {
-        this.bestTimes = {};
-      }
+      this.bestTimes = this.readBestTimes();
       localStorage.setItem('memory_game_mode', this.currentMode);
       this.setupRankSelector();
       this.startGame();
