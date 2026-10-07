@@ -1,0 +1,205 @@
+<!-- CONCEPT: A kids' metronome - a big frog (or bunny, puppy, kangaroo) hops on every beat. Turtle / Walk / Run tempos, +/-, tap-to-set, 2-3-4 beats with a bigger hop on beat one, and a Quiet mode that bounces without sound. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bounce Beat</title>
+<style>
+/* Layout: one column, the hopping animal is the whole show; controls are big round buttons under it. */
+:root {
+  --sky: #dff3ff;        /* background */
+  --ink: #1b2a3a;        /* text */
+  --leaf: #1a7f45;       /* start / accent (white text on it is 5.0:1) */
+  --leaf-dark: #146b39;
+  --sun: #ffd23f;        /* beat-one flash */
+  --card: #ffffff;
+  --muted: #4a5b6c;      /* secondary text, 6.5:1 on --sky */
+  --stop: #c62828;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--sky); color: var(--ink);
+  font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 16px; gap: 14px; min-height: 100%;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+h1 { margin: 4px 0 0; font-size: clamp(26px, 7vw, 40px); letter-spacing: .5px; }
+.stage {
+  position: relative; width: min(92vw, 420px); aspect-ratio: 1 / .8;
+  background: var(--card); border-radius: 28px; box-shadow: 0 6px 0 #b9dcef;
+  display: flex; align-items: flex-end; justify-content: center; overflow: hidden;
+  transition: background-color .12s;
+}
+.stage.one { background: #fff6cc; }
+.ground { position: absolute; left: 0; right: 0; bottom: 0; height: 18%; background: #9be28f; }
+.critter {
+  position: relative; z-index: 1; font-size: clamp(90px, 30vw, 150px); line-height: 1;
+  margin-bottom: 10%; transform-origin: 50% 100%; cursor: pointer; border: 0; background: none; padding: 0;
+}
+.critter:focus-visible { outline: 4px solid var(--leaf); outline-offset: 6px; border-radius: 20px; }
+.hop { animation: hop var(--hop-ms, 400ms) cubic-bezier(.3,.7,.4,1); }
+.hop.big { animation-name: bighop; }
+@keyframes hop { 0% { transform: translateY(0) scale(1.1, .9); } 35% { transform: translateY(-28%) scale(.95, 1.05); } 100% { transform: translateY(0) scale(1); } }
+@keyframes bighop { 0% { transform: translateY(0) scale(1.15, .85); } 35% { transform: translateY(-48%) scale(.92, 1.08) rotate(-6deg); } 100% { transform: translateY(0) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .hop, .hop.big { animation: none; } .critter.hop { filter: drop-shadow(0 0 14px var(--sun)); } }
+.dots { display: flex; gap: 12px; }
+.dot { width: 22px; height: 22px; border-radius: 50%; background: #b9dcef; transition: transform .1s, background .1s; }
+.dot.on { background: var(--leaf); transform: scale(1.3); }
+.dot.first.on { background: #e0a800; }
+.tempo { font-size: 22px; font-weight: 700; text-align: center; }
+.tempo b { font-size: 44px; display: block; line-height: 1.05; }
+.tempo small { color: var(--muted); font-weight: 600; font-size: 16px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: min(92vw, 420px); }
+button.b {
+  font: inherit; font-weight: 700; font-size: 18px; border: 0; border-radius: 999px;
+  min-height: 56px; min-width: 56px; padding: 10px 18px; cursor: pointer;
+  background: var(--card); color: var(--ink); box-shadow: 0 4px 0 #b9dcef;
+}
+button.b:active { transform: translateY(3px); box-shadow: 0 1px 0 #b9dcef; }
+button.b:focus-visible { outline: 4px solid var(--leaf); outline-offset: 3px; }
+button.b[aria-pressed="true"] { background: var(--leaf); color: #fff; box-shadow: 0 4px 0 var(--leaf-dark); }
+button.go { background: var(--leaf); color: #fff; font-size: 26px; min-width: 200px; min-height: 72px; box-shadow: 0 5px 0 var(--leaf-dark); }
+button.go.playing { background: var(--stop); box-shadow: 0 5px 0 #8e1b1b; }
+.label { width: 100%; text-align: center; color: var(--muted); font-weight: 700; font-size: 15px; margin-top: 4px; }
+.hint { color: var(--muted); font-size: 15px; text-align: center; max-width: 420px; margin: 0; }
+</style>
+</head>
+<body>
+<h1>Bounce Beat</h1>
+
+<div class="stage" id="stage">
+  <div class="ground"></div>
+  <button class="critter" id="critter" aria-label="Frog - tap to change animal">🐸</button>
+</div>
+
+<div class="dots" id="dots" aria-hidden="true"></div>
+
+<div class="tempo" aria-live="polite"><b id="bpm">90</b><small id="speedName">beats a minute · Walk</small></div>
+
+<div class="row">
+  <button class="b go" id="go">▶ Start</button>
+</div>
+
+<div class="row" role="group" aria-label="Speed">
+  <button class="b" data-bpm="60">🐢 Turtle</button>
+  <button class="b" data-bpm="90">🚶 Walk</button>
+  <button class="b" data-bpm="120">🏃 Run</button>
+</div>
+
+<div class="row" role="group" aria-label="Fine tune">
+  <button class="b" id="minus" aria-label="Slower">−</button>
+  <button class="b" id="tap">👏 Tap the beat</button>
+  <button class="b" id="plus" aria-label="Faster">+</button>
+</div>
+
+<div class="row" role="group" aria-label="Beats to count">
+  <div class="label">Count to</div>
+  <button class="b" data-beats="2">2</button>
+  <button class="b" data-beats="3">3</button>
+  <button class="b" data-beats="4">4</button>
+</div>
+
+<div class="row">
+  <button class="b" id="quiet" aria-pressed="false">🤫 Quiet mode</button>
+</div>
+
+<p class="hint">Tap the animal to swap it. Beat one gets the big hop. Quiet mode keeps the bounce and turns the sound off.</p>
+
+<script>
+const CRITTERS = [["🐸", "Frog"], ["🐰", "Bunny"], ["🐶", "Puppy"], ["🦘", "Kangaroo"], ["🐥", "Chick"]];
+const MIN = 40, MAX = 200;
+const KEY = "bounce-beat-v1";
+let S = { bpm: 90, beats: 4, quiet: false, critter: 0 };
+try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const $ = (id) => document.getElementById(id);
+
+// --- sound: scheduled ahead on the audio clock so the beat stays steady even if the page is busy
+let ac = null, playing = false, nextTime = 0, beat = 0, timer = null;
+const queue = [];
+function click(time, first) {
+  if (S.quiet) return;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = "triangle";
+  o.frequency.value = first ? 1320 : 880;
+  g.gain.setValueAtTime(0.0001, time);
+  g.gain.exponentialRampToValueAtTime(first ? 0.9 : 0.55, time + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, time + 0.09);
+  o.connect(g).connect(ac.destination);
+  o.start(time); o.stop(time + 0.1);
+}
+function scheduler() {
+  while (nextTime < ac.currentTime + 0.12) {
+    const first = beat % S.beats === 0;
+    click(nextTime, first);
+    queue.push({ time: nextTime, n: beat % S.beats });
+    nextTime += 60 / S.bpm;
+    beat++;
+  }
+}
+function draw() {
+  if (!playing) return;
+  while (queue.length && queue[0].time <= ac.currentTime) show(queue.shift().n);
+  requestAnimationFrame(draw);
+}
+function show(n) {
+  const c = $("critter");
+  c.style.setProperty("--hop-ms", Math.min(450, Math.round(60000 / S.bpm * 0.8)) + "ms");
+  c.classList.remove("hop", "big"); void c.offsetWidth;
+  c.classList.add("hop"); if (n === 0) c.classList.add("big");
+  $("stage").classList.toggle("one", n === 0);
+  [...$("dots").children].forEach((d, i) => d.classList.toggle("on", i === n));
+}
+function start() {
+  ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+  ac.resume();
+  playing = true; beat = 0; queue.length = 0; nextTime = ac.currentTime + 0.06;
+  timer = setInterval(scheduler, 25); scheduler(); requestAnimationFrame(draw);
+  $("go").textContent = "■ Stop"; $("go").classList.add("playing");
+}
+function stop() {
+  playing = false; clearInterval(timer); queue.length = 0;
+  $("go").textContent = "▶ Start"; $("go").classList.remove("playing");
+  $("stage").classList.remove("one");
+  [...$("dots").children].forEach((d) => d.classList.remove("on"));
+}
+
+// --- controls
+function name(b) { return b < 75 ? "Turtle" : b < 105 ? "Walk" : b < 140 ? "Run" : "Zoom!"; }
+function render() {
+  S.bpm = Math.max(MIN, Math.min(MAX, Math.round(S.bpm)));
+  $("bpm").textContent = S.bpm;
+  $("speedName").textContent = "beats a minute · " + name(S.bpm);
+  document.querySelectorAll("[data-bpm]").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.bpm === S.bpm));
+  document.querySelectorAll("[data-beats]").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.beats === S.beats));
+  $("quiet").setAttribute("aria-pressed", S.quiet);
+  const [emoji, label] = CRITTERS[S.critter % CRITTERS.length];
+  $("critter").textContent = emoji; $("critter").setAttribute("aria-label", label + " - tap to change animal");
+  $("dots").innerHTML = Array.from({ length: S.beats }, (_, i) => `<div class="dot${i === 0 ? " first" : ""}"></div>`).join("");
+  save();
+}
+$("go").onclick = () => (playing ? stop() : start());
+document.querySelectorAll("[data-bpm]").forEach((b) => (b.onclick = () => { S.bpm = +b.dataset.bpm; render(); }));
+document.querySelectorAll("[data-beats]").forEach((b) => (b.onclick = () => { S.beats = +b.dataset.beats; beat = 0; render(); }));
+$("minus").onclick = () => { S.bpm -= 5; render(); };
+$("plus").onclick = () => { S.bpm += 5; render(); };
+$("quiet").onclick = () => { S.quiet = !S.quiet; render(); };
+$("critter").onclick = () => { S.critter = (S.critter + 1) % CRITTERS.length; render(); };
+let taps = [];
+$("tap").onclick = () => {
+  const now = performance.now();
+  taps = taps.filter((t) => now - t < 3000); taps.push(now);
+  if (taps.length >= 3) {
+    const gaps = taps.slice(1).map((t, i) => t - taps[i]);
+    S.bpm = 60000 / (gaps.reduce((a, b) => a + b, 0) / gaps.length);
+    render();
+  }
+};
+document.addEventListener("keydown", (e) => { if (e.code === "Space" && e.target === document.body) { e.preventDefault(); $("go").click(); } });
+render();
+</script>
+</body>
+</html>
