@@ -1,0 +1,370 @@
+<!-- CONCEPT: SPEED/REACTION (Simon-says variant) - "Boss Says: Chaos Edition": a host-run, one-screen elimination game where the screen flashes silly commands; only obey cards that start with "BOSS SAYS" (traps, decoy bosses, races & freeze twists try to trip you up); last player standing wins, with session leaderboard. 3-12 players, ~10-15 min. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boss Says: Chaos Edition</title>
+<style>
+:root{--bg:#1a0b3d;--bg2:#2b1163;--card:#3a1b86;--yellow:#ffd93d;--green:#3ddc84;--red:#ff4d6d;--cyan:#4dd0ff;--white:#fff;--ink:#12062e}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%;background:radial-gradient(circle at 50% 0%,var(--bg2),var(--bg) 70%) fixed;color:var(--white);font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif}
+body{min-height:100vh}
+button{font-family:inherit;cursor:pointer;border:0;color:inherit}
+.wrap{max-width:1200px;margin:0 auto;padding:16px 20px 28px}
+h1{font-size:clamp(2.2rem,6vw,4.4rem);margin:0;line-height:1;color:var(--yellow);text-shadow:0 4px 0 #b8860b,0 8px 20px rgba(0,0,0,.4);letter-spacing:1px;text-transform:uppercase}
+h1 span{color:var(--green)}
+.sub{font-size:clamp(1rem,2.2vw,1.5rem);margin:10px 0 4px;opacity:.95}
+.meta{display:inline-block;background:rgba(255,255,255,.12);border-radius:999px;padding:6px 16px;font-weight:700;font-size:clamp(.9rem,1.8vw,1.2rem);margin:4px 0 14px}
+.panel{background:rgba(255,255,255,.08);border:3px solid rgba(255,255,255,.18);border-radius:22px;padding:18px 20px;margin-bottom:16px}
+.panel h2{margin:0 0 10px;font-size:clamp(1.2rem,2.4vw,1.7rem);color:var(--cyan)}
+.rules{font-size:clamp(1.05rem,2.2vw,1.45rem);line-height:1.45}
+.rules b.g{color:var(--green)}.rules b.r{color:var(--red)}.rules b.y{color:var(--yellow)}
+.rules ol{margin:6px 0 0;padding-left:1.3em}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.prow{display:flex;gap:6px}
+.prow input{flex:1;min-width:0;font-size:1.3rem;padding:12px 14px;border-radius:14px;border:3px solid rgba(255,255,255,.25);background:#fff;color:var(--ink);font-family:inherit;font-weight:700}
+.prow input:focus{outline:4px solid var(--yellow)}
+.x{width:46px;border-radius:14px;background:rgba(255,255,255,.15);font-size:1.4rem;font-weight:900}
+.btn{font-size:clamp(1.2rem,2.5vw,1.8rem);font-weight:900;padding:14px 26px;border-radius:18px;box-shadow:0 6px 0 rgba(0,0,0,.35);transition:transform .08s,box-shadow .08s;text-transform:uppercase;letter-spacing:.5px}
+.btn:active{transform:translateY(5px);box-shadow:0 1px 0 rgba(0,0,0,.35)}
+.btn.go{background:var(--green);color:var(--ink)}
+.btn.alt{background:var(--yellow);color:var(--ink)}
+.btn.ghost{background:rgba(255,255,255,.16)}
+.btn.big{font-size:clamp(1.6rem,4vw,2.6rem);padding:18px 40px}
+.opts{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:6px 0}
+.opts label.t{font-weight:800;font-size:1.15rem;margin-right:4px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{padding:12px 18px;border-radius:14px;background:rgba(255,255,255,.14);font-weight:800;font-size:1.1rem;border:3px solid transparent}
+.seg button.on{background:var(--yellow);color:var(--ink);border-color:#fff}
+.center{text-align:center}
+.hidden{display:none!important}
+/* play */
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.stat{background:rgba(255,255,255,.12);border-radius:999px;padding:8px 18px;font-weight:900;font-size:clamp(1rem,2vw,1.4rem)}
+.stat b{color:var(--yellow)}
+.cmd{position:relative;border-radius:30px;padding:clamp(18px,3vw,36px);min-height:clamp(260px,42vh,460px);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;background:var(--card);border:6px solid rgba(255,255,255,.3);box-shadow:0 12px 0 rgba(0,0,0,.3);overflow:hidden}
+.cmd .banner{font-size:clamp(1.6rem,5vw,3.6rem);font-weight:900;letter-spacing:2px;text-transform:uppercase;color:var(--yellow);margin-bottom:6px;min-height:1.1em}
+.cmd .text{font-size:clamp(2.2rem,7.5vw,6rem);font-weight:900;line-height:1.05;text-shadow:0 4px 0 rgba(0,0,0,.35)}
+.cmd .small{font-size:clamp(1rem,2.2vw,1.6rem);opacity:.9;margin-top:12px}
+.cmd.ready .text{font-size:clamp(2rem,6vw,4.6rem);color:var(--cyan)}
+.cmd.pop{animation:pop .28s ease-out}
+@keyframes pop{0%{transform:scale(.85) rotate(-2deg);opacity:.2}70%{transform:scale(1.04)}100%{transform:scale(1)}}
+.cmd.verdict-boss{background:#117a46;border-color:var(--green)}
+.cmd.verdict-trap{background:#8a1230;border-color:var(--red)}
+.cmd.verdict-twist{background:#0b5a8a;border-color:var(--cyan)}
+.cmd.shake{animation:shake .4s}
+@keyframes shake{20%{transform:translateX(-14px)}40%{transform:translateX(14px)}60%{transform:translateX(-8px)}80%{transform:translateX(8px)}}
+.bar{height:22px;border-radius:999px;background:rgba(255,255,255,.18);margin:14px 0;overflow:hidden;border:3px solid rgba(255,255,255,.25)}
+.bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--green),var(--yellow),var(--red));transform-origin:left}
+.hint{text-align:center;font-weight:700;font-size:clamp(1rem,2vw,1.3rem);opacity:.9;min-height:1.6em}
+.chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin:10px 0}
+.chip{position:relative;padding:14px 10px;border-radius:18px;background:rgba(255,255,255,.14);border:4px solid rgba(255,255,255,.25);font-weight:900;font-size:clamp(1.1rem,2.2vw,1.6rem);min-height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:transform .08s}
+.chip:active{transform:scale(.96)}
+.chip small{font-size:.8rem;opacity:.85;font-weight:700}
+.chip.pend{background:var(--red);border-color:#fff;animation:shake .4s}
+.chip.pend::after{content:"OUT!";position:absolute;top:-10px;right:-6px;background:#fff;color:var(--red);padding:2px 10px;border-radius:999px;font-size:.9rem}
+.chip.dead{opacity:.35;filter:grayscale(1);text-decoration:line-through;cursor:default}
+.actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+/* results */
+.winner{font-size:clamp(2.4rem,8vw,6rem);font-weight:900;color:var(--yellow);text-shadow:0 5px 0 #b8860b;margin:6px 0}
+table{width:100%;border-collapse:collapse;font-size:clamp(1.1rem,2.4vw,1.7rem)}
+td,th{padding:10px 12px;text-align:left;border-bottom:2px solid rgba(255,255,255,.15)}
+th{color:var(--cyan);font-size:.8em;text-transform:uppercase}
+td.n{text-align:right;font-weight:900;color:var(--yellow)}
+tr.top td{color:var(--green)}
+canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:50}
+.mute{position:fixed;right:12px;bottom:12px;z-index:60;width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.2);font-size:1.5rem}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<button class="mute" id="muteBtn" title="Sound on/off" aria-label="Toggle sound">🔊</button>
+<div class="wrap">
+
+<!-- SETUP -->
+<section id="setup">
+  <h1>Boss Says: <span>Chaos Edition</span></h1>
+  <p class="sub">The screen shouts silly commands — only obey the ones from the <b style="color:var(--yellow)">BOSS</b>. Fall for a trap and you're out. Last one standing wins!</p>
+  <div class="meta">3–12 players · about 10–15 minutes · one screen, one host</div>
+  <div class="grid2">
+    <div class="panel rules">
+      <h2>How to play (10 seconds)</h2>
+      <ol>
+        <li><b class="g">BOSS SAYS …</b> → do it, fast!</li>
+        <li>A command with <b class="r">no Boss</b> (or a fake boss like <i>"Captain says"</i>) → <b class="r">DON'T move!</b></li>
+        <li><b class="y">Twists</b> (Freeze! Silence!) and <b class="y">Races</b> (last one to do it is out) pop up too.</li>
+        <li>The <b>host</b> taps anyone who messed up, then presses <b>NEXT</b>. Survive each command = 1 point; winning = 5!</li>
+      </ol>
+    </div>
+    <div class="panel">
+      <h2>Players</h2>
+      <div class="plist" id="plist"></div>
+      <div class="actions" style="justify-content:flex-start"><button class="btn ghost" id="addP">+ Add player</button></div>
+      <div class="opts" style="margin-top:12px"><label class="t">Speed:</label><div class="seg" id="segSpeed"></div></div>
+      <div class="opts"><label class="t">Game length:</label><div class="seg" id="segLen"></div></div>
+      <div class="opts"><label class="t">Read commands aloud:</label><div class="seg" id="segVoice"></div></div>
+    </div>
+  </div>
+  <div class="center"><button class="btn go big" id="startBtn">Start Game</button></div>
+</section>
+
+<!-- PLAY -->
+<section id="play" class="hidden">
+  <div class="topbar">
+    <div class="stat">Command <b id="cNum">0</b> / <span id="cMax">30</span></div>
+    <div class="stat">Still in: <b id="alive">0</b></div>
+    <button class="btn ghost" id="quitBtn" style="font-size:1rem;padding:8px 16px">End game</button>
+  </div>
+  <div class="cmd ready" id="card"><div class="banner" id="banner"></div><div class="text" id="ctext"></div><div class="small" id="csmall"></div></div>
+  <div class="bar"><i id="barfill"></i></div>
+  <div class="hint" id="hint"></div>
+  <div class="chips" id="chips"></div>
+  <div class="actions"><button class="btn go big" id="nextBtn">Start</button></div>
+  <div class="hint" style="margin-top:8px">Host: tap a player to mark them OUT (tap again to undo) · Space / Enter = Next</div>
+</section>
+
+<!-- RESULTS -->
+<section id="results" class="hidden center">
+  <div class="sub">Game over!</div>
+  <div class="winner" id="winName"></div>
+  <div class="sub" id="winSub"></div>
+  <div class="grid2" style="text-align:left;margin-top:14px">
+    <div class="panel"><h2>This game</h2><table id="gameTbl"></table></div>
+    <div class="panel"><h2>Session leaderboard</h2><table id="sessTbl"></table></div>
+  </div>
+  <div class="actions">
+    <button class="btn go big" id="againBtn">Play Again</button>
+    <button class="btn alt" id="newBtn">New Game</button>
+  </div>
+</section>
+</div>
+
+<script>
+"use strict";
+/* ============ CONTENT ============ */
+// Commands that make sense as "do it" or "trap" (no-prefix) cards
+const DO = [
+"Touch your nose","Pat your head","Rub your belly","Touch your toes","Wave with both hands","Put your hands on your hips","Cross your arms","Stand on one foot","Wiggle your fingers","Touch your left ear","Touch your right elbow","Shrug your shoulders","Clap three times","Snap your fingers","Stomp your feet","Give yourself a hug","Salute the screen","Cover your eyes","Cross your fingers","Stick out your tongue","Raise your right hand","Raise your left knee","Pat your knees","Tap your chin","Touch your left knee with your right hand","Hold your ears","Make a muscle pose","Wiggle your eyebrows","Puff out your cheeks","Pinch your nose",
+"Flap like a chicken","Make a fish face","Hold a tiny pretend umbrella","Brush your teeth (pretend)","Wiggle like a jellyfish","Be a T-Rex (tiny arms!)","Strike a superhero pose","Make monster claws","Row a pretend boat","Do the robot arms","Wave in slow motion","Climb a pretend ladder","Drive a pretend bus","Make a duck face","Sway like a tree in the wind","Do a happy dance","Eat pretend spaghetti","Walk like a penguin (stay in place)","Toss a pretend pizza","Play air guitar","Conduct an orchestra","Do jazz hands","Take a deep royal bow","Blow a kiss","Pretend to swim","Gallop like a horse (in place)","Pretend to juggle three balls","Freeze like an ice cube… then melt","Shiver like it's freezing","Mime opening a huge gift",
+"Say \"Boing!\"","Moo like a cow","Hum a happy tune","Whistle","Yell \"Yippee!\"","Meow twice","Make a siren sound","Say \"Cheese!\"","Squeak your name","Roar like a lion","Gasp loudly","Make a spaceship noise","Say \"Wow\" in a tiny voice","Buzz like a bee","Sing \"la la la\"","Giggle like a goblin","Bark like a dog","Say \"Abracadabra!\"","Go \"Ooh la la!\"","Hiss like a snake"
+];
+// "Race" commands: last player to do it is OUT
+const RACE = [
+"Touch the floor","Touch a wall","Sit down","Put both hands on your head","Point at the ceiling","Touch something blue","Touch something made of wood","Crouch down low","Turn your back to the screen","Raise both hands high","High-five a neighbor","Shake hands with someone","Jump once","Find something red and touch it","Hide your hands behind your back","Cover your mouth with both hands","Hold your elbows","Touch your shoes","Spin around once and freeze","Stand tall on tiptoes"
+];
+const TWISTS = [
+{banner:"FREEZE!",text:"Don't move a muscle!",small:"Hold still for 5 seconds",verdict:"Anyone who MOVED is OUT!"},
+{banner:"STATUE!",text:"Strike a pose and hold it!",small:"No wobbling for 5 seconds",verdict:"Anyone who WOBBLED or MOVED is OUT!"},
+{banner:"SILENCE!",text:"Nobody make a sound!",small:"Zip it for 5 seconds",verdict:"Anyone who MADE A SOUND is OUT!"},
+{banner:"STRAIGHT FACE!",text:"No smiling, no laughing!",small:"Poker faces for 5 seconds",verdict:"Anyone who SMILED or LAUGHED is OUT!"},
+{banner:"EYES SHUT!",text:"Close your eyes and keep them closed!",small:"No peeking for 5 seconds",verdict:"Anyone who PEEKED is OUT!"},
+{banner:"STARE DOWN!",text:"Don't blink!",small:"Stare at the screen for 5 seconds",verdict:"Anyone who BLINKED is OUT (host's call)!"}
+];
+const DECOYS = ["Captain says","Bob says","Grandma says","The Boss's cat says","Sir Wiggles says","Boss's cousin says","Please","Mister Boss-ish says","Your pal says","The Mayor says","Bossy says","Robot Boss says"];
+const BOSSBANNERS = ["BOSS SAYS","BOSS SAYS","BOSS SAYS","BOSS SAYS","THE BOSS SAYS"];
+
+/* ============ STATE ============ */
+const $ = id => document.getElementById(id);
+const SPEEDS = {chill:{label:"Chill",base:7,min:4},normal:{label:"Normal",base:5,min:2.6},frantic:{label:"Frantic",base:3.6,min:1.6}};
+const LENS = [20,30,45];
+const cfg = {speed:"normal",len:30,voice:false,sound:true};
+let names = ["","","",""];
+let session = {};      // name -> total points (kept across Play Again)
+let G = null;          // current game
+let timerId = null;
+
+/* ============ AUDIO ============ */
+let AC = null;
+function ac(){ if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC && AC.state==="suspended") AC.resume(); return AC; }
+function tone(f,d,type="square",vol=.18,delay=0,slide=0){
+  if(!cfg.sound) return; const a=ac(); if(!a) return;
+  const t=a.currentTime+delay, o=a.createOscillator(), g=a.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,t); if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(30,f+slide),t+d);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+d);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t+d+.02);
+}
+const SFX = {
+  reveal(){ tone(660,.12,"square",.16); tone(990,.16,"square",.16,.1); },
+  twist(){ tone(1200,.5,"sine",.2,0,-700); tone(1500,.4,"triangle",.12,.1); },
+  tick(){ tone(880,.07,"square",.12); },
+  time(){ tone(150,.5,"sawtooth",.22,0,-60); tone(110,.5,"sawtooth",.2,.05); },
+  out(){ [392,330,262,196].forEach((f,i)=>tone(f,.22,"triangle",.2,i*.16)); },
+  pend(){ tone(260,.12,"square",.14,0,-120); },
+  undo(){ tone(520,.1,"sine",.14); },
+  win(){ [523,659,784,1047,784,1047,1319].forEach((f,i)=>tone(f,.22,"square",.15,i*.13)); },
+  start(){ [392,523,659].forEach((f,i)=>tone(f,.15,"square",.16,i*.1)); }
+};
+$("muteBtn").onclick=()=>{ cfg.sound=!cfg.sound; $("muteBtn").textContent=cfg.sound?"🔊":"🔇"; if(cfg.sound){ac();SFX.undo();} };
+
+function speak(t){
+  if(!cfg.voice || !("speechSynthesis" in window)) return;
+  try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(t); u.rate=1.1; u.pitch=1.1; speechSynthesis.speak(u);}catch(e){}
+}
+
+/* ============ UTIL ============ */
+const rnd = n => Math.floor(Math.random()*n);
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]];} return a; }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function show(id){ ["setup","play","results"].forEach(s=>$(s).classList.toggle("hidden",s!==id)); window.scrollTo(0,0); }
+
+/* ============ SETUP UI ============ */
+function renderPlayers(){
+  $("plist").innerHTML = names.map((n,i)=>`<div class="prow"><input data-i="${i}" maxlength="14" placeholder="Player ${i+1}" value="${esc(n)}" aria-label="Player ${i+1} name">${names.length>3?`<button class="x" data-x="${i}" aria-label="Remove">×</button>`:""}</div>`).join("");
+  $("plist").querySelectorAll("input").forEach(inp=>inp.oninput=e=>{names[+e.target.dataset.i]=e.target.value;});
+  $("plist").querySelectorAll(".x").forEach(b=>b.onclick=e=>{names.splice(+e.currentTarget.dataset.x,1);renderPlayers();});
+  $("addP").style.display = names.length>=12?"none":"";
+}
+$("addP").onclick=()=>{ if(names.length<12){ names.push(""); renderPlayers(); const ins=$("plist").querySelectorAll("input"); ins[ins.length-1].focus(); } };
+function seg(id,opts,get,set){
+  const el=$(id); el.innerHTML=opts.map(o=>`<button data-v="${o.v}" class="${get()==o.v?"on":""}">${o.l}</button>`).join("");
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{ const v=b.dataset.v; set(isNaN(+v)?(v==="true"?true:v==="false"?false:v):+v); seg(id,opts,get,set); });
+}
+function renderOpts(){
+  seg("segSpeed",Object.keys(SPEEDS).map(k=>({v:k,l:SPEEDS[k].label})),()=>cfg.speed,v=>cfg.speed=v);
+  seg("segLen",LENS.map(n=>({v:n,l:n+" commands"})),()=>cfg.len,v=>cfg.len=v);
+  seg("segVoice",[{v:false,l:"Off"},{v:true,l:"On"}],()=>cfg.voice,v=>cfg.voice=v);
+}
+
+/* ============ GAME ============ */
+function finalNames(){
+  const out=[]; names.forEach((n,i)=>{ let nm=n.trim()||("Player "+(i+1)); let base=nm,k=2; while(out.includes(nm)) nm=base+" "+(k++); out.push(nm); }); return out;
+}
+function newGame(){
+  const ps=G?G.players:finalNames();
+  G={players:ps,alive:ps.slice(),pending:new Set(),pts:{},n:0,state:"ready",cur:null,doDeck:[],raceDeck:[],twistDeck:[],decoyDeck:[],hist:[],outBatches:[],end:false};
+  ps.forEach(p=>{G.pts[p]=0; if(!(p in session)) session[p]=0;});
+  show("play");
+  $("cMax").textContent=cfg.len;
+  setCard("ready","", "Everybody stand up!", "Get loose, spread out a little, and press START when the room is ready.");
+  $("nextBtn").textContent="Start"; $("hint").textContent="";
+  setBar(1); renderChips(); updateStats();
+}
+function draw(deckKey,src){ if(!G[deckKey].length) G[deckKey]=shuffle(src); return G[deckKey].pop(); }
+function pickKind(){
+  const h=G.hist; let r=Math.random(); let k;
+  if(G.n>=3 && r<.14) k="twist"; else if(r<.30) k="race"; else if(r<.62) k="trap"; else k="boss";
+  // avoid >2 of same kind in a row
+  if(h.length>=2 && h[h.length-1]===k && h[h.length-2]===k) k = k==="boss"?"trap":"boss";
+  if(k==="twist" && h[h.length-1]==="twist") k="boss";
+  return k;
+}
+function makeCmd(){
+  const kind=pickKind(); G.hist.push(kind);
+  const sp=SPEEDS[cfg.speed]; const dur=Math.max(sp.min, sp.base - G.n*0.1);
+  if(kind==="twist"){ const t=draw("twistDeck",TWISTS); return {kind,banner:t.banner,text:t.text,small:t.small,verdict:t.verdict,dur:5,speak:t.banner+" "+t.text}; }
+  if(kind==="race"){ const t=draw("raceDeck",RACE); const b=BOSSBANNERS[rnd(BOSSBANNERS.length)];
+    return {kind,banner:b,text:t,small:"…and the LAST one to do it is OUT!",verdict:"RACE! Tap the LAST player to finish (and anyone who didn't do it)!",dur:dur+1,speak:"Boss says "+t+". Last one is out!"}; }
+  const t=draw("doDeck",DO);
+  if(kind==="boss"){ const b=BOSSBANNERS[rnd(BOSSBANNERS.length)]; return {kind,banner:b,text:t,small:"",verdict:"The Boss DID say it — anyone who did NOT do it is OUT!",dur,speak:b.toLowerCase()+" "+t}; }
+  // trap: half the time a decoy banner
+  if(Math.random()<.4){ const d=draw("decoyDeck",DECOYS); return {kind:"trap",banner:d.toUpperCase(),text:t,small:"",verdict:"DECOY! That wasn't the Boss — anyone who did it is OUT!",dur,speak:d+" "+t}; }
+  return {kind:"trap",banner:"",text:t,small:"",verdict:"TRAP! The Boss didn't say it — anyone who did it is OUT!",dur,speak:t};
+}
+function setCard(cls,banner,text,small){
+  const c=$("card"); c.className="cmd "+cls; void c.offsetWidth; c.classList.add("pop");
+  $("banner").textContent=banner; $("ctext").textContent=text; $("csmall").textContent=small||"";
+}
+function setBar(frac){ $("barfill").style.transform=`scaleX(${Math.max(0,frac)})`; }
+function updateStats(){ $("cNum").textContent=G.n; $("alive").textContent=G.alive.length; }
+function renderChips(){
+  $("chips").innerHTML=G.players.map(p=>{
+    const dead=!G.alive.includes(p), pend=G.pending.has(p);
+    return `<button class="chip ${dead?"dead":""} ${pend?"pend":""}" data-p="${esc(p)}" ${dead?"disabled":""}>${esc(p)}<small>${G.pts[p]} pts this game</small></button>`;
+  }).join("");
+  $("chips").querySelectorAll(".chip").forEach(b=>b.onclick=()=>{
+    const p=b.dataset.p; if(!G.alive.includes(p)) return;
+    if(G.pending.has(p)){G.pending.delete(p);SFX.undo();} else {G.pending.add(p);SFX.pend();}
+    renderChips();
+  });
+}
+function startCommand(){
+  G.n++; G.pending.clear();
+  const c=makeCmd(); G.cur=c; G.state="live";
+  setCard(c.kind==="twist"?"twist":"", c.banner, c.text, c.small);
+  c.kind==="twist"?SFX.twist():SFX.reveal();
+  speak(c.speak);
+  $("nextBtn").textContent="Next ▶"; $("hint").textContent="Go go go!";
+  updateStats(); renderChips();
+  const t0=performance.now(), total=c.dur*1000; let lastSec=Math.ceil(c.dur);
+  clearInterval(timerId);
+  timerId=setInterval(()=>{
+    const el=performance.now()-t0, left=total-el; setBar(left/total);
+    const sec=Math.ceil(left/1000);
+    if(sec<lastSec && sec<=3 && sec>0){ SFX.tick(); }
+    lastSec=sec;
+    if(left<=0){ clearInterval(timerId); timeUp(); }
+  },50);
+}
+function timeUp(){
+  if(G.state!=="live") return;
+  G.state="judge"; SFX.time(); setBar(0);
+  const c=G.cur;
+  const cls = c.kind==="boss"||c.kind==="race" ? "verdict-boss" : c.kind==="twist" ? "verdict-twist" : "verdict-trap";
+  const cd=$("card"); cd.className="cmd "+cls+" shake";
+  $("banner").textContent = c.kind==="trap" ? (c.banner?"Not the Boss!":"No Boss!") : (c.kind==="twist"?"TIME!":"Boss said it!");
+  $("csmall").textContent = c.verdict;
+  $("hint").textContent="Tap anyone who slipped up, then press NEXT.";
+}
+function commit(){
+  clearInterval(timerId); if("speechSynthesis" in window){try{speechSynthesis.cancel();}catch(e){}}
+  const out=[...G.pending]; const surv=G.alive.filter(p=>!G.pending.has(p));
+  surv.forEach(p=>G.pts[p]++);
+  if(out.length){ SFX.out(); G.outBatches.push(out.slice()); }
+  if(surv.length===0 && out.length){ G.end=true; G.winners=out.slice(); G.runner=[]; }
+  else {
+    G.alive=surv; G.pending.clear();
+    if(G.alive.length<=1){ G.end=true; G.winners=G.alive.slice(); G.runner=G.outBatches.length&&G.outBatches[G.outBatches.length-1].length===out.length&&out.length? out.slice(): []; }
+    else if(G.n>=cfg.len){ G.end=true; G.winners=G.alive.slice(); G.runner=[]; }
+  }
+  updateStats();
+}
+function nextAction(){
+  if(!G || $("play").classList.contains("hidden")) return;
+  ac();
+  if(G.state==="ready"){ SFX.start(); startCommand(); return; }
+  commit();
+  if(G.end){ finish(); return; }
+  startCommand();
+}
+function finish(){
+  G.state="done";
+  const bonus={}; G.players.forEach(p=>bonus[p]=0);
+  G.winners.forEach(p=>bonus[p]+=5);
+  if(G.winners.length===1 && G.runner && G.runner.length===1) bonus[G.runner[0]]+=2;
+  G.players.forEach(p=>session[p]=(session[p]||0)+G.pts[p]+bonus[p]);
+  const rows=G.players.map(p=>({p,g:G.pts[p]+bonus[p],b:bonus[p],w:G.winners.includes(p)})).sort((a,b)=>b.g-a.g);
+  $("winName").textContent = G.winners.length===1 ? "👑 "+G.winners[0]+" 👑" : "👑 "+G.winners.join(" & ")+" 👑";
+  $("winSub").textContent = G.winners.length===1 ? "is the last one standing — Boss approved!" : "survive together!";
+  $("gameTbl").innerHTML="<tr><th>Player</th><th style='text-align:right'>Pts</th></tr>"+rows.map(r=>`<tr class="${r.w?"top":""}"><td>${esc(r.p)}${r.w?" 🏆":""}${r.b&&!r.w?" 🥈":""}</td><td class="n">${r.g}</td></tr>`).join("");
+  const srows=Object.keys(session).map(p=>({p,s:session[p]})).sort((a,b)=>b.s-a.s);
+  $("sessTbl").innerHTML="<tr><th>Player</th><th style='text-align:right'>Total</th></tr>"+srows.map((r,i)=>`<tr class="${i===0?"top":""}"><td>${i+1}. ${esc(r.p)}</td><td class="n">${r.s}</td></tr>`).join("");
+  show("results"); SFX.win(); confetti();
+}
+
+/* ============ CONFETTI ============ */
+function confetti(){
+  const cv=$("fx"), cx=cv.getContext("2d"); cv.width=innerWidth; cv.height=innerHeight;
+  const cols=["#ffd93d","#3ddc84","#ff4d6d","#4dd0ff","#fff"];
+  const ps=Array.from({length:160},()=>({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.5,vx:(Math.random()-.5)*4,vy:2+Math.random()*5,r:5+Math.random()*8,c:cols[rnd(cols.length)],a:Math.random()*6}));
+  let f=0; (function loop(){ cx.clearRect(0,0,cv.width,cv.height);
+    ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.a+=.15;cx.save();cx.translate(p.x,p.y);cx.rotate(p.a);cx.fillStyle=p.c;cx.fillRect(-p.r/2,-p.r/2,p.r,p.r*.6);cx.restore();});
+    if(++f<260) requestAnimationFrame(loop); else cx.clearRect(0,0,cv.width,cv.height); })();
+}
+
+/* ============ WIRING ============ */
+$("startBtn").onclick=()=>{ ac(); G=null; session={}; newGame(); };
+$("nextBtn").onclick=nextAction;
+$("quitBtn").onclick=()=>{ if(!G) return; clearInterval(timerId); if(G.state==="ready"){show("setup");return;} G.pending.clear(); G.winners=G.alive.slice(); G.runner=[]; G.end=true; finish(); };
+$("againBtn").onclick=()=>{ ac(); newGame(); };
+$("newBtn").onclick=()=>{ clearInterval(timerId); G=null; session={}; show("setup"); };
+document.addEventListener("keydown",e=>{
+  if((e.code==="Space"||e.code==="Enter") && !/INPUT|BUTTON/.test(document.activeElement.tagName)){ e.preventDefault(); nextAction(); }
+  else if(e.code==="Space" && document.activeElement.id==="nextBtn"){ /* default button click */ }
+});
+renderPlayers(); renderOpts();
+</script>
+</body>
+</html>

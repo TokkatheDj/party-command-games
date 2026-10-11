@@ -1,0 +1,306 @@
+<!-- CONCEPT: Color-mixing learning game - tap two paint pots to mix the exact color a customer ordered (red+yellow=orange, etc.), 10 rounds with stars and a confetti finish. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Paint Pot Mixer</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+  html,body{margin:0;height:100%;font-family:"Comic Sans MS","Chalkboard SE","Trebuchet MS",sans-serif;background:linear-gradient(#bde7ff,#fff3c9);color:#4a2c6b;overflow-x:hidden}
+  #app{max-width:760px;margin:0 auto;padding:10px 12px 20px;text-align:center}
+  h1{margin:6px 0 2px;font-size:clamp(28px,6vw,44px);color:#ff5d8f;text-shadow:3px 3px 0 #fff}
+  .desc{margin:0 0 8px;font-size:clamp(14px,3.2vw,18px)}
+  .btn{font:inherit;font-weight:bold;font-size:clamp(20px,5vw,28px);border:none;border-radius:999px;padding:14px 34px;color:#fff;background:linear-gradient(#ff8a5c,#ff5d8f);box-shadow:0 6px 0 #c23a6a;cursor:pointer;margin:6px}
+  .btn:active{transform:translateY(4px);box-shadow:0 2px 0 #c23a6a}
+  .btn.small{font-size:18px;padding:8px 20px;background:linear-gradient(#8ad7ff,#4aa8ff);box-shadow:0 4px 0 #2b78c4}
+  .hidden{display:none!important}
+  #hud{display:flex;justify-content:space-between;align-items:center;font-size:clamp(18px,4vw,26px);font-weight:bold;margin:4px 6px}
+  #stars{letter-spacing:2px}
+  #order{background:#fff;border-radius:26px;border:5px solid #ffd23f;padding:8px 10px;display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0;box-shadow:0 5px 0 #e0b020}
+  #blobby{font-size:clamp(50px,12vw,76px);animation:bob 2s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateY(-8px) rotate(4deg)}}
+  #want{font-size:clamp(18px,4vw,26px)}
+  #swatch{width:clamp(70px,16vw,100px);height:clamp(70px,16vw,100px);border-radius:50%;border:5px solid #fff;box-shadow:0 0 0 4px #4a2c6b33,inset 0 -8px 0 #0002;margin:0 auto}
+  #stage{display:flex;align-items:center;justify-content:center;gap:10px;margin:10px 0}
+  .slot{width:clamp(62px,15vw,92px);height:clamp(62px,15vw,92px);border-radius:50%;border:4px dashed #4a2c6b88;background:#ffffff99;display:flex;align-items:center;justify-content:center;font-size:30px}
+  .slot.full{border-style:solid}
+  .op{font-size:34px;font-weight:bold}
+  #bowl{width:clamp(110px,26vw,160px);height:clamp(80px,19vw,116px);border-radius:0 0 90px 90px;border:6px solid #4a2c6b;border-top-width:8px;background:#fff;position:relative;overflow:hidden;box-shadow:0 6px 0 #0002}
+  #bowl .fill{position:absolute;inset:0;background:#eee;transition:background .5s}
+  #msg{min-height:34px;font-size:clamp(18px,4.2vw,26px);font-weight:bold;margin:2px 0}
+  #pots{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin:10px 0}
+  .pot{width:clamp(84px,21vw,120px);cursor:pointer;background:none;border:none;padding:0;font:inherit;transition:transform .15s}
+  .pot:active{transform:scale(.92)}
+  .pot.sel{transform:translateY(-12px) scale(1.08)}
+  .pot.focus .body{outline:5px solid #4a2c6b;outline-offset:3px}
+  .pot .body{height:clamp(66px,16vw,92px);border-radius:14px 14px 38px 38px;border:5px solid #4a2c6b;position:relative;box-shadow:inset 0 -12px 0 #0002,0 5px 0 #0002}
+  .pot .body:before{content:"";position:absolute;left:-5px;right:-5px;top:-14px;height:20px;border-radius:12px;background:#4a2c6b}
+  .pot .lbl{display:block;margin-top:6px;font-weight:bold;font-size:clamp(14px,3.4vw,19px)}
+  .wiggle{animation:wig .5s 3}
+  @keyframes wig{25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+  .shake{animation:shk .4s}
+  @keyframes shk{25%{transform:translateX(-10px)}75%{transform:translateX(10px)}}
+  .pop{animation:pp .5s}
+  @keyframes pp{40%{transform:scale(1.25)}}
+  #end{padding:20px}
+  #end .big{font-size:clamp(60px,16vw,110px)}
+  #confetti{position:fixed;inset:0;pointer-events:none;z-index:9}
+  .row{display:flex;justify-content:center;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div id="app">
+  <h1>🎨 Paint Pot Mixer</h1>
+  <p class="desc">Blobby the painter needs a color! Tap two paint pots to mix it, then press Mix!</p>
+
+  <div id="start">
+    <div style="font-size:90px">🧑‍🎨</div>
+    <button class="btn" id="playBtn">Let's Paint!</button>
+    <p class="desc">Tip: you can also use ← → arrows and Enter.</p>
+  </div>
+
+  <div id="game" class="hidden">
+    <div id="hud"><span id="round">Color 1 / 10</span><span id="stars"></span></div>
+    <div id="order">
+      <div id="blobby">🐙</div>
+      <div><div id="want">I need this color!</div><div id="swatch"></div></div>
+    </div>
+    <div id="stage">
+      <div class="slot" id="s1"></div><span class="op">+</span>
+      <div class="slot" id="s2"></div><span class="op">=</span>
+      <div id="bowl"><div class="fill" id="fill"></div></div>
+    </div>
+    <div id="msg">Pick a pot!</div>
+    <div class="row">
+      <button class="btn" id="mixBtn">🥄 Mix!</button>
+      <button class="btn small" id="clearBtn">Empty bowl</button>
+      <button class="btn small" id="hintBtn">💡 Hint</button>
+    </div>
+    <div id="pots"></div>
+  </div>
+
+  <div id="end" class="hidden">
+    <div class="big">🏆🌈</div>
+    <h2 id="endTitle">You are a Color Wizard!</h2>
+    <p class="desc" id="endText"></p>
+    <button class="btn" id="againBtn">Paint Again!</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ---------- Audio ----------
+  var AC=null;
+  function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+  function tone(f,t0,d,type,vol){
+    var a=ac(); if(!a)return;
+    var o=a.createOscillator(),g=a.createGain();
+    o.type=type||"sine"; o.frequency.value=f;
+    var s=a.currentTime+t0;
+    g.gain.setValueAtTime(0.0001,s);
+    g.gain.exponentialRampToValueAtTime(vol||0.15,s+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,s+d);
+    o.connect(g);g.connect(a.destination);o.start(s);o.stop(s+d+0.05);
+  }
+  var sfx={
+    pick:function(){tone(520,0,.12,"triangle");tone(780,.06,.12,"triangle");},
+    splash:function(){tone(200,0,.25,"sawtooth",.07);tone(140,.05,.3,"sine",.12);},
+    win:function(){[523,659,784,1047].forEach(function(f,i){tone(f,i*.1,.25,"triangle",.18);});},
+    oops:function(){tone(330,0,.18,"sine",.12);tone(262,.15,.28,"sine",.12);},
+    big:function(){[523,659,784,1047,784,1047,1319].forEach(function(f,i){tone(f,i*.12,.3,"triangle",.18);});}
+  };
+
+  // ---------- Colors ----------
+  var POTS={
+    red:{name:"Red",hex:"#ff3b3b"},
+    yellow:{name:"Yellow",hex:"#ffd92e"},
+    blue:{name:"Blue",hex:"#2e7bff"},
+    white:{name:"White",hex:"#ffffff"}
+  };
+  // key = sorted pot ids joined by "+"
+  var MIX={
+    "red":["Red","#ff3b3b"],"yellow":["Yellow","#ffd92e"],"blue":["Blue","#2e7bff"],"white":["White","#ffffff"],
+    "red+yellow":["Orange","#ff9524"],
+    "blue+yellow":["Green","#34c759"],
+    "blue+red":["Purple","#a24bd8"],
+    "red+white":["Pink","#ff9ec7"],
+    "blue+white":["Sky Blue","#9fd6ff"],
+    "white+yellow":["Cream","#fff3a8"]
+  };
+  // rounds: target key, which pots are on the shelf
+  var ROUNDS=[
+    {t:"orange",k:"red+yellow",p:["red","yellow","blue"]},
+    {t:"green",k:"blue+yellow",p:["red","yellow","blue"]},
+    {t:"purple",k:"blue+red",p:["red","yellow","blue"]},
+    {t:"red",k:"red",p:["red","yellow","blue"]},
+    {t:"pink",k:"red+white",p:["red","yellow","blue","white"]},
+    {t:"sky blue",k:"blue+white",p:["red","yellow","blue","white"]},
+    {t:"green",k:"blue+yellow",p:["red","yellow","blue","white"]},
+    {t:"cream",k:"white+yellow",p:["red","yellow","blue","white"]},
+    {t:"purple",k:"blue+red",p:["red","yellow","blue","white"]},
+    {t:"orange",k:"red+yellow",p:["red","yellow","blue","white"]}
+  ];
+  var BLOBS=["🐙","🦄","🐸","🐼","🦊","🐯","🐰","🐻","🦁","🐵"];
+  var PAINTS=["a rainbow","a big flower","a happy sun","a pretty butterfly","a silly fish","a tall tree","a cozy house","a cute kite","a fun balloon","a sparkly star"];
+
+  var $=function(id){return document.getElementById(id);};
+  var ri=0, sel=[], wrong=0, stars=0, focusIdx=0, locked=false, hintsUsed=0;
+
+  function show(id){["start","game","end"].forEach(function(x){$(x).classList.toggle("hidden",x!==id);});}
+
+  function buildPots(){
+    var box=$("pots"); box.innerHTML="";
+    ROUNDS[ri].p.forEach(function(id,i){
+      var b=document.createElement("button");
+      b.className="pot"; b.dataset.id=id; b.setAttribute("aria-label",POTS[id].name+" paint");
+      b.innerHTML='<div class="body" style="background:'+POTS[id].hex+'"></div><span class="lbl">'+POTS[id].name+'</span>';
+      b.addEventListener("click",function(){focusIdx=i;pick(id);});
+      box.appendChild(b);
+    });
+    focusIdx=0; updateFocus();
+  }
+  function updateFocus(){
+    var ps=$("pots").children;
+    for(var i=0;i<ps.length;i++){ps[i].classList.toggle("focus",i===focusIdx);}
+  }
+  function refreshSel(){
+    var ps=$("pots").children;
+    for(var i=0;i<ps.length;i++){ps[i].classList.toggle("sel",sel.indexOf(ps[i].dataset.id)>-1);}
+    [0,1].forEach(function(n){
+      var s=$("s"+(n+1));
+      if(sel[n]){s.style.background=POTS[sel[n]].hex;s.classList.add("full");s.textContent="";}
+      else{s.style.background="";s.classList.remove("full");}
+    });
+    var key=sel.length?currentKey():null;
+    $("fill").style.background=key&&MIX[key]?MIX[key][1]:"#eee";
+  }
+  function currentKey(){
+    if(sel.length===1)return sel[0];
+    var a=sel.slice().sort();
+    return a[0]===a[1]?a[0]:a.join("+");
+  }
+  function say(t){$("msg").textContent=t;}
+
+  function pick(id){
+    if(locked)return;
+    ac();
+    if(sel.length>=2){sel=[];}
+    sel.push(id);
+    sfx.pick(); refreshSel();
+    say(sel.length===1?"Nice! Pick another pot, or press Mix!":"Ready? Press Mix!");
+  }
+  function clearBowl(){ if(locked)return; sel=[]; refreshSel(); say("Bowl is empty. Pick a pot!"); }
+
+  function mix(){
+    if(locked)return; ac();
+    if(!sel.length){say("Pick a pot first!");$("pots").classList.add("shake");setTimeout(function(){$("pots").classList.remove("shake");},400);return;}
+    sfx.splash();
+    var key=currentKey(), target=ROUNDS[ri].k;
+    var got=MIX[key]?MIX[key][0]:"?";
+    $("fill").style.background=MIX[key]?MIX[key][1]:"#eee";
+    if(key===target){
+      locked=true;
+      var earned=wrong===0?3:(wrong<3?2:1);
+      stars+=earned;
+      say("🎉 Yes! "+got+"! Blobby loves it!");
+      $("blobby").textContent="🥳";
+      $("swatch").classList.add("pop");
+      setTimeout(function(){sfx.win();burst(60);},250);
+      $("stars").textContent="⭐ "+stars;
+      setTimeout(next,2200);
+    }else{
+      wrong++;
+      sfx.oops();
+      say("That made "+got+". Try again! You can do it!");
+      $("bowl").classList.add("shake");
+      setTimeout(function(){$("bowl").classList.remove("shake");sel=[];refreshSel();},900);
+      if(wrong>=2){setTimeout(hint,1000);}
+    }
+  }
+  function hint(){
+    if(locked)return;
+    var need=ROUNDS[ri].k.split("+"), ps=$("pots").children;
+    for(var i=0;i<ps.length;i++){
+      if(need.indexOf(ps[i].dataset.id)>-1){
+        (function(el){el.classList.remove("wiggle");void el.offsetWidth;el.classList.add("wiggle");setTimeout(function(){el.classList.remove("wiggle");},1600);})(ps[i]);
+      }
+    }
+    hintsUsed++;
+    say(need.length===1?"Look at the wiggling pot!":"Try the two wiggling pots!");
+  }
+
+  function startRound(){
+    locked=false; sel=[]; wrong=0;
+    var r=ROUNDS[ri];
+    $("round").textContent="Color "+(ri+1)+" / "+ROUNDS.length;
+    $("blobby").textContent=BLOBS[ri%BLOBS.length];
+    $("want").textContent="Please mix "+r.t+" for "+PAINTS[ri]+"!";
+    $("swatch").style.background=MIX[r.k][1];
+    $("swatch").classList.remove("pop");
+    $("stars").textContent="⭐ "+stars;
+    buildPots(); refreshSel();
+    say("Pick a pot!");
+  }
+  function next(){
+    ri++;
+    if(ri>=ROUNDS.length)finish(); else startRound();
+  }
+  function finish(){
+    show("end");
+    var max=ROUNDS.length*3;
+    $("endTitle").textContent=stars>=max*0.8?"You are a Color Wizard!":"You are a Super Painter!";
+    $("endText").textContent="You mixed all 10 colors and collected "+stars+" stars! ⭐";
+    sfx.big(); burst(160); setTimeout(function(){burst(120);},900);
+  }
+  function begin(){
+    ri=0; stars=0; hintsUsed=0;
+    show("game"); startRound();
+  }
+
+  // ---------- Confetti ----------
+  var cv=$("confetti"), cx=cv.getContext("2d"), parts=[], running=false;
+  function size(){cv.width=window.innerWidth;cv.height=window.innerHeight;}
+  window.addEventListener("resize",size); size();
+  function burst(n){
+    var cols=["#ff3b3b","#ffd92e","#2e7bff","#34c759","#ff9ec7","#a24bd8","#ff9524"];
+    for(var i=0;i<n;i++){
+      parts.push({x:cv.width/2+(Math.random()-.5)*200,y:cv.height*0.35,vx:(Math.random()-.5)*14,vy:-Math.random()*12-2,
+        s:6+Math.random()*8,c:cols[(Math.random()*cols.length)|0],r:Math.random()*6,vr:(Math.random()-.5)*.4,l:90+Math.random()*50});
+    }
+    if(!running){running=true;requestAnimationFrame(tick);}
+  }
+  function tick(){
+    cx.clearRect(0,0,cv.width,cv.height);
+    parts=parts.filter(function(p){return p.l>0&&p.y<cv.height+20;});
+    parts.forEach(function(p){
+      p.x+=p.vx;p.y+=p.vy;p.vy+=.35;p.r+=p.vr;p.l--;
+      cx.save();cx.translate(p.x,p.y);cx.rotate(p.r);cx.fillStyle=p.c;cx.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);cx.restore();
+    });
+    if(parts.length)requestAnimationFrame(tick); else running=false;
+  }
+
+  // ---------- Events ----------
+  $("playBtn").onclick=function(){ac();sfx.pick();begin();};
+  $("againBtn").onclick=function(){ac();sfx.pick();begin();};
+  $("mixBtn").onclick=mix;
+  $("clearBtn").onclick=clearBowl;
+  $("hintBtn").onclick=function(){ac();hint();};
+  document.addEventListener("keydown",function(e){
+    if($("game").classList.contains("hidden"))return;
+    var n=$("pots").children.length;
+    if(e.key==="ArrowRight"){focusIdx=(focusIdx+1)%n;updateFocus();sfx.pick();e.preventDefault();}
+    else if(e.key==="ArrowLeft"){focusIdx=(focusIdx-1+n)%n;updateFocus();sfx.pick();e.preventDefault();}
+    else if(e.key==="ArrowUp"){pick($("pots").children[focusIdx].dataset.id);e.preventDefault();}
+    else if(e.key==="Enter"||e.key===" "){
+      e.preventDefault();
+      if(sel.length>=2||(sel.length&&e.key==="Enter"&&sel.length===1&&false))mix();
+      else if(e.key==="Enter"&&sel.length)mix();
+      else pick($("pots").children[focusIdx].dataset.id);
+    }
+  });
+})();
+</script>
+</body>
+</html>
