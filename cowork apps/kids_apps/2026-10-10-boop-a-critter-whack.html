@@ -1,0 +1,265 @@
+<!-- CONCEPT: Whack-a-mole style game where kids boop cute critters popping out of a 3x3 grid of holes with a foam mitt, boop golden stars for bonus, and let the sleepy owl rest. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Boop-a-Critter!</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  html,body{margin:0;height:100%;font-family:"Comic Sans MS","Chalkboard SE","Trebuchet MS",sans-serif;overflow:hidden;touch-action:manipulation}
+  body{background:linear-gradient(#8fe3ff 0%,#c9f4ff 45%,#8fe07a 45%,#5cc65a 100%);display:flex;flex-direction:column;align-items:center;color:#3b2a6b}
+  .sun{position:fixed;top:14px;right:22px;font-size:54px;animation:spin 20s linear infinite;pointer-events:none}
+  .cloud{position:fixed;font-size:60px;opacity:.9;pointer-events:none;animation:drift 40s linear infinite}
+  .cloud.c2{top:70px;font-size:44px;animation-duration:55s;animation-delay:-20s}
+  @keyframes drift{from{left:-100px}to{left:105%}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  header{text-align:center;padding:8px 10px 0;z-index:2}
+  h1{margin:0;font-size:clamp(28px,6vw,48px);color:#ff5a8a;text-shadow:3px 3px 0 #fff,5px 5px 0 #ffd23f}
+  .desc{margin:2px 0 0;font-size:clamp(13px,2.6vw,18px);font-weight:bold;color:#3b2a6b}
+  .hud{display:flex;gap:10px;margin:8px 0;z-index:2}
+  .pill{background:#fff;border:4px solid #ffd23f;border-radius:22px;padding:4px 16px;font-size:clamp(18px,4vw,28px);font-weight:bold;min-width:100px;text-align:center;box-shadow:0 4px 0 #e0a800}
+  .pill small{display:block;font-size:.5em;color:#8a6fd1}
+  #board{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(8px,2vw,18px);width:min(92vw,62vh,520px);aspect-ratio:1;z-index:2;margin-top:4px}
+  .hole{position:relative;border-radius:50%/40%;cursor:pointer;overflow:hidden;background:transparent;border:none;padding:0;outline:none}
+  .hole .dirt{position:absolute;left:4%;right:4%;bottom:6%;height:34%;background:radial-gradient(ellipse at 50% 35%,#3a2412,#6b4423 70%);border-radius:50%;box-shadow:0 6px 0 #4a2f18}
+  .hole .critter{position:absolute;left:0;right:0;bottom:-10%;text-align:center;font-size:clamp(40px,12vw,92px);line-height:1;transform:translateY(110%);transition:transform .16s cubic-bezier(.3,1.6,.5,1);pointer-events:none}
+  .hole.up .critter{transform:translateY(-22%)}
+  .hole.booped .critter{transform:translateY(110%) rotate(25deg);transition:transform .22s ease-in}
+  .hole .rim{position:absolute;left:0;right:0;bottom:0;height:30%;background:radial-gradient(ellipse at 50% 0%,transparent 45%,#5cc65a 47%);pointer-events:none}
+  .hole.sel{box-shadow:0 0 0 5px #ff5a8a inset}
+  .hole:focus-visible{box-shadow:0 0 0 5px #ff5a8a inset}
+  .pop{position:fixed;font-size:clamp(22px,5vw,38px);font-weight:bold;pointer-events:none;z-index:20;animation:floatup .9s ease-out forwards;text-shadow:2px 2px 0 #fff}
+  @keyframes floatup{from{transform:translateY(0) scale(.6);opacity:1}to{transform:translateY(-90px) scale(1.3);opacity:0}}
+  #mitt{position:fixed;font-size:60px;pointer-events:none;z-index:30;display:none;transform:translate(-50%,-50%)}
+  #mitt.hit{animation:boop .2s ease-out}
+  @keyframes boop{0%{transform:translate(-50%,-50%) scale(1) rotate(0)}50%{transform:translate(-50%,-50%) scale(1.5) rotate(-25deg)}100%{transform:translate(-50%,-50%) scale(1) rotate(0)}}
+  .overlay{position:fixed;inset:0;background:rgba(255,255,255,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:50;text-align:center;padding:16px}
+  .overlay.hidden{display:none}
+  .card{background:#fff;border:6px solid #ff5a8a;border-radius:36px;padding:20px 28px;max-width:560px;box-shadow:0 10px 0 #c93a68}
+  .card h2{margin:0 0 6px;font-size:clamp(28px,6vw,44px);color:#ff5a8a}
+  .card p{margin:6px 0;font-size:clamp(16px,3.4vw,22px);font-weight:bold}
+  .legend{display:flex;justify-content:center;gap:14px;font-size:clamp(28px,6vw,44px);margin:8px 0}
+  .legend span{font-size:.4em;display:block;font-weight:bold}
+  .big{margin-top:12px;background:#43c463;color:#fff;border:none;border-radius:999px;font:inherit;font-weight:bold;font-size:clamp(26px,6vw,40px);padding:12px 40px;cursor:pointer;box-shadow:0 8px 0 #2a8c44;transition:transform .08s}
+  .big:active{transform:translateY(6px);box-shadow:0 2px 0 #2a8c44}
+  .stars{font-size:clamp(40px,10vw,70px);letter-spacing:6px}
+  .stars .off{filter:grayscale(1);opacity:.3}
+  .mute{position:fixed;left:10px;top:10px;z-index:60;background:#fff;border:4px solid #ffd23f;border-radius:50%;width:54px;height:54px;font-size:28px;cursor:pointer}
+  #confetti{position:fixed;inset:0;pointer-events:none;z-index:70}
+</style>
+</head>
+<body>
+<div class="sun">☀️</div><div class="cloud">☁️</div><div class="cloud c2">☁️</div>
+<button class="mute" id="mute" aria-label="Sound on/off">🔊</button>
+<header>
+  <h1>Boop-a-Critter!</h1>
+  <p class="desc">Boop the friendly critters when they pop up! Grab the golden ⭐ and let the sleepy owl nap.</p>
+</header>
+<div class="hud">
+  <div class="pill"><small>SCORE</small><span id="score">0</span></div>
+  <div class="pill"><small>TIME</small><span id="time">30</span></div>
+  <div class="pill"><small>COMBO</small><span id="combo">0</span></div>
+</div>
+<div id="board" role="group" aria-label="Critter holes"></div>
+<div id="mitt">🧤</div>
+<canvas id="confetti"></canvas>
+
+<div class="overlay" id="startScreen">
+  <div class="card">
+    <h2>Boop-a-Critter!</h2>
+    <p>Tap the critters as they pop out!</p>
+    <div class="legend"><div>🐹<span>+1</span></div><div>🐰<span>+1</span></div><div>🐸<span>+1</span></div><div>⭐<span>+5!</span></div><div>🦉<span>Shhh…</span></div></div>
+    <p>Arrow keys + Space work too!</p>
+    <button class="big" id="startBtn">Play!</button>
+  </div>
+</div>
+<div class="overlay hidden" id="endScreen">
+  <div class="card">
+    <h2 id="endTitle">Great job!</h2>
+    <div class="stars" id="endStars"></div>
+    <p>You booped <b id="endCount">0</b> critters!</p>
+    <p>Score: <b id="endScore">0</b> &nbsp; Best: <b id="endBest">0</b></p>
+    <button class="big" id="againBtn">Play again!</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var ctx = null, muted = false;
+  function initAudio(){ if(!ctx && AC){ try{ctx = new AC();}catch(e){} } if(ctx && ctx.state==='suspended') ctx.resume(); }
+  function tone(freq, dur, type, vol, when, slideTo){
+    if(!ctx || muted) return;
+    var t = ctx.currentTime + (when||0);
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type||'sine'; o.frequency.setValueAtTime(freq, t);
+    if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t+dur);
+    g.gain.setValueAtTime(vol||0.2, t); g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+    o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+dur+0.02);
+  }
+  var sfx = {
+    pop: function(){ tone(300,.08,'sine',.08,0,600); },
+    boop: function(combo){ var f = 400 + Math.min(combo,10)*50; tone(f,.12,'triangle',.25,0,f*1.6); tone(f*2,.1,'sine',.1,.05); },
+    star: function(){ [660,880,1100,1320].forEach(function(f,i){ tone(f,.18,'square',.1,i*.07); }); },
+    shh: function(){ tone(220,.35,'sine',.18,0,140); },
+    miss: function(){ tone(260,.12,'sine',.05,0,200); },
+    tick: function(){ tone(900,.06,'square',.06); },
+    win: function(){ [523,659,784,1047,784,1047,1319].forEach(function(f,i){ tone(f,.22,'triangle',.22,i*.12); }); }
+  };
+
+  var CRITTERS = ['🐹','🐰','🐸','🐻','🐱'];
+  var board = document.getElementById('board');
+  var holes = [];
+  for(var i=0;i<9;i++){
+    var h = document.createElement('button');
+    h.className='hole'; h.setAttribute('aria-label','Hole '+(i+1));
+    h.innerHTML = '<div class="dirt"></div><div class="critter"></div><div class="rim"></div>';
+    board.appendChild(h);
+    holes.push({el:h, crit:h.querySelector('.critter'), kind:null, timer:null, up:false});
+    (function(idx){
+      h.addEventListener('pointerdown', function(e){ e.preventDefault(); initAudio(); hit(idx, e.clientX, e.clientY); });
+      h.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); } });
+    })(i);
+  }
+
+  var score=0, count=0, combo=0, timeLeft=30, running=false, sel=4, spawnTimer=null, clockTimer=null, elapsed=0;
+  var best = 0;
+  try{ best = parseInt(localStorage.getItem('boopBest')||'0',10)||0; }catch(e){}
+
+  var $ = function(id){return document.getElementById(id);};
+  function setHUD(){ $('score').textContent=score; $('time').textContent=timeLeft; $('combo').textContent=combo; }
+
+  function floatText(txt, x, y, color){
+    var d=document.createElement('div'); d.className='pop'; d.textContent=txt;
+    d.style.left=(x-20)+'px'; d.style.top=(y-30)+'px'; d.style.color=color||'#ff5a8a';
+    document.body.appendChild(d); setTimeout(function(){ d.remove(); },950);
+  }
+
+  function showSel(){ holes.forEach(function(h,i){ h.el.classList.toggle('sel', running && i===sel && usingKeys); }); }
+  var usingKeys=false;
+
+  function hideHole(idx){
+    var h=holes[idx]; if(!h.up) return;
+    clearTimeout(h.timer); h.up=false; h.kind=null;
+    h.el.classList.remove('up');
+  }
+
+  function popUp(){
+    if(!running) return;
+    var free = holes.map(function(h,i){return h.up?-1:i;}).filter(function(i){return i>=0;});
+    if(free.length){
+      var idx = free[Math.floor(Math.random()*free.length)];
+      var r = Math.random(), kind, emoji;
+      if(r < 0.10){ kind='star'; emoji='⭐'; }
+      else if(r < 0.22){ kind='owl'; emoji='🦉'; }
+      else { kind='crit'; emoji=CRITTERS[Math.floor(Math.random()*CRITTERS.length)]; }
+      var h=holes[idx];
+      h.kind=kind; h.up=true; h.crit.textContent=emoji;
+      h.el.classList.remove('booped'); void h.el.offsetWidth; h.el.classList.add('up');
+      sfx.pop();
+      var stay = Math.max(650, 1400 - elapsed*22) * (kind==='star'?0.8:1);
+      h.timer = setTimeout(function(){ if(h.up && h.kind==='crit'){ combo=0; setHUD(); } hideHole(idx); }, stay);
+    }
+    var gap = Math.max(380, 900 - elapsed*18);
+    spawnTimer = setTimeout(popUp, gap * (0.7+Math.random()*0.6));
+  }
+
+  function hit(idx, x, y){
+    if(!running) return;
+    var h = holes[idx];
+    var rect = h.el.getBoundingClientRect();
+    if(x==null){ x=rect.left+rect.width/2; y=rect.top+rect.height/3; }
+    mitt(x,y);
+    if(!h.up){ sfx.miss(); combo=0; setHUD(); return; }
+    var kind = h.kind;
+    h.up=false; clearTimeout(h.timer); h.kind=null;
+    h.el.classList.remove('up'); h.el.classList.add('booped');
+    if(kind==='crit'){
+      combo++; count++;
+      var pts = 1 + (combo>=5?1:0) + (combo>=10?1:0);
+      score += pts; sfx.boop(combo);
+      floatText('+'+pts+(combo>=5?' 🔥':''), x, y, '#ff5a8a');
+    } else if(kind==='star'){
+      combo++; count++; score += 5; sfx.star();
+      floatText('+5 ⭐', x, y, '#e0a800'); burst(x,y,24);
+    } else {
+      combo=0; score=Math.max(0,score-2); sfx.shh();
+      floatText('Shhh! 💤', x, y, '#6b5bd1');
+    }
+    setHUD();
+  }
+
+  function mitt(x,y){
+    var m=$('mitt'); m.style.display='block'; m.style.left=x+'px'; m.style.top=y+'px';
+    m.classList.remove('hit'); void m.offsetWidth; m.classList.add('hit');
+    clearTimeout(mitt.t); mitt.t=setTimeout(function(){ m.style.display='none'; },260);
+  }
+
+  // confetti
+  var cv=$('confetti'), cx=cv.getContext('2d'), parts=[], animating=false;
+  function resize(){ cv.width=innerWidth; cv.height=innerHeight; }
+  addEventListener('resize', resize); resize();
+  function burst(x,y,n){
+    var cols=['#ff5a8a','#ffd23f','#43c463','#4db8ff','#a56bff','#ff9a3c'];
+    for(var i=0;i<n;i++){ var a=Math.random()*Math.PI*2, s=2+Math.random()*6;
+      parts.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-3,c:cols[i%cols.length],l:60+Math.random()*40,r:3+Math.random()*5}); }
+    if(!animating){ animating=true; requestAnimationFrame(stepC); }
+  }
+  function stepC(){
+    cx.clearRect(0,0,cv.width,cv.height);
+    parts=parts.filter(function(p){return p.l>0;});
+    parts.forEach(function(p){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.18; p.l--; cx.fillStyle=p.c; cx.globalAlpha=Math.min(1,p.l/30); cx.fillRect(p.x,p.y,p.r*1.6,p.r); });
+    cx.globalAlpha=1;
+    if(parts.length) requestAnimationFrame(stepC); else { animating=false; cx.clearRect(0,0,cv.width,cv.height); }
+  }
+  function rain(){ for(var i=0;i<6;i++) setTimeout(function(){ burst(Math.random()*innerWidth, innerHeight*0.3, 30); }, i*250); }
+
+  function start(){
+    initAudio();
+    score=0; count=0; combo=0; timeLeft=30; elapsed=0; running=true;
+    holes.forEach(function(_,i){hideHole(i); holes[i].el.classList.remove('booped');});
+    setHUD(); showSel();
+    $('startScreen').classList.add('hidden'); $('endScreen').classList.add('hidden');
+    clearInterval(clockTimer);
+    clockTimer=setInterval(function(){
+      timeLeft--; elapsed++; setHUD();
+      if(timeLeft<=5 && timeLeft>0) sfx.tick();
+      if(timeLeft<=0) finish();
+    },1000);
+    spawnTimer=setTimeout(popUp, 500);
+  }
+
+  function finish(){
+    running=false; clearInterval(clockTimer); clearTimeout(spawnTimer);
+    holes.forEach(function(_,i){hideHole(i);}); showSel();
+    var isBest = score>best;
+    if(isBest){ best=score; try{localStorage.setItem('boopBest',String(best));}catch(e){} }
+    var n = score>=40?3:score>=22?2:1;
+    var titles=['Nice booping!','Super booping!','Amazing! You\'re a critter champion!'];
+    $('endTitle').textContent = isBest && score>0 ? 'New best! 🎉' : titles[n-1];
+    $('endStars').innerHTML = [1,2,3].map(function(i){return '<span class="'+(i<=n?'':'off')+'">⭐</span>';}).join('');
+    $('endCount').textContent=count; $('endScore').textContent=score; $('endBest').textContent=best;
+    setTimeout(function(){ $('endScreen').classList.remove('hidden'); sfx.win(); rain(); }, 350);
+  }
+
+  $('startBtn').addEventListener('click', start);
+  $('againBtn').addEventListener('click', start);
+  $('mute').addEventListener('click', function(){ muted=!muted; this.textContent=muted?'🔇':'🔊'; initAudio(); });
+
+  addEventListener('keydown', function(e){
+    var k=e.key;
+    if(!running){ if(k==='Enter'||k===' '){ if(!$('startScreen').classList.contains('hidden')||!$('endScreen').classList.contains('hidden')){ e.preventDefault(); start(); } } return; }
+    var r=Math.floor(sel/3), c=sel%3, used=true;
+    if(k==='ArrowLeft') c=(c+2)%3; else if(k==='ArrowRight') c=(c+1)%3;
+    else if(k==='ArrowUp') r=(r+2)%3; else if(k==='ArrowDown') r=(r+1)%3;
+    else if(k===' '||k==='Enter'){ e.preventDefault(); usingKeys=true; hit(sel); showSel(); return; }
+    else used=false;
+    if(used){ e.preventDefault(); sel=r*3+c; usingKeys=true; showSel(); }
+  });
+  addEventListener('pointerdown', function(){ usingKeys=false; showSel(); }, true);
+  setHUD();
+})();
+</script>
+</body>
+</html>
