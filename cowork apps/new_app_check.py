@@ -3,11 +3,17 @@
 
 New apps arrive almost daily and sat unplayed until someone checked them by
 hand; of the five from 9-10 Oct, two were broken in ways a load test misses.
-This finds every app that is new or changed since the last commit (git status
-on the repo that holds this folder), skips any it already checked unchanged,
-plays the rest with smoke_new_apps.js, and:
+This plays, with smoke_new_apps.js, every app that is
+  - NEW: made in the last RECENT_DAYS days (date in the file name, or changed since),
+    in ANY folder - the routines make ~20 a day, mostly in private (gitignored)
+    folders that git status never shows; the first version only saw ~1 in 10, or
+  - WAITING: new or changed since the last commit in a public folder (git status),
+skipping any it already played unchanged (by hash), and writes:
 
-  test_reports/new-apps.json      every app waiting to be committed, with its result
+  test_reports/new-apps.json      every app still new or waiting, with its result
+  Reviews/review-<date>.md        a "Played" section under that day's code-reading
+                                  review (it can't run the apps; on 10 Oct it passed
+                                  Ricochet Arena, which hit GAME OVER on its own)
   test_reports/new-apps.log       one line per run
   the house status page           POST <url>/door/apps - titles and results only,
                                   best effort, never fails the run. The URLs live in
@@ -15,10 +21,10 @@ plays the rest with smoke_new_apps.js, and:
                                   this repo is public); no file, no report.
 
     python new_app_check.py            check what's new
-    python new_app_check.py --all-again  re-check every waiting app, changed or not
+    python new_app_check.py --all-again  re-play every new/waiting app, changed or not
 
-An app leaves the list when it's committed - i.e. once someone has looked at it.
-Apps that passed also get ONE waiting SHIP IT step, "put these on the Games Arcade"
+A public app leaves the list when it's committed - i.e. once someone has looked at
+it; a private one when it's older than RECENT_DAYS. Public waiting apps that passed also get ONE waiting SHIP IT step, "put these on the Games Arcade"
 (add_to_arcade.py; the SHIP IT list's path is in test_reports/ship-queue.txt) - tap it
 once you've played them. It goes away by itself when nothing that passed is waiting.
 Runs from the "CoworkApps-NewAppCheck" scheduled task (pythonw, no window).
@@ -34,7 +40,12 @@ REPORT_TO = os.path.join(REPORTS, "report-to.txt")
 SHIP_QUEUE = os.path.join(REPORTS, "ship-queue.txt")   # path of the SHIP IT list (your-turn.json); gitignored
 ARCADE = "https://tokkathedj.github.io/party-command-games/"
 SKIP_DIRS = ("test_reports/", "node_modules/", "review-kit/", "_retired_launchers/", "_scheduler/",
-             "test_results/", "test-results/", "test_screenshots/", "surface-setup/")
+             "test_results/", "test-results/", "test_screenshots/", "surface-setup/", "Reviews/",
+             "vr_prompts/", "__pycache__/")
+RECENT_DAYS = 3                 # covers a night or two with the desktop asleep
+BATCH = 8                       # apps per browser run; progress is saved after each
+REVIEWS = os.path.join(HERE, "Reviews")
+MARK = "<!-- played by new_app_check.py -->"
 NO_WINDOW = 0x08000000
 # the scheduled task's PATH can be thinner than a terminal's
 NODE = shutil.which("node") or r"C:\Program Files\nodejs\node.exe"
@@ -69,6 +80,66 @@ def waiting_apps():
     return sorted(set(out))
 
 
+def recent_apps():
+    """Every app made in the last RECENT_DAYS days, in any folder (private ones too)."""
+    days = {time.strftime("%Y-%m-%d", time.localtime(time.time() - i * 86400)) for i in range(RECENT_DAYS)}
+    cutoff = time.time() - RECENT_DAYS * 86400
+    out = []
+    for root, dirs, files in os.walk(HERE):
+        dirs[:] = [d for d in dirs if d not in ("node_modules", ".git", "__pycache__")]
+        for f in files:
+            if not f.lower().endswith(".html"):
+                continue
+            rel = os.path.relpath(os.path.join(root, f), HERE).replace(os.sep, "/")
+            if "/" not in rel or rel.startswith(SKIP_DIRS):
+                continue
+            if f[:10] in days or os.path.getmtime(os.path.join(root, f)) >= cutoff:
+                out.append(rel)
+    return sorted(out)
+
+
+def private(rels):
+    """The ones in gitignored folders - never published, never offered to the Arcade."""
+    folder = os.path.relpath(HERE, REPO).replace(os.sep, "/")
+    r = subprocess.run([GIT, "-C", REPO, "check-ignore", "--stdin"], input="\n".join(folder + "/" + x for x in rels),
+                       capture_output=True, text=True, encoding="utf-8", creationflags=NO_WINDOW)
+    return {ln.strip()[len(folder) + 1:] for ln in r.stdout.splitlines() if ln.strip()}
+
+
+def play(apps):
+    r = subprocess.run([NODE, os.path.join(HERE, "smoke_new_apps.js")] + apps, cwd=HERE,
+                       capture_output=True, text=True, encoding="utf-8", timeout=60 * (2 + 2 * len(apps)),
+                       creationflags=NO_WINDOW)
+    try:
+        return json.loads(r.stdout)
+    except ValueError:
+        log("checker failed (exit %s): %s" % (r.returncode, (r.stderr or r.stdout)[-300:].strip()))
+        return None
+
+
+def note_reviews(known):
+    """A "Played" section in each day's review file (Reviews/ is gitignored), replaced each run."""
+    by_day = {}
+    for k, v in known.items():
+        day = os.path.basename(k)[:10]
+        if os.path.isfile(os.path.join(REVIEWS, "review-%s.md" % day)):
+            by_day.setdefault(day, []).append((k, v))
+    for day, rows in by_day.items():
+        path = os.path.join(REVIEWS, "review-%s.md" % day)
+        text = open(path, encoding="utf-8").read()
+        text = text.split("\n\n" + MARK)[0].rstrip("\n")
+        lines = ["", "", MARK, "## Played (nightly check)", "",
+                 "Each app loaded and played on a phone and a tablet screen: idle 15 s, then Start and 5 s of play. "
+                 "Not a substitute for a person playing it; it catches what code-reading can't.", "",
+                 "| App | Played | What happened |", "|---|---|---|"]
+        for k, v in sorted(rows):
+            what = "; ".join(v["problems"][:3]).replace("|", "/") if v["problems"] else "nothing wrong seen"
+            lines.append("| %s | %s | %s |" % (os.path.basename(k), "✅ plays" if v["ok"] else "❌ broken", what[:400]))
+        lines.append("")
+        lines.append("*%s*" % time.strftime("played %Y-%m-%d %H:%M"))
+        open(path, "w", encoding="utf-8").write(text + "\n".join(lines) + "\n")
+
+
 def sha(rel):
     return hashlib.sha1(open(os.path.join(HERE, rel), "rb").read()).hexdigest()
 
@@ -84,33 +155,48 @@ def main():
     except (OSError, RuntimeError) as e:
         log(str(e))
         return 1
+    recent = recent_apps()
+    every = sorted(set(waiting) | set(recent))
+    hidden = private(every)
     redo = "--all-again" in sys.argv
-    todo = [a for a in waiting if redo or known.get(a, {}).get("sha") != sha(a)]
+    todo = [a for a in every if redo or known.get(a, {}).get("sha") != sha(a)]
 
-    if todo:
-        r = subprocess.run([NODE, os.path.join(HERE, "smoke_new_apps.js")] + todo, cwd=HERE,
-                           capture_output=True, text=True, encoding="utf-8", timeout=60 * (2 + 2 * len(todo)),
-                           creationflags=NO_WINDOW)
-        try:
-            result = json.loads(r.stdout)
-        except ValueError:
-            log("checker failed (exit %s): %s" % (r.returncode, (r.stderr or r.stdout)[-300:].strip()))
-            return 1
+    def save():
+        json.dump({"run_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "apps": known},
+                  open(STATE, "w", encoding="utf-8"), indent=1)
+
+    failed = 0
+    for i in range(0, len(todo), BATCH):
+        result = play(todo[i:i + BATCH])
+        if result is None:
+            failed += 1
+            continue
         for a in result["apps"]:
             known[a["app"]] = {"sha": sha(a["app"]), "title": a["title"], "ok": a["ok"],
                                "problems": a["problems"], "checked": result["checked_at"]}
+        save()                  # a long first run keeps what it has done
+    for k, v in known.items():
+        v["public"] = k not in hidden
+        v["waiting"] = k in waiting
 
-    # only apps still waiting to be committed stay on the list
-    known = {k: v for k, v in known.items() if k in waiting}
-    state = {"run_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "apps": known}
-    json.dump(state, open(STATE, "w", encoding="utf-8"), indent=1)
+    # only apps still new, or waiting to be committed, stay on the list
+    known = {k: v for k, v in known.items() if k in waiting or k in recent}
+    save()
+    run_at = time.strftime("%Y-%m-%dT%H:%M:%S")
     bad = [v["title"] for v in known.values() if not v["ok"]]
-    log("checked %d new/changed, %d waiting in all, %d need a look%s"
-        % (len(todo), len(known), len(bad), (": " + ", ".join(bad)) if bad else ""))
+    log("played %d new/changed (%d batch(es) failed), %d on the list, %d need a look%s"
+        % (len(todo), failed, len(known), len(bad), (": " + ", ".join(bad)) if bad else ""))
+    try:
+        note_reviews(known)
+    except OSError as e:
+        log("couldn't add to the review files: %s" % e)
 
-    report = {"run_at": state["run_at"],
-              "apps": [{"title": v["title"][:80], "app": k[:160], "ok": v["ok"],
-                        "problems": [p[:200] for p in v["problems"][:4]]} for k, v in sorted(known.items())]}
+    # to the status page: how many were played, and only the ones worth a row -
+    # broken ones, and public apps waiting to go on the Arcade
+    report = {"run_at": run_at, "played": len(known), "days": RECENT_DAYS,
+              "apps": [{"title": v["title"][:80], "ok": v["ok"], "waiting": v["waiting"],
+                        "problems": [p[:200] for p in v["problems"][:4]]}
+                       for k, v in sorted(known.items()) if not v["ok"] or v["waiting"]]}
     body = json.dumps(report).encode()
     try:
         urls = [u.strip() for u in open(REPORT_TO, encoding="utf-8") if u.strip() and not u.startswith("#")]
@@ -126,8 +212,8 @@ def main():
     else:
         if urls:
             log("the status page didn't answer - not updated")
-    queue_arcade_step(known)
-    return 0
+    queue_arcade_step({k: v for k, v in known.items() if v["waiting"] and v["public"]})
+    return 1 if failed else 0
 
 
 def queue_arcade_step(known):

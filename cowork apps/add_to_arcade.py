@@ -85,7 +85,8 @@ def main():
         checked = {}
     apps = [x.replace("\\", "/").split(FOLDER + "/")[-1] for x in a.apps]
     if a.waiting:
-        apps += [k for k, v in sorted(checked.items()) if v.get("ok")]
+        # public apps waiting to be committed - not the private ones the check also plays
+        apps += [k for k, v in sorted(checked.items()) if v.get("ok") and v.get("waiting", True) and v.get("public", True)]
     apps = list(dict.fromkeys(apps))
     if not apps:
         sys.exit("nothing to add - no apps given, and nothing waiting that passed the nightly check")
