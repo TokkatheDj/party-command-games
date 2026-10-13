@@ -18,6 +18,9 @@ plays the rest with smoke_new_apps.js, and:
     python new_app_check.py --all-again  re-check every waiting app, changed or not
 
 An app leaves the list when it's committed - i.e. once someone has looked at it.
+Apps that passed also get ONE waiting SHIP IT step, "put these on the Games Arcade"
+(add_to_arcade.py; the SHIP IT list's path is in test_reports/ship-queue.txt) - tap it
+once you've played them. It goes away by itself when nothing that passed is waiting.
 Runs from the "CoworkApps-NewAppCheck" scheduled task (pythonw, no window).
 """
 import hashlib, json, os, shutil, subprocess, sys, time, urllib.request
@@ -28,6 +31,8 @@ REPORTS = os.path.join(HERE, "test_reports")
 STATE = os.path.join(REPORTS, "new-apps.json")
 LOG = os.path.join(REPORTS, "new-apps.log")
 REPORT_TO = os.path.join(REPORTS, "report-to.txt")
+SHIP_QUEUE = os.path.join(REPORTS, "ship-queue.txt")   # path of the SHIP IT list (your-turn.json); gitignored
+ARCADE = "https://tokkathedj.github.io/party-command-games/"
 SKIP_DIRS = ("test_reports/", "node_modules/", "review-kit/", "_retired_launchers/", "_scheduler/",
              "test_results/", "test-results/", "test_screenshots/", "surface-setup/")
 NO_WINDOW = 0x08000000
@@ -121,7 +126,45 @@ def main():
     else:
         if urls:
             log("the status page didn't answer - not updated")
+    queue_arcade_step(known)
     return 0
+
+
+def queue_arcade_step(known):
+    """Keep ONE waiting SHIP IT step, "put these on the Arcade", for the apps that passed -
+    a phone tap once you've played them (add_to_arcade.py does the work). Updated each
+    night; removed when nothing that passed is waiting. No ship-queue.txt, no step."""
+    try:
+        qpath = open(SHIP_QUEUE, encoding="utf-8").read().strip()
+        q = json.load(open(qpath, encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    ok = sorted((k, v) for k, v in known.items() if v.get("ok"))
+    steps = [st for st in q.get("steps", []) if not (st.get("id", "").startswith("arcade-add-") and st.get("status") == "waiting")]
+    if ok:
+        names = ", ".join(v["title"][:40] for _, v in ok)
+        steps.append({
+            "id": "arcade-add-" + time.strftime("%Y-%m-%d-%H%M"),
+            "title": "Put on the Games Arcade - only once you've played them: " + names,
+            "why": "The nightly check played these and found nothing wrong. This commits them, adds their tiles "
+                   "to the Arcade, pushes, and waits for the live site. PUBLIC.",
+            "from": "new_app_check.py",
+            "guard": {"cwd": HERE, "run": '"%s" add_to_arcade.py --waiting --dry' % sys.executable.replace("pythonw", "python"),
+                      "explain": "something waiting didn't pass the nightly check, or nothing is waiting"},
+            "commands": [{"cwd": HERE, "run": '"%s" add_to_arcade.py --waiting' % sys.executable.replace("pythonw", "python")}],
+            "verify": [{"label": "%s is on the Arcade" % v["title"][:40], "type": "http", "url": ARCADE, "status": 200,
+                        "contains": "src: '%s'" % "/".join(x.replace(" ", "%20") for x in k.split("/")), "patience": 120}
+                       for k, v in ok],
+            "status": "waiting", "done_at": None, "error": None})
+    if steps == q.get("steps", []):
+        return
+    q["steps"] = steps
+    q["updated"] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    tmp = qpath + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(q, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, qpath)
+    log("SHIP IT: %s" % ("arcade step for %d app(s)" % len(ok) if ok else "arcade step removed - nothing waiting"))
 
 
 if __name__ == "__main__":
