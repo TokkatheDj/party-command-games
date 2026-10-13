@@ -4,7 +4,7 @@
 
 <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://tokkathedj.github.io/party-command-games/" alt="QR code" />
 
-One catalog for everything — **Party games**, **Carnival**, and **Kids apps** — in a single searchable menu, **55 games** in all. Tap any card and it opens full-screen; tap **← All Games** to come back. No install, no server, no framework.
+One catalog for everything — **Party games**, **Carnival**, and **Kids apps** — in a single searchable menu, **64 games** in all. Tap any card and it opens full-screen; tap **← All Games** to come back. No install, no server, no framework.
 
 ## What's inside
 
