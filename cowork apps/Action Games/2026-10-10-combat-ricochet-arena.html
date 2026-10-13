@@ -23,6 +23,9 @@
   #go{margin-top:14px;font-size:22px;padding:12px 36px;border:0;border-radius:10px;background:#7cf9ff;color:#04202a;font-weight:700;cursor:pointer;box-shadow:0 0 16px #18c6d6}
   #again{margin-top:14px;font-size:20px;padding:10px 28px;border:0;border-radius:10px;background:#7cf9ff;color:#04202a;font-weight:700;cursor:pointer;box-shadow:0 0 16px #18c6d6}
   #again:hover{background:#fff}
+  /* phone held upright: the arena turns portrait too (see setArena), so give it the room */
+  @media (orientation:portrait) and (max-width:700px){ #top p{display:none} #top h1{font-size:17px} }
+  @media (max-height:500px){ #top p{display:none} #top h1{font-size:15px} }
 </style>
 </head>
 <body>
@@ -48,15 +51,30 @@
 </div>
 <script>
 (()=>{
-const W=960,H=600;
+// 960x600 on a wide screen; on a phone held upright the arena turns portrait, 600 wide and
+// as tall as the screen allows (960-1250), pillars rotated and spread to match - the
+// landscape arena squeezed into a portrait phone filled ~28% of the screen.
+// Chosen when a game starts, never mid-game.
+let W=960,H=600;
+const PILLARS_WIDE=[{x:210,y:160,w:70,h:70},{x:680,y:160,w:70,h:70},{x:210,y:370,w:70,h:70},{x:680,y:370,w:70,h:70},{x:445,y:265,w:70,h:70}];
+let pillars=PILLARS_WIDE;
+const dashBtn={x:0,y:0,r:42};
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
-cv.width=W;cv.height=H;
+function setArena(){
+  const tall=innerHeight>innerWidth*1.15;
+  const room=(innerHeight-document.getElementById('top').offsetHeight-14)/(innerWidth-8);
+  W=tall?600:960;H=tall?Math.round(Math.min(1250,Math.max(960,600*room))):600;
+  pillars=tall?PILLARS_WIDE.map(q=>({x:q.y,y:(q.x+35)*H/960-35,w:q.h,h:q.w})):PILLARS_WIDE;
+  dashBtn.x=W-80;dashBtn.y=H-190;
+  if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
+  fit();
+}
 function fit(){
   const hh=document.getElementById('top').offsetHeight+6;
   const s=Math.max(.2,Math.min((innerWidth-8)/W,(innerHeight-hh-8)/H));
   cv.style.width=W*s+'px';cv.style.height=H*s+'px';
 }
-addEventListener('resize',fit);fit();
+addEventListener('resize',()=>{ if(G.state==='ready'||G.state==='over') setArena(); else fit(); });
 
 /* ---------- audio ---------- */
 let AC=null;
@@ -103,7 +121,6 @@ cv.addEventListener('mousemove',e=>{const p=toCv(e.clientX,e.clientY);mouse.x=p.
 cv.addEventListener('mousedown',e=>{initAudio();mouse.down=true;mouse.used=true;const p=toCv(e.clientX,e.clientY);mouse.x=p.x;mouse.y=p.y;});
 addEventListener('mouseup',()=>{mouse.down=false;});
 cv.addEventListener('contextmenu',e=>e.preventDefault());
-const dashBtn={x:W-80,y:H-190,r:42};
 function tstart(e){
   e.preventDefault();initAudio();isTouch=true;
   for(const t of e.changedTouches){
@@ -135,7 +152,6 @@ window.addEventListener('blur',()=>{if(G.state==='play')togglePause();});
 /* ---------- helpers ---------- */
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const rnd=(a,b)=>a+Math.random()*(b-a);
-const pillars=[{x:210,y:160,w:70,h:70},{x:680,y:160,w:70,h:70},{x:210,y:370,w:70,h:70},{x:680,y:370,w:70,h:70},{x:445,y:265,w:70,h:70}];
 function pushOut(o,r){
   for(const p of pillars){
     const cx=clamp(o.x,p.x,p.x+p.w),cy=clamp(o.y,p.y,p.y+p.h);
@@ -158,7 +174,7 @@ function reset(){
   slowT=0;triT=0;shieldT=0;dashId=0;
 }
 function start(){
-  reset();G.state='play';document.getElementById('over').style.display='none';document.getElementById('ready').style.display='none';initAudio();
+  setArena();reset();G.state='play';document.getElementById('over').style.display='none';document.getElementById('ready').style.display='none';initAudio();
 }
 function togglePause(){G.state=G.state==='pause'?'play':'pause';}
 document.getElementById('again').addEventListener('click',e=>{e.stopPropagation();start();});
@@ -555,7 +571,7 @@ function drawHUD(){
 cv.addEventListener('click',()=>{if(G.state==='pause')togglePause();});
 
 /* ---------- main loop ---------- */
-reset();
+setArena();reset();
 let last=performance.now();
 function frame(now){
   const dt=Math.min(.033,(now-last)/1000);last=now;
