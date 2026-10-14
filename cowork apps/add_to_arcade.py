@@ -86,7 +86,9 @@ def main():
     apps = [x.replace("\\", "/").split(FOLDER + "/")[-1] for x in a.apps]
     if a.waiting:
         # public apps waiting to be committed - not the private ones the check also plays
-        apps += [k for k, v in sorted(checked.items()) if v.get("ok") and v.get("waiting", True) and v.get("public", True)]
+        # (and not ones failing the accessibility scan - the Arcade is kept clean)
+        apps += [k for k, v in sorted(checked.items())
+                 if v.get("ok") and not v.get("a11y") and v.get("waiting", True) and v.get("public", True)]
     apps = list(dict.fromkeys(apps))
     if not apps:
         sys.exit("nothing to add - no apps given, and nothing waiting that passed the nightly check")
@@ -107,6 +109,9 @@ def main():
         if (changed or not tracked) and not (rel in checked and checked[rel].get("ok")):
             why = "the nightly check found problems" if rel in checked else "the nightly check hasn't played it yet"
             sys.exit("%s: %s - run python new_app_check.py first, or fix it" % (rel, why))
+        if rel in checked and checked[rel].get("a11y"):
+            sys.exit("%s: fails the accessibility scan the Arcade is held to (%s) - fix it, then let the "
+                     "nightly check play it again" % (rel, "; ".join(checked[rel]["a11y"][:2])))
         src = "/".join(p.replace(" ", "%20") for p in rel.split("/"))
         sec = a.section or SECTION_OF.get(rel.split("/")[0])
         if not sec:

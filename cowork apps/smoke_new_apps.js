@@ -15,7 +15,8 @@
  *   4. flags "null" / "undefined" / "NaN" left showing as text.
  *
  *   node smoke_new_apps.js kids_apps/2026-10-11-foo.html party_apps/bar.html
- * Prints one JSON object: { checked_at, apps: [{ app, title, ok, problems: [...] }] }.
+ * Prints one JSON object: { checked_at, apps: [{ app, title, ok, problems: [...], a11y: [...] }] }
+ * - ok is "does it play"; a11y lists serious accessibility issues (axe-core) on its own.
  * Run nightly by new_app_check.py, which picks the apps (new or changed since the
  * last commit) and reports the result.
  */
@@ -40,6 +41,30 @@ const JUNK = /(^|[\s:(=])(null|undefined|NaN)(?=[\s.,!?)]|$)/;
 // speech voices (speechSynthesis errors) and no microphone, so a recording is empty and
 // playing its blob: URL fails with ERR_REQUEST_RANGE_NOT_SATISFIABLE. Real devices have both.
 const IGNORE = /SpeechSynthesisErrorEvent|Speech synthesis error|ERR_REQUEST_RANGE_NOT_SATISFIABLE|failed request: blob:/;
+// The accessibility scan the weekly health check runs on the Games Arcade (axe-core, serious
+// and critical only, the page as it opens on a tablet). 13 Oct: three new apps reached the
+// Arcade failing colour contrast; the health check only saw it once they were live. Reported
+// apart from "does it play" - new_app_check.py decides what it blocks.
+const AXE = "D:/Documents/Claude Local/canopy-hr/node_modules/axe-core/axe.min.js";
+const axeSrc = fs.existsSync(AXE) ? fs.readFileSync(AXE, "utf8") : null;
+
+async function a11yScan(browser, rel) {
+  if (!axeSrc) return ["not checked: axe-core missing at " + AXE];
+  const ctx = await browser.newContext({ viewport: { width: 1024, height: 1366 }, hasTouch: true });
+  const page = await ctx.newPage();
+  try {
+    await page.goto(`http://127.0.0.1:${PORT}/${rel.split("/").map(encodeURIComponent).join("/")}`, { waitUntil: "load", timeout: 15000 });
+    await page.waitForTimeout(1500);
+    await page.addScriptTag({ content: axeSrc });
+    return await page.evaluate(async () => (await axe.run(document, { resultTypes: ["violations"] })).violations
+      .filter(v => v.impact === "serious" || v.impact === "critical")
+      .map(v => `${v.id} x${v.nodes.length} (e.g. ${v.nodes[0].target.join(" ")})`));
+  } catch (e) {
+    return ["not checked: " + e.message.split("\n")[0]];
+  } finally {
+    await ctx.close();
+  }
+}
 
 function serve() {
   return new Promise((resolve) => {
@@ -126,7 +151,7 @@ async function checkOne(browser, rel, vp) {
       const r = await checkOne(browser, rel, vp);
       title = r.title; problems.push(...r.problems);
     }
-    out.apps.push({ app: rel, title, ok: problems.length === 0, problems });
+    out.apps.push({ app: rel, title, ok: problems.length === 0, problems, a11y: await a11yScan(browser, rel) });
   }
   await browser.close(); server.close();
   process.stdout.write(JSON.stringify(out, null, 1) + "\n");
