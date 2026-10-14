@@ -36,6 +36,10 @@ const OVER = /\b(game over|you lose|you lost|you died|time'?s up|out of lives|no
 const START = /^\W*(start|play|let'?s|begin|go\b|tap to (start|play)|new game|ready)/i;
 const SKIP = /sound|mute|music|volume|settings|help|how to|rules|about|back|quit|menu|reset/i;
 const JUNK = /(^|[\s:(=])(null|undefined|NaN)(?=[\s.,!?)]|$)/;
+// Errors that come from the TEST browser, not the app (13 Oct 2026): headless Chromium has no
+// speech voices (speechSynthesis errors) and no microphone, so a recording is empty and
+// playing its blob: URL fails with ERR_REQUEST_RANGE_NOT_SATISFIABLE. Real devices have both.
+const IGNORE = /SpeechSynthesisErrorEvent|Speech synthesis error|ERR_REQUEST_RANGE_NOT_SATISFIABLE|failed request: blob:/;
 
 function serve() {
   return new Promise((resolve) => {
@@ -55,9 +59,9 @@ async function checkOne(browser, rel, vp) {
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.isMobile, hasTouch: vp.hasTouch });
   const page = await ctx.newPage();
   const errors = [];
-  page.on("console", m => { if (m.type() === "error") errors.push(m.text()); });
-  page.on("pageerror", e => errors.push("uncaught: " + e.message));
-  page.on("requestfailed", r => { if (!r.url().startsWith("data:")) errors.push("failed request: " + r.url()); });
+  page.on("console", m => { if (m.type() === "error" && !IGNORE.test(m.text())) errors.push(m.text()); });
+  page.on("pageerror", e => { if (!IGNORE.test(e.message)) errors.push("uncaught: " + e.message); });
+  page.on("requestfailed", r => { if (!r.url().startsWith("data:") && !r.url().startsWith("blob:")) errors.push("failed request: " + r.url()); });
   const add = (what) => problems.push(`${vp.name}: ${what}`);
   const text = () => page.evaluate(() => document.body ? document.body.innerText : "").catch(() => "");
   let title = rel;

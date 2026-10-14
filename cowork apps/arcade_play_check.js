@@ -29,6 +29,10 @@ const OVER = /\b(game over|you lose|you lost|you died|time'?s up|out of lives|no
 const START = /^\W*(start|play|let'?s|begin|go\b|tap to (start|play)|new (game|word|item)|ready|spin|roll|deal|flip|shuffle|pick|next|truth)/i;
 const SKIP = /sound|mute|music|volume|settings|help|how to|rules|about|back|quit|menu|reset|all games/i;
 const JUNK = /(^|[\s:(=])(null|undefined|NaN)(?=[\s.,!?)]|$)/;
+// Errors that come from the TEST browser, not the app (13 Oct 2026): headless Chromium has no
+// speech voices (speechSynthesis errors) and no microphone, so a recording is empty and
+// playing its blob: URL fails with ERR_REQUEST_RANGE_NOT_SATISFIABLE. Real devices have both.
+const IGNORE = /SpeechSynthesisErrorEvent|Speech synthesis error|ERR_REQUEST_RANGE_NOT_SATISFIABLE|failed request: blob:/;
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".png": "image/png",
   ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".json": "application/json", ".mp3": "audio/mpeg", ".wav": "audio/wav" };
 
@@ -94,9 +98,9 @@ async function playTile(p, vp, id, errs) {
     const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.mobile, hasTouch: true });
     const p = await ctx.newPage();
     const errs = [];
-    p.on("pageerror", e => errs.push("uncaught: " + e.message.split("\n")[0].slice(0, 160)));
-    p.on("console", m => { if (m.type() === "error") errs.push(m.text().split("\n")[0].slice(0, 160)); });
-    p.on("requestfailed", r => { if (!r.url().startsWith("data:")) errs.push("failed request: " + r.url().slice(-80)); });
+    p.on("pageerror", e => { const t = "uncaught: " + e.message.split("\n")[0].slice(0, 160); if (!IGNORE.test(t)) errs.push(t); });
+    p.on("console", m => { if (m.type() === "error" && !IGNORE.test(m.text())) errs.push(m.text().split("\n")[0].slice(0, 160)); });
+    p.on("requestfailed", r => { if (!r.url().startsWith("data:") && !r.url().startsWith("blob:")) errs.push("failed request: " + r.url().slice(-80)); });
     await p.goto(`http://127.0.0.1:${PORT}/index.html`); await p.waitForTimeout(800);
     const list = await p.evaluate(() => Object.keys(REGISTRY).filter(i => !/^https?:/.test(REGISTRY[i].src || ""))
       .map(i => ({ id: i, name: REGISTRY[i].name })));
