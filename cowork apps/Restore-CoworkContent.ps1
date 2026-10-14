@@ -60,6 +60,20 @@ $remap = [ordered]@{
   'dj_music_apps/Reviews/'                 = 'Reviews/'
   'dj_music_apps/Music/'                   = 'music_apps/'
   'dj_music_apps/DJ/'                      = 'dj_music_apps/'
+  # Second pollution wave, 9-11 Sep 2026: the generators wrote into
+  # dj_music_apps\<SLUG or new display name>\ rather than the old display names
+  # above. Left unmapped, these 21 files would recreate the mess on this machine
+  # and trip the 07:00 CoworkApps-PollutionCheck email.
+  'dj_music_apps/Content Creation Apps/'   = 'Content Creation Apps/'
+  'dj_music_apps/Health Productivity/'     = 'health_productivity_apps/'
+  'dj_music_apps/table_games_apps/'        = 'table_games_apps/'
+  'dj_music_apps/classroom_tools/'         = 'classroom_tools/'
+  'dj_music_apps/card_games_apps/'         = 'card_games_apps/'
+  'dj_music_apps/Therapy Apps/'            = 'therapy_apps/'
+  'dj_music_apps/Fashion Apps/'            = 'fashion_apps/'
+  'dj_music_apps/kid_apps/'                = 'kids_apps/'
+  # Surface-only nesting; 5 of its 7 files already sit in Shooting Games\ here.
+  'Shooting Games/shooting_games_apps/'    = 'Shooting Games/'
 }
 $remapKeys = $remap.Keys | Sort-Object { $_.Length } -Descending
 
@@ -123,6 +137,9 @@ Get-ChildItem -LiteralPath $stage -Recurse -File | ForEach-Object {
   $isApp   = ($ext -eq '.html')
   $isRev   = ($ext -eq '.md' -and $relNorm -match '(^|/)Reviews/')
   if (-not ($isApp -or $isRev)) { $skippedInfra++; return }   # skip infra/config/scripts/etc.
+  # Any folder starting with _ or . is never shown by serve_apps.py (quarantines,
+  # _scheduler\dashboard, .tmp-* screenshot sheets), so copying it is clutter.
+  if (($relNorm.Split('/') | Select-Object -SkipLast 1) | Where-Object { $_ -match '^[_.]' }) { $skippedInfra++; return }
   $relDest = Remap-Path $relNorm
   if ($relDest -ne $relNorm) { $remapped++ }
   $dest = Join-Path $Root ($relDest.Replace('/', $SEP))
