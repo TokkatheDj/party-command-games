@@ -132,7 +132,10 @@ def main():
             _, end = section_block(s, p["section"])
             s = s[:end] + line + s[end:]
         hubs[h] = s
-    total = len(re.findall(r"\{ id: '", re.search(r"const SECTIONS = \[(.*?)\n\];", hubs[HUBS[0]], re.S).group(1)))
+    registry = re.search(r"const SECTIONS = \[(.*?)\n\];", hubs[HUBS[0]], re.S).group(1)
+    total = len(re.findall(r"\{ id: '", registry))
+    # the README counts each section too, and the weekly health check compares them (13 Oct)
+    per = {k: len(re.findall(r"\{ id: '%s" % k, registry)) for k in ("party-", "kids-")}
 
     for p in plan:
         print("%-55s %s %-20s %s%s" % (p["rel"], p["emoji"], p["name"], p["section"], "  (already listed)" if p["already"] else ""))
@@ -143,13 +146,17 @@ def main():
     for h, s in hubs.items():
         open(h, "w", encoding="utf-8", newline="").write(s)
     counted = []
-    for path, pat, fmt in ((README, r"\*\*\d+ games\*\*", "**%d games**"), (PROFILE, r"^\d+ party, carnival", "%d party, carnival")):
+    for path, pat, fmt, n in ((README, r"\*\*\d+ games\*\*", "**%d games**", total),
+                              (README, r"Party Games \(\d+\)", "Party Games (%d)", per["party-"]),
+                              (README, r"Kids Games \(\d+\)", "Kids Games (%d)", per["kids-"]),
+                              (PROFILE, r"^\d+ party, carnival", "%d party, carnival", total)):
         if os.path.isfile(path):
             t = open(path, encoding="utf-8", newline="").read()
-            t2 = re.sub(pat, fmt % total, t, count=1, flags=re.M)
+            t2 = re.sub(pat, fmt % n, t, count=1, flags=re.M)
             if t2 != t:
                 open(path, "w", encoding="utf-8", newline="").write(t2)
-                counted.append(path)
+                if path not in counted:
+                    counted.append(path)
 
     git("add", "--", *[os.path.join(FOLDER, p["rel"]) for p in plan], *HUBS, *[c for c in counted if c == README])
     committed = subprocess.run(GIT + ["diff", "--cached", "--quiet"]).returncode != 0   # something staged

@@ -8,9 +8,9 @@ One catalog for everything — **Party games**, **Carnival**, and **Kids apps** 
 
 ## What's inside
 
-- **🎉 Party Games (19)** — Floor is Lava, Simon Says, Red/Green Light, Hot Potato, Musical Chairs, Freeze Dance, Would You Rather, Dice & Coins, Memory Match, Quick Match, Charades, Truth or Dare, Never Have I Ever, Scavenger Hunt, Voice Box, Spin the Wheel, Team Picker, Shell Game, Follow the Pattern
+- **🎉 Party Games (23)** — Floor is Lava, Simon Says, Red/Green Light, Hot Potato, Musical Chairs, Freeze Dance, Would You Rather, Dice & Coins, Memory Match, Quick Match, Charades, Truth or Dare, Never Have I Ever, Scavenger Hunt, Voice Box, Spin the Wheel, Team Picker, Shell Game, Follow the Pattern, Backronym Bash, Boss Says: Chaos, Telephone Doodle, Mingle Bingo
 - **🎠 Carnival (8)** — each carnival game as its own card (Basketball Hoops, Spin Reels, Guess the Number, Ring Toss, Critter Boop, Prize Wheel, Duck Gallery), plus **Carnival Midway** for the full hub
-- **🧒 Kids Games (28)** — drawing & colors, guided math worksheets (plus focused **Elementary Math**, **6th Grade Math**, **Algebra**, and green **Personal Finance** editions), math vocabulary (flashcards, matching & a printable word wall), hidden objects, song maker, a bouncing-frog metronome, memory games, monster makers, and lots more
+- **🧒 Kids Games (33)** — drawing & colors, guided math worksheets (plus focused **Elementary Math**, **6th Grade Math**, **Algebra**, and green **Personal Finance** editions), math vocabulary (flashcards, matching & a printable word wall), hidden objects, song maker, a bouncing-frog metronome, memory games, monster makers, paint mixing, a picture puzzle, a trail-running pup, an arena shooter, and lots more
 
 ## Smart answer checking (Math Worksheets)
 
