@@ -49,6 +49,13 @@ Infrastructure files in root — never modify them:
 - `test_apps.js` + `Run-Tests.ps1` — Playwright test agent
 - `.app_data.json` — ratings/favorites store
 
+### Build outputs — do not edit
+
+- `kids_apps/2026-06-26-splashy-bubbles.html` is **generated** from the React source in
+  `D:\Documents\Claude Local\splashy-bubbles` (`node scripts/build-single.mjs`, then copy
+  `dist-single/splashy-bubbles.html` here). Edit the source and rebuild; a fix made in this
+  minified file is lost on the next build. Its first line says so too.
+
 ---
 
 ## File naming
