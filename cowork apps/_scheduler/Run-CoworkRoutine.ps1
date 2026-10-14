@@ -111,7 +111,10 @@ if (Wait-Job $job -Timeout ($TimeoutMin * 60)) {
     # reported LastTaskResult 0 and the failures stayed invisible.
     $degraded = $null
     if ($fullOut -match '(?i)Reached max turns')        { $degraded = 'max-turns' }
-    elseif ($fullOut -match "(?i)hit your session limit") { $degraded = 'session-limit' }
+    # Any usage cap: "session", "weekly", ... On 12 Oct "You've hit your weekly limit"
+    # slipped past a session-only match AND past the empty-output floor (a plugin's
+    # SessionEnd hook error padded it to 231 chars), so every run "succeeded".
+    elseif ($fullOut -match "(?i)hit your (\w+ )?limit") { $degraded = if ($Matches[1]) { "$($Matches[1].Trim())-limit" } else { 'usage-limit' } }
     elseif ($fullOut.Trim().Length -lt 200)              { $degraded = 'empty-output' }
 
     if ($degraded) {
