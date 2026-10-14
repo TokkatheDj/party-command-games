@@ -133,7 +133,8 @@ def note_reviews(known):
                  "Not a substitute for a person playing it; it catches what code-reading can't.", "",
                  "| App | Played | What happened |", "|---|---|---|"]
         for k, v in sorted(rows):
-            what = "; ".join(v["problems"][:3]).replace("|", "/") if v["problems"] else "nothing wrong seen"
+            what = "; ".join(v["problems"][:3] + ["accessibility: " + x for x in v.get("a11y", [])][:2]).replace("|", "/") \
+                or "nothing wrong seen"
             lines.append("| %s | %s | %s |" % (os.path.basename(k), "✅ plays" if v["ok"] else "❌ broken", what[:400]))
         lines.append("")
         lines.append("*%s*" % time.strftime("played %Y-%m-%d %H:%M"))
@@ -173,7 +174,7 @@ def main():
             continue
         for a in result["apps"]:
             known[a["app"]] = {"sha": sha(a["app"]), "title": a["title"], "ok": a["ok"],
-                               "problems": a["problems"], "checked": result["checked_at"]}
+                               "problems": a["problems"], "a11y": a.get("a11y", []), "checked": result["checked_at"]}
         save()                  # a long first run keeps what it has done
     for k, v in known.items():
         v["public"] = k not in hidden
@@ -192,11 +193,16 @@ def main():
         log("couldn't add to the review files: %s" % e)
 
     # to the status page: how many were played, and only the ones worth a row -
-    # broken ones, and public apps waiting to go on the Arcade
+    # broken ones, and public apps waiting to go on the Arcade. A waiting public app that
+    # fails the accessibility scan counts as needing a look (the Arcade is kept clean);
+    # private apps' accessibility only goes in the review files.
+    def ready(v):
+        return v["ok"] and not (v["waiting"] and v["public"] and v.get("a11y"))
     report = {"run_at": run_at, "played": len(known), "days": RECENT_DAYS,
-              "apps": [{"title": v["title"][:80], "ok": v["ok"], "waiting": v["waiting"],
-                        "problems": [p[:200] for p in v["problems"][:4]]}
-                       for k, v in sorted(known.items()) if not v["ok"] or v["waiting"]]}
+              "apps": [{"title": v["title"][:80], "ok": ready(v), "waiting": v["waiting"],
+                        "problems": [p[:200] for p in (v["problems"] + (["accessibility: " + x for x in v.get("a11y", [])]
+                                                                        if v["waiting"] and v["public"] else []))[:4]]}
+                       for k, v in sorted(known.items()) if not ready(v) or v["waiting"]]}
     body = json.dumps(report).encode()
     try:
         urls = [u.strip() for u in open(REPORT_TO, encoding="utf-8") if u.strip() and not u.startswith("#")]
@@ -225,7 +231,7 @@ def queue_arcade_step(known):
         q = json.load(open(qpath, encoding="utf-8"))
     except (OSError, ValueError):
         return
-    ok = sorted((k, v) for k, v in known.items() if v.get("ok"))
+    ok = sorted((k, v) for k, v in known.items() if v.get("ok") and not v.get("a11y"))
     steps = [st for st in q.get("steps", []) if not (st.get("id", "").startswith("arcade-add-") and st.get("status") == "waiting")]
     if ok:
         names = ", ".join(v["title"][:40] for _, v in ok)
