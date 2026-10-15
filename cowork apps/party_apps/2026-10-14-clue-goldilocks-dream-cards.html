@@ -1,0 +1,562 @@
+<!-- CONCEPT: AMBIGUOUS CLUE / PICTURE CARDS - "Goldilocks": a Dixit-style pass-the-phone party game played with procedurally generated emoji dream-cards; each round the Storyteller secretly picks a card from their hand of six and gives a clue (styled by an app-checked Clue Card: one word, three words, song lyric, sound effect, a question...), every other player secretly slips in the card from their own hand that best fits the clue, all cards are shuffled onto a numbered board and everyone secretly votes for the Storyteller's card - but the clue has to be JUST RIGHT: if everyone finds it (too hot) or nobody does (too cold) the Storyteller scores nothing and everyone else gets 2, otherwise the Storyteller and every correct guesser score 3 and each decoy scores 1 per vote it stole. 3-player rule (decoys slip in two cards), resumable saves, end-of-game awards | Players: 3-8 | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Goldilocks — Not Too Hot, Not Too Cold</title>
+<style>
+:root{
+  --bg:#0f0d17; --panel:#1b1826; --panel2:#262236; --line:#383150;
+  --ink:#f4f0fa; --mute:#9a92b3; --a:#ffcf5a; --b:#ff7a59; --c:#b48cff;
+  --hot:#ff5b5b; --cold:#5bb8ff; --ok:#46dc96;
+  --r:16px; --gap:clamp(10px,2.8vw,16px);
+  --font:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(120% 80% at 50% 0%,#2a1f3a 0%,var(--bg) 62%);color:var(--ink);font-family:var(--font)}
+button{font-family:inherit;cursor:pointer;border:0;color:inherit}
+input,select{font-family:inherit;user-select:text;-webkit-user-select:text}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;max-width:760px;margin:0 auto}
+.grad{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+#bar{display:none;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:rgba(15,13,23,.88)}
+#bar.on{display:flex}
+#bar .t{font-weight:900;font-size:20px;letter-spacing:.4px}
+#bar .info{flex:1;text-align:center;font-size:13px;color:var(--mute);font-weight:700}
+.iconbtn{min-width:44px;min-height:44px;border-radius:12px;background:var(--panel);font-size:18px}
+
+#main{flex:1;display:flex;flex-direction:column;gap:var(--gap);padding:clamp(14px,4vw,24px);overflow-y:auto;overflow-x:hidden}
+.center{justify-content:flex-start;align-items:center;text-align:center}
+.center::before{content:"";margin-top:auto}
+.center::after{content:"";margin-bottom:auto}
+h1{margin:0;font-size:clamp(44px,14vw,80px);font-weight:900;letter-spacing:.5px;line-height:1}
+h2{margin:0;font-size:clamp(20px,5.5vw,28px)}
+.sub{color:var(--mute);font-size:clamp(14px,3.8vw,17px);margin:0;line-height:1.4}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:clamp(12px,3.5vw,18px)}
+.lbl{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--mute);font-weight:700;margin-bottom:8px}
+.btn{min-height:52px;border-radius:14px;padding:12px 18px;font-size:clamp(16px,4.4vw,19px);font-weight:800;background:var(--panel2);border:1px solid var(--line)}
+.btn.main{background:linear-gradient(90deg,var(--a),var(--b));color:#2a1208;border:0;box-shadow:0 6px 22px rgba(255,150,80,.25)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.4}
+.row{display:flex;gap:10px}
+.row>.btn{flex:1}
+.small{font-size:13px;color:var(--mute)}
+.w100{width:100%}
+
+/* setup */
+#plist{display:flex;flex-direction:column;gap:8px}
+.prow{display:flex;gap:8px;align-items:center}
+.prow input{flex:1;min-width:0;min-height:48px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);padding:0 12px;font-size:16px}
+.prow .dot{width:14px;height:14px;border-radius:50%;flex:none}
+.prow button{min-width:44px;min-height:44px;border-radius:12px;background:var(--panel2);font-size:18px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1;min-width:64px;min-height:46px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-weight:800;font-size:15px}
+.seg button.on{background:var(--a);color:#2a1208;border-color:var(--a)}
+details.how{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 16px}
+details.how summary{cursor:pointer;font-weight:800;min-height:28px;list-style:none}
+details.how ol{margin:8px 0 0;padding-left:20px;line-height:1.5;color:#d8d2e6;font-size:15px}
+.bowls{display:flex;gap:10px;justify-content:center;font-size:13px;color:var(--mute);flex-wrap:wrap}
+.bowls span{display:flex;align-items:center;gap:4px}
+
+/* dream cards */
+.card{position:relative;aspect-ratio:3/4;border-radius:14px;overflow:hidden;container-type:inline-size;
+  border:2px solid rgba(255,255,255,.14);box-shadow:0 6px 18px rgba(0,0,0,.4);background:#222}
+.card .orb{position:absolute;inset:0}
+.card .tex{position:absolute;inset:0;opacity:.35}
+.card .e{position:absolute;line-height:1;transform:translate(-50%,-50%) rotate(var(--r));font-size:calc(var(--s) * 1cqw);
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))}
+.card .badge{position:absolute;left:6px;top:6px;min-width:30px;height:30px;padding:0 6px;border-radius:15px;background:rgba(10,8,16,.82);
+  font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.25);z-index:2}
+.card .tag{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;background:rgba(10,8,16,.8);font-size:12px;font-weight:800;text-align:center;z-index:2;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick{cursor:pointer;transition:transform .12s, box-shadow .12s, border-color .12s}
+.pick.sel{border-color:var(--a);box-shadow:0 0 0 3px var(--a),0 8px 24px rgba(255,207,90,.35);transform:translateY(-3px)}
+.pick.off{opacity:.35;cursor:not-allowed}
+.card .check{position:absolute;right:6px;top:6px;width:30px;height:30px;border-radius:50%;background:var(--a);color:#2a1208;font-weight:900;
+  display:none;align-items:center;justify-content:center;z-index:2;font-size:17px}
+.pick.sel .check{display:flex}
+.hand{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(8px,2.4vw,14px)}
+.board{display:grid;gap:clamp(8px,2.4vw,14px)}
+.board.c2{grid-template-columns:repeat(2,1fr)}
+.board.c3{grid-template-columns:repeat(3,1fr)}
+@media (min-width:620px){ .board.c3{grid-template-columns:repeat(4,1fr)} .hand{grid-template-columns:repeat(6,1fr)} }
+
+/* clue */
+.cluebox{background:linear-gradient(135deg,#3a2a12,#2a1a2e);border:1px solid #6b5326;border-radius:var(--r);padding:12px 16px;text-align:center}
+.cluebox .q{font-size:clamp(22px,6.5vw,34px);font-weight:900;line-height:1.15;word-break:break-word}
+.cluebox .by{font-size:13px;color:#e8cf94;margin-top:4px}
+.style{display:flex;gap:10px;align-items:center;background:var(--panel2);border:1px dashed var(--c);border-radius:14px;padding:10px 12px}
+.style .ico{font-size:28px}
+.style .n{font-weight:900;color:var(--c)}
+.style .d{font-size:13px;color:var(--mute)}
+.style button{margin-left:auto;min-height:44px;min-width:44px;border-radius:10px;background:var(--panel);font-size:13px;font-weight:800;padding:0 10px;border:1px solid var(--line)}
+#clue{width:100%;min-height:52px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);padding:0 14px;font-size:18px}
+.warn{color:var(--hot);font-size:13px;min-height:18px;font-weight:700}
+
+/* pass screen */
+.passname{font-size:clamp(34px,11vw,60px);font-weight:900;line-height:1.05;word-break:break-word}
+.role{display:inline-block;padding:6px 14px;border-radius:20px;font-weight:900;letter-spacing:1px;text-transform:uppercase;font-size:13px}
+.role.tell{background:var(--a);color:#2a1208}
+.role.decoy{background:var(--c);color:#170b2a}
+.role.vote{background:var(--cold);color:#081a2a}
+.shh{font-size:64px}
+
+/* reveal */
+.verdict{border-radius:var(--r);padding:14px 16px;text-align:center}
+.verdict .big{font-size:clamp(26px,8vw,40px);font-weight:900}
+.verdict.hot{background:linear-gradient(135deg,#4a1414,#2a0f1a);border:1px solid var(--hot)}
+.verdict.cold{background:linear-gradient(135deg,#0f2a44,#101a2e);border:1px solid var(--cold)}
+.verdict.right{background:linear-gradient(135deg,#3f3210,#2a1f10);border:1px solid var(--a)}
+.rv{display:flex;flex-direction:column;gap:6px}
+.rv .card{transition:transform .35s, opacity .35s}
+.rv.hide .card{opacity:0;transform:scale(.8)}
+.rv.teller .card{border-color:var(--a);box-shadow:0 0 0 3px var(--a),0 0 26px rgba(255,207,90,.55)}
+.chips{display:flex;flex-wrap:wrap;gap:4px;min-height:22px}
+.chip{font-size:11px;font-weight:800;padding:3px 7px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.deltas{display:flex;flex-direction:column;gap:6px}
+.drow{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;background:var(--panel)}
+.drow .nm{flex:1;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drow .why{font-size:12px;color:var(--mute)}
+.drow .pts{font-weight:900;font-size:20px;color:var(--ok);min-width:40px;text-align:right}
+.drow .pts.z{color:var(--mute)}
+
+/* scores */
+.sb{display:flex;flex-direction:column;gap:8px}
+.sbrow{position:relative;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--panel);overflow:hidden}
+.sbrow .fill{position:absolute;left:0;top:0;bottom:0;opacity:.22;border-radius:12px;transition:width .6s}
+.sbrow .nm{position:relative;flex:1;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sbrow .sc{position:relative;font-weight:900;font-size:22px}
+.sbrow .rk{position:relative;width:26px;text-align:center;font-weight:900;color:var(--mute)}
+.podium{font-size:clamp(56px,18vw,96px);line-height:1}
+.awards{display:grid;grid-template-columns:1fr;gap:8px}
+@media (min-width:520px){ .awards{grid-template-columns:1fr 1fr} }
+.award{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;text-align:left}
+.award .h{font-weight:900;color:var(--a)}
+.award .p{font-size:13px;color:var(--mute)}
+
+#modal{position:fixed;inset:0;background:rgba(5,4,10,.75);display:none;align-items:center;justify-content:center;padding:20px;z-index:20}
+#modal.on{display:flex}
+#modal .box{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:18px;max-width:380px;width:100%;display:flex;flex-direction:column;gap:12px;text-align:center}
+@keyframes pop{0%{transform:scale(.7);opacity:0}100%{transform:scale(1);opacity:1}}
+.popin{animation:pop .35s ease-out both}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <span class="t grad">Goldilocks</span>
+    <span class="info" id="info"></span>
+    <button class="iconbtn" id="menuBtn" aria-label="Menu">☰</button>
+  </div>
+  <div id="main"></div>
+</div>
+<div id="modal"><div class="box" id="mbox"></div></div>
+<script>
+const KEY='cowork-goldilocks-save', NKEY='cowork-goldilocks-names', MKEY='cowork-goldilocks-mute';
+const HAND=6, COLORS=['#ffcf5a','#ff7a59','#b48cff','#5bb8ff','#46dc96','#ff6fb5','#f2f27a','#7af2e4'];
+const EMOJI=[...'🐙🦉🐋🦊🐢🦋🐌🦄🐉🦩🐝🐸🦔🐺🦁🐧🦜🐇🐈🦇🕷🐠🦀🐳🦒🐘🦥🦚🐿🐞'+
+ '🌙🌞⭐🌈⛅🌧⚡❄🌪🔥🌊🌋🏔🌵🌴🍄🌻🌹🍂🌾🪐☄🌍🌱🪨🐚🌷🍁🌕💧'+
+ '🏰🗼🎡🏝⛺🏚🗿⛩🌉🏛🚂⛵🚀🎈🛸🚲🛶🗝🚪🪞🕯💡🔮🧭⏳⌛🕰📜🗺🎁'+
+ '🎻🎺🥁🎭🎨🎪🃏🎲♟🧩🪁🎯🧸🪆🎠🎩👑💍💎🪄🧪🔭📚✉🔑🪜⚓🛟🧲🪤'+
+ '🍎🍋🍯🧁🍰🍩🥐🧀🍵☕🍷🥚🍉🍒🫖🍪🥨🍓🌶🧂'+
+ '👁👣💤💭💔❤🫧🎵🔔⚖♾🌀🔒🕸🪶🦴🧶🧵🪡⛓🕳🏹🛡⚔'].filter(ch=>/\p{Extended_Pictographic}/u.test(ch)).map(ch=>ch+'️');
+const GRADS=[
+ 'linear-gradient(160deg,#2b1055,#7597de)','linear-gradient(160deg,#0f2027,#2c5364)','linear-gradient(160deg,#42275a,#734b6d)',
+ 'linear-gradient(160deg,#141e30,#35577d)','linear-gradient(160deg,#3a1c71,#d76d77 70%,#ffaf7b)','linear-gradient(160deg,#16222a,#3a6073)',
+ 'linear-gradient(160deg,#1f1c2c,#928dab)','linear-gradient(160deg,#0b486b,#f56217)','linear-gradient(160deg,#134e5e,#71b280)',
+ 'linear-gradient(160deg,#4b134f,#c94b4b)','linear-gradient(160deg,#232526,#5f6f52)','linear-gradient(160deg,#360033,#0b8793)',
+ 'linear-gradient(160deg,#2c3e50,#fd746c)','linear-gradient(160deg,#1a2a6c,#b21f1f 60%,#fdbb2d)','linear-gradient(160deg,#0f0c29,#302b63 55%,#24243e)',
+ 'linear-gradient(160deg,#3e5151,#decba4)'];
+const TEX=['none',
+ 'radial-gradient(rgba(255,255,255,.5) 1px,transparent 1.5px) 0 0/14px 14px',
+ 'repeating-linear-gradient(45deg,rgba(255,255,255,.18) 0 2px,transparent 2px 12px)',
+ 'radial-gradient(circle at 20% 30%,rgba(255,255,255,.7) 1px,transparent 2px),radial-gradient(circle at 70% 15%,rgba(255,255,255,.6) 1px,transparent 2px),radial-gradient(circle at 85% 60%,rgba(255,255,255,.7) 1px,transparent 2px),radial-gradient(circle at 35% 80%,rgba(255,255,255,.5) 1px,transparent 2px),radial-gradient(circle at 55% 45%,rgba(255,255,255,.6) 1px,transparent 2px)',
+ 'repeating-radial-gradient(circle at 50% 110%,rgba(255,255,255,.14) 0 3px,transparent 3px 18px)'];
+// [x%, y%, size (cqw), rotate deg] for the 3 emoji
+const LAYOUTS=[
+ [[50,58,46,0],[24,22,24,-12],[77,24,22,10]],
+ [[36,66,50,-6],[72,28,26,8],[80,74,18,-10]],
+ [[24,22,28,-10],[50,52,34,4],[76,80,28,12]],
+ [[50,36,50,0],[27,79,24,-8],[73,80,24,8]],
+ [[50,20,26,6],[50,51,32,-4],[50,82,26,8]],
+ [[64,50,52,4],[22,28,22,-12],[24,74,26,10]],
+ [[30,40,38,-8],[72,62,38,8],[50,86,18,0]]];
+const STYLES=[
+ {i:'🥣',n:'Anything goes',d:'Any word, phrase, sound or sentence.'},
+ {i:'1️⃣',n:'One word',d:'Exactly one word. Make it count.',chk:c=>words(c)===1||'Exactly ONE word, please.'},
+ {i:'3️⃣',n:'Three words',d:'Exactly three words, no more, no less.',chk:c=>words(c)===3||'Exactly THREE words, please.'},
+ {i:'🎤',n:'Song lyric',d:'Sing or quote a line from a song.'},
+ {i:'🎬',n:'Title',d:'Name a film, TV show or book.'},
+ {i:'🔊',n:'Sound effect',d:'Make a noise out loud, then type how it sounds.'},
+ {i:'💞',n:'A feeling',d:'An emotion, mood or vibe.'},
+ {i:'📜',n:'Old saying',d:'A proverb or saying, twisted if you like.'},
+ {i:'❓',n:'A question',d:'Your clue must be a question.',chk:c=>/\?\s*$/.test(c)||'End your clue with a question mark.'},
+ {i:'🥠',n:'Fortune cookie',d:'Write it like a prophecy: "You will..."'},
+ {i:'📍',n:'A place',d:'Somewhere real or imaginary.'},
+ {i:'🕰',n:'A memory',d:'"That time when..." Something the room might share.'},
+ {i:'🔤',n:'Same letter',d:'Every word starts with the same letter.',chk:c=>{const w=c.toLowerCase().match(/[a-z0-9']+/g)||[];return (w.length>1&&w.every(x=>x[0]===w[0][0]))||'Use 2+ words that all start with the same letter.'}},
+ {i:'🤫',n:'Whisper it',d:'Whisper your clue. The room leans in.'}];
+const words=c=>(c.trim().match(/\S+/g)||[]).length;
+const $=s=>document.querySelector(s);
+const main=$('#main');
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const rnd=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+
+let S=null, setup=null, muted=localStorage.getItem(MKEY)==='1', actx=null;
+
+function beep(f=660,d=.12,type='sine',vol=.08,delay=0){
+  if(muted)return;
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    const t=actx.currentTime+delay, o=actx.createOscillator(), g=actx.createGain();
+    o.type=type;o.frequency.setValueAtTime(f,t);
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+d);
+    o.connect(g).connect(actx.destination);o.start(t);o.stop(t+d+.02);
+  }catch(e){}
+}
+const chime=()=>{beep(660,.15);beep(880,.2,'sine',.07,.1)};
+const fanfare=()=>[523,659,784,1047].forEach((f,i)=>beep(f,.25,'triangle',.07,i*.11));
+const thud=()=>{beep(180,.25,'sawtooth',.05);beep(140,.3,'sawtooth',.04,.08)};
+
+/* ---------- cards ---------- */
+function newCard(){
+  for(let tries=0;tries<500;tries++){
+    const pool=new Set();while(pool.size<3)pool.add(EMOJI[rnd(EMOJI.length)]);
+    const e=[...pool], k=[...e].sort().join('');
+    if(S.used.includes(k))continue;
+    S.used.push(k);
+    return {e,k,g:rnd(GRADS.length),l:rnd(LAYOUTS.length),t:rnd(TEX.length),ox:10+rnd(80),oy:10+rnd(60)};
+  }
+  S.used=[];return newCard();
+}
+function cardHTML(c,{badge='',tag='',cls='',attr=''}={}){
+  const L=LAYOUTS[c.l];
+  return `<div class="card ${cls}" ${attr} style="background:${GRADS[c.g]}">
+    <div class="orb" style="background:radial-gradient(circle at ${c.ox}% ${c.oy}%,rgba(255,240,200,.38),transparent 38%)"></div>
+    <div class="tex" style="background:${TEX[c.t]}"></div>
+    ${c.e.map((em,i)=>`<span class="e" style="left:${L[i][0]}%;top:${L[i][1]}%;--s:${L[i][2]};--r:${L[i][3]}deg">${em}</span>`).join('')}
+    ${badge!==''?`<span class="badge">${badge}</span>`:''}
+    <span class="check">✓</span>
+    ${tag?`<span class="tag">${tag}</span>`:''}
+  </div>`;
+}
+
+/* ---------- persistence ---------- */
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const loadSave=()=>{try{const s=JSON.parse(localStorage.getItem(KEY));return s&&s.players&&s.phase&&s.phase!=='final'?s:null}catch(e){return null}};
+function bar(){
+  const on=S&&S.phase!=='setup';
+  $('#bar').classList.toggle('on',!!on);
+  if(on)$('#info').textContent=S.phase==='final'?'Game over':`Round ${S.round} · first to ${S.target}`;
+}
+const P=i=>S.players[i];
+const pname=i=>esc(P(i).name);
+const pdot=i=>`<span class="dot" style="background:${COLORS[i%COLORS.length]};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px"></span>`;
+const decoyN=()=>S.players.length===3?2:1;
+// everyone but the Storyteller, in seat order starting with the player after them
+const others=()=>S.players.map((_,k)=>(S.teller+1+k)%S.players.length).filter(i=>i!==S.teller);
+
+/* ---------- setup ---------- */
+function showSetup(){
+  S=null;bar();
+  if(!setup){
+    let names=[];try{names=JSON.parse(localStorage.getItem(NKEY))||[]}catch(e){}
+    if(names.length<3)names=['Player 1','Player 2','Player 3','Player 4'];
+    setup={names,target:25,styles:true};
+  }
+  const res=loadSave();
+  main.className='';main.id='main';
+  main.innerHTML=`
+    <div style="text-align:center;padding-top:6px">
+      <h1 class="grad">Goldilocks</h1>
+      <p class="sub" style="margin-top:8px">Give a clue that's <b>not too hot</b>, <b>not too cold</b>, but <b>just right</b>.</p>
+      <div class="bowls" style="margin-top:8px"><span>🔥 everyone gets it = 0</span><span>🥣 some get it = 3</span><span>🧊 nobody gets it = 0</span></div>
+    </div>
+    ${res?`<button class="btn main" id="resume">▶ Resume game (round ${res.round})</button>`:''}
+    <div class="panel">
+      <div class="lbl">Players (3-8)</div>
+      <div id="plist"></div>
+      <button class="btn ghost w100" id="addP" style="margin-top:8px">＋ Add player</button>
+    </div>
+    <div class="panel">
+      <div class="lbl">Play to</div>
+      <div class="seg" id="tseg">${[15,20,25,30].map(t=>`<button data-t="${t}" class="${t===setup.target?'on':''}">${t} pts</button>`).join('')}</div>
+      <div class="lbl" style="margin-top:14px">Clue Cards</div>
+      <div class="seg" id="sseg"><button data-s="1" class="${setup.styles?'on':''}">On: style every clue</button><button data-s="0" class="${!setup.styles?'on':''}">Off: free clues</button></div>
+    </div>
+    <details class="how"><summary>📖 How to play</summary><ol>
+      <li>Everyone holds a secret hand of 6 dream-cards. The phone gets passed around and only the person holding it may look.</li>
+      <li>The <b>Storyteller</b> picks one of their cards and types a clue for it, following the round's Clue Card, then says the clue out loud.</li>
+      <li>Everyone else secretly slips in the card from their own hand that best fits the clue. With 3 players, slip in two.</li>
+      <li>All the cards are shuffled onto a numbered board. Then each player secretly votes for the one they think is the Storyteller's. You can't vote for your own.</li>
+      <li><b>Just right:</b> if some players (not all) find it, the Storyteller and every correct guesser score 3. <b>Too hot or too cold:</b> if everyone or no one finds it, the Storyteller scores 0 and everyone else scores 2.</li>
+      <li>Every decoy card also earns its owner 1 point per vote it steals. Storytellers take turns; first to the target wins.</li>
+    </ol></details>
+    <button class="btn main" id="start">Deal the cards</button>
+    <div class="warn" id="swarn" style="text-align:center"></div>`;
+  drawPlist();
+  $('#addP').onclick=()=>{if(setup.names.length<8){setup.names.push('Player '+(setup.names.length+1));drawPlist();
+    const ins=main.querySelectorAll('#plist input');ins[ins.length-1].focus();ins[ins.length-1].select()}};
+  main.querySelectorAll('#tseg button').forEach(b=>b.onclick=()=>{setup.target=+b.dataset.t;showSetup()});
+  main.querySelectorAll('#sseg button').forEach(b=>b.onclick=()=>{setup.styles=b.dataset.s==='1';showSetup()});
+  $('#start').onclick=startGame;
+  // resuming never lands on a secret hand: drop back to the pass-the-phone screen first
+  if(res)$('#resume').onclick=()=>{S=res;if(['tell','decoy','vote'].includes(S.phase)){S.phase='pass';S.sel=[]}render()};
+  main.scrollTop=0;
+}
+function drawPlist(){
+  const pl=$('#plist');
+  pl.innerHTML=setup.names.map((n,i)=>`<div class="prow"><span class="dot" style="background:${COLORS[i]}"></span>
+    <input maxlength="14" value="${esc(n)}" data-i="${i}" aria-label="Player ${i+1} name">
+    <button data-x="${i}" ${setup.names.length<=3?'disabled style="opacity:.3"':''} aria-label="Remove">✕</button></div>`).join('');
+  pl.querySelectorAll('input').forEach(inp=>inp.oninput=()=>{setup.names[+inp.dataset.i]=inp.value});
+  pl.querySelectorAll('button[data-x]').forEach(b=>b.onclick=()=>{if(setup.names.length>3){setup.names.splice(+b.dataset.x,1);drawPlist()}});
+  $('#addP').disabled=setup.names.length>=8;
+}
+function startGame(){
+  const names=setup.names.map((n,i)=>n.trim()||('Player '+(i+1)));
+  const low=names.map(n=>n.toLowerCase());
+  if(new Set(low).size!==low.length){$('#swarn').textContent='Two players have the same name. Make them different.';return}
+  setup.names=names;localStorage.setItem(NKEY,JSON.stringify(names));
+  S={phase:'setup',target:setup.target,styles:setup.styles,round:1,teller:rnd(names.length),used:[],
+     players:names.map(name=>({name,score:0,hand:[],st:{told:0,ok:0,hot:0,cold:0,eye:0,fooled:0}}))};
+  S.players.forEach(p=>{while(p.hand.length<HAND)p.hand.push(newCard())});
+  chime();beginRound();
+}
+function beginRound(){
+  Object.assign(S,{style:S.styles?1+rnd(STYLES.length-1):0,rerolled:false,clue:'',subs:[],votes:{},sel:[],order:[],res:null,q:[],qi:0});
+  passTo(S.teller,'tell');
+}
+function passTo(p,role){S.phase='pass';S.who=p;S.role=role;S.sel=[];save();render()}
+
+/* ---------- render router ---------- */
+function render(){
+  bar();
+  main.classList.remove('center');
+  ({pass:rPass,tell:rTell,decoy:rDecoy,board:rBoard,vote:rVote,reveal:rReveal,scores:rScores,final:rFinal}[S.phase]||showSetup)();
+  main.scrollTop=0;
+}
+
+function rPass(){
+  const roleTxt={tell:['tell','Storyteller','Pick a card and give a clue.'],decoy:['decoy','Decoy','Slip in a card that fits the clue.'],vote:['vote','Voter','Find the Storyteller\'s card.']}[S.role];
+  main.classList.add('center');
+  main.innerHTML=`<div class="shh">🤫</div>
+    <p class="sub">Pass the phone to</p>
+    <div class="passname" style="color:${COLORS[S.who%COLORS.length]}">${pname(S.who)}</div>
+    <span class="role ${roleTxt[0]}">${roleTxt[1]}</span>
+    <p class="sub">${roleTxt[2]}<br>Everyone else, eyes off the screen.</p>
+    <button class="btn main" id="go" style="min-width:240px">I'm ${pname(S.who)}, show me</button>`;
+  $('#go').onclick=()=>{S.phase=S.role;S.sel=[];save();render()};
+}
+
+function handGrid(p,max){
+  return `<div class="hand">${P(p).hand.map((c,i)=>cardHTML(c,{cls:'pick'+(S.sel.includes(i)?' sel':''),attr:`data-h="${i}"`})).join('')}</div>`;
+}
+function wireHand(max,after){
+  main.querySelectorAll('[data-h]').forEach(el=>el.onclick=()=>{
+    const i=+el.dataset.h, k=S.sel.indexOf(i);
+    if(k>=0)S.sel.splice(k,1);else{S.sel.push(i);if(S.sel.length>max)S.sel.shift()}
+    main.querySelectorAll('[data-h]').forEach(x=>x.classList.toggle('sel',S.sel.includes(+x.dataset.h)));
+    beep(520+S.sel.length*80,.06,'triangle',.05);after();
+  });
+}
+const clueBox=()=>`<div class="cluebox"><div class="lbl" style="color:#e8cf94;margin:0 0 4px">${STYLES[S.style].i} ${esc(STYLES[S.style].n)}</div><div class="q">“${esc(S.clue)}”</div><div class="by">${pname(S.teller)}'s clue</div></div>`;
+
+function rTell(){
+  const st=STYLES[S.style];
+  main.innerHTML=`<h2>${pname(S.teller)}, you're the Storyteller</h2>
+    <div class="style"><span class="ico">${st.i}</span><div><div class="n">${esc(st.n)}</div><div class="d">${esc(st.d)}</div></div>
+      ${S.styles&&!S.rerolled?'<button id="reroll">↻ Swap</button>':''}</div>
+    <div class="lbl" style="margin:0">1 · Pick your card</div>
+    ${handGrid(S.teller,1)}
+    <div class="lbl" style="margin:0">2 · Your clue</div>
+    <input id="clue" maxlength="60" placeholder="Not too obvious, not too obscure..." autocomplete="off" value="${esc(S.clue)}">
+    <div class="warn" id="cw"></div>
+    <button class="btn main" id="lock">Lock it in</button>
+    <p class="small" style="text-align:center;margin:0">Remember: if EVERYONE finds your card, or NOBODY does, you score nothing.</p>`;
+  const inp=$('#clue');
+  const upd=()=>{$('#lock').disabled=!(S.sel.length===1&&inp.value.trim())};
+  inp.oninput=()=>{S.clue=inp.value;$('#cw').textContent='';upd()};
+  wireHand(1,upd);upd();
+  if($('#reroll'))$('#reroll').onclick=()=>{let n;do{n=1+rnd(STYLES.length-1)}while(n===S.style);S.style=n;S.rerolled=true;S.clue=inp.value;save();rTell()};
+  $('#lock').onclick=()=>{
+    const c=inp.value.trim().replace(/\s+/g,' ');
+    const ok=st.chk?st.chk(c):true;
+    if(ok!==true){$('#cw').textContent=ok;thud();return}
+    S.clue=c;
+    S.subs=[{c:P(S.teller).hand[S.sel[0]],o:S.teller,h:S.sel[0]}];
+    S.q=others();S.qi=0;chime();
+    passTo(S.q[0],'decoy');
+  };
+}
+
+function rDecoy(){
+  const p=S.who, n=decoyN();
+  main.innerHTML=`${clueBox()}
+    <h2>${pname(p)}: slip in ${n===2?'two cards':'a card'}</h2>
+    <p class="sub" style="margin:0">Pick the card${n===2?'s':''} from your hand that best fit${n===2?'':'s'} the clue. Every vote your card steals is a point for you.</p>
+    ${handGrid(p,n)}
+    <button class="btn main" id="lock" disabled>Slip it in</button>`;
+  const upd=()=>{$('#lock').disabled=S.sel.length!==n;$('#lock').textContent=S.sel.length===n?'Slip it in':`Pick ${n-S.sel.length} more`};
+  wireHand(n,upd);upd();
+  $('#lock').onclick=()=>{
+    S.sel.forEach(h=>S.subs.push({c:P(p).hand[h],o:p,h}));
+    S.qi++;chime();
+    if(S.qi<S.q.length)passTo(S.q[S.qi],'decoy');
+    else{S.order=shuffle(S.subs.map((_,i)=>i));S.phase='board';save();render()}
+  };
+}
+
+function boardCls(){const n=S.order.length;return n<=4?'c2':'c3'}
+function rBoard(){
+  main.innerHTML=`<h2 style="text-align:center">Everyone, look! 👀</h2>
+    ${clueBox()}
+    <div class="board ${boardCls()}">${S.order.map((si,k)=>cardHTML(S.subs[si].c,{badge:k+1,cls:'popin'})).join('')}</div>
+    <p class="sub" style="text-align:center;margin:0">Which one is ${pname(S.teller)}'s? Talk it over, then vote in secret.</p>
+    <button class="btn main" id="go">Start secret voting</button>`;
+  main.querySelectorAll('.board .card').forEach((el,k)=>el.style.animationDelay=(k*90)+'ms');
+  $('#go').onclick=()=>{S.q=others();S.qi=0;passTo(S.q[0],'vote')};
+}
+
+function rVote(){
+  const p=S.who;
+  main.innerHTML=`${clueBox()}
+    <h2>${pname(p)}: which is ${pname(S.teller)}'s?</h2>
+    <div class="board ${boardCls()}">${S.order.map((si,k)=>{const mine=S.subs[si].o===p;
+      return cardHTML(S.subs[si].c,{badge:k+1,tag:mine?'Yours':'',cls:'pick'+(mine?' off':'')+(S.sel[0]===k?' sel':''),attr:`data-v="${k}"`})}).join('')}</div>
+    <button class="btn main" id="lock" disabled>Cast secret vote</button>`;
+  const upd=()=>{$('#lock').disabled=S.sel.length!==1;$('#lock').textContent=S.sel.length?`Vote for #${S.sel[0]+1}`:'Tap a card'};
+  main.querySelectorAll('[data-v]').forEach(el=>el.onclick=()=>{
+    if(el.classList.contains('off'))return;
+    S.sel=[+el.dataset.v];
+    main.querySelectorAll('[data-v]').forEach(x=>x.classList.toggle('sel',+x.dataset.v===S.sel[0]));
+    beep(600,.06,'triangle',.05);upd();
+  });
+  upd();
+  $('#lock').onclick=()=>{
+    S.votes[p]=S.sel[0];S.qi++;chime();
+    if(S.qi<S.q.length)passTo(S.q[S.qi],'vote');
+    else{score();S.phase='reveal';save();render()}
+  };
+}
+
+/* ---------- scoring ---------- */
+function score(){
+  const voters=Object.keys(S.votes).map(Number);
+  const tPos=S.order.findIndex(si=>S.subs[si].o===S.teller);
+  const correct=voters.filter(v=>S.votes[v]===tPos);
+  const d={}, why={};S.players.forEach((_,i)=>{d[i]=0;why[i]=[]});
+  let verdict;
+  if(correct.length===voters.length){verdict='hot'}
+  else if(correct.length===0){verdict='cold'}
+  else verdict='right';
+  if(verdict==='right'){d[S.teller]+=3;why[S.teller].push('just right +3');correct.forEach(v=>{d[v]+=3;why[v].push('found it +3')})}
+  else voters.forEach(v=>{d[v]+=2;why[v].push((verdict==='hot'?'too hot':'too cold')+' +2')});
+  voters.forEach(v=>{const si=S.order[S.votes[v]], o=S.subs[si].o;if(o!==S.teller){d[o]+=1;P(o).st.fooled++}});
+  S.players.forEach((_,i)=>{if(i===S.teller)return;const f=voters.filter(v=>S.subs[S.order[S.votes[v]]].o===i).length;if(f)why[i].push(`fooled ${f} +${f}`)});
+  const st=P(S.teller).st;st.told++;if(verdict==='right')st.ok++;if(verdict==='hot')st.hot++;if(verdict==='cold')st.cold++;
+  correct.forEach(v=>P(v).st.eye++);
+  S.players.forEach((p,i)=>p.score+=d[i]);
+  S.res={verdict,tPos,correct,d,why};
+}
+
+function rReveal(){
+  const R=S.res;
+  const V={hot:['🔥 Too hot!','Everyone found it. The Storyteller gets nothing, everyone else +2.','hot'],
+           cold:['🧊 Too cold!','Nobody found it. The Storyteller gets nothing, everyone else +2.','cold'],
+           right:['🥣 Just right!',`${R.correct.length} of ${Object.keys(S.votes).length} found it. ${P(S.teller).name} and the finders score 3.`,'right']}[R.verdict];
+  const votersOf=k=>Object.keys(S.votes).map(Number).filter(v=>S.votes[v]===k);
+  main.innerHTML=`<div class="verdict ${V[2]} popin"><div class="big">${V[0]}</div><div class="small" style="color:#e9e3f5">${esc(V[1])}</div></div>
+    ${clueBox()}
+    <div class="board ${boardCls()}">${S.order.map((si,k)=>{const s=S.subs[si], isT=s.o===S.teller;
+      return `<div class="rv hide${isT?' teller':''}" data-k="${k}">${cardHTML(s.c,{badge:k+1,tag:(isT?'⭐ ':'')+esc(P(s.o).name)})}
+        <div class="chips">${votersOf(k).map(v=>`<span class="chip" style="border-color:${COLORS[v%COLORS.length]}">${pname(v)}</span>`).join('')}</div></div>`}).join('')}</div>
+    <div class="lbl" style="margin:0">This round</div>
+    <div class="deltas">${S.players.map((p,i)=>({i,v:R.d[i]})).sort((a,b)=>b.v-a.v).map(({i,v})=>`<div class="drow">${pdot(i)}<div class="nm">${pname(i)}${i===S.teller?' 📖':''}<div class="why">${esc(R.why[i].join(' · ')||(i===S.teller?'no points this time':'no points'))}</div></div><div class="pts${v?'':' z'}">+${v}</div></div>`).join('')}</div>
+    <button class="btn main" id="go">See the scores</button>`;
+  // stagger: decoys flip in first, the Storyteller's card last
+  const els=[...main.querySelectorAll('.rv')], order=[...els.filter(e=>!e.classList.contains('teller')),...els.filter(e=>e.classList.contains('teller'))];
+  order.forEach((el,i)=>setTimeout(()=>{el.classList.remove('hide');if(i===order.length-1)(R.verdict==='right'?fanfare:thud)()},180+i*220));
+  $('#go').onclick=endRound;
+}
+
+function endRound(){
+  // remove played cards (highest hand index first per player), then refill
+  const byP={};S.subs.forEach(s=>(byP[s.o]=byP[s.o]||[]).push(s.h));
+  Object.entries(byP).forEach(([p,hs])=>hs.sort((a,b)=>b-a).forEach(h=>P(+p).hand.splice(h,1)));
+  S.players.forEach(p=>{while(p.hand.length<HAND)p.hand.push(newCard())});
+  S.over=S.players.some(p=>p.score>=S.target);
+  S.phase='scores';save();render();
+}
+
+function standings(){
+  const max=Math.max(S.target,...S.players.map(p=>p.score));
+  const ranked=S.players.map((p,i)=>({p,i})).sort((a,b)=>b.p.score-a.p.score);
+  let last=null,rank=0;
+  return `<div class="sb">${ranked.map(({p,i},k)=>{if(p.score!==last){rank=k+1;last=p.score}
+    return `<div class="sbrow"><span class="fill" style="width:${Math.max(2,p.score/max*100)}%;background:${COLORS[i%COLORS.length]}"></span>
+      <span class="rk">${rank}</span><span class="nm">${pname(i)}</span><span class="sc">${p.score}</span></div>`}).join('')}</div>`;
+}
+function rScores(){
+  const next=(S.teller+1)%S.players.length;
+  main.innerHTML=`<h2 style="text-align:center">Scores after round ${S.round}</h2>
+    <p class="sub" style="text-align:center;margin:0">First to <b>${S.target}</b> wins</p>
+    ${standings()}
+    ${S.over?`<button class="btn main" id="go">🏆 Final results</button>`:`<button class="btn main" id="go">Next round: ${pname(next)} tells</button>`}`;
+  $('#go').onclick=()=>{
+    if(S.over){S.phase='final';save();fanfare();render();return}
+    S.round++;S.teller=next;beginRound();
+  };
+}
+
+function rFinal(){
+  const hi=Math.max(...S.players.map(p=>p.score));
+  const winners=S.players.map((p,i)=>i).filter(i=>P(i).score===hi);
+  const best=(f,min=1)=>{const v=Math.max(...S.players.map(f));return v>=min?S.players.map((p,i)=>i).filter(i=>f(P(i))===v):[]};
+  const aw=[];
+  const add=(h,ids,p)=>{if(ids.length)aw.push(`<div class="award"><div class="h">${h}</div><div>${ids.map(pname).join(' & ')}</div><div class="p">${p}</div></div>`)};
+  add('🥣 Porridge Perfectionist',best(p=>p.st.ok),'Most just-right clues');
+  add('🎭 Master of Disguise',best(p=>p.st.fooled),'Decoys stole the most votes');
+  add('🦅 Eagle Eye',best(p=>p.st.eye),'Found the Storyteller\'s card most often');
+  add('🔥 Too Hot to Handle',best(p=>p.st.hot),'Gave the most obvious clues');
+  add('🧊 Cold Case',best(p=>p.st.cold),'Gave the most baffling clues');
+  main.innerHTML=`<div style="text-align:center"><div class="podium">🏆</div>
+      <h2 style="margin-top:6px">${winners.map(pname).join(' & ')} win${winners.length>1?'':'s'}!</h2>
+      <p class="sub">${hi} points after ${S.round} round${S.round>1?'s':''}</p></div>
+    ${standings()}
+    <div class="lbl" style="margin:0">Awards</div>
+    <div class="awards">${aw.join('')||'<div class="small">No awards this time.</div>'}</div>
+    <div class="row"><button class="btn main" id="again">Play again</button><button class="btn" id="home">New players</button></div>`;
+  localStorage.removeItem(KEY);
+  $('#again').onclick=()=>{setup.names=S.players.map(p=>p.name);startGame()};
+  $('#home').onclick=showSetup;
+}
+
+/* ---------- menu ---------- */
+function modal(html,wire){$('#mbox').innerHTML=html;$('#modal').classList.add('on');wire&&wire()}
+const closeModal=()=>$('#modal').classList.remove('on');
+$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
+$('#menuBtn').onclick=()=>{
+  const live=S&&S.phase!=='final';
+  modal(`<h2>Menu</h2>
+    ${live?`<div style="text-align:left">${standings()}</div>`:''}
+    <button class="btn" id="mSnd">${muted?'🔇 Sound off':'🔊 Sound on'}</button>
+    ${live?'<button class="btn" id="mRe">↺ Restart (same players)</button>':''}
+    <button class="btn" id="mQuit">⌂ Quit to setup</button>
+    <button class="btn main" id="mBack">Back to game</button>`,()=>{
+    $('#mSnd').onclick=()=>{muted=!muted;localStorage.setItem(MKEY,muted?'1':'0');$('#mSnd').textContent=muted?'🔇 Sound off':'🔊 Sound on'};
+    if($('#mRe'))$('#mRe').onclick=()=>{if(confirmTwice('mRe'))return;closeModal();setup=setup||{};setup.names=S.players.map(p=>p.name);setup.target=S.target;setup.styles=S.styles;startGame()};
+    $('#mQuit').onclick=()=>{if(live&&confirmTwice('mQuit'))return;closeModal();if(live)localStorage.removeItem(KEY);showSetup()};
+    $('#mBack').onclick=closeModal;
+  });
+};
+// first tap arms the button, second tap confirms (returns true while only armed)
+function confirmTwice(id){const b=$('#'+id);if(b.dataset.armed)return false;b.dataset.armed='1';b.textContent='Tap again to confirm';b.style.borderColor='var(--hot)';return true}
+
+showSetup();
+</script>
+</body>
+</html>
