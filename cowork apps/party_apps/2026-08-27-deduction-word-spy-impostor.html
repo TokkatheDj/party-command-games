@@ -1,0 +1,893 @@
+<!-- CONCEPT: DEDUCTION/SOCIAL - "Word Spy": pass one phone around the circle so every player secretly views their word - everyone gets the same word except one (or two) hidden Spies, who get a sneaky related word instead. Players take turns giving a single spoken clue about their word without saying it, then the room votes out loud on who they think the Spy is. If the group catches the Spy the Civilians score; if the Spy dodges suspicion (or talks their way past a wrong vote) the Spy scores - all tallied on a shared leaderboard across rounds. 50 word pairs across 6 themes | Players: 3-10 | ~5-10 min per round -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Word Spy</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+}
+
+:root {
+  --bg: #120a1e;
+  --bg2: #1c1130;
+  --panel: #241735;
+  --panel2: #2d1d44;
+  --line: #402a5c;
+  --ink: #f3ecff;
+  --dim: #b3a0d4;
+  --a: #ffb020;
+  --b: #7c5cff;
+  --spy: #ff3d6e;
+  --civ: #22d3a8;
+  --pad: clamp(10px, 3vw, 18px);
+  --r: 18px;
+}
+
+body {
+  background: radial-gradient(circle at 50% -10%, var(--bg2), var(--bg) 65%);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#app {
+  width: 100%;
+  max-width: 480px;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: var(--pad);
+  gap: 10px;
+}
+
+h1.title {
+  margin: 4px 0 0;
+  font-size: clamp(24px, 7vw, 34px);
+  text-align: center;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, var(--a), var(--spy));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.subtitle {
+  text-align: center;
+  color: var(--dim);
+  font-size: clamp(11px, 3vw, 14px);
+  margin: -6px 0 4px;
+}
+
+.screen {
+  flex: 1;
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.screen.active { display: flex; }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 14px;
+}
+
+.scroll { overflow-y: auto; flex: 1; min-height: 0; }
+
+/* ---- Setup screen ---- */
+label.field-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--dim);
+  font-weight: 700;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.stepper button {
+  width: 46px; height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.stepper .count {
+  font-size: 30px;
+  font-weight: 800;
+  min-width: 46px;
+  text-align: center;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.name-row .dot {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: var(--b);
+  color: #0a0614;
+  font-weight: 800;
+  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.name-row input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 15px;
+  padding: 10px 12px;
+  min-height: 44px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  padding: 9px 14px;
+  min-height: 44px;
+  display: flex; align-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--dim);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.chip.on {
+  background: linear-gradient(90deg, var(--b), var(--spy));
+  color: #fff;
+  border-color: transparent;
+}
+
+.spy-toggle {
+  display: flex;
+  gap: 8px;
+}
+.spy-toggle .chip { flex: 1; justify-content: center; }
+
+.btn {
+  border: none;
+  border-radius: 14px;
+  padding: 14px;
+  min-height: 50px;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #100819;
+}
+.btn.primary { background: linear-gradient(90deg, var(--a), var(--spy)); color: #1a0b12; }
+.btn.secondary { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); }
+.btn.ghost { background: transparent; color: var(--dim); border: 1px solid var(--line); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn-row { display: flex; gap: 10px; }
+.btn-row .btn { flex: 1; }
+
+/* ---- Reveal screen ---- */
+.reveal-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
+}
+.pass-name {
+  font-size: clamp(22px, 8vw, 32px);
+  font-weight: 800;
+}
+.pass-hint { color: var(--dim); font-size: 14px; }
+
+.hold-btn {
+  width: min(78vw, 260px);
+  height: min(78vw, 260px);
+  border-radius: 50%;
+  border: 3px solid var(--line);
+  background: radial-gradient(circle at 35% 30%, var(--panel2), var(--bg2));
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+.hold-btn .fill {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: 0%;
+  background: linear-gradient(0deg, var(--spy), var(--a));
+  opacity: .55;
+  transition: height .05s linear;
+}
+.hold-btn span { position: relative; z-index: 1; padding: 0 20px; }
+
+.word-card {
+  width: min(84vw, 300px);
+  min-height: 220px;
+  border-radius: 22px;
+  background: linear-gradient(160deg, var(--panel2), var(--bg2));
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px;
+}
+.word-card .cat { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
+.word-card .role { font-size: 12px; font-weight: 800; letter-spacing: 1px; padding: 4px 12px; border-radius: 999px; }
+.word-card .role.civ { background: rgba(34,211,168,.15); color: var(--civ); }
+.word-card .role.spy { background: rgba(255,61,110,.15); color: var(--spy); }
+.word-card .word { font-size: clamp(26px, 8vw, 38px); font-weight: 800; text-align: center; }
+
+.progress-dots { display: flex; gap: 7px; justify-content: center; flex-wrap: wrap; }
+.progress-dots .d { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+.progress-dots .d.done { background: var(--a); }
+
+/* ---- Discuss screen ---- */
+.turn-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+.turn-label { color: var(--dim); font-size: 13px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
+.turn-name { font-size: clamp(26px, 9vw, 40px); font-weight: 800; }
+.turn-timer {
+  font-size: 40px;
+  font-weight: 800;
+  color: var(--a);
+  font-variant-numeric: tabular-nums;
+}
+.order-strip { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; }
+.order-strip .chip { white-space: nowrap; font-size: 12px; padding: 7px 12px; min-height: 36px; }
+.order-strip .chip.current { background: linear-gradient(90deg, var(--a), var(--spy)); color: #fff; border-color: transparent; }
+.order-strip .chip.spoken { opacity: .45; }
+
+/* ---- Vote screen ---- */
+.vote-grid { display: flex; flex-direction: column; gap: 8px; }
+.vote-btn {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 16px;
+  min-height: 50px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.vote-btn.selected { border-color: var(--spy); background: rgba(255,61,110,.15); }
+.vote-btn .check { color: var(--spy); font-weight: 900; visibility: hidden; }
+.vote-btn.selected .check { visibility: visible; }
+
+/* ---- Results screen ---- */
+.result-banner {
+  text-align: center;
+  padding: 16px;
+  border-radius: var(--r);
+  font-size: clamp(18px, 6vw, 24px);
+  font-weight: 800;
+}
+.result-banner.civ-win { background: rgba(34,211,168,.15); color: var(--civ); border: 1px solid var(--civ); }
+.result-banner.spy-win { background: rgba(255,61,110,.15); color: var(--spy); border: 1px solid var(--spy); }
+
+.role-list { display: flex; flex-direction: column; gap: 6px; }
+.role-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--panel2);
+  border-radius: 10px;
+  font-size: 14px;
+}
+.role-item .tag { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 999px; }
+.role-item .tag.civ { background: rgba(34,211,168,.18); color: var(--civ); }
+.role-item .tag.spy { background: rgba(255,61,110,.18); color: var(--spy); }
+
+.leaderboard { display: flex; flex-direction: column; gap: 6px; }
+.lb-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg2); border-radius: 10px; font-size: 14px; }
+.lb-row .pts { font-weight: 800; color: var(--a); }
+
+.top-bar { display: flex; align-items: center; justify-content: space-between; }
+.top-bar .lbl { color: var(--dim); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <h1 class="title">🕵️ Word Spy</h1>
+  <div class="subtitle" id="subtitle">Pass-the-phone deduction party game</div>
+
+  <!-- SETUP -->
+  <div class="screen active" id="screen-setup">
+    <div class="scroll">
+      <div class="panel">
+        <label class="field-label">Players</label>
+        <div class="stepper">
+          <button id="playerMinus">−</button>
+          <div class="count" id="playerCount">4</div>
+          <button id="playerPlus">+</button>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:10px;">
+        <label class="field-label">Names</label>
+        <div id="nameList"></div>
+      </div>
+
+      <div class="panel" style="margin-top:10px;">
+        <label class="field-label">Spies</label>
+        <div class="spy-toggle" id="spyToggle"></div>
+      </div>
+
+      <div class="panel" style="margin-top:10px;">
+        <label class="field-label">Word Theme</label>
+        <div class="chip-row" id="themeRow"></div>
+      </div>
+    </div>
+    <button class="btn primary" id="startGameBtn">Start Game</button>
+  </div>
+
+  <!-- REVEAL -->
+  <div class="screen" id="screen-reveal">
+    <div class="progress-dots" id="revealDots"></div>
+    <div class="reveal-wrap" id="revealStage"></div>
+  </div>
+
+  <!-- DISCUSS -->
+  <div class="screen" id="screen-discuss">
+    <div class="top-bar">
+      <div class="lbl">Clue Round <span id="clueRoundNum">1</span>/<span id="clueRoundTotal">2</span></div>
+      <div class="lbl">🕵️ Say a clue — don't say the word!</div>
+    </div>
+    <div class="order-strip" id="orderStrip"></div>
+    <div class="turn-card">
+      <div class="turn-label">Now speaking</div>
+      <div class="turn-name" id="turnName">—</div>
+      <div class="turn-timer" id="turnTimer">15</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn secondary" id="skipTurnBtn">Skip</button>
+      <button class="btn primary" id="nextTurnBtn">Next Player</button>
+    </div>
+  </div>
+
+  <!-- VOTE -->
+  <div class="screen" id="screen-vote">
+    <div class="panel">
+      <label class="field-label" id="voteLabel">Who is the Spy? Discuss out loud, then tap the group's pick(s).</label>
+      <div class="vote-grid" id="voteGrid"></div>
+    </div>
+    <button class="btn primary" id="lockVoteBtn">Reveal the Truth</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="screen" id="screen-results">
+    <div class="scroll">
+      <div class="result-banner" id="resultBanner"></div>
+      <div class="panel" style="margin-top:10px;">
+        <label class="field-label">The Words</label>
+        <div class="role-list" id="roleList"></div>
+      </div>
+      <div class="panel" style="margin-top:10px;">
+        <label class="field-label">Leaderboard</label>
+        <div class="leaderboard" id="leaderboard"></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn secondary" id="newGameBtn">New Game</button>
+      <button class="btn primary" id="nextRoundBtn">Next Round</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const SAVE_KEY = 'cowork-wordspy-save';
+
+  const PAIRS = [
+    {t:'food', c:'Pizza', s:'Calzone'}, {t:'food', c:'Coffee', s:'Tea'},
+    {t:'food', c:'Burger', s:'Sandwich'}, {t:'food', c:'Ice Cream', s:'Frozen Yogurt'},
+    {t:'food', c:'Pancake', s:'Waffle'}, {t:'food', c:'Soup', s:'Stew'},
+    {t:'food', c:'Taco', s:'Burrito'}, {t:'food', c:'Donut', s:'Bagel'},
+    {t:'food', c:'Popcorn', s:'Pretzel'}, {t:'food', c:'Milkshake', s:'Smoothie'},
+    {t:'food', c:'Cupcake', s:'Muffin'}, {t:'food', c:'Cheese', s:'Butter'},
+    {t:'animals', c:'Lion', s:'Tiger'}, {t:'animals', c:'Dog', s:'Wolf'},
+    {t:'animals', c:'Dolphin', s:'Shark'}, {t:'animals', c:'Butterfly', s:'Moth'},
+    {t:'animals', c:'Frog', s:'Toad'}, {t:'animals', c:'Eagle', s:'Hawk'},
+    {t:'animals', c:'Turtle', s:'Tortoise'}, {t:'animals', c:'Alligator', s:'Crocodile'},
+    {t:'animals', c:'Rabbit', s:'Hare'}, {t:'animals', c:'Camel', s:'Llama'},
+    {t:'animals', c:'Owl', s:'Bat'}, {t:'animals', c:'Penguin', s:'Puffin'},
+    {t:'places', c:'Beach', s:'Lake'}, {t:'places', c:'Mountain', s:'Volcano'},
+    {t:'places', c:'Airport', s:'Train Station'}, {t:'places', c:'Library', s:'Bookstore'},
+    {t:'places', c:'Hospital', s:'Clinic'}, {t:'places', c:'Castle', s:'Palace'},
+    {t:'places', c:'Desert', s:'Tundra'}, {t:'places', c:'Zoo', s:'Aquarium'},
+    {t:'places', c:'Farm', s:'Ranch'}, {t:'places', c:'Circus', s:'Carnival'},
+    {t:'objects', c:'Umbrella', s:'Raincoat'}, {t:'objects', c:'Backpack', s:'Suitcase'},
+    {t:'objects', c:'Guitar', s:'Violin'}, {t:'objects', c:'Bicycle', s:'Scooter'},
+    {t:'objects', c:'Candle', s:'Lantern'}, {t:'objects', c:'Mirror', s:'Window'},
+    {t:'objects', c:'Wallet', s:'Purse'}, {t:'objects', c:'Blanket', s:'Pillow'},
+    {t:'objects', c:'Clock', s:'Calendar'}, {t:'objects', c:'Telescope', s:'Binoculars'},
+    {t:'fantasy', c:'Wizard', s:'Witch'}, {t:'fantasy', c:'Dragon', s:'Dinosaur'},
+    {t:'fantasy', c:'Pirate', s:'Sailor'}, {t:'fantasy', c:'Ghost', s:'Vampire'},
+    {t:'fantasy', c:'Robot', s:'Alien'}, {t:'fantasy', c:'Ninja', s:'Samurai'},
+    {t:'fantasy', c:'Mermaid', s:'Fairy'}, {t:'fantasy', c:'Superhero', s:'Villain'},
+    {t:'actions', c:'Swimming', s:'Diving'}, {t:'actions', c:'Running', s:'Jogging'},
+    {t:'actions', c:'Painting', s:'Drawing'}, {t:'actions', c:'Singing', s:'Humming'},
+    {t:'actions', c:'Dancing', s:'Skating'}, {t:'actions', c:'Camping', s:'Hiking'},
+    {t:'actions', c:'Baking', s:'Cooking'}, {t:'actions', c:'Reading', s:'Writing'}
+  ];
+  const THEMES = [
+    {k:'all', label:'All Themes'}, {k:'food', label:'Food'}, {k:'animals', label:'Animals'},
+    {k:'places', label:'Places'}, {k:'objects', label:'Objects'}, {k:'fantasy', label:'Fantasy'},
+    {k:'actions', label:'Actions'}
+  ];
+
+  const $ = id => document.getElementById(id);
+  const screens = ['setup','reveal','discuss','vote','results'];
+  function showScreen(name){
+    screens.forEach(s => $('screen-'+s).classList.toggle('active', s === name));
+  }
+
+  let state = {
+    playerCount: 4,
+    names: ['Player 1','Player 2','Player 3','Player 4'],
+    theme: 'all',
+    spyCount: 1,
+    spyCountManual: false,
+    scores: {}
+  };
+
+  function loadSave(){
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved && Array.isArray(saved.names)) {
+        state.names = saved.names;
+        state.playerCount = saved.names.length;
+        state.scores = saved.scores || {};
+        if (saved.theme) state.theme = saved.theme;
+      }
+    } catch(e){}
+  }
+  function persist(){
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      names: state.names, scores: state.scores, theme: state.theme
+    }));
+  }
+
+  function autoSpyCount(n){ return n >= 7 ? 2 : 1; }
+
+  // ---------- SETUP SCREEN ----------
+  function renderNameList(){
+    const wrap = $('nameList');
+    wrap.innerHTML = '';
+    for (let i = 0; i < state.playerCount; i++){
+      if (!state.names[i]) state.names[i] = 'Player ' + (i+1);
+      const row = document.createElement('div');
+      row.className = 'name-row';
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      dot.textContent = i+1;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.maxLength = 16;
+      input.value = state.names[i];
+      input.placeholder = 'Player ' + (i+1);
+      input.addEventListener('input', () => { state.names[i] = input.value.trim() || ('Player ' + (i+1)); });
+      row.appendChild(dot); row.appendChild(input);
+      wrap.appendChild(row);
+    }
+    state.names = state.names.slice(0, state.playerCount);
+  }
+
+  function renderSpyToggle(){
+    const wrap = $('spyToggle');
+    wrap.innerHTML = '';
+    const maxSpies = state.playerCount >= 8 ? 3 : (state.playerCount >= 5 ? 2 : 1);
+    if (!state.spyCountManual) state.spyCount = autoSpyCount(state.playerCount);
+    if (state.spyCount > maxSpies) state.spyCount = maxSpies;
+    for (let n = 1; n <= maxSpies; n++){
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (state.spyCount === n ? ' on' : '');
+      chip.textContent = n + (n === 1 ? ' Spy' : ' Spies');
+      chip.addEventListener('click', () => {
+        state.spyCount = n;
+        state.spyCountManual = true;
+        renderSpyToggle();
+      });
+      wrap.appendChild(chip);
+    }
+  }
+
+  function renderThemeRow(){
+    const wrap = $('themeRow');
+    wrap.innerHTML = '';
+    THEMES.forEach(th => {
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (state.theme === th.k ? ' on' : '');
+      chip.textContent = th.label;
+      chip.addEventListener('click', () => { state.theme = th.k; renderThemeRow(); });
+      wrap.appendChild(chip);
+    });
+  }
+
+  $('playerMinus').addEventListener('click', () => {
+    state.playerCount = Math.max(3, state.playerCount - 1);
+    renderNameList(); renderSpyToggle();
+    $('playerCount').textContent = state.playerCount;
+  });
+  $('playerPlus').addEventListener('click', () => {
+    state.playerCount = Math.min(10, state.playerCount + 1);
+    renderNameList(); renderSpyToggle();
+    $('playerCount').textContent = state.playerCount;
+  });
+
+  $('startGameBtn').addEventListener('click', () => {
+    state.names.forEach((n,i) => { if (!n || !n.trim()) state.names[i] = 'Player '+(i+1); });
+    persist();
+    startRound();
+  });
+
+  // ---------- ROUND STATE ----------
+  let round = null; // { pair, roles[], revealIndex, order[], turnIndex, clueRound, timer, votes:Set }
+
+  function pickPair(){
+    const pool = state.theme === 'all' ? PAIRS : PAIRS.filter(p => p.t === state.theme);
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function shuffledIndices(n){
+    const arr = Array.from({length:n}, (_,i)=>i);
+    for (let i = arr.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i+1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function startRound(){
+    const pair = pickPair();
+    const spyIdx = shuffledIndices(state.playerCount).slice(0, state.spyCount);
+    const roles = state.names.map((_, i) => spyIdx.includes(i) ? 'spy' : 'civ');
+    round = {
+      pair, roles,
+      revealIndex: 0,
+      order: shuffledIndices(state.playerCount),
+      turnIndex: 0,
+      clueRound: 1,
+      clueRounds: 2,
+      timerVal: 15,
+      timerHandle: null,
+      votes: new Set()
+    };
+    showScreen('reveal');
+    renderReveal();
+  }
+
+  // ---------- REVEAL SCREEN ----------
+  function renderRevealDots(){
+    const wrap = $('revealDots');
+    wrap.innerHTML = '';
+    for (let i = 0; i < state.playerCount; i++){
+      const d = document.createElement('div');
+      d.className = 'd' + (i < round.revealIndex ? ' done' : '');
+      wrap.appendChild(d);
+    }
+  }
+
+  function renderReveal(){
+    renderRevealDots();
+    const stage = $('revealStage');
+    stage.innerHTML = '';
+    if (round.revealIndex >= state.playerCount){
+      startDiscuss();
+      return;
+    }
+    const i = round.revealIndex;
+    const name = state.names[i];
+
+    const passWrap = document.createElement('div');
+    passWrap.style.display = 'flex';
+    passWrap.style.flexDirection = 'column';
+    passWrap.style.alignItems = 'center';
+    passWrap.style.gap = '18px';
+
+    const passName = document.createElement('div');
+    passName.className = 'pass-name';
+    passName.textContent = 'Pass to ' + name;
+    const hint = document.createElement('div');
+    hint.className = 'pass-hint';
+    hint.textContent = 'Hold the circle to secretly reveal your word';
+
+    const holdBtn = document.createElement('div');
+    holdBtn.className = 'hold-btn';
+    const fill = document.createElement('div');
+    fill.className = 'fill';
+    const label = document.createElement('span');
+    label.textContent = '👁 Hold to Reveal';
+    holdBtn.appendChild(fill);
+    holdBtn.appendChild(label);
+
+    passWrap.appendChild(passName);
+    passWrap.appendChild(hint);
+    passWrap.appendChild(holdBtn);
+    stage.appendChild(passWrap);
+
+    let holdTimer = null, holdStart = 0, holding = false;
+    const HOLD_MS = 550;
+    function beginHold(e){
+      e.preventDefault();
+      holding = true;
+      holdStart = Date.now();
+      fill.style.height = '0%';
+      holdTimer = setInterval(() => {
+        const pct = Math.min(100, ((Date.now() - holdStart) / HOLD_MS) * 100);
+        fill.style.height = pct + '%';
+        if (pct >= 100){
+          clearInterval(holdTimer);
+          showWord(i, name);
+        }
+      }, 16);
+    }
+    function cancelHold(){
+      if (!holding) return;
+      holding = false;
+      clearInterval(holdTimer);
+      fill.style.height = '0%';
+    }
+    holdBtn.addEventListener('pointerdown', beginHold);
+    holdBtn.addEventListener('pointerup', cancelHold);
+    holdBtn.addEventListener('pointerleave', cancelHold);
+    holdBtn.addEventListener('pointercancel', cancelHold);
+  }
+
+  function showWord(i, name){
+    const stage = $('revealStage');
+    stage.innerHTML = '';
+    const role = round.roles[i];
+    const word = role === 'spy' ? round.pair.s : round.pair.c;
+
+    const card = document.createElement('div');
+    card.className = 'word-card';
+    const cat = document.createElement('div');
+    cat.className = 'cat';
+    cat.textContent = THEMES.find(t=>t.k===round.pair.t) ? THEMES.find(t=>t.k===round.pair.t).label : round.pair.t;
+    const roleTag = document.createElement('div');
+    roleTag.className = 'role ' + (role === 'spy' ? 'spy' : 'civ');
+    roleTag.textContent = role === 'spy' ? '🕵 YOU ARE THE SPY' : 'CIVILIAN';
+    const w = document.createElement('div');
+    w.className = 'word';
+    w.textContent = word;
+    card.appendChild(cat); card.appendChild(roleTag); card.appendChild(w);
+
+    const doneBtn = document.createElement('button');
+    doneBtn.className = 'btn primary';
+    doneBtn.style.marginTop = '16px';
+    doneBtn.style.width = 'min(84vw, 300px)';
+    doneBtn.textContent = 'Got It — Hide & Pass';
+    doneBtn.addEventListener('click', () => {
+      round.revealIndex++;
+      renderReveal();
+    });
+
+    stage.appendChild(card);
+    stage.appendChild(doneBtn);
+  }
+
+  // ---------- DISCUSS SCREEN ----------
+  function startDiscuss(){
+    round.turnIndex = 0;
+    round.clueRound = 1;
+    showScreen('discuss');
+    renderDiscuss();
+  }
+
+  function renderOrderStrip(){
+    const wrap = $('orderStrip');
+    wrap.innerHTML = '';
+    round.order.forEach((pIdx, pos) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (pos === round.turnIndex ? ' current' : (pos < round.turnIndex ? ' spoken' : ''));
+      chip.textContent = state.names[pIdx];
+      wrap.appendChild(chip);
+    });
+  }
+
+  function stopTimer(){
+    if (round.timerHandle){ clearInterval(round.timerHandle); round.timerHandle = null; }
+  }
+
+  function renderDiscuss(){
+    $('clueRoundNum').textContent = round.clueRound;
+    $('clueRoundTotal').textContent = round.clueRounds;
+    renderOrderStrip();
+    const pIdx = round.order[round.turnIndex];
+    $('turnName').textContent = state.names[pIdx];
+    round.timerVal = 15;
+    $('turnTimer').textContent = round.timerVal;
+    stopTimer();
+    round.timerHandle = setInterval(() => {
+      round.timerVal--;
+      $('turnTimer').textContent = Math.max(0, round.timerVal);
+      if (round.timerVal <= 0){
+        stopTimer();
+      }
+    }, 1000);
+  }
+
+  function advanceTurn(){
+    stopTimer();
+    round.turnIndex++;
+    if (round.turnIndex >= round.order.length){
+      round.turnIndex = 0;
+      round.clueRound++;
+      if (round.clueRound > round.clueRounds){
+        startVote();
+        return;
+      }
+    }
+    renderDiscuss();
+  }
+
+  $('skipTurnBtn').addEventListener('click', advanceTurn);
+  $('nextTurnBtn').addEventListener('click', advanceTurn);
+
+  // ---------- VOTE SCREEN ----------
+  function startVote(){
+    stopTimer();
+    round.votes = new Set();
+    showScreen('vote');
+    $('voteLabel').textContent = state.spyCount > 1
+      ? 'Discuss out loud, then tap the ' + state.spyCount + ' players the group suspects.'
+      : "Discuss out loud, then tap the player the group thinks is the Spy.";
+    const grid = $('voteGrid');
+    grid.innerHTML = '';
+    state.names.forEach((name, i) => {
+      const btn = document.createElement('div');
+      btn.className = 'vote-btn';
+      const label = document.createElement('span');
+      label.textContent = name;
+      const check = document.createElement('span');
+      check.className = 'check';
+      check.textContent = '✓ SUSPECT';
+      btn.appendChild(label); btn.appendChild(check);
+      btn.addEventListener('click', () => {
+        if (round.votes.has(i)) {
+          round.votes.delete(i);
+        } else {
+          if (round.votes.size >= state.spyCount) return;
+          round.votes.add(i);
+        }
+        btn.classList.toggle('selected', round.votes.has(i));
+      });
+      grid.appendChild(btn);
+    });
+  }
+
+  $('lockVoteBtn').addEventListener('click', () => { showResults(); });
+
+  // ---------- RESULTS SCREEN ----------
+  function showResults(){
+    const spySet = new Set(round.roles.map((r,i)=> r==='spy' ? i : -1).filter(i=>i>=0));
+    const votedSet = round.votes;
+    let allCaught = spySet.size > 0;
+    spySet.forEach(i => { if (!votedSet.has(i)) allCaught = false; });
+    let noInnocentAccused = true;
+    votedSet.forEach(i => { if (!spySet.has(i)) noInnocentAccused = false; });
+    const civiliansWin = allCaught && noInnocentAccused;
+
+    if (!state.scores) state.scores = {};
+    state.names.forEach((name, i) => {
+      if (!(name in state.scores)) state.scores[name] = 0;
+      const isSpy = spySet.has(i);
+      if (civiliansWin && !isSpy) state.scores[name] += 1;
+      if (!civiliansWin && isSpy) state.scores[name] += 2;
+    });
+    persist();
+
+    showScreen('results');
+    const banner = $('resultBanner');
+    banner.className = 'result-banner ' + (civiliansWin ? 'civ-win' : 'spy-win');
+    banner.textContent = civiliansWin
+      ? '✅ Civilians Win — the Spy was caught!'
+      : '🕵️ Spy Wins — the Spy got away!';
+
+    const catLabel = THEMES.find(t=>t.k===round.pair.t) ? THEMES.find(t=>t.k===round.pair.t).label : round.pair.t;
+    const roleList = $('roleList');
+    roleList.innerHTML = '';
+    const wordsInfo = document.createElement('div');
+    wordsInfo.style.textAlign = 'center';
+    wordsInfo.style.marginBottom = '8px';
+    wordsInfo.style.fontSize = '13px';
+    wordsInfo.style.color = 'var(--dim)';
+    wordsInfo.textContent = catLabel + ':  Civilian word "' + round.pair.c + '"  ·  Spy word "' + round.pair.s + '"';
+    roleList.appendChild(wordsInfo);
+
+    state.names.forEach((name, i) => {
+      const isSpy = spySet.has(i);
+      const row = document.createElement('div');
+      row.className = 'role-item';
+      const left = document.createElement('span');
+      left.textContent = name + (votedSet.has(i) ? '  (voted suspect)' : '');
+      const tag = document.createElement('span');
+      tag.className = 'tag ' + (isSpy ? 'spy' : 'civ');
+      tag.textContent = isSpy ? 'SPY' : 'CIVILIAN';
+      row.appendChild(left); row.appendChild(tag);
+      roleList.appendChild(row);
+    });
+
+    const lb = $('leaderboard');
+    lb.innerHTML = '';
+    const ranked = state.names.map(n => ({name:n, pts: state.scores[n]||0})).sort((a,b)=>b.pts-a.pts);
+    ranked.forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'lb-row';
+      const left = document.createElement('span');
+      left.textContent = r.name;
+      const pts = document.createElement('span');
+      pts.className = 'pts';
+      pts.textContent = r.pts + ' pts';
+      row.appendChild(left); row.appendChild(pts);
+      lb.appendChild(row);
+    });
+  }
+
+  $('nextRoundBtn').addEventListener('click', () => { startRound(); });
+  $('newGameBtn').addEventListener('click', () => {
+    state.scores = {};
+    persist();
+    showScreen('setup');
+    renderNameList(); renderSpyToggle(); renderThemeRow();
+    $('playerCount').textContent = state.playerCount;
+  });
+
+  // ---------- INIT ----------
+  loadSave();
+  $('playerCount').textContent = state.playerCount;
+  renderNameList();
+  renderSpyToggle();
+  renderThemeRow();
+})();
+</script>
+</body>
+</html>

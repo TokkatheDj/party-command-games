@@ -1,0 +1,926 @@
+<!-- CONCEPT: DEDUCTION/QUESTIONING - "Twenty Down": competitive 20 Questions around one phone - the Oracle secretly holds a thing, everyone else takes turns asking yes/no questions out of ONE shared pot of 20, and every answer helps your rivals too; guess right on your turn (or BLURT out of turn at a risk) to bank whatever is left in the pot, while letter hints leak as it drains and Sudden Death settles a dry pot. Twist cards, 300 secrets in 8 decks | Players: 3-10 | ~15-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Twenty Down</title>
+<style>
+:root {
+  --bg: #0f1220;
+  --bg2: #161a2e;
+  --panel: #1c2138;
+  --panel2: #252b48;
+  --line: #333a5e;
+  --text: #eef0fa;
+  --muted: #9aa1c4;
+  --a: #ffb547;
+  --b: #ff5f8f;
+  --c: #5fd4ff;
+  --yes: #3ddc97;
+  --no: #ff5f6d;
+  --sort: #ffc857;
+  --cant: #7b84ad;
+  --gold: #ffd166;
+  --radius: 16px;
+  --gap: 10px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+  background: radial-gradient(120% 80% at 50% 0%, #1d2244 0%, var(--bg) 60%);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+button {
+  font: inherit; color: inherit; border: 0; cursor: pointer;
+  min-height: 44px; border-radius: 12px;
+}
+button:disabled { opacity: .35; cursor: default; }
+input { font: inherit; user-select: text; -webkit-user-select: text; }
+.screen {
+  position: absolute; inset: 0;
+  display: none; flex-direction: column;
+  height: 100dvh;
+  max-width: 640px; margin: 0 auto;
+  padding: 12px max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-bottom));
+}
+.screen.on { display: flex; }
+.scroll { overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+h1.title {
+  margin: 4px 0 2px; text-align: center;
+  font-size: clamp(34px, 11vw, 56px); font-weight: 900; letter-spacing: -1px;
+  background: linear-gradient(90deg, var(--a), var(--b)); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tag { text-align: center; color: var(--muted); font-size: clamp(13px, 3.6vw, 16px); margin: 0 0 12px; }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 12px; margin-bottom: 10px;
+}
+.card h3 { margin: 0 0 8px; font-size: clamp(14px, 3.8vw, 17px); color: var(--a); letter-spacing: .5px; text-transform: uppercase; }
+.row { display: flex; gap: 8px; align-items: center; }
+.btn {
+  background: var(--panel2); padding: 10px 14px; font-weight: 700;
+  font-size: clamp(14px, 4vw, 17px);
+}
+.btn.primary {
+  background: linear-gradient(90deg, var(--a), var(--b)); color: #1a1020;
+  font-size: clamp(17px, 5vw, 21px); padding: 14px; width: 100%;
+}
+.btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.small { font-size: 13px; color: var(--muted); }
+
+/* setup */
+#plist { display: flex; flex-direction: column; gap: 6px; }
+.prow { display: flex; gap: 6px; }
+.prow input {
+  flex: 1; min-width: 0; min-height: 44px; padding: 8px 12px; border-radius: 10px;
+  background: var(--bg2); border: 1px solid var(--line); color: var(--text);
+}
+.prow button { width: 44px; background: var(--bg2); color: var(--muted); font-size: 20px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  padding: 8px 12px; background: var(--bg2); border: 1px solid var(--line); border-radius: 999px;
+  font-size: clamp(13px, 3.6vw, 15px); font-weight: 600; color: var(--muted);
+}
+.chip.on { background: rgba(255,181,71,.16); border-color: var(--a); color: var(--text); }
+.seg { display: flex; background: var(--bg2); border-radius: 12px; padding: 3px; gap: 3px; }
+.seg button { flex: 1; background: transparent; color: var(--muted); font-weight: 700; font-size: 14px; }
+.seg button.on { background: var(--panel2); color: var(--text); box-shadow: inset 0 0 0 1px var(--a); }
+.err { color: var(--no); font-size: 14px; min-height: 18px; text-align: center; margin: 4px 0; }
+.rules li { margin-bottom: 4px; color: var(--muted); font-size: 14px; }
+.rules b { color: var(--text); }
+
+/* pass / secret */
+.center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; }
+.big { font-size: clamp(30px, 9vw, 46px); font-weight: 900; }
+.who { font-size: clamp(32px, 10vw, 52px); font-weight: 900; color: var(--a); }
+.secretbox {
+  background: var(--panel); border: 2px solid var(--a); border-radius: 20px; padding: 20px 18px; width: 100%;
+}
+.secretbox .cat { color: var(--muted); font-size: 15px; text-transform: uppercase; letter-spacing: 1px; }
+.secretbox .sec { font-size: clamp(32px, 10vw, 50px); font-weight: 900; margin: 8px 0; line-height: 1.1; word-break: break-word; }
+.twistcard {
+  background: linear-gradient(135deg, rgba(255,95,143,.18), rgba(95,212,255,.12));
+  border: 1px solid var(--b); border-radius: 16px; padding: 12px 14px; width: 100%; text-align: left;
+}
+.twistcard .tn { font-weight: 900; font-size: 18px; color: var(--b); }
+.twistcard .td { font-size: 14px; color: var(--text); margin-top: 3px; }
+
+/* play */
+.top { display: flex; align-items: center; gap: 8px; flex: none; }
+.top .meta { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); line-height: 1.25; }
+.top .meta b { color: var(--text); }
+#peekBtn {
+  background: var(--panel2); padding: 0 12px; font-size: 13px; font-weight: 700; color: var(--a);
+  touch-action: none; -webkit-touch-callout: none; border: 1px solid var(--line);
+}
+#muteBtn { width: 44px; background: var(--panel2); font-size: 18px; }
+.potwrap { display: flex; gap: 12px; align-items: center; margin: 8px 0; flex: none; }
+.pot {
+  --p: 1; width: clamp(84px, 24vw, 110px); aspect-ratio: 1; border-radius: 50%; flex: none;
+  background: conic-gradient(var(--a) calc(var(--p) * 360deg), var(--panel2) 0);
+  display: grid; place-items: center; position: relative;
+}
+.pot::before { content: ''; position: absolute; inset: 8px; border-radius: 50%; background: var(--bg2); }
+.pot span { position: relative; font-size: clamp(32px, 10vw, 44px); font-weight: 900; }
+.pot small { position: absolute; bottom: 16%; font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+.pot.low { background: conic-gradient(var(--no) calc(var(--p) * 360deg), var(--panel2) 0); }
+.pot.bump span { animation: bump .35s; }
+@keyframes bump { 40% { transform: scale(1.25); } }
+.info { flex: 1; min-width: 0; }
+.info .catl { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.info .catv { font-size: clamp(17px, 5vw, 22px); font-weight: 800; }
+.mask { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; min-height: 22px; }
+.mask .w { display: inline-flex; gap: 3px; }
+.mask i { display: inline-block; width: 11px; height: 3px; background: var(--c); margin-top: 16px; border-radius: 2px; }
+.mask b { display: inline-block; width: 11px; text-align: center; color: var(--c); font-size: 17px; line-height: 19px; }
+.mask em { font-style: normal; color: var(--c); font-size: 15px; line-height: 19px; }
+.nexthint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.twistchip {
+  display: inline-block; margin-top: 4px; padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--b); color: var(--b); font-size: 12px; font-weight: 700;
+}
+.turn {
+  flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 8px 12px; display: flex; align-items: center; gap: 10px; min-height: 52px;
+}
+.turn .tw { flex: 1; min-width: 0; }
+.turn .tl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.turn .tv { font-size: clamp(18px, 5.4vw, 24px); font-weight: 900; color: var(--a); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.turn.sd { border-color: var(--no); background: rgba(255,95,109,.12); }
+.turn.sd .tv { color: var(--no); }
+.timer { font-size: 22px; font-weight: 900; color: var(--b); min-width: 36px; text-align: right; }
+.answers { flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.answers button { font-weight: 900; font-size: clamp(18px, 5.4vw, 24px); color: #10131f; min-height: 54px; }
+.a-yes { background: var(--yes); }
+.a-no { background: var(--no); }
+.a-sort { background: var(--sort); }
+.a-cant { background: var(--cant); color: var(--text) !important; font-size: clamp(15px, 4.4vw, 19px) !important; }
+.acts { flex: none; display: grid; grid-template-columns: 1.3fr 1.3fr 1fr; gap: 8px; margin-top: 8px; }
+.acts button { font-weight: 800; font-size: clamp(14px, 4.2vw, 18px); min-height: 50px; }
+.b-guess { background: linear-gradient(90deg, var(--a), var(--b)); color: #1a1020; }
+.b-blurt { background: var(--panel2); border: 1px solid var(--b) !important; color: var(--b); }
+.b-undo { background: var(--panel2); color: var(--muted); }
+.b-foul { background: var(--panel2); border: 1px solid var(--sort) !important; color: var(--sort); }
+.sdbar { flex: none; display: none; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.sdbar button { font-weight: 900; font-size: 20px; min-height: 56px; color: #10131f; }
+.lower { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.scores { display: flex; gap: 6px; overflow-x: auto; flex: none; padding-bottom: 2px; scrollbar-width: none; }
+.scores::-webkit-scrollbar { display: none; }
+.sc {
+  flex: none; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 4px 10px; font-size: 13px; text-align: center; min-width: 64px;
+}
+.sc b { display: block; font-size: 17px; }
+.sc.cur { border-color: var(--a); box-shadow: 0 0 0 1px var(--a) inset; }
+.sc.orc { opacity: .6; border-style: dashed; }
+.sc.bench { opacity: .4; text-decoration: line-through; }
+.log { flex: 1; min-height: 40px; background: var(--bg2); border-radius: 12px; padding: 6px 10px; font-size: 14px; }
+.log div { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.05); display: flex; gap: 8px; }
+.log .q { color: var(--muted); min-width: 34px; font-variant-numeric: tabular-nums; }
+.log .k-yes { color: var(--yes); font-weight: 800; }
+.log .k-no { color: var(--no); font-weight: 800; }
+.log .k-sort { color: var(--sort); font-weight: 800; }
+.log .k-x { color: var(--b); font-weight: 800; }
+.log .k-dim { color: var(--muted); }
+
+/* flash + overlays */
+#flash {
+  position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none;
+  font-size: clamp(60px, 22vw, 140px); font-weight: 900; opacity: 0; z-index: 40;
+  text-shadow: 0 6px 30px rgba(0,0,0,.6);
+}
+#flash.go { animation: flash .8s ease-out; }
+@keyframes flash { 0% { opacity: 0; transform: scale(.6); } 20% { opacity: 1; transform: scale(1.05); } 70% { opacity: 1; } 100% { opacity: 0; transform: scale(1); } }
+#peek {
+  position: fixed; inset: 0; z-index: 50; display: none; pointer-events: none;
+  background: rgba(8,10,20,.96); align-items: center; justify-content: center; padding: 20px;
+}
+#peek.on { display: flex; }
+.modal {
+  position: fixed; inset: 0; z-index: 30; display: none; align-items: flex-end; justify-content: center;
+  background: rgba(5,7,15,.7);
+}
+.modal.on { display: flex; }
+.sheet {
+  width: 100%; max-width: 640px; background: var(--panel); border-top: 2px solid var(--a);
+  border-radius: 20px 20px 0 0; padding: 16px 14px max(16px, env(safe-area-inset-bottom));
+  max-height: 85dvh; overflow-y: auto;
+}
+.sheet h2 { margin: 0 0 4px; font-size: clamp(20px, 6vw, 26px); }
+.sheet p { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+.sheet .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sheet .grid2 button { min-height: 56px; font-weight: 900; font-size: 19px; color: #10131f; }
+.pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.pick button { background: var(--panel2); font-weight: 700; padding: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* reveal / final */
+.pts { font-size: clamp(42px, 13vw, 64px); font-weight: 900; color: var(--gold); }
+.lb { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.lbr {
+  display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 8px 12px; font-size: 17px;
+}
+.lbr .rk { width: 28px; font-weight: 900; color: var(--muted); }
+.lbr .nm { flex: 1; min-width: 0; text-align: left; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lbr .pt { font-weight: 900; font-size: 20px; }
+.lbr .dl { font-size: 13px; color: var(--yes); min-width: 34px; text-align: right; }
+.lbr .dl.neg { color: var(--no); }
+.lbr.first { border-color: var(--gold); background: rgba(255,209,102,.1); }
+.awards { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; width: 100%; }
+.aw { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px; text-align: center; }
+.aw .ai { font-size: 24px; }
+.aw .at { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.aw .an { font-weight: 800; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stack { display: flex; flex-direction: column; gap: 8px; width: 100%; flex: none; }
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<section class="screen on" id="s-setup">
+  <div class="scroll" style="flex:1">
+    <h1 class="title">Twenty Down</h1>
+    <p class="tag">20 questions. One shared pot. Every answer helps your rivals.</p>
+
+    <div class="card">
+      <h3>Players (3–10)</h3>
+      <div id="plist"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="addP" style="flex:1">＋ Add player</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Secret decks</h3>
+      <div class="chips" id="deckChips"></div>
+    </div>
+
+    <div class="card">
+      <h3>Game length</h3>
+      <div class="seg" id="lapSeg">
+        <button data-v="1" class="on">Everyone Oracles once</button>
+        <button data-v="2">Twice</button>
+      </div>
+      <h3 style="margin-top:12px">Twist cards</h3>
+      <div class="seg" id="twSeg">
+        <button data-v="1" class="on">On</button>
+        <button data-v="0">Off</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>How to play</h3>
+      <ul class="rules" style="margin:0;padding-left:18px">
+        <li>Each round one player is the <b>Oracle</b> and secretly sees a thing. Everyone else is racing to name it.</li>
+        <li>Take turns asking <b>one yes/no question out loud</b>. The Oracle answers and taps it in. Each answer drains the shared <b>pot</b> by 1. Everyone hears every answer.</li>
+        <li>On your turn, you can <b>GUESS</b> instead of asking. Get it right and you bank whatever is left in the pot. A miss costs 1 and passes the turn.</li>
+        <li>Can't wait? <b>BLURT</b> a guess any time, even out of turn. A correct blurt banks the pot. A wrong one costs <b>−3</b> and benches you for the rest of the round.</li>
+        <li>At half pot the word lengths are revealed, and at a quarter the first letters. If the pot runs dry, it's <b>Sudden Death</b>: one guess each, worth 1 point.</li>
+        <li>The Oracle earns <b>+2</b> when the secret is solved (+1 if it only falls in Sudden Death), so give clear answers!</li>
+      </ul>
+    </div>
+  </div>
+  <div class="err" id="setupErr"></div>
+  <button class="btn primary" id="startBtn">Start game</button>
+</section>
+
+<!-- PASS TO ORACLE -->
+<section class="screen" id="s-pass">
+  <div class="center">
+    <div class="small" id="passRound">Round 1 of 4</div>
+    <div class="big">Hand the phone to</div>
+    <div class="who" id="passName">Name</div>
+    <div class="small">You are this round's <b style="color:var(--text)">Oracle</b>. Everyone else, look away.</div>
+  </div>
+  <button class="btn primary" id="showSecret">I'm the Oracle. Show me</button>
+</section>
+
+<!-- SECRET -->
+<section class="screen" id="s-secret">
+  <div class="center">
+    <div class="secretbox">
+      <div class="cat" id="secCat">Category</div>
+      <div class="sec" id="secWord">Secret</div>
+      <div class="small">Answer only <b style="color:var(--yes)">Yes</b>, <b style="color:var(--no)">No</b>, <b style="color:var(--sort)">Sort of</b> or <b style="color:var(--text)">Can't say</b>.</div>
+    </div>
+    <div class="twistcard" id="secTwist" style="display:none"></div>
+    <div class="small">During play you can <b style="color:var(--a)">hold 👁 Peek</b> to check the secret again.</div>
+  </div>
+  <button class="btn primary" id="hideStart">Got it. Hide it &amp; start</button>
+</section>
+
+<!-- PLAY -->
+<section class="screen" id="s-play">
+  <div class="top">
+    <div class="meta" id="pMeta"></div>
+    <button id="muteBtn" aria-label="Sound">🔊</button>
+    <button id="peekBtn">👁 Hold to peek</button>
+  </div>
+  <div class="potwrap">
+    <div class="pot" id="pot"><span id="potN">20</span><small>POT</small></div>
+    <div class="info">
+      <div class="catl">Category</div>
+      <div class="catv" id="pCat">Animals</div>
+      <div class="mask" id="pMask"></div>
+      <div class="nexthint" id="pNext"></div>
+      <div id="pTwist"></div>
+    </div>
+  </div>
+  <div class="turn" id="turnBox">
+    <div class="tw">
+      <div class="tl" id="turnL">Now asking</div>
+      <div class="tv" id="turnV">Name</div>
+    </div>
+    <div class="timer" id="timer"></div>
+  </div>
+  <div class="answers" id="answers">
+    <button class="a-yes" data-a="yes">YES</button>
+    <button class="a-no" data-a="no">NO</button>
+    <button class="a-sort" data-a="sort">SORT OF</button>
+    <button class="a-cant" data-a="cant">Can't say</button>
+  </div>
+  <div class="acts" id="acts">
+    <button class="b-guess" id="guessBtn">🎯 Guess</button>
+    <button class="b-blurt" id="blurtBtn">💥 Blurt</button>
+    <button class="b-foul" id="foulBtn" style="display:none">⚠ Foul</button>
+    <button class="b-undo" id="undoBtn">↩ Undo</button>
+  </div>
+  <div class="sdbar" id="sdbar">
+    <button class="a-yes" id="sdRight">✔ Right!</button>
+    <button class="a-no" id="sdWrong">✘ Wrong</button>
+  </div>
+  <div class="lower">
+    <div class="scores" id="scores"></div>
+    <div class="log scroll" id="log"></div>
+  </div>
+</section>
+
+<!-- REVEAL -->
+<section class="screen" id="s-reveal">
+  <div class="center scroll" style="justify-content:flex-start;padding-top:10px">
+    <div class="small" id="rvHead">It was…</div>
+    <div class="secretbox">
+      <div class="cat" id="rvCat"></div>
+      <div class="sec" id="rvWord"></div>
+    </div>
+    <div class="big" id="rvWho"></div>
+    <div class="pts" id="rvPts"></div>
+    <div class="small" id="rvNote"></div>
+    <div class="lb" id="rvLb"></div>
+  </div>
+  <div class="stack">
+    <button class="btn primary" id="nextRound">Next round</button>
+    <button class="btn ghost" id="rvUndo">↩ Oops, undo that last tap</button>
+  </div>
+</section>
+
+<!-- FINAL -->
+<section class="screen" id="s-final">
+  <div class="center scroll" style="justify-content:flex-start;padding-top:10px">
+    <h1 class="title" style="font-size:clamp(30px,9vw,46px)">Final Pot</h1>
+    <div class="big" id="fWin"></div>
+    <div class="lb" id="fLb"></div>
+    <div class="awards" id="fAw"></div>
+  </div>
+  <div class="stack">
+    <button class="btn primary" id="again">Play again (same players)</button>
+    <button class="btn ghost" id="toSetup">Change players / settings</button>
+  </div>
+</section>
+
+<!-- overlays -->
+<div id="flash"></div>
+<div id="peek">
+  <div class="secretbox" style="text-align:center">
+    <div class="cat" id="pkCat"></div>
+    <div class="sec" id="pkWord"></div>
+    <div class="small">Let go to hide</div>
+  </div>
+</div>
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+
+<script>
+const DECKS = {
+  animals: { name: 'Animals', icon: '🦁', items: ['Penguin','Giraffe','Octopus','Kangaroo','Hedgehog','Flamingo','Shark','Elephant','Sloth','Owl','Crocodile','Bee','Panda','Zebra','Camel','Dolphin','Squirrel','Peacock','Snail','Polar Bear','Jellyfish','Gorilla','Hamster','Bat','Lobster','Koala','Ostrich','Butterfly','Horse','Frog','Spider','Tortoise','Raccoon','Seahorse','Wolf','Parrot','Goldfish','Llama'] },
+  food: { name: 'Food & Drink', icon: '🍕', items: ['Pizza','Pancakes','Sushi','Popcorn','Banana','Spaghetti','Ice Cream','Hot Dog','Watermelon','Toast','Cheese','Chocolate','Taco','Orange Juice','Broccoli','Doughnut','Peanut Butter','Pineapple','Soup','French Fries','Birthday Cake','Lemonade','Cereal','Burrito','Strawberry','Hamburger','Egg','Popsicle','Pretzel','Coffee','Avocado','Cupcake','Carrot','Milkshake','Bubble Gum','Marshmallow','Salad','Onion'] },
+  home: { name: 'Around the House', icon: '🏠', items: ['Toothbrush','Fridge','Umbrella','Pillow','Remote Control','Toaster','Bathtub','Light Bulb','Scissors','Doorbell','Washing Machine','Mirror','Sofa','Alarm Clock','Spoon','Candle','Ladder','Vacuum Cleaner','Sock','Key','Blanket','Frying Pan','Television','Stapler','Hairdryer','Teapot','Bookshelf','Rubber Duck','Trash Can','Calendar','Doormat','Paperclip','Backpack','Smoke Alarm','Coat Hanger','Bunk Bed','Piggy Bank','Plunger'] },
+  places: { name: 'Places', icon: '🗺️', items: ['Eiffel Tower','Beach','Library','Airport','Moon','Volcano','Hospital','Zoo','Desert','Castle','Supermarket','North Pole','Cinema','Jungle','Swimming Pool','Pyramids','Farm','Bowling Alley','Museum','Space Station','Waterfall','Playground','Lighthouse','Train Station','Igloo','Theme Park','Statue of Liberty','Post Office','Cave','Treehouse','Great Wall of China','Bakery','Haunted House','Island','Car Wash','Stadium','Submarine','Graveyard'] },
+  jobs: { name: 'Jobs', icon: '👷', items: ['Firefighter','Astronaut','Dentist','Chef','Pilot','Teacher','Magician','Farmer','Lifeguard','Detective','Plumber','Clown','Librarian','Zookeeper','Pirate','Doctor','Mail Carrier','Scientist','Hairdresser','Referee','Lumberjack','Baker','Police Officer','Photographer','Vet','Bus Driver','Ballet Dancer','Knight','Archaeologist','Gardener','Judge','DJ','Lighthouse Keeper','Mechanic','Weather Forecaster','Spy','Cowboy','Beekeeper'] },
+  characters: { name: 'Famous Characters', icon: '🦸', items: ['Santa Claus','Cinderella','Superman','Pinocchio','Harry Potter','Mickey Mouse','Tooth Fairy','Sherlock Holmes','Spider-Man','Mario','Robin Hood','Dracula','Peter Pan','Shrek','Batman','Easter Bunny','Frankenstein','Little Red Riding Hood','SpongeBob','Elsa','Pikachu','King Arthur','Winnie the Pooh','Darth Vader','Tarzan','Captain Hook','Goldilocks','Wonder Woman','Big Bad Wolf','Mermaid','Genie','Snow White','Hulk','Yoda','Rapunzel','Paddington','Cookie Monster','Zombie'] },
+  sports: { name: 'Sports & Hobbies', icon: '⚽', items: ['Soccer','Skateboarding','Chess','Swimming','Basketball','Knitting','Bowling','Surfing','Fishing','Tennis','Karate','Camping','Gymnastics','Golf','Ice Skating','Baseball','Painting','Skiing','Juggling','Yoga','Video Games','Rock Climbing','Archery','Dancing','Cycling','Boxing','Gardening','Hide and Seek','Trampoline','Photography','Kite Flying','Snowboarding','Hula Hoop','Jigsaw Puzzle','Fencing','Marathon','Karaoke','Scuba Diving'] },
+  nature: { name: 'Nature & Space', icon: '🌋', items: ['Rainbow','Lightning','Snowflake','Sun','Tornado','Mushroom','Cactus','Iceberg','Comet','Puddle','Sunflower','Earthquake','Oak Tree','Black Hole','River','Fog','Pinecone','Seashell','Thunderstorm','Saturn','Coral Reef','Avalanche','Acorn','Shooting Star','Tide','Dandelion','Glacier','Sand Dune','Northern Lights','Hailstone','Rose','Meteor','Moss','Feather','Coconut','Rock','Solar Eclipse','Bamboo'] },
+};
+
+const TWISTS = [
+  { id: 'mystery', icon: '❓', name: 'Mystery Category', desc: 'The category stays hidden until the pot is half gone. The solver gets a +3 bonus.' },
+  { id: 'fuse', icon: '🧨', name: 'Short Fuse', desc: 'The pot starts at 12 instead of 20, but every point scored this round is doubled.' },
+  { id: 'three', icon: '✂️', name: 'Three Words Max', desc: 'Every question must be three words or fewer. The Oracle taps FOUL on a long one. It burns the turn and still costs 1 from the pot.' },
+  { id: 'noisit', icon: '🚫', name: 'No "Is it…"', desc: 'No question may start with "Is it". The Oracle taps FOUL if one does. It burns the turn and still costs 1 from the pot.' },
+  { id: 'potato', icon: '🥔', name: 'Hot Potato', desc: 'You get 12 seconds to ask your question. Run out of time and your turn passes, and the pot still drops.' },
+  { id: 'silent', icon: '🤐', name: 'Silent Oracle', desc: 'The Oracle may not speak, nod or point. Answers only appear on the screen. Askers, keep your eyes up!' },
+];
+
+const LS = 'cowork-twenty-down-';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pick = a => a[Math.random() * a.length | 0];
+const TURN_SECS = 12;
+
+/* ---------- settings ---------- */
+let cfg = { names: ['', '', ''], decks: Object.keys(DECKS), laps: 1, twists: true };
+try {
+  const s = JSON.parse(localStorage.getItem(LS + 'setup'));
+  if (s && Array.isArray(s.names) && s.names.length >= 3) cfg = { ...cfg, ...s, names: s.names.slice(0, 10) };
+} catch {}
+cfg.decks = (cfg.decks || []).filter(d => DECKS[d]);
+if (!cfg.decks.length) cfg.decks = Object.keys(DECKS);
+
+/* ---------- sound ---------- */
+let actx = null, muted = localStorage.getItem(LS + 'muted') === '1';
+function tone(freq, dur = 0.12, type = 'sine', vol = 0.15, delay = 0) {
+  if (muted) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch {}
+}
+const SFX = {
+  yes: () => { tone(660, .12, 'triangle'); tone(880, .16, 'triangle', .15, .1); },
+  no: () => { tone(300, .18, 'square', .07); tone(220, .22, 'square', .07, .12); },
+  sort: () => { tone(500, .1, 'triangle'); tone(560, .1, 'triangle', .15, .1); tone(500, .12, 'triangle', .15, .2); },
+  cant: () => tone(420, .1, 'sine', .08),
+  win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .22, 'triangle', .16, i * .1)),
+  bad: () => { tone(220, .25, 'sawtooth', .07); tone(160, .35, 'sawtooth', .07, .15); },
+  tick: () => tone(1200, .04, 'square', .04),
+  hint: () => { tone(988, .1, 'sine', .1); tone(1319, .15, 'sine', .1, .08); },
+};
+function syncMute() { $('muteBtn').textContent = muted ? '🔇' : '🔊'; }
+$('muteBtn').addEventListener('click', () => { muted = !muted; localStorage.setItem(LS + 'muted', muted ? '1' : '0'); syncMute(); });
+syncMute();
+
+/* ---------- screens, flash, modal ---------- */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+}
+function flash(text, color) {
+  const f = $('flash');
+  f.textContent = text; f.style.color = color;
+  f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+}
+let modalOpen = false;
+function openModal(html, bind) {
+  $('sheet').innerHTML = html; $('modal').classList.add('on'); modalOpen = true;
+  bind($('sheet'));
+}
+function closeModal() { $('modal').classList.remove('on'); modalOpen = false; }
+$('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+
+/* ---------- setup ---------- */
+function setupErr(m) { $('setupErr').textContent = m || ''; }
+function renderPlayers() {
+  const el = $('plist'); el.innerHTML = '';
+  cfg.names.forEach((n, i) => {
+    const r = document.createElement('div'); r.className = 'prow';
+    r.innerHTML = `<input maxlength="14" placeholder="Player ${i + 1}" value="${esc(n)}"><button aria-label="Remove player"${cfg.names.length <= 3 ? ' disabled' : ''}>✕</button>`;
+    const inp = r.querySelector('input');
+    inp.addEventListener('input', () => { cfg.names[i] = inp.value; setupErr(); });
+    r.querySelector('button').addEventListener('click', () => { cfg.names.splice(i, 1); renderPlayers(); });
+    el.appendChild(r);
+  });
+  $('addP').disabled = cfg.names.length >= 10;
+}
+$('addP').addEventListener('click', () => {
+  if (cfg.names.length >= 10) return;
+  cfg.names.push(''); renderPlayers();
+  const ins = $('plist').querySelectorAll('input'); ins[ins.length - 1].focus();
+});
+function renderDecks() {
+  const el = $('deckChips'); el.innerHTML = '';
+  Object.entries(DECKS).forEach(([k, d]) => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (cfg.decks.includes(k) ? ' on' : '');
+    b.textContent = `${d.icon} ${d.name}`;
+    b.addEventListener('click', () => {
+      if (cfg.decks.includes(k)) {
+        if (cfg.decks.length === 1) { setupErr('Keep at least one deck switched on.'); return; }
+        cfg.decks = cfg.decks.filter(x => x !== k);
+      } else cfg.decks.push(k);
+      setupErr(); renderDecks();
+    });
+    el.appendChild(b);
+  });
+}
+function bindSeg(id, get, set) {
+  const seg = $(id);
+  const sync = () => seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === String(get())));
+  seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { set(b.dataset.v); sync(); }));
+  sync();
+}
+bindSeg('lapSeg', () => cfg.laps, v => cfg.laps = +v);
+bindSeg('twSeg', () => cfg.twists ? 1 : 0, v => cfg.twists = v === '1');
+renderPlayers(); renderDecks();
+
+$('startBtn').addEventListener('click', () => {
+  const names = [];
+  cfg.names.forEach((n, i) => {
+    let base = n.trim() || `Player ${i + 1}`, nm = base, k = 2;
+    while (names.some(x => x.toLowerCase() === nm.toLowerCase())) nm = `${base} ${k++}`;
+    names.push(nm);
+  });
+  if (names.length < 3) { setupErr('You need at least 3 players.'); return; }
+  try { localStorage.setItem(LS + 'setup', JSON.stringify(cfg)); } catch {}
+  tone(1, .01, 'sine', .0001); // unlock audio on a user gesture
+  newGame(names);
+});
+
+/* ---------- game state ---------- */
+let G = null, R = null, undo = [];
+
+function newGame(names) {
+  G = {
+    players: names.map(name => ({ name, score: 0, solves: 0, blurts: 0, benches: 0 })),
+    round: 0, total: names.length * cfg.laps, used: [], orc: [], lastTwist: null,
+  };
+  nextRound();
+}
+const half = () => Math.ceil(R.start / 2);
+const quarter = () => Math.ceil(R.start / 4);
+const deckOf = () => DECKS[R.deck];
+const eligible = i => i !== R.oracle && !R.benched.includes(i);
+function nextAsker(from) {
+  const n = G.players.length;
+  for (let k = 1; k <= n; k++) { const j = (from + k) % n; if (eligible(j)) return j; }
+  return -1;
+}
+function pickSecret() {
+  let pool = cfg.decks.flatMap(d => DECKS[d].items.map(w => ({ d, w }))).filter(x => !G.used.includes(x.d + '|' + x.w));
+  if (!pool.length) { G.used = []; return pickSecret(); }
+  const s = pick(pool); G.used.push(s.d + '|' + s.w); return s;
+}
+function nextRound() {
+  G.round++;
+  if (G.round > G.total) return showFinal();
+  const oracle = (G.round - 1) % G.players.length;
+  const s = pickSecret();
+  let tw = null;
+  if (cfg.twists && G.round > 1 && Math.random() < 0.6) {
+    tw = pick(TWISTS.filter(t => t.id !== G.lastTwist));
+    G.lastTwist = tw.id;
+  } else G.lastTwist = null;
+  const start = tw && tw.id === 'fuse' ? 12 : 20;
+  R = {
+    oracle, deck: s.d, secret: s.w, twist: tw ? tw.id : null, start, pot: start,
+    turn: 0, benched: [], log: [], phase: 'ask', sd: [], sdi: 0, qn: 0, result: null,
+    before: G.players.map(p => p.score), deadline: 0,
+  };
+  R.turn = nextAsker(oracle);
+  undo = [];
+  $('passRound').textContent = `Round ${G.round} of ${G.total}`;
+  $('passName').textContent = G.players[oracle].name;
+  show('s-pass');
+}
+const twistObj = () => TWISTS.find(t => t.id === R.twist);
+
+$('showSecret').addEventListener('click', () => {
+  const d = deckOf();
+  $('secCat').textContent = `${d.icon} ${d.name}`;
+  $('secWord').textContent = R.secret;
+  const tw = twistObj(), tc = $('secTwist');
+  if (tw) { tc.style.display = ''; tc.innerHTML = `<div class="tn">${tw.icon} Twist: ${esc(tw.name)}</div><div class="td">${esc(tw.desc)}</div>`; }
+  else tc.style.display = 'none';
+  show('s-secret');
+});
+$('hideStart').addEventListener('click', () => {
+  R.deadline = performance.now() + TURN_SECS * 1000;
+  show('s-play'); renderPlay(true);
+  const tw = twistObj();
+  if (tw) setTimeout(() => flash(tw.icon, 'var(--b)'), 150);
+});
+
+/* ---------- undo ---------- */
+function snap() {
+  undo.push(JSON.stringify({ R, P: G.players }));
+  if (undo.length > 80) undo.shift();
+}
+function doUndo() {
+  if (!undo.length) return;
+  const s = JSON.parse(undo.pop());
+  R = s.R; G.players = s.P;
+  R.deadline = performance.now() + TURN_SECS * 1000;
+  closeModal(); show('s-play'); renderPlay();
+}
+$('undoBtn').addEventListener('click', doUndo);
+$('rvUndo').addEventListener('click', doUndo);
+
+/* ---------- hints ---------- */
+function maskHTML(secret, firsts) {
+  return secret.split(' ').map(w => {
+    let out = '', seen = false;
+    for (const ch of w) {
+      if (/[A-Za-z0-9]/.test(ch)) { out += firsts && !seen ? `<b>${esc(ch.toUpperCase())}</b>` : '<i></i>'; seen = true; }
+      else out += `<em>${esc(ch)}</em>`;
+    }
+    return `<span class="w">${out}</span>`;
+  }).join('');
+}
+const lengths = s => s.split(' ').map(w => (w.match(/[A-Za-z0-9]/g) || []).length).join(', ');
+
+/* ---------- play rendering ---------- */
+function addLog(html) { R.log.unshift(html); }
+function pName(i) { return esc(G.players[i].name); }
+
+function renderPlay(fresh) {
+  const sd = R.phase === 'sd', p = G.players;
+  const tw = twistObj();
+  $('pMeta').innerHTML = `Round <b>${G.round}/${G.total}</b><br>Oracle: <b>${pName(R.oracle)}</b>`;
+  const pot = $('pot');
+  pot.style.setProperty('--p', Math.max(0, R.pot) / R.start);
+  pot.classList.toggle('low', R.pot <= quarter());
+  $('potN').textContent = Math.max(0, R.pot);
+  if (!fresh) { pot.classList.remove('bump'); void pot.offsetWidth; pot.classList.add('bump'); }
+
+  const showMask = sd || R.pot <= half(), showFirst = sd || R.pot <= quarter();
+  const d = deckOf();
+  $('pCat').textContent = R.twist === 'mystery' && !showMask ? '❓ Mystery' : `${d.icon} ${d.name}`;
+  $('pMask').innerHTML = showMask ? maskHTML(R.secret, showFirst) : '';
+  $('pNext').textContent = !showMask ? `Word lengths revealed at pot ${half()}${R.twist === 'mystery' ? ' (with the category)' : ''}`
+    : !showFirst ? `(${lengths(R.secret)}) · first letters at pot ${quarter()}`
+    : `(${lengths(R.secret)})`;
+  $('pTwist').innerHTML = tw ? `<span class="twistchip">${tw.icon} ${esc(tw.name)}</span>` : '';
+
+  const tb = $('turnBox');
+  tb.classList.toggle('sd', sd);
+  if (sd) {
+    const who = R.sd[R.sdi];
+    $('turnL').textContent = `Sudden Death · one guess · ${R.twist === 'fuse' ? 2 : 1} pt`;
+    $('turnV').textContent = `${p[who].name}, guess!`;
+  } else {
+    $('turnL').textContent = R.twist === 'three' ? 'Ask in 3 words or fewer' : R.twist === 'noisit' ? 'Ask (no "Is it…")' : 'Ask a yes/no question';
+    $('turnV').textContent = p[R.turn].name;
+  }
+  $('answers').style.display = sd ? 'none' : '';
+  $('sdbar').style.display = sd ? 'grid' : 'none';
+  const foul = !sd && (R.twist === 'three' || R.twist === 'noisit');
+  $('foulBtn').style.display = foul ? '' : 'none';
+  $('guessBtn').style.display = sd ? 'none' : '';
+  $('blurtBtn').style.display = sd ? 'none' : '';
+  $('acts').style.gridTemplateColumns = sd ? '1fr' : foul ? '1.2fr 1.2fr 1fr 1fr' : '1.3fr 1.3fr 1fr';
+  $('blurtBtn').disabled = !p.some((_, i) => eligible(i));
+  $('undoBtn').disabled = !undo.length;
+  $('timer').textContent = ''; lastShown = -1;
+
+  $('scores').innerHTML = p.map((pl, i) => {
+    const cls = i === R.oracle ? 'orc' : R.benched.includes(i) ? 'bench' : (sd ? R.sd[R.sdi] === i : R.turn === i) ? 'cur' : '';
+    const tag = i === R.oracle ? '🔮 ' : '';
+    return `<div class="sc ${cls}">${tag}${esc(pl.name)}<b>${pl.score}</b></div>`;
+  }).join('');
+  const sc = $('scores'), cur = sc.querySelector('.cur');
+  if (cur) sc.scrollLeft = Math.max(0, cur.offsetLeft - sc.offsetLeft - (sc.clientWidth - cur.offsetWidth) / 2);
+  $('log').innerHTML = R.log.length ? R.log.map(h => `<div>${h}</div>`).join('')
+    : `<div><span class="k-dim">Questions and answers will appear here. ${pName(R.turn)} asks first.</span></div>`;
+}
+
+/* ---------- actions ---------- */
+const KIND = {
+  yes: { t: 'YES', c: 'var(--yes)', cls: 'k-yes' },
+  no: { t: 'NO', c: 'var(--no)', cls: 'k-no' },
+  sort: { t: 'SORT OF', c: 'var(--sort)', cls: 'k-sort' },
+};
+function drain(logHTML) {
+  R.qn++; R.pot--;
+  addLog(`<span class="q">Q${R.qn}</span><span>${logHTML}</span>`);
+  if (R.pot === half() || R.pot === quarter()) setTimeout(SFX.hint, 350);
+  R.turn = nextAsker(R.turn);
+  R.deadline = performance.now() + TURN_SECS * 1000;
+  if (R.turn < 0) return endRound();
+  if (R.pot <= 0) return enterSD();
+  renderPlay();
+}
+function answer(kind) {
+  if (R.phase !== 'ask' || modalOpen) return;
+  snap();
+  if (kind === 'cant') {
+    addLog(`<span class="q">·</span><span>${pName(R.turn)}: <span class="k-dim">"can't say". Ask again, free</span></span>`);
+    flash('?', 'var(--cant)'); SFX.cant();
+    renderPlay(true); return;
+  }
+  const k = KIND[kind];
+  flash(k.t, k.c); SFX[kind]();
+  drain(`${pName(R.turn)} → <span class="${k.cls}">${k.t}</span>`);
+}
+document.querySelectorAll('#answers button').forEach(b => b.addEventListener('click', () => answer(b.dataset.a)));
+
+$('foulBtn').addEventListener('click', () => {
+  if (R.phase !== 'ask') return;
+  snap(); flash('FOUL', 'var(--sort)'); SFX.bad();
+  drain(`${pName(R.turn)} → <span class="k-x">FOUL</span> <span class="k-dim">(${R.twist === 'three' ? 'too many words' : '"Is it…"'})</span>`);
+});
+
+function judgeSheet(title, sub, onRight, onWrong) {
+  openModal(`<h2>${title}</h2><p>${sub}</p>
+    <div class="grid2"><button class="a-yes" data-r="1">✔ Right!</button><button class="a-no" data-r="0">✘ Wrong</button></div>
+    <button class="btn ghost" data-r="x" style="width:100%;margin-top:8px">Cancel</button>`, sh => {
+    sh.querySelectorAll('[data-r]').forEach(b => b.addEventListener('click', () => {
+      const r = b.dataset.r; closeModal();
+      if (r === '1') onRight(); else if (r === '0') onWrong();
+    }));
+  });
+}
+$('guessBtn').addEventListener('click', () => {
+  if (R.phase !== 'ask') return;
+  const i = R.turn;
+  judgeSheet(`🎯 ${pName(i)} guesses`, `Say your guess out loud. Oracle, is it right? Right banks <b style="color:var(--gold)">${potValue()}</b>. Wrong costs 1 from the pot.`,
+    () => { snap(); solve(i, 'guess'); },
+    () => { snap(); flash('✘', 'var(--no)'); SFX.bad(); drain(`${pName(i)} guessed <span class="k-x">WRONG</span>`); });
+});
+function potValue() {
+  let v = R.pot + (R.twist === 'mystery' ? 3 : 0);
+  return R.twist === 'fuse' ? v * 2 : v;
+}
+$('blurtBtn').addEventListener('click', () => {
+  if (R.phase !== 'ask') return;
+  const opts = G.players.map((pl, i) => i).filter(eligible);
+  openModal(`<h2>💥 Who's blurting?</h2><p>Right banks <b style="color:var(--gold)">${potValue()}</b>. Wrong costs <b style="color:var(--no)">−3</b> and benches you for the rest of the round.</p>
+    <div class="pick">${opts.map(i => `<button data-i="${i}">${pName(i)}</button>`).join('')}</div>
+    <button class="btn ghost" data-i="x" style="width:100%">Cancel</button>`, sh => {
+    sh.querySelectorAll('[data-i]').forEach(b => b.addEventListener('click', () => {
+      if (b.dataset.i === 'x') return closeModal();
+      const i = +b.dataset.i;
+      judgeSheet(`💥 ${pName(i)} blurts!`, 'Shout it out. Oracle, is it right?',
+        () => { snap(); solve(i, 'blurt'); },
+        () => { snap(); blurtFail(i); });
+    }));
+  });
+});
+function blurtFail(i) {
+  const pl = G.players[i];
+  pl.score -= 3; pl.benches++; R.benched.push(i);
+  addLog(`<span class="q">💥</span><span>${pName(i)} blurted <span class="k-x">WRONG</span>: −3, benched</span>`);
+  flash('−3', 'var(--no)'); SFX.bad();
+  if (R.turn === i) { R.turn = nextAsker(i); R.deadline = performance.now() + TURN_SECS * 1000; }
+  if (R.turn < 0) return endRound();
+  renderPlay(true);
+}
+
+/* ---------- sudden death ---------- */
+function enterSD() {
+  R.phase = 'sd';
+  const n = G.players.length, order = [];
+  for (let k = 0; k < n; k++) { const j = (R.turn + k) % n; if (eligible(j)) order.push(j); }
+  R.sd = order; R.sdi = 0;
+  if (!order.length) return endRound();
+  addLog(`<span class="q">☠</span><span class="k-x">Pot empty! SUDDEN DEATH</span>`);
+  flash('☠', 'var(--no)'); SFX.bad();
+  renderPlay();
+}
+$('sdRight').addEventListener('click', () => { if (R.phase !== 'sd') return; snap(); solve(R.sd[R.sdi], 'sd'); });
+$('sdWrong').addEventListener('click', () => {
+  if (R.phase !== 'sd') return;
+  snap();
+  addLog(`<span class="q">☠</span><span>${pName(R.sd[R.sdi])} guessed <span class="k-x">WRONG</span></span>`);
+  SFX.bad(); R.sdi++;
+  if (R.sdi >= R.sd.length) return endRound();
+  flash('✘', 'var(--no)'); renderPlay(true);
+});
+
+/* ---------- round end ---------- */
+function solve(i, how) {
+  const sd = how === 'sd';
+  let pts = sd ? 1 : R.pot + (R.twist === 'mystery' ? 3 : 0);
+  if (R.twist === 'fuse') pts *= 2;
+  const op = sd ? 1 : 2;
+  const pl = G.players[i];
+  pl.score += pts; pl.solves++; if (how === 'blurt') pl.blurts++;
+  G.players[R.oracle].score += op;
+  R.result = { solver: i, how, pts, op };
+  R.phase = 'done';
+  SFX.win(); showReveal();
+}
+function endRound() {
+  R.result = { solver: null };
+  R.phase = 'done';
+  SFX.bad(); showReveal();
+}
+function showReveal() {
+  const r = R.result, d = deckOf(), p = G.players;
+  $('rvCat').textContent = `${d.icon} ${d.name}`;
+  $('rvWord').textContent = R.secret;
+  if (r.solver != null) {
+    const how = { guess: 'got it on their turn!', blurt: 'BLURTED it out!', sd: 'survived Sudden Death!' }[r.how];
+    $('rvHead').textContent = 'Solved! It was…';
+    $('rvWho').innerHTML = `${pName(r.solver)} <span style="font-size:.55em;color:var(--muted);font-weight:700">${how}</span>`;
+    $('rvPts').textContent = `+${r.pts}`;
+    const extras = [];
+    if (r.how !== 'sd' && R.twist === 'mystery') extras.push('includes +3 mystery bonus');
+    if (R.twist === 'fuse') extras.push('Short Fuse doubled');
+    $('rvNote').textContent = `${extras.length ? extras.join(' · ') + ' · ' : ''}Oracle ${p[R.oracle].name} +${r.op} · ${R.qn} question${R.qn === 1 ? '' : 's'} used`;
+  } else {
+    $('rvHead').textContent = 'Nobody got it! It was…';
+    $('rvWho').textContent = 'The secret survives';
+    $('rvPts').textContent = '0';
+    $('rvNote').textContent = `${R.qn} questions used · no points this round`;
+  }
+  const order = p.map((pl, i) => i).sort((a, b) => p[b].score - p[a].score);
+  $('rvLb').innerHTML = order.map((i, k) => {
+    const dl = p[i].score - R.before[i];
+    return `<div class="lbr ${k === 0 ? 'first' : ''}"><span class="rk">${rankOf(i)}</span><span class="nm">${i === R.oracle ? '🔮 ' : ''}${pName(i)}</span><span class="dl ${dl < 0 ? 'neg' : ''}">${dl ? (dl > 0 ? '+' : '') + dl : ''}</span><span class="pt">${p[i].score}</span></div>`;
+  }).join('');
+  $('nextRound').textContent = G.round >= G.total ? 'See final scores' : 'Next round';
+  $('rvUndo').style.display = undo.length ? '' : 'none';
+  show('s-reveal');
+}
+function rankOf(i) {
+  const s = G.players[i].score;
+  return 1 + G.players.filter(pl => pl.score > s).length;
+}
+$('nextRound').addEventListener('click', () => {
+  G.orc.push({ oracle: R.oracle, solved: R.result.solver != null, qn: R.qn });
+  nextRound();
+});
+
+/* ---------- final ---------- */
+function showFinal() {
+  const p = G.players;
+  const order = p.map((pl, i) => i).sort((a, b) => p[b].score - p[a].score);
+  const top = p[order[0]].score, winners = order.filter(i => p[i].score === top);
+  $('fWin').innerHTML = winners.length > 2
+    ? `🤝 ${winners.length}-way tie for first!`
+    : winners.length > 1
+    ? `🤝 ${winners.map(pName).join(' &amp; ')} tie!`
+    : `🏆 ${pName(winners[0])} wins!`;
+  $('fLb').innerHTML = order.map(i => `<div class="lbr ${p[i].score === top ? 'first' : ''}"><span class="rk">${rankOf(i)}</span><span class="nm">${pName(i)}</span><span class="pt">${p[i].score}</span></div>`).join('');
+  const joinNames = ns => ns.length > 2 ? `${ns.length}-way tie` : ns.join(' & ');
+  const best = (key) => {
+    const m = Math.max(...p.map(pl => pl[key]));
+    return m > 0 ? joinNames(p.filter(pl => pl[key] === m).map(pl => pl.name)) : '—';
+  };
+  const solvedOrc = G.orc.filter(o => o.solved);
+  let clear = '—';
+  if (solvedOrc.length) {
+    const m = Math.min(...solvedOrc.map(o => o.qn));
+    clear = joinNames([...new Set(solvedOrc.filter(o => o.qn === m).map(o => p[o.oracle].name))]) + ` (${m}Q)`;
+  }
+  const aw = [
+    ['🎯', 'Sharpest', best('solves')],
+    ['💥', 'Bold Blurter', best('blurts')],
+    ['🔮', 'Clearest Oracle', clear],
+    ['🪑', 'Benchwarmer', best('benches')],
+  ];
+  $('fAw').innerHTML = aw.map(([i, t, n]) => `<div class="aw"><div class="ai">${i}</div><div class="at">${t}</div><div class="an">${esc(n)}</div></div>`).join('');
+  SFX.win();
+  show('s-final');
+}
+$('again').addEventListener('click', () => newGame(G.players.map(p => p.name)));
+$('toSetup').addEventListener('click', () => { renderPlayers(); show('s-setup'); });
+
+/* ---------- peek (press-and-hold) ---------- */
+const peekBtn = $('peekBtn');
+function peekOn(e) {
+  if (!R) return;
+  e.preventDefault();
+  try { peekBtn.setPointerCapture(e.pointerId); } catch {}
+  const d = deckOf();
+  $('pkCat').textContent = `${d.icon} ${d.name}`;
+  $('pkWord').textContent = R.secret;
+  $('peek').classList.add('on');
+}
+function peekOff() { $('peek').classList.remove('on'); }
+peekBtn.addEventListener('pointerdown', peekOn);
+['pointerup', 'pointercancel', 'pointerleave', 'lostpointercapture'].forEach(ev => peekBtn.addEventListener(ev, peekOff));
+peekBtn.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('blur', peekOff);
+document.addEventListener('visibilitychange', peekOff);
+
+/* ---------- hot potato timer ---------- */
+let lastT = performance.now(), lastShown = -1;
+setInterval(() => {
+  const now = performance.now(), dt = now - lastT; lastT = now;
+  if (!R || R.twist !== 'potato' || R.phase !== 'ask' || !$('s-play').classList.contains('on')) return;
+  if (modalOpen || $('peek').classList.contains('on') || document.hidden) { R.deadline += dt; return; }
+  const left = Math.ceil((R.deadline - now) / 1000);
+  if (left !== lastShown) {
+    lastShown = left;
+    $('timer').textContent = Math.max(0, left);
+    if (left <= 3 && left > 0) SFX.tick();
+  }
+  if (now >= R.deadline) {
+    snap(); flash('⏰', 'var(--b)'); SFX.bad();
+    drain(`${pName(R.turn)} → <span class="k-x">OUT OF TIME</span>`);
+    lastShown = -1;
+  }
+}, 100);
+</script>
+</body>
+</html>

@@ -1,0 +1,1172 @@
+<!-- CONCEPT: DRAWING/DESCRIBE (telephone chain) - "Broken Sketch": pass-the-phone drawing telephone where a secret prompt is drawn, the next player only sees the drawing and writes what they think it is, the next draws THAT, and so on down the chain - then the whole room watches the reveal card-by-card to see how "a penguin doing yoga" became "grandpa fighting a lamp". Optional Memory Mode hides the drawing before you guess. 130 prompts, trophy voting for Best Drawing and Biggest Derailment | Players: 3-10 | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Broken Sketch</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #0a0713;
+  --panel: #17102a;
+  --panel2: #211738;
+  --line: #362a55;
+  --ink: #f3eeff;
+  --dim: #a494c9;
+  --a: #ff3d9a;
+  --b: #35e0ff;
+  --c: #ffd23d;
+  --good: #45e88a;
+  --pad: clamp(10px, 3vw, 16px);
+  --r: 16px;
+}
+
+html, body {
+  margin: 0; padding: 0;
+  height: 100%;
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(900px 500px at 12% -10%, rgba(255,61,154,.20), transparent 60%),
+    radial-gradient(800px 500px at 92% 105%, rgba(53,224,255,.16), transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app { position: relative; z-index: 1; height: 100%; }
+
+.screen {
+  position: absolute; inset: 0;
+  display: none;
+  flex-direction: column;
+  padding: var(--pad);
+  gap: var(--pad);
+}
+.screen.on { display: flex; }
+
+.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+h1 {
+  margin: 0;
+  font-size: clamp(30px, 9vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -.02em;
+  font-weight: 800;
+  background: linear-gradient(100deg, var(--a), var(--c) 55%, var(--b));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tag {
+  color: var(--dim);
+  font-size: clamp(12px, 3.4vw, 15px);
+  line-height: 1.45;
+}
+
+/* ---------- buttons ---------- */
+button {
+  font-family: inherit;
+  font-size: clamp(15px, 4vw, 18px);
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  min-height: 48px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: transform .08s ease, filter .15s ease;
+}
+button:active { transform: scale(.97); }
+button:disabled { opacity: .4; cursor: default; }
+
+.big {
+  min-height: 62px;
+  font-size: clamp(18px, 5vw, 22px);
+  border: none;
+  color: #14071c;
+  background: linear-gradient(100deg, var(--a), var(--c));
+  box-shadow: 0 8px 26px rgba(255,61,154,.28);
+}
+.big.cool { background: linear-gradient(100deg, var(--b), var(--good)); box-shadow: 0 8px 26px rgba(53,224,255,.24); }
+.ghost { background: transparent; }
+
+/* ---------- setup ---------- */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: var(--pad);
+}
+.lbl {
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--dim); font-weight: 700; margin-bottom: 8px;
+}
+.plist { display: flex; flex-direction: column; gap: 8px; }
+.prow { display: flex; gap: 8px; align-items: center; }
+input[type=text] {
+  flex: 1; min-width: 0;
+  font-family: inherit; font-size: clamp(15px, 4.2vw, 18px); font-weight: 600;
+  color: var(--ink); background: var(--panel2);
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 13px 14px; min-height: 48px;
+  user-select: text; -webkit-user-select: text;
+}
+input[type=text]:focus { outline: none; border-color: var(--a); }
+.xbtn { min-height: 48px; width: 48px; padding: 0; font-size: 20px; color: var(--dim); background: transparent; }
+
+.opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.opt {
+  flex: 1 1 0; min-width: 68px; min-height: 48px;
+  padding: 10px 8px; font-size: clamp(13px, 3.6vw, 15px);
+}
+.opt.sel { background: linear-gradient(100deg, rgba(255,61,154,.35), rgba(53,224,255,.28)); border-color: var(--a); }
+
+.toggle {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; text-align: left; min-height: 56px;
+}
+.knob {
+  flex: none; width: 50px; height: 30px; border-radius: 15px;
+  background: var(--panel2); border: 1px solid var(--line); position: relative; transition: background .18s;
+}
+.knob::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--dim); transition: transform .18s, background .18s;
+}
+.toggle.on .knob { background: linear-gradient(100deg, var(--a), var(--c)); border-color: transparent; }
+.toggle.on .knob::after { transform: translateX(20px); background: #fff; }
+.tt { flex: 1; }
+.tt b { display: block; font-size: clamp(14px, 4vw, 17px); }
+.tt span { display: block; font-weight: 500; font-size: 12px; color: var(--dim); margin-top: 3px; line-height: 1.35; }
+
+.err { color: var(--a); font-size: 13px; font-weight: 700; min-height: 18px; }
+
+/* ---------- handoff ---------- */
+#handoff { align-items: center; justify-content: center; text-align: center; }
+.passer { font-size: clamp(15px, 4.4vw, 19px); color: var(--dim); font-weight: 700; }
+.pname {
+  font-size: clamp(38px, 13vw, 76px); font-weight: 800; line-height: 1.05;
+  background: linear-gradient(100deg, var(--b), var(--a));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  word-break: break-word; max-width: 100%;
+}
+.job {
+  font-size: clamp(14px, 4vw, 18px); font-weight: 700; color: var(--c);
+  border: 1px dashed rgba(255,210,61,.5); border-radius: 999px; padding: 10px 18px;
+}
+.eyes { font-size: clamp(44px, 16vw, 90px); }
+
+/* ---------- play ---------- */
+.top { display: flex; align-items: center; gap: 10px; }
+.who { flex: 1; min-width: 0; }
+.who b { display: block; font-size: clamp(15px, 4.4vw, 19px); }
+.who span { display: block; font-size: 12px; color: var(--dim); font-weight: 600; margin-top: 2px; }
+.chip {
+  flex: none; font-size: 12px; font-weight: 800; color: var(--dim);
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 999px; padding: 7px 12px;
+}
+.bar { height: 8px; border-radius: 4px; background: var(--panel2); overflow: hidden; flex: none; }
+.bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--good), var(--c)); transition: width .2s linear; }
+.bar.warn i { background: linear-gradient(90deg, var(--c), var(--a)); }
+
+.secret {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 11px 14px; flex: none;
+}
+.secret .lbl { margin-bottom: 4px; }
+.secret p { margin: 0; font-size: clamp(16px, 4.6vw, 21px); font-weight: 700; line-height: 1.25; }
+
+.stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+canvas {
+  background: #fff; border-radius: 12px; display: block;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5);
+  touch-action: none;
+}
+#pad { cursor: crosshair; }
+
+.cover {
+  position: absolute; inset: 0;
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  text-align: center; padding: 20px;
+}
+.cover.on { display: flex; }
+.cover .big-emo { font-size: clamp(48px, 18vw, 96px); }
+.cover p { margin: 0; color: var(--dim); font-weight: 700; font-size: clamp(14px, 4vw, 17px); }
+
+.tools { display: flex; flex-direction: column; gap: 8px; flex: none; }
+.swatches { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+.sw {
+  width: 44px; height: 44px; min-height: 44px; padding: 0;
+  border-radius: 12px; border: 2px solid transparent; position: relative;
+}
+.sw.sel { border-color: var(--ink); transform: scale(1.06); }
+.trow { display: flex; gap: 7px; }
+.trow button { flex: 1; min-height: 48px; padding: 8px 4px; font-size: clamp(13px, 3.6vw, 16px); }
+.szdot { display: inline-block; border-radius: 50%; background: var(--ink); vertical-align: middle; }
+.trow button.sel { border-color: var(--b); background: rgba(53,224,255,.16); }
+
+.guessbox { flex: none; display: flex; flex-direction: column; gap: 8px; }
+
+/* ---------- reveal ---------- */
+.rcard {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
+  padding: var(--pad); text-align: center;
+  animation: pop .3s ease;
+}
+@keyframes pop { from { opacity: 0; transform: scale(.96) translateY(8px); } to { opacity: 1; transform: none; } }
+.rwho { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); font-weight: 800; }
+.rtext {
+  font-size: clamp(22px, 7vw, 38px); font-weight: 800; line-height: 1.2;
+  word-break: break-word;
+  background: linear-gradient(100deg, var(--c), var(--a));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.rtext.seed { background: linear-gradient(100deg, var(--b), var(--good)); -webkit-background-clip: text; background-clip: text; }
+.rimg { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; width: 100%; }
+
+.finale { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.fbox { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.fbox .lbl { margin-bottom: 5px; }
+.fbox p { margin: 0; font-size: clamp(16px, 4.8vw, 22px); font-weight: 800; line-height: 1.25; word-break: break-word; }
+.verdict { font-size: clamp(18px, 5.4vw, 26px); font-weight: 800; }
+
+/* ---------- awards ---------- */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.pick {
+  padding: 8px; border-radius: 12px; background: var(--panel);
+  border: 1px solid var(--line); cursor: pointer; min-height: 44px;
+  display: flex; flex-direction: column; gap: 6px; align-items: center;
+  font-size: 12px; font-weight: 700; color: var(--dim);
+  text-align: center; word-break: break-word;
+}
+.pick canvas { width: 100%; height: auto; box-shadow: none; }
+.pick .ptxt {
+  width: 100%; padding: 10px 6px; border-radius: 8px; background: var(--panel2);
+  color: var(--ink); font-size: clamp(12px, 3.4vw, 15px); font-weight: 700; line-height: 1.25;
+  display: flex; align-items: center; justify-content: center; min-height: 62px;
+}
+.pick:active { transform: scale(.97); }
+
+.board { display: flex; flex-direction: column; gap: 7px; }
+.brow {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 11px 13px;
+}
+.brow .nm { flex: 1; font-weight: 700; font-size: clamp(14px, 4vw, 17px); word-break: break-word; }
+.brow .tr { font-size: clamp(14px, 4vw, 18px); letter-spacing: 2px; }
+.brow .pts { font-weight: 800; color: var(--c); font-size: clamp(15px, 4.2vw, 19px); }
+.brow.lead { border-color: var(--c); background: rgba(255,210,61,.09); }
+
+.foot { display: flex; gap: 8px; flex: none; }
+.foot button { flex: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ SETUP ============ -->
+  <section class="screen on scroll" id="setup">
+    <div>
+      <h1>Broken<br>Sketch</h1>
+      <p class="tag">Draw the secret. Pass the phone. The next player only sees your drawing &mdash; and writes what they <i>think</i> it is. Then someone draws <i>that</i>. Watch it fall apart together.</p>
+    </div>
+
+    <div class="card">
+      <div class="lbl">Players (3&ndash;10)</div>
+      <div class="plist" id="plist"></div>
+      <button class="ghost" id="addP" style="margin-top:8px;width:100%">+ Add player</button>
+    </div>
+
+    <div class="card">
+      <div class="lbl">Time to draw</div>
+      <div class="opts" id="dtOpts"></div>
+      <div class="lbl" style="margin-top:14px">Time to guess</div>
+      <div class="opts" id="gtOpts"></div>
+    </div>
+
+    <div class="card" style="padding:4px var(--pad)">
+      <button class="toggle ghost" id="memT">
+        <span class="knob"></span>
+        <span class="tt"><b>Memory Mode</b><span>The drawing vanishes before you type your guess. Much funnier. Much worse.</span></span>
+      </button>
+      <div style="height:1px;background:var(--line)"></div>
+      <button class="toggle ghost" id="ownT">
+        <span class="knob"></span>
+        <span class="tt"><b>Write our own prompt</b><span>The first player types the starting phrase instead of using the 130-prompt deck.</span></span>
+      </button>
+    </div>
+
+    <div class="err" id="setupErr"></div>
+    <button class="big" id="startBtn">Start the chain</button>
+    <div class="tag" style="text-align:center;padding-bottom:6px">One phone, passed around the room.</div>
+  </section>
+
+  <!-- ============ HANDOFF ============ -->
+  <section class="screen" id="handoff">
+    <div class="eyes" id="hEmo">📵</div>
+    <div class="passer" id="hPass">Pass the phone to</div>
+    <div class="pname" id="hName">&nbsp;</div>
+    <div class="job" id="hJob">&nbsp;</div>
+    <div class="tag" id="hNote" style="text-align:center;max-width:30ch">Nobody else look.</div>
+    <button class="big" id="hGo" style="width:100%;max-width:420px">I'm ready</button>
+  </section>
+
+  <!-- ============ DRAW ============ -->
+  <section class="screen" id="draw">
+    <div class="top">
+      <div class="who"><b id="dWho">&nbsp;</b><span id="dSub">&nbsp;</span></div>
+      <div class="chip" id="dTime">&mdash;</div>
+    </div>
+    <div class="bar" id="dBarWrap"><i id="dBar"></i></div>
+    <div class="secret">
+      <div class="lbl" id="dLbl">Draw this</div>
+      <p id="dPrompt">&nbsp;</p>
+    </div>
+    <div class="stage"><canvas id="pad"></canvas></div>
+    <div class="tools">
+      <div class="swatches" id="sw"></div>
+      <div class="trow" id="sizes"></div>
+      <div class="trow">
+        <button id="undoB">↶ Undo</button>
+        <button id="clearB">Clear</button>
+      </div>
+    </div>
+    <button class="big cool" id="doneDraw">Done drawing →</button>
+  </section>
+
+  <!-- ============ GUESS ============ -->
+  <section class="screen" id="guess">
+    <div class="top">
+      <div class="who"><b id="gWho">&nbsp;</b><span id="gSub">&nbsp;</span></div>
+      <div class="chip" id="gTime">&mdash;</div>
+    </div>
+    <div class="bar" id="gBarWrap"><i id="gBar"></i></div>
+    <div class="stage">
+      <canvas id="view"></canvas>
+      <div class="cover" id="gCover">
+        <div class="big-emo">🙈</div>
+        <p>Time's up &mdash; from memory now!</p>
+      </div>
+    </div>
+    <div class="guessbox">
+      <input type="text" id="gInput" maxlength="70" placeholder="What is it?" autocomplete="off" autocapitalize="sentences" spellcheck="false">
+      <button class="big cool" id="doneGuess">Lock it in →</button>
+    </div>
+  </section>
+
+  <!-- ============ SEED (own prompt) ============ -->
+  <section class="screen" id="seed">
+    <div class="top">
+      <div class="who"><b id="sWho">&nbsp;</b><span>Write the secret starting phrase</span></div>
+    </div>
+    <div class="stage" style="flex-direction:column;gap:14px;padding:10px">
+      <div style="font-size:clamp(48px,18vw,96px)">🤫</div>
+      <p class="tag" style="text-align:center;max-width:32ch">Something drawable and a bit ridiculous. Nobody else sees this until the reveal.</p>
+    </div>
+    <div class="guessbox">
+      <input type="text" id="sInput" maxlength="70" placeholder="e.g. a penguin doing yoga" autocomplete="off" autocapitalize="sentences" spellcheck="false">
+      <button class="ghost" id="sDice">🎲 Surprise me</button>
+      <button class="big" id="sDone">Lock it in →</button>
+    </div>
+  </section>
+
+  <!-- ============ REVEAL ============ -->
+  <section class="screen" id="reveal">
+    <div class="top">
+      <div class="who"><b>The Reveal</b><span id="rSub">&nbsp;</span></div>
+      <div class="chip" id="rStep">&mdash;</div>
+    </div>
+    <div class="rcard" id="rCard"></div>
+    <button class="big" id="rNext">Next →</button>
+  </section>
+
+  <!-- ============ AWARDS ============ -->
+  <section class="screen scroll" id="awards">
+    <div>
+      <h1 style="font-size:clamp(26px,8vw,42px)" id="aTitle">Trophies</h1>
+      <p class="tag" id="aSub">&nbsp;</p>
+    </div>
+    <div class="grid" id="aGrid"></div>
+    <button class="ghost" id="aSkip">Skip this one</button>
+  </section>
+
+  <!-- ============ SCORES ============ -->
+  <section class="screen scroll" id="scores">
+    <div>
+      <h1 style="font-size:clamp(26px,8vw,42px)">Trophy Case</h1>
+      <p class="tag">🏆 Best Drawing = 2 &nbsp;·&nbsp; 🌀 Biggest Derailment = 1 (yes, that's a compliment)</p>
+    </div>
+    <div class="board" id="board"></div>
+    <div class="foot">
+      <button class="ghost" id="newGame">New game</button>
+      <button class="big" id="nextRound" style="flex:2">Next chain →</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+'use strict';
+
+/* ===================== data ===================== */
+
+const PROMPTS = [
+  "a penguin doing yoga","a shark riding a skateboard","a cat DJing a wedding","a giraffe stuck in an elevator",
+  "a hedgehog in a hot air balloon","an octopus juggling teapots","a snail winning a marathon","a flamingo teaching math",
+  "a bear squeezed into a phone booth","a llama at the dentist","a squirrel robbing a bank","a walrus doing ballet",
+  "a chicken driving a school bus","a sloth speed dating","a raccoon selling used cars","a frog with a huge mustache",
+  "a whale wearing sneakers","a pigeon running a bakery","a moose on a trampoline","a crab playing the drums",
+  "a dinosaur ordering coffee","a hamster lifting weights","a peacock in a laundromat","an owl reading tarot cards",
+  "a goat in a spacesuit","a jellyfish riding a bicycle","a bat hanging from a chandelier","a koala doing taxes",
+  "a lobster at a job interview","a swan pumping gas",
+  "grandma winning a street race","a burglar stuck in a chimney","someone sneezing in a quiet library",
+  "a wedding cake tipping over","a first date at a car wash","a mime trapped in a real box",
+  "a barber cutting a lion's hair","the very last slice of pizza","a clown changing a flat tire",
+  "a toddler stealing a hat","a plumber inside a submarine","a lifeguard who is afraid of water",
+  "a knight in the supermarket","a ghost doing laundry","a robot learning to dance","a wizard microwaving soup",
+  "a vampire at the beach","a pirate parallel parking","a chef juggling knives","a janitor finding treasure",
+  "a librarian at a rock concert","a cowboy on a scooter","a scientist tasting her own potion",
+  "a mailman chased by geese","a taxi driver napping at a red light","a farmer flying a kite",
+  "a firefighter afraid of cats","an astronaut mowing the lawn","a detective losing his hat","a magic trick gone wrong",
+  "spaghetti sliding off a table","a donut that came alive","an avocado in armor","a pineapple wearing sunglasses",
+  "a hot dog walking a dog","two tacos getting married","a cupcake with a mohawk","a banana slipping on a person",
+  "one very angry pickle","a sushi roll on a skateboard","a burger doing pushups","a lonely french fry",
+  "an egg escaping a frying pan","a watermelon in a tuxedo","a cheese wheel rolling downhill",
+  "a nervous marshmallow","a pizza slice surfing","soup with eyes","popcorn escaping the bowl","a carrot at the gym",
+  "an alien tourist taking selfies","a dragon with a toothache","a unicorn in a traffic jam","a robot with a broken arm",
+  "a wizard's exploding hat","a UFO abducting a cow","a time traveler with a dead battery","a mermaid using a phone",
+  "a zombie out jogging","a knight fighting a vacuum cleaner","a giant baby in the city","a ninja stuck in traffic",
+  "a superhero doing the dishes","a genie stuck in a soda can","a yeti at a barbecue","a troll under a bridge waving",
+  "a cyborg cat","a haunted refrigerator","an evil snowman","a spaceship made of cardboard",
+  "a bowling ball hitting a piano","a skier who hates snow","a boxer punching a pillow","a swimmer in a bathtub",
+  "a soccer ball with legs","a golfer in quicksand","an ice skater on grass","a weightlifter lifting a feather",
+  "a marathon runner eating cake","a very tiny basketball player",
+  "a sad traffic cone","a proud mailbox","a shy volcano","an angry teapot","a lovesick lamp","a lazy tornado",
+  "a jealous cactus","a confused compass","a heroic paperclip","a dramatic umbrella",
+  "the moon eating a star","a cloud raining spaghetti","a tree wearing shoes","an island with one tiny house",
+  "a rainbow tied in a knot","a mountain with a zipper","a river flowing upward","a house on chicken legs",
+  "a lighthouse afraid of the dark","a bridge made of pancakes"
+];
+
+const PALETTE = ['#141018','#e63946','#f77f00','#ffd23d','#3fa34d','#118ab2','#3d5af1','#9b5de5','#ff70a6','#8a5a2b'];
+const SIZES = [
+  { w: .008, dot: 5,  name: 'Fine' },
+  { w: .020, dot: 9,  name: 'Med' },
+  { w: .045, dot: 15, name: 'Fat' }
+];
+const TIME_OPTS = [30, 50, 80, 0];
+const GTIME_OPTS = [20, 35, 60, 0];
+const STORE = 'cowork-brokensketch-';
+
+/* ===================== state ===================== */
+
+const G = {
+  names: [],
+  drawTime: 50,
+  guessTime: 35,
+  memory: false,
+  ownPrompt: false,
+  trophies: {},           // name -> {best, derail}
+  chain: [],              // {kind:'seed'|'draw'|'guess', player, text?, strokes?}
+  turn: 0,                // index into chain currently being produced
+  handoffMode: 'turn',    // 'turn' = hand to next player, 'reveal' = gather everyone
+  deck: [],               // shuffled prompt deck so chains don't repeat in one session
+  linkCount: 4,           // draw/guess links after the seed
+  starter: 0,
+  round: 1,
+  awardStep: 0
+};
+
+const $ = id => document.getElementById(id);
+const screens = ['setup','handoff','draw','guess','seed','reveal','awards','scores'];
+function show(id) {
+  screens.forEach(s => $(s).classList.toggle('on', s === id));
+  if (id !== 'draw' && id !== 'guess') stopTimer();
+}
+
+/* ===================== setup screen ===================== */
+
+function loadSaved() {
+  try {
+    const n = JSON.parse(localStorage.getItem(STORE + 'players'));
+    if (Array.isArray(n) && n.length >= 3) G.names = n.slice(0, 10);
+    const s = JSON.parse(localStorage.getItem(STORE + 'settings'));
+    if (s) {
+      if (TIME_OPTS.includes(s.drawTime)) G.drawTime = s.drawTime;
+      if (GTIME_OPTS.includes(s.guessTime)) G.guessTime = s.guessTime;
+      G.memory = !!s.memory;
+      G.ownPrompt = !!s.ownPrompt;
+    }
+  } catch (e) { /* ignore bad storage */ }
+  if (!G.names.length) G.names = ['', '', '', ''];
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(STORE + 'settings', JSON.stringify({
+      drawTime: G.drawTime, guessTime: G.guessTime, memory: G.memory, ownPrompt: G.ownPrompt
+    }));
+  } catch (e) { /* ignore */ }
+}
+
+function renderPlayers() {
+  const box = $('plist');
+  box.innerHTML = '';
+  G.names.forEach((nm, i) => {
+    const row = document.createElement('div');
+    row.className = 'prow';
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.value = nm;
+    inp.maxLength = 14;
+    inp.placeholder = 'Player ' + (i + 1);
+    inp.autocomplete = 'off';
+    inp.addEventListener('input', () => { G.names[i] = inp.value; });
+    row.appendChild(inp);
+    const x = document.createElement('button');
+    x.className = 'xbtn';
+    x.textContent = '✕';
+    x.setAttribute('aria-label', 'Remove player');
+    x.addEventListener('click', () => {
+      if (G.names.length <= 3) return;
+      G.names.splice(i, 1);
+      renderPlayers();
+    });
+    row.appendChild(x);
+    box.appendChild(row);
+  });
+  $('addP').disabled = G.names.length >= 10;
+}
+
+function renderOpts(hostId, list, current, onPick) {
+  const host = $(hostId);
+  host.innerHTML = '';
+  list.forEach(v => {
+    const b = document.createElement('button');
+    b.className = 'opt' + (v === current ? ' sel' : '');
+    b.textContent = v === 0 ? '∞ none' : v + 's';
+    b.addEventListener('click', () => { onPick(v); });
+    host.appendChild(b);
+  });
+}
+
+function renderToggles() {
+  $('memT').classList.toggle('on', G.memory);
+  $('ownT').classList.toggle('on', G.ownPrompt);
+}
+
+function refreshSetup() {
+  renderOpts('dtOpts', TIME_OPTS, G.drawTime, v => { G.drawTime = v; refreshSetup(); saveSettings(); });
+  renderOpts('gtOpts', GTIME_OPTS, G.guessTime, v => { G.guessTime = v; refreshSetup(); saveSettings(); });
+  renderToggles();
+}
+
+$('addP').addEventListener('click', () => {
+  if (G.names.length >= 10) return;
+  G.names.push('');
+  renderPlayers();
+});
+$('memT').addEventListener('click', () => { G.memory = !G.memory; renderToggles(); saveSettings(); });
+$('ownT').addEventListener('click', () => { G.ownPrompt = !G.ownPrompt; renderToggles(); saveSettings(); });
+
+$('startBtn').addEventListener('click', () => {
+  const clean = G.names.map(n => n.trim()).filter(Boolean);
+  if (clean.length < 3) { $('setupErr').textContent = 'Need at least 3 named players.'; return; }
+  const lower = clean.map(n => n.toLowerCase());
+  if (new Set(lower).size !== lower.length) { $('setupErr').textContent = 'Two players share a name — make them different.'; return; }
+  $('setupErr').textContent = '';
+  G.names = clean;
+  try { localStorage.setItem(STORE + 'players', JSON.stringify(clean)); } catch (e) { /* ignore */ }
+  G.trophies = {};
+  clean.forEach(n => { G.trophies[n] = { best: 0, derail: 0 }; });
+  G.round = 1;
+  G.starter = 0;
+  startChain();
+});
+
+/* ===================== chain construction ===================== */
+
+// Deal from a shuffled deck so one session never repeats a prompt until the deck runs dry.
+function dealPrompt() {
+  if (!G.deck.length) {
+    G.deck = PROMPTS.slice();
+    for (let i = G.deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = G.deck[i]; G.deck[i] = G.deck[j]; G.deck[j] = t;
+    }
+  }
+  return G.deck.pop();
+}
+
+// Links after the seed alternate draw, guess, draw, guess... and must end on a guess.
+function plannedLinks(n) {
+  let k = n - (G.ownPrompt ? 1 : 0);
+  if (k < 2) k = 2;
+  if (k % 2) k += 1;
+  return Math.min(k, 10);
+}
+
+function startChain() {
+  const n = G.names.length;
+  G.linkCount = plannedLinks(n);
+  G.chain = [];
+  G.turn = 0;
+
+  const seedAuthor = G.ownPrompt ? G.names[G.starter % n] : null;
+  G.chain.push({ kind: 'seed', player: seedAuthor, text: '' });
+
+  const first = G.starter + (G.ownPrompt ? 1 : 0);
+  for (let i = 0; i < G.linkCount; i++) {
+    G.chain.push({
+      kind: i % 2 === 0 ? 'draw' : 'guess',
+      player: G.names[(first + i) % n],
+      text: '',
+      strokes: []
+    });
+  }
+
+  if (G.ownPrompt) {
+    G.turn = 0;
+    goHandoff();
+  } else {
+    G.chain[0].text = dealPrompt();
+    G.turn = 1;
+    goHandoff();
+  }
+}
+
+function currentLink() { return G.chain[G.turn]; }
+
+function goHandoff() {
+  const link = currentLink();
+  G.handoffMode = 'turn';
+  const job = link.kind === 'guess' ? 'YOU WILL GUESS' : 'YOU WILL DRAW';
+  $('hEmo').textContent = link.kind === 'guess' ? '💭' : '✏️';
+  $('hPass').textContent = 'Pass the phone to';
+  $('hName').textContent = link.player;
+  $('hJob').textContent = job;
+  $('hNote').textContent = link.kind === 'guess'
+    ? 'You will only see the drawing — not the words behind it.'
+    : (link.kind === 'seed' ? 'You write the secret phrase that starts everything.' : 'Only you see the words you are drawing.');
+  if (link.kind === 'seed') { $('hEmo').textContent = '🤫'; $('hJob').textContent = 'YOU WRITE THE SECRET'; }
+  $('hGo').textContent = link.player + ", I'm ready";
+  show('handoff');
+}
+
+$('hGo').addEventListener('click', () => {
+  if (G.handoffMode === 'reveal') { drawRevealCard(); return; }
+  const link = currentLink();
+  if (!link) return;
+  if (link.kind === 'seed') openSeed();
+  else if (link.kind === 'draw') openDraw();
+  else openGuess();
+});
+
+/* ===================== timer ===================== */
+
+let timerId = null;
+function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
+
+function runTimer(seconds, chipId, barId, wrapId, onEnd) {
+  stopTimer();
+  const bar = $(barId), chip = $(chipId), wrap = $(wrapId);
+  wrap.classList.remove('warn');
+  if (!seconds) {
+    chip.textContent = '∞';
+    bar.style.width = '100%';
+    return;
+  }
+  const end = Date.now() + seconds * 1000;
+  const tick = () => {
+    const left = Math.max(0, end - Date.now());
+    const pct = (left / (seconds * 1000)) * 100;
+    bar.style.width = pct + '%';
+    chip.textContent = Math.ceil(left / 1000) + 's';
+    wrap.classList.toggle('warn', pct < 30);
+    if (left <= 0) { stopTimer(); onEnd(); }
+  };
+  tick();
+  timerId = setInterval(tick, 200);
+}
+
+/* ===================== seed screen ===================== */
+
+function openSeed() {
+  const link = currentLink();
+  $('sWho').textContent = link.player;
+  $('sInput').value = '';
+  show('seed');
+  setTimeout(() => $('sInput').focus(), 120);
+}
+
+$('sDice').addEventListener('click', () => {
+  $('sInput').value = dealPrompt();
+});
+
+$('sDone').addEventListener('click', () => {
+  const v = $('sInput').value.trim();
+  G.chain[0].text = v || dealPrompt();
+  G.chain[0].player = currentLink().player;
+  $('sInput').blur();
+  advance();
+});
+
+/* ===================== drawing ===================== */
+
+const pad = $('pad');
+const pctx = pad.getContext('2d');
+let padSize = 300;
+let curColor = 0, curSize = 1;
+let drawing = false, active = null;
+
+function fitCanvas(cv, ctx) {
+  const stage = cv.parentElement;
+  const w = stage.clientWidth, h = stage.clientHeight;
+  const size = Math.max(120, Math.floor(Math.min(w, h)));
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  cv.style.width = size + 'px';
+  cv.style.height = size + 'px';
+  cv.width = Math.floor(size * dpr);
+  cv.height = Math.floor(size * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return size;
+}
+
+function paint(ctx, strokes, size) {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, size, size);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  strokes.forEach(s => {
+    const col = PALETTE[s.c] || PALETTE[0];
+    const lw = Math.max(1, s.w * size);
+    const p = s.pts;
+    if (p.length <= 2) {
+      ctx.beginPath();
+      ctx.arc(p[0] * size, p[1] * size, lw / 2, 0, Math.PI * 2);
+      ctx.fillStyle = col;
+      ctx.fill();
+      return;
+    }
+    ctx.strokeStyle = col;
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.moveTo(p[0] * size, p[1] * size);
+    for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i] * size, p[i + 1] * size);
+    ctx.stroke();
+  });
+}
+
+function renderPad() { paint(pctx, currentLink().strokes, padSize); }
+
+function buildTools() {
+  const sw = $('sw');
+  sw.innerHTML = '';
+  PALETTE.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.className = 'sw' + (i === curColor ? ' sel' : '');
+    b.style.background = c;
+    b.setAttribute('aria-label', 'Color ' + (i + 1));
+    b.addEventListener('click', () => { curColor = i; buildTools(); });
+    sw.appendChild(b);
+  });
+  const sz = $('sizes');
+  sz.innerHTML = '';
+  SIZES.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.className = i === curSize ? 'sel' : '';
+    b.innerHTML = '<span class="szdot" style="width:' + s.dot + 'px;height:' + s.dot + 'px"></span> ' + s.name;
+    b.addEventListener('click', () => { curSize = i; buildTools(); });
+    sz.appendChild(b);
+  });
+}
+
+function padPoint(e) {
+  const r = pad.getBoundingClientRect();
+  return [
+    Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)),
+    Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))
+  ];
+}
+
+pad.addEventListener('pointerdown', e => {
+  if (!$('draw').classList.contains('on')) return;
+  e.preventDefault();
+  pad.setPointerCapture(e.pointerId);
+  drawing = true;
+  const [x, y] = padPoint(e);
+  active = { c: curColor, w: SIZES[curSize].w, pts: [x, y] };
+  currentLink().strokes.push(active);
+  renderPad();
+});
+
+pad.addEventListener('pointermove', e => {
+  if (!drawing || !active) return;
+  e.preventDefault();
+  const [x, y] = padPoint(e);
+  const n = active.pts.length;
+  const dx = x - active.pts[n - 2], dy = y - active.pts[n - 1];
+  if (dx * dx + dy * dy < 0.000004) return;   // skip micro-jitter
+  active.pts.push(x, y);
+  // incremental segment for responsiveness
+  pctx.lineCap = 'round'; pctx.lineJoin = 'round';
+  pctx.strokeStyle = PALETTE[active.c];
+  pctx.lineWidth = Math.max(1, active.w * padSize);
+  pctx.beginPath();
+  pctx.moveTo(active.pts[n - 2] * padSize, active.pts[n - 1] * padSize);
+  pctx.lineTo(x * padSize, y * padSize);
+  pctx.stroke();
+});
+
+function endStroke(e) {
+  if (!drawing) return;
+  drawing = false;
+  active = null;
+  if (e && e.pointerId !== undefined && pad.hasPointerCapture && pad.hasPointerCapture(e.pointerId)) {
+    pad.releasePointerCapture(e.pointerId);
+  }
+}
+pad.addEventListener('pointerup', endStroke);
+pad.addEventListener('pointercancel', endStroke);
+
+$('undoB').addEventListener('click', () => {
+  const s = currentLink().strokes;
+  if (s.length) { s.pop(); renderPad(); }
+});
+$('clearB').addEventListener('click', () => {
+  currentLink().strokes.length = 0;
+  renderPad();
+});
+
+function openDraw() {
+  const link = currentLink();
+  const prev = G.chain[G.turn - 1];
+  $('dWho').textContent = link.player;
+  $('dSub').textContent = 'Link ' + G.turn + ' of ' + G.linkCount + '  ·  Chain ' + G.round;
+  $('dLbl').textContent = prev.kind === 'seed' ? 'The secret prompt — draw it' : 'Draw exactly what it says';
+  $('dPrompt').textContent = prev.text;
+  buildTools();
+  show('draw');
+  requestAnimationFrame(() => {
+    padSize = fitCanvas(pad, pctx);
+    renderPad();
+    runTimer(G.drawTime, 'dTime', 'dBar', 'dBarWrap', () => finishDraw(true));
+  });
+}
+
+function finishDraw(auto) {
+  if (!$('draw').classList.contains('on')) return;
+  endStroke(null);
+  stopTimer();
+  advance();
+}
+$('doneDraw').addEventListener('click', () => finishDraw(false));
+
+/* ===================== guessing ===================== */
+
+const view = $('view');
+const vctx = view.getContext('2d');
+
+function openGuess() {
+  const link = currentLink();
+  const prev = G.chain[G.turn - 1];
+  $('gWho').textContent = link.player;
+  $('gSub').textContent = 'Link ' + G.turn + ' of ' + G.linkCount + '  ·  What did ' + prev.player + ' draw?';
+  $('gInput').value = '';
+  $('gCover').classList.remove('on');
+  show('guess');
+  requestAnimationFrame(() => {
+    const size = fitCanvas(view, vctx);
+    paint(vctx, prev.strokes, size);
+    if (G.memory) {
+      // With no guess deadline, still take the drawing away after a fixed peek —
+      // otherwise Memory Mode would silently do nothing.
+      const peek = G.guessTime ? Math.max(4, Math.round(G.guessTime * 0.4)) : 10;
+      runTimer(peek, 'gTime', 'gBar', 'gBarWrap', () => {
+        $('gCover').classList.add('on');
+        if (G.guessTime) runTimer(G.guessTime - peek, 'gTime', 'gBar', 'gBarWrap', () => finishGuess(true));
+        else runTimer(0, 'gTime', 'gBar', 'gBarWrap', () => {});
+        setTimeout(() => $('gInput').focus(), 60);
+      });
+    } else {
+      runTimer(G.guessTime, 'gTime', 'gBar', 'gBarWrap', () => finishGuess(true));
+      setTimeout(() => $('gInput').focus(), 150);
+    }
+  });
+}
+
+function finishGuess(auto) {
+  if (!$('guess').classList.contains('on')) return;
+  stopTimer();
+  const v = $('gInput').value.trim();
+  currentLink().text = v || (auto ? '…no idea…' : '…no idea…');
+  $('gInput').blur();
+  advance();
+}
+$('doneGuess').addEventListener('click', () => finishGuess(false));
+$('gInput').addEventListener('keydown', e => { if (e.key === 'Enter') finishGuess(false); });
+$('sInput').addEventListener('keydown', e => { if (e.key === 'Enter') $('sDone').click(); });
+
+/* ===================== advance ===================== */
+
+function advance() {
+  G.turn++;
+  if (G.turn >= G.chain.length) startReveal();
+  else goHandoff();
+}
+
+/* ===================== reveal ===================== */
+
+let rIdx = 0;
+
+function startReveal() {
+  rIdx = 0;
+  G.handoffMode = 'reveal';
+  $('hEmo').textContent = '👀';
+  $('hPass').textContent = 'Everyone gather round';
+  $('hName').textContent = 'THE REVEAL';
+  $('hJob').textContent = 'CHAIN ' + G.round;
+  $('hNote').textContent = 'Nobody explain anything yet. Just watch.';
+  $('hGo').textContent = 'Show us the damage';
+  show('handoff');
+}
+
+function drawRevealCard() {
+  show('reveal');
+  const card = $('rCard');
+  card.innerHTML = '';
+  const total = G.chain.length;
+
+  if (rIdx >= total) { showFinale(); return; }
+
+  const link = G.chain[rIdx];
+  $('rStep').textContent = (rIdx + 1) + ' / ' + (total + 1);
+  $('rSub').textContent = rIdx === 0 ? 'How it started' : 'Link ' + rIdx + ' of ' + G.linkCount;
+
+  const who = document.createElement('div');
+  who.className = 'rwho';
+  if (link.kind === 'seed') who.textContent = link.player ? link.player + ' wrote' : 'The deck dealt';
+  else if (link.kind === 'draw') who.textContent = link.player + ' drew';
+  else who.textContent = link.player + ' saw that and wrote';
+  card.appendChild(who);
+
+  if (link.kind === 'draw') {
+    const wrap = document.createElement('div');
+    wrap.className = 'rimg';
+    const cv = document.createElement('canvas');
+    wrap.appendChild(cv);
+    card.appendChild(wrap);
+    requestAnimationFrame(() => {
+      const s = Math.max(120, Math.floor(Math.min(wrap.clientWidth, wrap.clientHeight)));
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      cv.style.width = s + 'px'; cv.style.height = s + 'px';
+      cv.width = Math.floor(s * dpr); cv.height = Math.floor(s * dpr);
+      const c = cv.getContext('2d');
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      paint(c, link.strokes, s);
+    });
+  } else {
+    const t = document.createElement('div');
+    t.className = 'rtext' + (link.kind === 'seed' ? ' seed' : '');
+    t.textContent = '“' + link.text + '”';
+    card.appendChild(t);
+  }
+
+  $('rNext').textContent = rIdx === total - 1 ? 'So… how did we do? →' : 'Next →';
+}
+
+$('rNext').addEventListener('click', () => {
+  if (rIdx >= G.chain.length) { startAwards(); return; }
+  rIdx++;
+  drawRevealCard();
+});
+
+function normalize(s) {
+  return (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function overlap(a, b) {
+  const stop = new Set(['a','an','the','of','in','on','at','with','and','is','to','his','her','their','some','very','one']);
+  const wa = normalize(a).split(' ').filter(w => w.length > 2 && !stop.has(w));
+  const wb = new Set(normalize(b).split(' ').filter(w => w.length > 2 && !stop.has(w)));
+  if (!wa.length) return 0;
+  let hit = 0;
+  wa.forEach(w => { if (wb.has(w)) hit++; });
+  return hit / wa.length;
+}
+
+function showFinale() {
+  const card = $('rCard');
+  card.innerHTML = '';
+  $('rStep').textContent = 'end';
+  $('rSub').textContent = 'Start vs finish';
+
+  const seed = G.chain[0].text;
+  const last = G.chain[G.chain.length - 1].text;
+  const score = overlap(seed, last);
+
+  const box = document.createElement('div');
+  box.className = 'finale';
+  box.innerHTML =
+    '<div class="fbox"><div class="lbl">It started as</div><p style="color:var(--b)">“' + esc(seed) + '”</p></div>' +
+    '<div style="font-size:26px">⬇️</div>' +
+    '<div class="fbox"><div class="lbl">It ended as</div><p style="color:var(--a)">“' + esc(last) + '”</p></div>';
+  card.appendChild(box);
+
+  const v = document.createElement('div');
+  v.className = 'verdict';
+  if (score >= 0.6) { v.textContent = '🎯 Practically telepathic.'; v.style.color = 'var(--good)'; }
+  else if (score >= 0.3) { v.textContent = '😅 Bruised, but alive.'; v.style.color = 'var(--c)'; }
+  else { v.textContent = '💀 Total collapse. Beautiful.'; v.style.color = 'var(--a)'; }
+  card.appendChild(v);
+
+  $('rNext').textContent = 'Hand out trophies →';
+  rIdx = G.chain.length;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/* ===================== awards ===================== */
+
+function startAwards() { G.awardStep = 0; renderAwards(); }
+
+function renderAwards() {
+  show('awards');
+  const grid = $('aGrid');
+  grid.innerHTML = '';
+
+  if (G.awardStep === 0) {
+    $('aTitle').textContent = '🏆 Best Drawing';
+    $('aSub').textContent = 'Tap the drawing the room loved most. Shout it out, majority wins.';
+    G.chain.forEach((link, i) => {
+      if (link.kind !== 'draw') return;
+      const b = document.createElement('div');
+      b.className = 'pick';
+      const cv = document.createElement('canvas');
+      cv.width = 220; cv.height = 220;
+      paint(cv.getContext('2d'), link.strokes, 220);
+      b.appendChild(cv);
+      const nm = document.createElement('div');
+      nm.textContent = link.player;
+      b.appendChild(nm);
+      b.addEventListener('click', () => {
+        G.trophies[link.player].best++;
+        G.awardStep = 1;
+        renderAwards();
+      });
+      grid.appendChild(b);
+    });
+  } else {
+    $('aTitle').textContent = '🌀 Biggest Derailment';
+    $('aSub').textContent = 'Tap the link where the chain went gloriously off the rails.';
+    G.chain.forEach((link, i) => {
+      if (i === 0) return;
+      const b = document.createElement('div');
+      b.className = 'pick';
+      if (link.kind === 'draw') {
+        const cv = document.createElement('canvas');
+        cv.width = 220; cv.height = 220;
+        paint(cv.getContext('2d'), link.strokes, 220);
+        b.appendChild(cv);
+      } else {
+        const t = document.createElement('div');
+        t.className = 'ptxt';
+        t.textContent = '“' + link.text + '”';
+        b.appendChild(t);
+      }
+      const nm = document.createElement('div');
+      nm.textContent = link.player;
+      b.appendChild(nm);
+      b.addEventListener('click', () => {
+        G.trophies[link.player].derail++;
+        renderScores();
+      });
+      grid.appendChild(b);
+    });
+  }
+}
+
+$('aSkip').addEventListener('click', () => {
+  if (G.awardStep === 0) { G.awardStep = 1; renderAwards(); }
+  else renderScores();
+});
+
+/* ===================== scores ===================== */
+
+function renderScores() {
+  show('scores');
+  const rows = G.names.map(n => {
+    const t = G.trophies[n] || { best: 0, derail: 0 };
+    return { n, t, pts: t.best * 2 + t.derail };
+  }).sort((a, b) => b.pts - a.pts);
+
+  const top = rows.length ? rows[0].pts : 0;
+  const board = $('board');
+  board.innerHTML = '';
+  rows.forEach(r => {
+    const d = document.createElement('div');
+    d.className = 'brow' + (r.pts === top && top > 0 ? ' lead' : '');
+    d.innerHTML =
+      '<span class="nm">' + esc(r.n) + '</span>' +
+      '<span class="tr">' + '🏆'.repeat(r.t.best) + '🌀'.repeat(r.t.derail) + '</span>' +
+      '<span class="pts">' + r.pts + '</span>';
+    board.appendChild(d);
+  });
+}
+
+$('nextRound').addEventListener('click', () => {
+  G.round++;
+  G.starter = (G.starter + 1) % G.names.length;
+  startChain();
+});
+$('newGame').addEventListener('click', () => {
+  stopTimer();
+  refreshSetup();
+  renderPlayers();
+  show('setup');
+});
+
+/* ===================== resize ===================== */
+
+let rt = null;
+window.addEventListener('resize', () => {
+  clearTimeout(rt);
+  rt = setTimeout(() => {
+    if ($('draw').classList.contains('on')) {
+      padSize = fitCanvas(pad, pctx);
+      renderPad();
+    } else if ($('guess').classList.contains('on')) {
+      const s = fitCanvas(view, vctx);
+      paint(vctx, G.chain[G.turn - 1].strokes, s);
+    } else if ($('reveal').classList.contains('on')) {
+      drawRevealCard();
+    }
+  }, 140);
+});
+
+/* ===================== boot ===================== */
+
+loadSaved();
+renderPlayers();
+refreshSetup();
+buildTools();
+</script>
+</body>
+</html>

@@ -1,0 +1,811 @@
+<!-- CONCEPT: SYNCHRONIZED SHOUT / WORD DEFENCE - "Contact!": one Keeper secretly locks a word into the phone and only its first letter goes up on the shared screen; the other players hunt for any word starting with those letters, give each other riddle clues out loud, and when someone thinks they know the clue-giver's word they cry CONTACT! and the pair count down together to shout it in unison - unless the Keeper names their word first and slams BLOCK. Every successful contact forces the Keeper to reveal another letter until the whole word falls (or someone makes contact on the secret word itself). The phone runs the countdown, checks every logged word against the prefix, burns used words, tracks blocks and contacts, and keeps a rotating-Keeper scoreboard | Players: 3-10 | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Contact! — Keeper Standoff</title>
+<style>
+:root {
+  --bg: #0c0f1c;
+  --bg2: #141a2e;
+  --panel: #1a2140;
+  --panel2: #222b52;
+  --line: #2f3a6b;
+  --text: #eef1ff;
+  --muted: #9aa4d0;
+  --a: #ff4fa3;
+  --b: #ffb640;
+  --c: #3ee0c5;
+  --warn: #ff5a5a;
+  --ok: #47e08a;
+  --key: #8f7bff;
+  --radius: 16px;
+  --gap: clamp(8px, 2.4vw, 14px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+  background: radial-gradient(circle at 20% 0%, #1d1440 0%, var(--bg) 55%);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+button {
+  font: inherit; color: inherit; cursor: pointer;
+  min-height: 48px; border: 0; border-radius: 12px;
+  padding: 10px 16px; font-weight: 700;
+  background: var(--panel2);
+  font-size: clamp(15px, 4vw, 18px);
+  transition: transform .08s ease, filter .15s ease;
+}
+button:active { transform: scale(.96); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+button.primary { background: linear-gradient(90deg, var(--a), var(--b)); color: #1a0b1c; }
+button.teal { background: linear-gradient(90deg, var(--c), #3aa0ff); color: #06201c; }
+button.ghost { background: transparent; border: 2px solid var(--line); }
+button.danger { background: var(--warn); color: #2a0606; }
+button.keeper { background: var(--key); color: #120b30; }
+input[type=text] {
+  font: inherit; font-size: clamp(16px, 4.2vw, 20px);
+  min-height: 48px; padding: 8px 12px; width: 100%;
+  border-radius: 12px; border: 2px solid var(--line);
+  background: var(--bg2); color: var(--text);
+  user-select: text; -webkit-user-select: text;
+}
+input[type=text]:focus { outline: none; border-color: var(--c); }
+#app {
+  height: 100%; max-width: 720px; margin: 0 auto;
+  display: flex; flex-direction: column;
+}
+.screen {
+  display: none; flex: 1; min-height: 0;
+  flex-direction: column; gap: var(--gap);
+  padding: 12px clamp(12px, 4vw, 24px) 14px;
+  overflow-y: auto;
+}
+.screen.on { display: flex; }
+h1 {
+  margin: 4px 0 0; text-align: center;
+  font-size: clamp(38px, 12vw, 64px); font-weight: 900; letter-spacing: 1px;
+  background: linear-gradient(90deg, var(--a), var(--b));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+h2 { margin: 0; font-size: clamp(20px, 5.6vw, 28px); text-align: center; }
+.tag { text-align: center; color: var(--muted); font-size: clamp(13px, 3.6vw, 16px); margin: 0; }
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.card h3 { margin: 0; font-size: clamp(14px, 3.8vw, 17px); color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > * { flex: 1; }
+.row > .shrink { flex: 0 0 auto; }
+.players { display: flex; flex-wrap: wrap; gap: 8px; }
+.pchip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--panel2); border-radius: 999px;
+  padding: 0 2px 0 14px; min-height: 48px; font-weight: 600;
+}
+.pchip button { min-height: 44px; min-width: 44px; padding: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 18px; }
+.seg { display: flex; gap: 6px; }
+.seg button { flex: 1; padding: 8px 4px; font-size: clamp(13px, 3.6vw, 16px); background: var(--bg2); border: 2px solid var(--line); }
+.seg button.sel { border-color: var(--c); background: #103a3a; color: var(--c); }
+.optlabel { font-size: clamp(13px, 3.6vw, 15px); color: var(--muted); margin-bottom: -4px; }
+.spacer { flex: 1; }
+.big-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* Handoff */
+.handoff { justify-content: center; align-items: center; text-align: center; }
+.handoff .who { font-size: clamp(34px, 11vw, 56px); font-weight: 900; color: var(--key); margin: 6px 0; word-break: break-word; }
+.eye { font-size: 64px; }
+
+/* Secret entry */
+.secret-hint { color: var(--muted); font-size: 14px; margin: 0; }
+.secret-err { color: var(--warn); font-weight: 700; min-height: 20px; font-size: 14px; margin: 0; }
+
+/* Board */
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: clamp(13px, 3.6vw, 16px); color: var(--muted); }
+.topbar b { color: var(--text); }
+.timer { font-variant-numeric: tabular-nums; font-weight: 800; font-size: clamp(18px, 5vw, 24px); color: var(--c); }
+.timer.low { color: var(--warn); }
+.tiles { --n: 8; display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 6px 0; }
+.tile {
+  --w: min(54px, calc((min(100vw, 720px) - 56px) / var(--n) - 4px));
+  width: var(--w); height: calc(var(--w) * 1.3);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-size: calc(var(--w) * .72); font-weight: 900;
+  background: var(--bg2); border: 2px dashed var(--line); color: var(--muted);
+}
+.tile.shown { background: linear-gradient(160deg, var(--b), var(--a)); border: 0; color: #1d0a17; box-shadow: 0 4px 0 #7a1d4d; }
+.tile.fresh { animation: pop .5s ease; }
+@keyframes pop { 0% { transform: scale(.3) rotate(-15deg); } 70% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.rule {
+  text-align: center; font-size: clamp(14px, 3.8vw, 17px); color: var(--muted); margin: 0;
+}
+.rule b { color: var(--b); letter-spacing: 1px; }
+.stats { display: flex; gap: 8px; }
+.stat { flex: 1; text-align: center; background: var(--panel); border-radius: 12px; padding: 6px; border: 1px solid var(--line); }
+.stat .n { font-size: clamp(20px, 6vw, 28px); font-weight: 900; }
+.stat .l { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.stat.c .n { color: var(--c); } .stat.k .n { color: var(--key); } .stat.h .n { color: var(--b); }
+#contactBtn {
+  min-height: clamp(84px, 18vh, 130px);
+  font-size: clamp(32px, 10vw, 52px); font-weight: 900; letter-spacing: 2px;
+  background: linear-gradient(90deg, var(--a), var(--b)); color: #1a0b1c;
+  border-radius: 22px; box-shadow: 0 6px 0 #8a2350;
+}
+.burnt { display: flex; flex-wrap: wrap; gap: 6px; }
+.burnt span { background: var(--bg2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 13px; text-decoration: line-through; color: var(--muted); }
+.burnt span.c { border-color: var(--c); }
+.burnt span.k { border-color: var(--key); }
+.burnt .none { text-decoration: none; border: 0; background: none; padding: 0; }
+#peekBtn { touch-action: none; }
+.small-row { display: flex; gap: 8px; }
+.small-row button { flex: 1; font-size: clamp(13px, 3.6vw, 15px); padding: 8px 6px; }
+
+/* Overlays */
+.overlay {
+  position: fixed; inset: 0; z-index: 20;
+  background: rgba(6, 8, 18, .94);
+  display: none; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.overlay.on { display: flex; }
+.sheet {
+  width: min(560px, 100%); max-height: 100%; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
+  padding: 16px; display: flex; flex-direction: column; gap: 12px;
+}
+.count-num {
+  font-size: clamp(120px, 42vw, 220px); font-weight: 900; line-height: 1;
+  text-align: center;
+  background: linear-gradient(180deg, var(--b), var(--a));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.count-num.beat { animation: beat .35s ease; }
+@keyframes beat { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
+#blockBtn { min-height: 96px; font-size: clamp(28px, 9vw, 44px); font-weight: 900; letter-spacing: 2px; }
+.pick { display: flex; flex-wrap: wrap; gap: 8px; }
+.pick button { flex: 1 1 40%; background: var(--bg2); border: 2px solid var(--line); font-size: 15px; }
+.pick button.sel { border-color: var(--c); color: var(--c); background: #103a3a; }
+.msg { min-height: 20px; margin: 0; font-weight: 700; font-size: 14px; text-align: center; }
+.msg.bad { color: var(--warn); } .msg.good { color: var(--ok); }
+
+/* Round end / final */
+.banner { text-align: center; font-size: clamp(22px, 6.4vw, 32px); font-weight: 900; margin: 0; }
+.banner.att { color: var(--c); } .banner.kep { color: var(--key); }
+.score-list { display: flex; flex-direction: column; gap: 6px; }
+.score-row { display: flex; align-items: center; gap: 10px; background: var(--bg2); border-radius: 12px; padding: 8px 12px; }
+.score-row .nm { flex: 1; font-weight: 700; }
+.score-row .pts { font-weight: 900; font-size: 20px; font-variant-numeric: tabular-nums; }
+.score-row .gain { color: var(--ok); font-weight: 800; font-size: 14px; min-width: 34px; text-align: right; }
+.score-row.first { border: 2px solid var(--b); }
+.log { font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; margin: 0; padding-left: 18px; }
+.award { display: flex; gap: 10px; align-items: center; background: var(--bg2); border-radius: 12px; padding: 8px 12px; }
+.award .ic { font-size: 26px; }
+.award .t { font-size: 13px; color: var(--muted); }
+.award .v { font-weight: 800; }
+.howto ol { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.4; }
+.howto .ex { background: var(--bg2); border-radius: 12px; padding: 10px; font-size: 14px; color: var(--muted); line-height: 1.45; }
+.howto .ex b { color: var(--text); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SETUP -->
+  <section class="screen on" id="scrSetup">
+    <h1>CONTACT!</h1>
+    <p class="tag">Crack the Keeper's word — one shouted-in-unison clue at a time.</p>
+    <div class="card">
+      <h3>Players (3–10)</h3>
+      <div class="row">
+        <input type="text" id="nameIn" maxlength="14" placeholder="Add a name" autocomplete="off">
+        <button class="teal shrink" id="addBtn">Add</button>
+      </div>
+      <div class="players" id="playerList"></div>
+    </div>
+    <div class="card">
+      <h3>Options</h3>
+      <div class="optlabel">Contact countdown</div>
+      <div class="seg" data-opt="count">
+        <button data-v="3">3 s</button><button data-v="5">5 s</button><button data-v="7">7 s</button>
+      </div>
+      <div class="optlabel">Round clock (Keeper survives if it runs out)</div>
+      <div class="seg" data-opt="clock">
+        <button data-v="0">Off</button><button data-v="180">3 min</button><button data-v="300">5 min</button><button data-v="480">8 min</button>
+      </div>
+      <div class="optlabel">Show word length</div>
+      <div class="seg" data-opt="showLen">
+        <button data-v="1">Yes</button><button data-v="0">No (harder)</button>
+      </div>
+      <div class="optlabel">Turns as Keeper</div>
+      <div class="seg" data-opt="laps">
+        <button data-v="1">Once each</button><button data-v="2">Twice each</button>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <div class="big-actions">
+      <button class="ghost" id="howBtn">How to play</button>
+      <button class="primary" id="startBtn">Start game</button>
+    </div>
+  </section>
+
+  <!-- HANDOFF -->
+  <section class="screen handoff" id="scrHandoff">
+    <div class="eye">🙈</div>
+    <p class="tag" id="handRound">Round 1 of 4</p>
+    <p class="tag">Pass the phone to this round's Keeper:</p>
+    <div class="who" id="handName">—</div>
+    <p class="tag">Everyone else — look away while the Keeper picks a secret word.</p>
+    <div class="spacer"></div>
+    <button class="keeper" id="imKeeperBtn">I'm the Keeper — show me</button>
+  </section>
+
+  <!-- SECRET -->
+  <section class="screen" id="scrSecret">
+    <h2>🔒 Keeper, lock in your word</h2>
+    <p class="tag">Pick something the room knows but won't guess fast. Longer words mean a longer siege.</p>
+    <div class="card">
+      <input type="text" id="secretIn" maxlength="12" placeholder="e.g. PARACHUTE" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <p class="secret-hint">5–12 letters, A–Z only, no spaces.</p>
+      <p class="secret-err" id="secretErr"></p>
+      <button class="ghost" id="dealBtn">🎲 Deal me a word</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="primary" id="lockBtn">Lock it &amp; hide</button>
+  </section>
+
+  <!-- BOARD -->
+  <section class="screen" id="scrBoard">
+    <div class="topbar">
+      <span>Keeper: <b id="bKeeper">—</b></span>
+      <span class="timer" id="bTimer"></span>
+      <span id="bRound">R1/4</span>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <p class="rule" id="bRule"></p>
+    <div class="stats">
+      <div class="stat c"><div class="n" id="sContacts">0</div><div class="l">Contacts</div></div>
+      <div class="stat k"><div class="n" id="sBlocks">0</div><div class="l">Blocks</div></div>
+      <div class="stat h"><div class="n" id="sHidden">?</div><div class="l">Hidden</div></div>
+    </div>
+    <button id="contactBtn">CONTACT!</button>
+    <div class="card">
+      <h3>Burnt words (can't be used again)</h3>
+      <div class="burnt" id="burnt"></div>
+    </div>
+    <div class="small-row">
+      <button class="keeper" id="peekBtn">👁 Keeper: hold to peek</button>
+    </div>
+    <div class="small-row">
+      <button class="ghost" id="undoBtn">↶ Undo</button>
+      <button class="ghost" id="howBtn2">Rules</button>
+      <button class="ghost" id="giveUpBtn">End round</button>
+    </div>
+  </section>
+
+  <!-- ROUND END -->
+  <section class="screen" id="scrRound">
+    <p class="banner" id="rBanner"></p>
+    <div class="tiles" id="rTiles"></div>
+    <div class="card">
+      <h3>This round</h3>
+      <ul class="log" id="rLog"></ul>
+    </div>
+    <div class="card">
+      <h3>Scoreboard</h3>
+      <div class="score-list" id="rScores"></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="primary" id="nextBtn">Next Keeper</button>
+  </section>
+
+  <!-- FINAL -->
+  <section class="screen" id="scrFinal">
+    <h1>CONTACT!</h1>
+    <p class="banner att" id="fWinner"></p>
+    <div class="card">
+      <h3>Final standings</h3>
+      <div class="score-list" id="fScores"></div>
+    </div>
+    <div class="card">
+      <h3>Awards</h3>
+      <div id="fAwards" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="big-actions">
+      <button class="primary" id="againBtn">Play again (same players)</button>
+      <button class="ghost" id="newBtn">New players / options</button>
+    </div>
+  </section>
+</div>
+
+<!-- COUNTDOWN -->
+<div class="overlay" id="ovCount">
+  <div class="sheet">
+    <p class="tag" id="cPrefix"></p>
+    <div class="count-num" id="cNum">5</div>
+    <p class="tag">Clue-giver &amp; contact partner: count down together and shout your word on zero!<br>Keeper: name their word <b>before zero</b> and hit BLOCK.</p>
+    <button class="keeper" id="blockBtn">BLOCK!</button>
+    <button class="ghost" id="falseBtn">False alarm — cancel</button>
+  </div>
+</div>
+
+<!-- RESOLVE -->
+<div class="overlay" id="ovResolve">
+  <div class="sheet">
+    <h2 id="resTitle">Did they shout the SAME word?</h2>
+    <div class="row" id="resAsk">
+      <button class="teal" id="matchBtn">✔ Match!</button>
+      <button class="ghost" id="missBtn">✘ No match</button>
+    </div>
+    <div id="resForm" style="display:none;flex-direction:column;gap:10px">
+      <p class="tag" id="resFormHint"></p>
+      <input type="text" id="resWord" maxlength="16" placeholder="The word (optional)" autocomplete="off" spellcheck="false">
+      <p class="msg" id="resMsg"></p>
+      <div class="optlabel" id="resPickLbl">Who made contact? (pick up to 2)</div>
+      <div class="pick" id="resPick"></div>
+      <button class="primary" id="resOk">Confirm</button>
+      <button class="ghost" id="resBack">Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOW TO -->
+<div class="overlay" id="ovHow">
+  <div class="sheet howto">
+    <h2>How to play</h2>
+    <ol>
+      <li><b>The Keeper</b> secretly locks a word into the phone. Only its <b>first letter</b> is shown.</li>
+      <li><b>Everyone else</b> thinks of <i>any</i> word that starts with the revealed letters and gives a riddle clue out loud — without saying the word.</li>
+      <li>If you think you know another player's word, shout <b>“CONTACT!”</b> and tap the big button. You and the clue-giver count down together and shout your words on zero.</li>
+      <li><b>The Keeper</b> is trying to stop you: if they can name the clue-giver's word <b>before zero</b>, they say it and tap <b>BLOCK</b>. That word is burnt.</li>
+      <li>If the pair shouted the same word — <b>Contact!</b> The Keeper must reveal the next letter, and the new prefix applies from now on.</li>
+      <li>Attackers win the round when every letter is revealed, or when they make contact on the <b>secret word itself</b>. The Keeper wins if the round clock runs out (or the attackers give up).</li>
+    </ol>
+    <div class="ex">
+      <b>Example.</b> Showing <b>PA</b>. Mia: “Is it something you open when it rains… no wait, when you jump out of a plane?” Leo: “CONTACT!” — 3, 2, 1 — both: “PARACHUTE!” The Keeper's word <i>was</i> PARACHUTE — attackers win!
+    </div>
+    <div class="ex">
+      <b>Scoring.</b> Each contact: +1 to both players involved. A winning contact: +3 each. Keeper: +1 per block, and if they survive: +2 plus 1 per letter still hidden.
+    </div>
+    <button class="primary" id="howClose">Got it</button>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const LS_P = 'cowork-contact-players', LS_O = 'cowork-contact-opts';
+
+const BANK = ('PARACHUTE BLANKET CHOCOLATE UMBRELLA VOLCANO TRAMPOLINE PENGUIN SANDWICH LIBRARY HAMMOCK ' +
+  'LIGHTHOUSE MARATHON BICYCLE CARNIVAL DINOSAUR KEYBOARD SUBMARINE PINEAPPLE TELESCOPE WATERFALL ' +
+  'SKELETON CROCODILE BUTTERFLY FIREWORK HARMONICA SNOWFLAKE CATERPILLAR SPAGHETTI TORNADO PASSPORT ' +
+  'MICROWAVE DETECTIVE BALLOON CAMPFIRE AVALANCHE JELLYFISH MUSHROOM PYRAMID TREASURE VAMPIRE ' +
+  'ORCHESTRA HEDGEHOG MAGNET ELEVATOR PRETZEL COMPASS DOMINO GALAXY HELMET ISLAND ' +
+  'KANGAROO LANTERN MERMAID NOODLE OCTOPUS PANCAKE QUICKSAND RAINBOW SCARECROW TOOTHBRUSH ' +
+  'UNICORN VIOLIN WALRUS YOGURT ZEPPELIN ASTRONAUT BACKPACK CACTUS DRAGONFLY ENVELOPE ' +
+  'FLAMINGO GARDEN HURRICANE IGLOO JIGSAW KETCHUP LOLLIPOP MOUSTACHE NECKLACE OSTRICH ' +
+  'PADDLE REINDEER SAXOPHONE TEAPOT TURTLE VACUUM WARDROBE WIZARD ANCHOR BRACELET ' +
+  'CANDLE DIAMOND EARTHQUAKE FOSSIL GRAVITY HONEYCOMB INVENTOR JUGGLER KNIGHT LEMONADE ' +
+  'MARSHMALLOW NINJA ORIGAMI PIRATE ROBOT SCISSORS TOASTER VELCRO WHISTLE BLIZZARD ' +
+  'CHIMNEY DOUGHNUT ESCALATOR FERRIS GLACIER HAMSTER KITTEN MAILBOX PUZZLE SPATULA ' +
+  'STAPLER SUNFLOWER TROPHY CUPCAKE BAGPIPES CHAMELEON DODGEBALL MUSEUM PELICAN POPCORN ' +
+  'SCOOTER SEAHORSE SPONGE SUITCASE TRACTOR SKATEBOARD MICROPHONE HOVERCRAFT CASTLE WINDMILL').split(' ');
+
+let players = [];
+let opts = { count: 5, clock: 300, showLen: 1, laps: 1 };
+let game = null;      // { order:[idx], roundIdx, used:Set }
+let R = null;         // current round
+let undoStack = [];
+let tick = null, countTimer = null, countN = 0;
+let resolveMode = null; // 'match' | 'block'
+let picked = [];
+
+/* ---------- storage ---------- */
+try {
+  const p = JSON.parse(localStorage.getItem(LS_P) || '[]');
+  if (Array.isArray(p)) players = p.filter(n => typeof n === 'string').slice(0, 10).map(n => ({ name: n }));
+  const o = JSON.parse(localStorage.getItem(LS_O) || 'null');
+  if (o && typeof o === 'object') opts = { ...opts, ...o };
+} catch (e) {}
+const saveSetup = () => {
+  try {
+    localStorage.setItem(LS_P, JSON.stringify(players.map(p => p.name)));
+    localStorage.setItem(LS_O, JSON.stringify(opts));
+  } catch (e) {}
+};
+
+/* ---------- audio ---------- */
+let actx = null;
+const tone = (f, d = .15, type = 'sine', v = .18, delay = 0) => {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime + delay;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(v, t + .01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t); o.stop(t + d + .05);
+  } catch (e) {}
+};
+const sfx = {
+  tick: () => tone(660, .1, 'square', .08),
+  zero: () => { tone(880, .25, 'sawtooth', .12); tone(1320, .3, 'sine', .12, .05); },
+  contact: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .22, 'triangle', .16, i * .08)),
+  block: () => { tone(160, .35, 'sawtooth', .2); tone(120, .4, 'square', .12, .05); },
+  win: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .3, 'triangle', .16, i * .1)),
+  keep: () => [392, 330, 262].forEach((f, i) => tone(f, .35, 'sine', .16, i * .14)),
+  miss: () => tone(220, .25, 'triangle', .12),
+};
+
+/* ---------- screens ---------- */
+const show = id => {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  const scr = $(id); if (scr) scr.scrollTop = 0;
+};
+const overlay = (id, on) => $(id).classList.toggle('on', on);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------- setup ---------- */
+const renderPlayers = () => {
+  $('playerList').innerHTML = players.length
+    ? players.map((p, i) => `<span class="pchip">${esc(p.name)}<button data-rm="${i}" aria-label="Remove">✕</button></span>`).join('')
+    : '<span class="tag">Add at least 3 players.</span>';
+  $('startBtn').disabled = players.length < 3;
+  $('addBtn').disabled = players.length >= 10;
+};
+const addPlayer = () => {
+  const n = $('nameIn').value.trim().replace(/\s+/g, ' ');
+  if (!n || players.length >= 10) return;
+  if (players.some(p => p.name.toLowerCase() === n.toLowerCase())) { $('nameIn').select(); return; }
+  players.push({ name: n });
+  $('nameIn').value = '';
+  renderPlayers(); saveSetup();
+  $('nameIn').focus();
+};
+$('addBtn').onclick = addPlayer;
+$('nameIn').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
+$('playerList').onclick = e => {
+  const b = e.target.closest('[data-rm]'); if (!b) return;
+  players.splice(+b.dataset.rm, 1); renderPlayers(); saveSetup();
+};
+const renderOpts = () => document.querySelectorAll('.seg').forEach(seg => {
+  seg.querySelectorAll('button').forEach(b => b.classList.toggle('sel', +b.dataset.v === +opts[seg.dataset.opt]));
+});
+document.querySelectorAll('.seg').forEach(seg => seg.onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  opts[seg.dataset.opt] = +b.dataset.v; renderOpts(); saveSetup();
+});
+
+/* ---------- game flow ---------- */
+const startGame = () => {
+  if (players.length < 3) return;
+  players.forEach(p => Object.assign(p, { score: 0, contacts: 0, blocks: 0, wins: 0, survived: 0 }));
+  const order = [];
+  for (let l = 0; l < opts.laps; l++) players.forEach((_, i) => order.push(i));
+  game = { order, roundIdx: 0, used: new Set() };
+  saveSetup();
+  toHandoff();
+};
+const toHandoff = () => {
+  stopTick();
+  const k = game.order[game.roundIdx];
+  $('handName').textContent = players[k].name;
+  $('handRound').textContent = `Round ${game.roundIdx + 1} of ${game.order.length}`;
+  show('scrHandoff');
+};
+$('startBtn').onclick = startGame;
+$('imKeeperBtn').onclick = () => {
+  $('secretIn').value = ''; $('secretErr').textContent = '';
+  show('scrSecret');
+};
+$('secretIn').addEventListener('input', () => {
+  const v = $('secretIn').value.toUpperCase().replace(/[^A-Z]/g, '');
+  if (v !== $('secretIn').value) $('secretIn').value = v;
+  $('secretErr').textContent = '';
+});
+$('dealBtn').onclick = () => {
+  const pool = BANK.filter(w => !game.used.has(w) && w.length >= 5 && w.length <= 12);
+  const w = (pool.length ? pool : BANK)[Math.floor(Math.random() * (pool.length || BANK.length))];
+  $('secretIn').value = w; $('secretErr').textContent = '';
+};
+const lockSecret = () => {
+  const w = $('secretIn').value.toUpperCase().replace(/[^A-Z]/g, '');
+  if (w.length < 5 || w.length > 12) { $('secretErr').textContent = 'Needs 5–12 letters.'; return; }
+  game.used.add(w);
+  $('secretIn').value = ''; $('secretIn').blur();
+  R = {
+    keeper: game.order[game.roundIdx], secret: w, revealed: 1,
+    contacts: 0, blocks: 0, burnt: [], log: [], gains: {},
+    timeLeft: opts.clock, fresh: true, over: false,
+  };
+  undoStack = [];
+  sfx.contact();
+  renderBoard();
+  show('scrBoard');
+  startTick();
+};
+$('lockBtn').onclick = lockSecret;
+$('secretIn').addEventListener('keydown', e => { if (e.key === 'Enter') lockSecret(); });
+
+const prefix = () => R.secret.slice(0, R.revealed);
+const fmt = s => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+const tileHTML = (word, n, showLen, freshIdx = -1) => {
+  let h = '';
+  const len = showLen ? word.length : Math.min(word.length, n);
+  for (let i = 0; i < len; i++) {
+    const on = i < n;
+    h += `<div class="tile${on ? ' shown' : ''}${i === freshIdx ? ' fresh' : ''}">${on ? word[i] : ''}</div>`;
+  }
+  if (!showLen && n < word.length) h += '<div class="tile">…</div>';
+  return h;
+};
+const setTiles = (el, word, n, showLen, freshIdx) => {
+  el.innerHTML = tileHTML(word, n, showLen, freshIdx);
+  el.style.setProperty('--n', Math.max(6, el.children.length));
+};
+
+const renderBoard = () => {
+  const pre = prefix();
+  $('bKeeper').textContent = players[R.keeper].name;
+  $('bRound').textContent = `R${game.roundIdx + 1}/${game.order.length}`;
+  setTiles($('tiles'), R.secret, R.revealed, opts.showLen, R.fresh ? R.revealed - 1 : -1);
+  R.fresh = false;
+  $('bRule').innerHTML = `Clue words must start with <b>${pre}</b>`;
+  $('sContacts').textContent = R.contacts;
+  $('sBlocks').textContent = R.blocks;
+  $('sHidden').textContent = opts.showLen ? R.secret.length - R.revealed : '?';
+  $('burnt').innerHTML = R.burnt.length
+    ? R.burnt.map(b => `<span class="${b.t}">${esc(b.w)}</span>`).join('')
+    : '<span class="none tag">None yet — logged words appear here.</span>';
+  $('undoBtn').disabled = !undoStack.length;
+  renderTimer();
+};
+const renderTimer = () => {
+  const t = $('bTimer');
+  if (!opts.clock) { t.textContent = '∞'; t.classList.remove('low'); return; }
+  t.textContent = fmt(Math.max(0, R.timeLeft));
+  t.classList.toggle('low', R.timeLeft <= 30);
+};
+const anyOverlay = () => document.querySelector('.overlay.on');
+const startTick = () => {
+  stopTick();
+  tick = setInterval(() => {
+    if (!R || R.over || !opts.clock || anyOverlay()) return;
+    if (!$('scrBoard').classList.contains('on')) return;
+    R.timeLeft--;
+    if (R.timeLeft <= 10 && R.timeLeft > 0) sfx.tick();
+    renderTimer();
+    if (R.timeLeft <= 0) endRound('keeper', 'The clock ran out');
+  }, 1000);
+};
+const stopTick = () => { if (tick) clearInterval(tick); tick = null; };
+
+/* ---------- peek ---------- */
+const peek = on => {
+  if (!R) return;
+  $('peekBtn').textContent = on ? `🔓 ${R.secret}` : '👁 Keeper: hold to peek';
+};
+$('peekBtn').addEventListener('pointerdown', e => { e.preventDefault(); peek(true); });
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => $('peekBtn').addEventListener(ev, () => peek(false)));
+$('peekBtn').addEventListener('contextmenu', e => e.preventDefault());
+
+/* ---------- contact countdown ---------- */
+$('contactBtn').onclick = () => {
+  if (!R || R.over) return;
+  countN = opts.count;
+  $('cPrefix').innerHTML = `Word starts with <b style="color:var(--b)">${prefix()}</b>`;
+  $('cNum').textContent = countN;
+  overlay('ovCount', true);
+  sfx.tick();
+  clearInterval(countTimer);
+  countTimer = setInterval(() => {
+    countN--;
+    const el = $('cNum');
+    el.classList.remove('beat'); void el.offsetWidth; el.classList.add('beat');
+    if (countN > 0) { el.textContent = countN; sfx.tick(); return; }
+    el.textContent = '0';
+    clearInterval(countTimer); countTimer = null;
+    sfx.zero();
+    zeroTimer = setTimeout(() => { zeroTimer = null; overlay('ovCount', false); openResolve(null); }, 450);
+  }, 1000);
+};
+let zeroTimer = null;
+const stopCount = () => {
+  clearInterval(countTimer); countTimer = null;
+  clearTimeout(zeroTimer); zeroTimer = null;
+  overlay('ovCount', false);
+};
+$('blockBtn').onclick = () => {
+  if (!countTimer) return;
+  stopCount(); sfx.block();
+  openResolve('block');
+};
+$('falseBtn').onclick = () => stopCount();
+
+/* ---------- resolve ---------- */
+const openResolve = mode => {
+  resolveMode = mode; picked = [];
+  $('resWord').value = ''; $('resMsg').textContent = ''; $('resMsg').className = 'msg';
+  if (mode === 'block') {
+    $('resTitle').textContent = '🛡 BLOCKED!';
+    showForm();
+  } else {
+    $('resTitle').textContent = 'Did they shout the SAME word?';
+    $('resAsk').style.display = 'flex';
+    $('resForm').style.display = 'none';
+  }
+  overlay('ovResolve', true);
+};
+const showForm = () => {
+  $('resAsk').style.display = 'none';
+  $('resForm').style.display = 'flex';
+  const isBlock = resolveMode === 'block';
+  $('resFormHint').innerHTML = isBlock
+    ? `Keeper named the clue-giver's word in time. Log it so it's burnt (optional). Keeper +1.`
+    : `Contact! Log the word (optional) — if it's the Keeper's secret word, attackers win the round.`;
+  $('resPickLbl').style.display = isBlock ? 'none' : '';
+  $('resPick').style.display = isBlock ? 'none' : '';
+  $('resOk').textContent = isBlock ? 'Burn it' : 'Reveal next letter';
+  renderPick(); validateWord();
+};
+$('matchBtn').onclick = () => { resolveMode = 'match'; sfx.contact(); showForm(); };
+$('missBtn').onclick = () => { sfx.miss(); overlay('ovResolve', false); };
+$('resBack').onclick = () => {
+  if (resolveMode === 'block') { overlay('ovResolve', false); return; }
+  resolveMode = null; openResolve(null);
+};
+const renderPick = () => {
+  $('resPick').innerHTML = players.map((p, i) => i === R.keeper ? '' :
+    `<button data-p="${i}" class="${picked.includes(i) ? 'sel' : ''}">${esc(p.name)}</button>`).join('');
+};
+$('resPick').onclick = e => {
+  const b = e.target.closest('[data-p]'); if (!b) return;
+  const i = +b.dataset.p;
+  if (picked.includes(i)) picked = picked.filter(x => x !== i);
+  else { picked.push(i); if (picked.length > 2) picked.shift(); }
+  renderPick(); validateWord();
+};
+const cleanWord = () => $('resWord').value.toUpperCase().replace(/[^A-Z]/g, '');
+const validateWord = () => {
+  const w = cleanWord(), m = $('resMsg'), pre = prefix();
+  let ok = true;
+  m.className = 'msg'; m.textContent = '';
+  if (w) {
+    if (!w.startsWith(pre)) { ok = false; m.className = 'msg bad'; m.textContent = `Doesn't start with ${pre} — that contact doesn't count.`; }
+    else if (R.burnt.some(b => b.w === w)) { ok = false; m.className = 'msg bad'; m.textContent = `${w} is already burnt — doesn't count.`; }
+    else if (w === R.secret && resolveMode === 'match') { m.className = 'msg good'; m.textContent = `That's the Keeper's word!`; }
+  }
+  $('resOk').disabled = !ok || (resolveMode === 'match' && !picked.length);
+  if (resolveMode === 'match') $('resOk').textContent = (w && w === R.secret) ? 'Break the word! 🏆' : 'Reveal next letter';
+  return ok;
+};
+$('resWord').addEventListener('input', validateWord);
+const snapshot = () => undoStack.push(JSON.stringify({ R, scores: players.map(p => [p.score, p.contacts, p.blocks, p.wins]) }));
+$('undoBtn').onclick = () => {
+  const s = undoStack.pop(); if (!s) return;
+  const d = JSON.parse(s);
+  R = d.R;
+  d.scores.forEach((v, i) => { [players[i].score, players[i].contacts, players[i].blocks, players[i].wins] = v; });
+  renderBoard();
+};
+const gain = (i, n) => { players[i].score += n; R.gains[i] = (R.gains[i] || 0) + n; };
+
+$('resOk').onclick = () => {
+  if (!validateWord()) return;
+  const w = cleanWord();
+  snapshot();
+  overlay('ovResolve', false);
+  if (resolveMode === 'block') {
+    R.blocks++; players[R.keeper].blocks++; gain(R.keeper, 1);
+    if (w) R.burnt.push({ w, t: 'k' });
+    R.log.push(`🛡 ${players[R.keeper].name} blocked${w ? ' ' + w : ''} (+1)`);
+    renderBoard();
+    return;
+  }
+  const names = picked.map(i => players[i].name).join(' & ') || 'Attackers';
+  if (w && w === R.secret) {
+    picked.forEach(i => { gain(i, 3); players[i].contacts++; players[i].wins++; });
+    R.contacts++;
+    R.log.push(`🏆 ${names} made contact on the secret word ${w}${picked.length ? ' (+3 each)' : ''}`);
+    endRound('attack', 'Contact on the secret word!');
+    return;
+  }
+  R.contacts++;
+  if (w) R.burnt.push({ w, t: 'c' });
+  R.revealed++;
+  const final = R.revealed >= R.secret.length;
+  picked.forEach(i => { gain(i, final ? 3 : 1); players[i].contacts++; if (final) players[i].wins++; });
+  R.log.push(`⚡ ${names} made contact${w ? ' on ' + w : ''} → revealed ${R.secret[R.revealed - 1]}${picked.length ? ` (+${final ? 3 : 1} each)` : ''}`);
+  if (final) { endRound('attack', 'Every letter revealed!'); return; }
+  R.fresh = true;
+  renderBoard();
+};
+
+/* ---------- end round ---------- */
+let giveUpArmed = null;
+$('giveUpBtn').onclick = () => {
+  if (!giveUpArmed) {
+    $('giveUpBtn').textContent = 'Tap again: Keeper survives';
+    giveUpArmed = setTimeout(() => { giveUpArmed = null; $('giveUpBtn').textContent = 'End round'; }, 3000);
+    return;
+  }
+  clearTimeout(giveUpArmed); giveUpArmed = null; $('giveUpBtn').textContent = 'End round';
+  endRound('keeper', 'The attackers gave up');
+};
+
+const endRound = (winner, reason) => {
+  if (R.over) return;
+  R.over = true;
+  stopTick(); stopCount(); overlay('ovResolve', false);
+  const k = players[R.keeper];
+  if (winner === 'keeper') {
+    const hidden = R.secret.length - R.revealed;
+    gain(R.keeper, 2 + hidden); k.survived++;
+    R.log.push(`🔒 ${k.name} survived with ${hidden} letter${hidden === 1 ? '' : 's'} hidden (+${2 + hidden})`);
+    sfx.keep();
+  } else sfx.win();
+  $('rBanner').className = 'banner ' + (winner === 'keeper' ? 'kep' : 'att');
+  $('rBanner').textContent = winner === 'keeper' ? `🔒 ${k.name} holds the word!` : '💥 Word broken!';
+  setTiles($('rTiles'), R.secret, R.secret.length, 1);
+  $('rLog').innerHTML = [`<li><b>${esc(reason)}</b></li>`].concat(R.log.map(l => `<li>${esc(l)}</li>`)).join('');
+  $('rScores').innerHTML = scoreRows(R.gains);
+  $('nextBtn').textContent = game.roundIdx + 1 >= game.order.length ? 'Final results' : 'Next Keeper';
+  show('scrRound');
+};
+const ranked = () => players.map((p, i) => ({ ...p, i })).sort((a, b) => b.score - a.score);
+const scoreRows = gains => {
+  const r = ranked(), top = r[0] ? r[0].score : 0;
+  return r.map(p => `<div class="score-row${p.score === top && top > 0 ? ' first' : ''}">
+      <span class="nm">${esc(p.name)}</span>
+      <span class="gain">${gains && gains[p.i] ? '+' + gains[p.i] : ''}</span>
+      <span class="pts">${p.score}</span></div>`).join('');
+};
+$('nextBtn').onclick = () => {
+  game.roundIdx++;
+  if (game.roundIdx >= game.order.length) finalScreen(); else toHandoff();
+};
+
+const finalScreen = () => {
+  const r = ranked(), top = r[0].score;
+  const winners = r.filter(p => p.score === top).map(p => p.name);
+  $('fWinner').textContent = winners.length > 1 ? `🤝 Tie: ${winners.join(' & ')}!` : `🏆 ${winners[0]} wins!`;
+  $('fScores').innerHTML = scoreRows(null);
+  const best = (key) => {
+    const m = Math.max(...players.map(p => p[key]));
+    return m > 0 ? { v: m, who: players.filter(p => p[key] === m).map(p => p.name).join(', ') } : null;
+  };
+  const aw = [
+    ['⚡', 'Mind Meld — most contacts', best('contacts')],
+    ['🛡', 'Iron Keeper — most blocks', best('blocks')],
+    ['💥', 'Word Breaker — winning contacts', best('wins')],
+    ['🔒', 'Vault — rounds survived as Keeper', best('survived')],
+  ].filter(a => a[2]);
+  $('fAwards').innerHTML = aw.length ? aw.map(([ic, t, b]) =>
+    `<div class="award"><span class="ic">${ic}</span><div><div class="t">${t}</div><div class="v">${esc(b.who)} (${b.v})</div></div></div>`).join('')
+    : '<p class="tag">No awards this time.</p>';
+  sfx.win();
+  show('scrFinal');
+};
+$('againBtn').onclick = startGame;
+$('newBtn').onclick = () => { renderPlayers(); renderOpts(); show('scrSetup'); };
+
+/* ---------- how to ---------- */
+$('howBtn').onclick = () => overlay('ovHow', true);
+$('howBtn2').onclick = () => overlay('ovHow', true);
+$('howClose').onclick = () => overlay('ovHow', false);
+
+renderPlayers(); renderOpts();
+</script>
+</body>
+</html>

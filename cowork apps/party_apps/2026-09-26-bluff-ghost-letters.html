@@ -1,0 +1,973 @@
+<!-- CONCEPT: BLUFF & DECEPTION (word building) - "Ghost Letters": players take turns adding ONE letter to a shared word fragment on one screen (to either end in Superghost mode), trying never to finish a real word - and bluffing when they're stuck; anyone can CHALLENGE the last player to prove a real word fits, or cry WORD! when they complete one, the room votes REAL or FAKE, and every lost round spells another letter of G-H-O-S-T until you're out - but eliminated ghosts can HAUNT the living by banning a letter for a turn. Round cards bend each round (Long Haul, Front Door, Banned Letter, Vowel Drought, Double Trouble, Lightning, Reverse), 520-word ghost dictionary reveals what you could have played | Players: 2-10 | ~15-25 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ghost Letters</title>
+<style>
+:root {
+  --bg: #120c24;
+  --bg2: #1d1438;
+  --panel: #251a47;
+  --panel2: #2f2259;
+  --line: #43357a;
+  --text: #f3efff;
+  --muted: #a99cd6;
+  --a: #7cf5d0;
+  --b: #b58cff;
+  --c: #ff8fd0;
+  --warn: #ffcf5c;
+  --bad: #ff6b7d;
+  --good: #5ef59b;
+  --ghost: #d9e4ff;
+  --radius: 14px;
+  --gap: 10px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% -10%, #33205f 0%, var(--bg) 60%) fixed, var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+button { font-family: inherit; cursor: pointer; border: none; color: inherit; }
+input { font-family: inherit; user-select: text; -webkit-user-select: text; }
+.screen { position: absolute; inset: 0; display: none; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+.screen.on { display: flex; }
+.wrap { width: 100%; max-width: 720px; margin: 0 auto; padding: 12px 14px 16px; display: flex; flex-direction: column; gap: var(--gap); flex: 1; }
+.grad { background: linear-gradient(90deg, var(--a), var(--b) 55%, var(--c)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+h1 { margin: 0; font-size: clamp(34px, 10vw, 60px); font-weight: 900; letter-spacing: 1px; line-height: 1.05; text-align: center; }
+h2 { margin: 0; font-size: clamp(20px, 5.5vw, 30px); font-weight: 800; text-align: center; }
+.sub { text-align: center; color: var(--muted); font-size: clamp(13px, 3.6vw, 17px); line-height: 1.35; margin: 0; }
+.meta { text-align: center; color: var(--a); font-size: clamp(12px, 3.2vw, 15px); font-weight: 700; letter-spacing: .5px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+.label { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+.btn { min-height: 48px; padding: 10px 16px; border-radius: 12px; font-weight: 800; font-size: clamp(15px, 4vw, 19px); background: var(--panel2); border: 1px solid var(--line); transition: transform .08s, filter .15s; }
+.btn:active { transform: scale(.96); }
+.btn:disabled { opacity: .35; cursor: default; transform: none; }
+.btn.primary { background: linear-gradient(90deg, #4be3b8, #8f6bff); color: #10091f; border: none; }
+.btn.danger { background: linear-gradient(90deg, #ff6b7d, #ff9a5c); color: #1c0710; border: none; }
+.btn.gold { background: linear-gradient(90deg, #ffd65c, #ffa94d); color: #221300; border: none; }
+.btn.ghostly { background: #3a3170; border-color: #6a5cc0; }
+.btn.small { min-height: 44px; padding: 6px 12px; font-size: 14px; }
+.row { display: flex; gap: var(--gap); }
+.row > * { flex: 1; }
+.seg { display: flex; background: var(--bg2); border-radius: 12px; padding: 4px; gap: 4px; }
+.seg button { flex: 1; min-height: 44px; border-radius: 9px; background: transparent; font-weight: 700; font-size: 14px; color: var(--muted); }
+.seg button.on { background: var(--panel2); color: var(--text); box-shadow: inset 0 0 0 2px var(--b); }
+.opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; }
+.opt .t { font-weight: 700; font-size: 15px; }
+.opt .d { color: var(--muted); font-size: 12px; }
+.opt .seg { min-width: 170px; flex: 0 0 auto; }
+
+/* setup players */
+#nameList { display: flex; flex-direction: column; gap: 8px; }
+.nrow { display: flex; gap: 8px; align-items: center; }
+.nrow .dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
+.nrow input { flex: 1; min-width: 0; height: 46px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); padding: 0 12px; font-size: 17px; font-weight: 700; }
+.nrow button { width: 46px; height: 46px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); font-size: 20px; color: var(--muted); }
+
+/* game top */
+.topbar { display: flex; align-items: center; gap: 8px; }
+.topbar .rnd { font-weight: 800; color: var(--muted); font-size: 14px; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 32px; }
+.chip.card { border-color: var(--warn); color: var(--warn); cursor: pointer; flex: 1; min-width: 0; justify-content: center; }
+.iconbtn { width: 44px; height: 44px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); font-size: 20px; font-weight: 900; flex: 0 0 auto; }
+#strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+#strip::-webkit-scrollbar { display: none; }
+.pchip { flex: 0 0 auto; padding: 5px 9px; border-radius: 10px; background: var(--panel); border: 2px solid transparent; font-size: 13px; font-weight: 800; display: flex; flex-direction: column; align-items: center; min-width: 58px; }
+.pchip.cur { border-color: var(--a); background: #1f3b44; }
+.pchip.last { border-color: #6a5cc0; }
+.pchip.out { opacity: .55; }
+.pchip .gl { font-size: 11px; letter-spacing: 2px; font-weight: 900; }
+.pchip .gl b { color: var(--bad); }
+.pchip .gl i { color: #4b3f80; font-style: normal; }
+.who { text-align: center; font-size: clamp(20px, 6vw, 30px); font-weight: 900; }
+.who small { display: block; font-size: 13px; color: var(--muted); font-weight: 700; margin-top: 2px; }
+
+/* fragment */
+.fragbox { display: flex; align-items: stretch; justify-content: center; gap: 8px; }
+.side { width: 54px; flex: 0 0 auto; border-radius: 12px; border: 2px dashed var(--line); background: transparent; font-size: 22px; color: var(--muted); font-weight: 900; }
+.side.on { border-style: solid; border-color: var(--a); color: var(--a); background: #173a3a; }
+.side[hidden] { display: none; }
+#frag { flex: 1; min-width: 0; min-height: 84px; border-radius: 16px; background: var(--bg2); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; flex-wrap: wrap; padding: 8px; gap: 3px; }
+.tile { display: inline-flex; align-items: center; justify-content: center; width: clamp(28px, 8.4vw, 50px); height: clamp(38px, 11vw, 62px); border-radius: 8px; background: #efeaff; color: #1a1236; font-weight: 900; font-size: clamp(22px, 6.6vw, 38px); box-shadow: 0 3px 0 #9d8ee0; }
+.tile.pend { background: var(--a); box-shadow: 0 3px 0 #2d9e7f; animation: pulse .8s ease-in-out infinite alternate; }
+.tile.slot { background: transparent; box-shadow: none; border: 2px dashed var(--a); color: var(--a); animation: pulse .8s ease-in-out infinite alternate; }
+.emptyfrag { color: var(--muted); font-weight: 700; font-size: 15px; text-align: center; }
+@keyframes pulse { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+.notice { text-align: center; font-size: 13px; font-weight: 700; min-height: 18px; color: var(--muted); }
+.notice.bad { color: var(--bad); }
+.notice.haunt { color: var(--ghost); }
+
+/* keyboard */
+#keys { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.key { min-height: 44px; height: clamp(44px, 6.4vh, 58px); border-radius: 10px; background: var(--panel2); border: 1px solid var(--line); font-size: clamp(18px, 5vw, 24px); font-weight: 900; }
+.key.sel { background: var(--a); color: #0f1a18; border-color: var(--a); }
+.key.ban { background: #3a1830; color: #7a4060; text-decoration: line-through; border-color: #5a2848; cursor: not-allowed; }
+.key.wide { grid-column: span 2; font-size: 14px; }
+.actions { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 8px; }
+.timerbar { height: 6px; border-radius: 3px; background: var(--bg2); overflow: hidden; }
+.timerbar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--good), var(--warn), var(--bad)); transform-origin: left; }
+.timerbar[hidden] { display: none; }
+
+/* big-card screens */
+.center { justify-content: center; }
+.bigword { text-align: center; font-size: clamp(34px, 11vw, 64px); font-weight: 900; letter-spacing: 4px; word-break: break-all; color: var(--ghost); }
+.bigword.frag { color: var(--a); }
+.hint { text-align: center; font-size: 14px; color: var(--muted); font-weight: 600; line-height: 1.4; }
+.hint b { color: var(--text); }
+.proofin { width: 100%; height: 60px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg2); color: var(--text); font-size: 26px; font-weight: 900; text-align: center; letter-spacing: 3px; text-transform: uppercase; }
+.proofin:focus { outline: none; border-color: var(--a); }
+.verdict { font-size: clamp(40px, 12vw, 70px); text-align: center; line-height: 1; }
+.lettersBig { display: flex; justify-content: center; gap: 8px; }
+.lettersBig span { width: clamp(40px, 12vw, 58px); height: clamp(48px, 14vw, 68px); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: clamp(24px, 7vw, 36px); background: var(--bg2); color: #4b3f80; border: 2px solid var(--line); }
+.lettersBig span.got { background: var(--bad); color: #1c0710; border-color: var(--bad); }
+.lettersBig span.new { animation: pop .6s ease-out; }
+@keyframes pop { 0% { transform: scale(2.2) rotate(-12deg); opacity: 0; } 70% { transform: scale(.9); opacity: 1; } 100% { transform: scale(1); } }
+.words { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.words span { padding: 4px 10px; border-radius: 8px; background: var(--bg2); border: 1px solid var(--line); font-weight: 800; letter-spacing: 1px; font-size: 14px; }
+.words span b { color: var(--a); }
+.dictflag { text-align: center; font-size: 13px; font-weight: 700; padding: 8px; border-radius: 10px; background: var(--bg2); }
+.dictflag.yes { color: var(--good); }
+.dictflag.no { color: var(--muted); }
+.cardbig { border: 2px solid var(--warn); border-radius: 18px; padding: 18px; text-align: center; background: linear-gradient(160deg, #3a2a10, #251a47 70%); }
+.cardbig .ic { font-size: 46px; }
+.cardbig .nm { font-size: clamp(22px, 6vw, 30px); font-weight: 900; color: var(--warn); margin: 4px 0; }
+.cardbig .tx { font-size: 15px; color: var(--text); line-height: 1.4; }
+.board { display: flex; flex-direction: column; gap: 6px; }
+.brow { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; background: var(--bg2); font-weight: 800; }
+.brow .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brow .gl { letter-spacing: 3px; font-weight: 900; }
+.brow .gl b { color: var(--bad); }
+.brow .gl i { color: #4b3f80; font-style: normal; }
+.brow.dead .n { color: var(--muted); }
+.brow.win { box-shadow: inset 0 0 0 2px var(--warn); }
+
+/* overlay */
+.overlay { position: fixed; inset: 0; background: rgba(8, 5, 18, .86); display: none; align-items: center; justify-content: center; z-index: 50; padding: 14px; }
+.overlay.on { display: flex; }
+.sheet { width: 100%; max-width: 520px; max-height: 92vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.sheet ul { margin: 0; padding-left: 20px; line-height: 1.5; font-size: 15px; }
+.sheet li { margin-bottom: 4px; }
+.pickgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.ghostlist { display: flex; flex-wrap: wrap; gap: 6px; }
+.ghostlist button { min-height: 44px; padding: 6px 12px; border-radius: 10px; background: var(--bg2); border: 2px solid var(--line); font-weight: 800; }
+.ghostlist button.on { border-color: var(--ghost); color: var(--ghost); }
+.floaty { position: fixed; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none; font-size: 64px; opacity: 0; z-index: 60; }
+.floaty.go { animation: boo 1.2s ease-out; }
+@keyframes boo { 0% { opacity: 0; transform: scale(.4); } 25% { opacity: 1; transform: scale(1.25); } 100% { opacity: 0; transform: translateY(-80px) scale(1); } }
+@media (min-width: 768px) {
+  .key { height: 60px; }
+  #frag { min-height: 110px; }
+}
+@media (max-height: 640px) {
+  .wrap { gap: 7px; padding-top: 8px; }
+  #frag { min-height: 70px; }
+  .key { height: 44px; }
+}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<section class="screen on" id="sSetup">
+  <div class="wrap">
+    <div style="text-align:center;font-size:44px;line-height:1">👻</div>
+    <h1><span class="grad">Ghost Letters</span></h1>
+    <p class="sub">Add one letter at a time &mdash; but don't be the one who finishes a word. Stuck? Bluff. Suspicious? Challenge. Lose a round, earn a letter of G-H-O-S-T.</p>
+    <div class="meta">2&ndash;10 PLAYERS &middot; ONE SHARED SCREEN &middot; ~15&ndash;25 MIN</div>
+
+    <div class="panel">
+      <div class="label">Players (in seating order)</div>
+      <div id="nameList"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn small" id="addP">+ Add player</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="label">House rules</div>
+      <div class="opt"><div><div class="t">Where letters go</div><div class="d">Superghost: either end</div></div>
+        <div class="seg" data-opt="mode"><button data-v="classic">End only</button><button data-v="super">Either end</button></div></div>
+      <div class="opt"><div><div class="t">Words count from</div><div class="d">shorter words are safe</div></div>
+        <div class="seg" data-opt="minLen"><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button></div></div>
+      <div class="opt"><div><div class="t">Turn timer</div><div class="d">run out = lose the round</div></div>
+        <div class="seg" data-opt="timer"><button data-v="0">Off</button><button data-v="20">20s</button><button data-v="30">30s</button></div></div>
+      <div class="opt"><div><div class="t">Round cards</div><div class="d">a twist every round</div></div>
+        <div class="seg" data-opt="cards"><button data-v="0">Off</button><button data-v="1">On</button></div></div>
+      <div class="opt"><div><div class="t">Haunting</div><div class="d">ghosts ban letters</div></div>
+        <div class="seg" data-opt="haunts"><button data-v="0">Off</button><button data-v="1">On</button></div></div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="rulesBtn">How to play</button>
+      <button class="btn primary" id="startBtn">Start game</button>
+    </div>
+    <div class="notice bad" id="setupMsg"></div>
+  </div>
+</section>
+
+<!-- ROUND CARD -->
+<section class="screen" id="sCard">
+  <div class="wrap center">
+    <h2 id="cardRound">Round 1</h2>
+    <div class="cardbig">
+      <div class="ic" id="cardIc">🃏</div>
+      <div class="nm" id="cardNm">Standard</div>
+      <div class="tx" id="cardTx"></div>
+    </div>
+    <p class="hint" id="cardStarter"></p>
+    <button class="btn primary" id="cardGo">Start the round</button>
+  </div>
+</section>
+
+<!-- TURN -->
+<section class="screen" id="sTurn">
+  <div class="wrap">
+    <div class="topbar">
+      <span class="rnd" id="tRound">R1</span>
+      <span class="chip card" id="tCard">🃏 Standard</span>
+      <button class="iconbtn" id="hauntBtn" title="Haunt">👻</button>
+      <button class="iconbtn" id="menuBtn" title="Menu">&#9776;</button>
+    </div>
+    <div id="strip"></div>
+    <div class="who" id="tWho">Name<small>add a letter</small></div>
+    <div class="timerbar" id="tBar"><i id="tBarFill"></i></div>
+    <div class="fragbox">
+      <button class="side" id="sideL" aria-label="Add to front">&#9664;</button>
+      <div id="frag"></div>
+      <button class="side" id="sideR" aria-label="Add to end">&#9654;</button>
+    </div>
+    <div class="notice" id="tNote"></div>
+    <div id="keys"></div>
+    <div class="actions">
+      <button class="btn danger" id="chalBtn">Challenge</button>
+      <button class="btn gold" id="wordBtn">WORD!</button>
+      <button class="btn primary" id="okBtn">Place letter</button>
+    </div>
+  </div>
+</section>
+
+<!-- PROOF (challenge) -->
+<section class="screen" id="sProof">
+  <div class="wrap center">
+    <h2><span id="pChal">X</span> challenges <span id="pAcc">Y</span>!</h2>
+    <p class="hint">Fragment on the table:</p>
+    <div class="bigword frag" id="pFrag">AB</div>
+    <p class="hint" id="pRule"></p>
+    <input class="proofin" id="proofIn" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="type your word">
+    <div class="notice bad" id="pMsg"></div>
+    <button class="btn primary" id="proofOk">Submit word</button>
+    <button class="btn" id="proofFold">I was bluffing&hellip; 😬</button>
+  </div>
+</section>
+
+<!-- VOTE -->
+<section class="screen" id="sVote">
+  <div class="wrap center">
+    <h2 id="vTitle">Room vote</h2>
+    <div class="bigword" id="vWord">WORD</div>
+    <p class="hint" id="vAsk">Is this a real word?</p>
+    <div class="dictflag" id="vDict"></div>
+    <p class="hint">Everyone point thumbs up or down &mdash; majority wins. Ties go to the word.</p>
+    <div class="row">
+      <button class="btn danger" id="vFake">👎 Not a word</button>
+      <button class="btn primary" id="vReal">👍 Real word</button>
+    </div>
+  </div>
+</section>
+
+<!-- ROUND END -->
+<section class="screen" id="sEnd">
+  <div class="wrap center">
+    <div class="verdict" id="eIc">👻</div>
+    <h2 id="eTitle">X loses the round</h2>
+    <p class="hint" id="eWhy"></p>
+    <div class="lettersBig" id="eLetters"></div>
+    <p class="hint" id="eStatus"></p>
+    <div class="panel" id="eWordsPanel">
+      <div class="label" id="eWordsLbl">The ghost's dictionary could have played</div>
+      <div class="words" id="eWords"></div>
+    </div>
+    <button class="btn primary" id="eNext">Next round</button>
+  </div>
+</section>
+
+<!-- GAME OVER -->
+<section class="screen" id="sOver">
+  <div class="wrap center">
+    <div class="verdict">🏆</div>
+    <h1><span class="grad" id="oWin">Winner</span></h1>
+    <p class="sub" id="oSub">last one living</p>
+    <div class="panel">
+      <div class="label">Final haunting</div>
+      <div class="board" id="oBoard"></div>
+    </div>
+    <div class="row">
+      <button class="btn" id="oSetup">Change players</button>
+      <button class="btn primary" id="oAgain">Play again</button>
+    </div>
+  </div>
+</section>
+
+<!-- RULES -->
+<div class="overlay" id="oRules">
+  <div class="sheet">
+    <h2><span class="grad">How to play</span></h2>
+    <ul>
+      <li>Take turns adding <b>one letter</b> to the shared fragment. In <b>Either end</b> mode, tap &#9664; or &#9654; to pick the side.</li>
+      <li>Every letter must keep a real word possible &mdash; but if you <b>complete</b> a word (of the minimum length or longer), you lose the round.</li>
+      <li>Stuck? <b>Bluff</b> with a letter anyway and hope nobody notices.</li>
+      <li><b>Challenge</b>: think the last player bluffed? They must type a real word that fits. The room votes. Real word &rarr; challenger loses. Fake or no word &rarr; bluffer loses.</li>
+      <li><b>WORD!</b>: think the last letter finished a word? The room votes. Real &rarr; they lose. Not a word &rarr; you lose.</li>
+      <li>Each lost round earns a letter of <b>G-H-O-S-T</b>. Spell it and you're a ghost. Last one living wins.</li>
+      <li><b>Haunting</b>: ghosts can't talk to the living &mdash; but once per round each ghost may tap 👻 to <b>ban a letter</b> for the current player's turn.</li>
+      <li>The phone doesn't know every word &mdash; <b>the room is the judge</b>. The ghost's dictionary only gives hints.</li>
+    </ul>
+    <button class="btn primary" id="rulesClose">Got it</button>
+  </div>
+</div>
+
+<!-- MENU -->
+<div class="overlay" id="oMenu">
+  <div class="sheet">
+    <h2>Paused</h2>
+    <div class="board" id="mBoard"></div>
+    <button class="btn" id="mRules">How to play</button>
+    <button class="btn" id="mCard">Show round card</button>
+    <button class="btn danger" id="mQuit">End game &amp; back to setup</button>
+    <button class="btn primary" id="mClose">Resume</button>
+  </div>
+</div>
+
+<!-- HAUNT -->
+<div class="overlay" id="oHaunt">
+  <div class="sheet">
+    <h2>👻 Haunt <span id="hVictim">X</span></h2>
+    <p class="hint">Which ghost is haunting?</p>
+    <div class="ghostlist" id="hGhosts"></div>
+    <p class="hint">Ban one letter for this turn only:</p>
+    <div class="pickgrid" id="hKeys"></div>
+    <div class="row">
+      <button class="btn" id="hCancel">Cancel</button>
+      <button class="btn ghostly" id="hOk" disabled>Boo!</button>
+    </div>
+  </div>
+</div>
+
+<div class="floaty" id="floaty">👻</div>
+
+<script>
+'use strict';
+// ---------- data ----------
+const BANK_RAW = `able about above absent accept acid acorn across actor adapt admire adult advice afraid after again agent agree ahead alarm album alert alien alive allow almost alone along amber amount anchor angel anger angle animal ankle answer apple apron arcade arch arena argue armor arrow artist ashore aside asleep attic aunt autumn avoid awake award badge bagel baker balance ballet bamboo banana bandit banner barber barrel basket battle beach beacon beard beast beaver become beetle begin behind below bench berry beyond bicycle binder biscuit bishop blanket blast blend blink blizzard block bloom blossom board bonus border bottle bottom boulder bounce bracelet branch brave bread breeze brick bridge bright broken bronze brother bubble bucket buckle budget buffalo bugle bundle burger butter button cabin cactus camera camel campus candle candy canoe canyon captain carpet carrot castle cattle cellar center chalk champion change chapter charm cheese cherry chicken chimney choice circle circus citizen clever cliff climate clock closet cloud clover coach coast cobweb coconut coffee collar comet comic compass copper corner cosmic costume cotton couch cousin cowboy crayon cream credit cricket crowd crown crumb crystal cupboard curtain cushion custom daisy dance danger dazzle decade decide desert design detail diamond dinner dinosaur doctor dolphin donkey double dragon drama drawer dream drift drizzle during dusty eager eagle early earth easel echo eclipse elbow elephant eleven empire empty energy engine enjoy escape evening event exact expert explore fabric falcon family famous fancy farmer father feather fence festival fiddle figure finger forest fortune fossil fountain fresh friend frozen fruit funny gadget galaxy garden garlic gather gentle giant ginger giraffe glacier glide glitter globe glove goblin golden gossip grape gravity great guitar hammer hamster handle happen harbor harvest hatch helmet hermit hidden hiccup honey horizon hornet hotel hundred hunger hurry iceberg igloo imagine index insect island jacket jaguar jelly jester jigsaw jingle jockey journey jungle kettle kiosk kingdom kitchen kitten knight koala ladder lantern laptop laugh lawyer leader legend lemon letter lizard lobster locket lucky lunar magic magnet mango marble market meadow melody melon mermaid meteor middle mirror mitten monkey monster morning mosaic mountain muffin museum mystery napkin nature needle nephew noodle normal nugget number ocean octopus office orange orbit orchard ostrich outside oyster paddle palace pancake panda panther parade parrot pastry peanut pebble pencil penguin pepper picnic pigeon pillow pirate planet plaster pocket poetry potato powder prince puddle pumpkin puppet puzzle python quartz queen question quiet rabbit raccoon radar rainbow ranger rattle raven reason record remote rescue ribbon riddle rocket rodeo rubber saddle sailor salmon sandal saucer scarf school scooter scribble season secret shadow shelter shiver silver simple sister sketch skate slipper smile snack sneeze socket spider spirit splash sponge spring square squirrel stable stadium stairs stamp statue sticker storm strange stream string studio sugar summer sunset supper swamp sweater switch symbol table tablet tadpole talent teapot temple tender thunder ticket tiger timber toast tomato tongue tornado tower tractor travel treasure triangle trumpet tulip tunnel turkey turtle twelve umbrella uncle unicorn useful valley velvet violin volcano voyage waffle wagon walnut walrus wander warm weasel weather whale whisper whistle window winter wizard wobble wonder yellow yogurt zebra zipper`;
+const BANK = Array.from(new Set(BANK_RAW.split(/\s+/).filter(Boolean).map(w => w.toUpperCase())));
+const BANKSET = new Set(BANK);
+
+const CARDS = [
+  { id: 'std', ic: '🃏', nm: 'Standard', tx: 'No twist. Just letters, nerves and lies.', w: 4 },
+  { id: 'long', ic: '🧵', nm: 'Long Haul', tx: 'Words only count from 6 letters this round &mdash; short words are safe, but the fragment gets long and scary.', w: 2 },
+  { id: 'front', ic: '🚪', nm: 'Front Door', tx: 'Letters may only go at the FRONT this round. Challenge words must END with the fragment.', w: 2, superOnly: true },
+  { id: 'ban', ic: '⛔', nm: 'Banned Letter', tx: 'Nobody may play <b>%L%</b> this round &mdash; and challenge words can\'t contain it either.', w: 2 },
+  { id: 'vowel', ic: '🏜️', nm: 'Vowel Drought', tx: 'No two vowels (A E I O U) may be added back to back.', w: 2 },
+  { id: 'double', ic: '💀', nm: 'Double Trouble', tx: 'Whoever loses this round takes TWO letters of GHOST.', w: 1 },
+  { id: 'light', ic: '⚡', nm: 'Lightning', tx: '8 seconds per turn. Hesitate and you lose the round.', w: 2 },
+  { id: 'reverse', ic: '🔄', nm: 'Reverse', tx: 'Play goes the OTHER way around the circle this round.', w: 1 }
+];
+const BAN_LETTERS = ['E', 'A', 'S', 'T', 'R', 'O', 'I', 'N', 'L'];
+const VOWELS = 'AEIOU';
+const GHOST = 'GHOST';
+const COLORS = ['#7cf5d0', '#b58cff', '#ff8fd0', '#ffcf5c', '#6fb7ff', '#ff9a5c', '#5ef59b', '#e6a0ff', '#ff6b7d', '#9cf2ff'];
+const LS_KEY = 'cowork-ghost-letters-setup';
+
+// ---------- state ----------
+const S = {
+  names: ['Player 1', 'Player 2', 'Player 3'],
+  opts: { mode: 'super', minLen: 4, timer: 0, cards: 1, haunts: 1 },
+  players: [],
+  round: 0,
+  card: null,
+  banLetter: null,
+  frag: '',
+  cur: 0,
+  last: null,
+  lastAdded: '',
+  dir: 1,
+  starter: 0,
+  sel: null,
+  side: 'R',
+  turnBan: null,
+  hauntedBy: null,
+  phase: 'setup',
+  timeLeft: 0,
+  timerId: null,
+  paused: false,
+  lastCardId: null,
+  showdown: null
+};
+
+// ---------- utils ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const rnd = n => Math.floor(Math.random() * n);
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  const sc = $(id); if (sc) sc.scrollTop = 0;
+}
+function glHTML(n) {
+  let h = '';
+  for (let i = 0; i < 5; i++) h += i < n ? `<b>${GHOST[i]}</b>` : `<i>${GHOST[i]}</i>`;
+  return h;
+}
+
+// ---------- audio ----------
+let AC = null;
+function ac() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, d = 0.12, type = 'sine', vol = 0.15, delay = 0, slide = 0) {
+  const a = ac(); if (!a) return;
+  const t = a.currentTime + delay;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, f + slide), t + d);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + d + 0.02);
+}
+const sfx = {
+  key: () => tone(660, 0.05, 'triangle', 0.08),
+  place: () => { tone(520, 0.08, 'triangle', 0.12); tone(780, 0.1, 'triangle', 0.1, 0.06); },
+  bad: () => tone(160, 0.25, 'sawtooth', 0.08),
+  tick: () => tone(1200, 0.04, 'square', 0.04),
+  boo: () => { tone(300, 0.7, 'sine', 0.14, 0, -180); tone(310, 0.7, 'sine', 0.08, 0.05, -190); },
+  gong: () => { tone(220, 0.6, 'sine', 0.16); tone(330, 0.5, 'sine', 0.08, 0.02); },
+  lose: () => { [440, 370, 311, 262].forEach((f, i) => tone(f, 0.22, 'triangle', 0.12, i * 0.14)); },
+  win: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, 'triangle', 0.13, i * 0.12)); }
+};
+function floaty(ch) {
+  const f = $('floaty'); f.textContent = ch; f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+}
+
+// ---------- persistence ----------
+function loadSetup() {
+  try {
+    const d = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    if (d && Array.isArray(d.names) && d.names.length >= 2) S.names = d.names.slice(0, 10).map(n => String(n).slice(0, 16));
+    if (d && d.opts) Object.assign(S.opts, d.opts);
+  } catch (e) { /* ignore */ }
+}
+function saveSetup() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ names: S.names, opts: S.opts })); } catch (e) { /* ignore */ }
+}
+
+// ---------- setup screen ----------
+function renderNames() {
+  const box = $('nameList');
+  box.innerHTML = S.names.map((n, i) => `
+    <div class="nrow">
+      <span class="dot" style="background:${COLORS[i % COLORS.length]}"></span>
+      <input data-i="${i}" maxlength="16" value="${esc(n)}" placeholder="Player ${i + 1}">
+      <button data-del="${i}" aria-label="Remove" ${S.names.length <= 2 ? 'disabled style="opacity:.3"' : ''}>&times;</button>
+    </div>`).join('');
+  $('addP').disabled = S.names.length >= 10;
+}
+function renderOpts() {
+  document.querySelectorAll('.seg[data-opt]').forEach(seg => {
+    const k = seg.dataset.opt;
+    seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(S.opts[k]) === b.dataset.v));
+  });
+}
+$('nameList').addEventListener('input', e => {
+  const i = e.target.dataset.i; if (i === undefined) return;
+  S.names[+i] = e.target.value.slice(0, 16); saveSetup();
+});
+$('nameList').addEventListener('click', e => {
+  const d = e.target.closest('[data-del]'); if (!d || S.names.length <= 2) return;
+  S.names.splice(+d.dataset.del, 1); renderNames(); saveSetup();
+});
+$('addP').addEventListener('click', () => {
+  if (S.names.length >= 10) return;
+  S.names.push(''); renderNames(); saveSetup();
+  const ins = $('nameList').querySelectorAll('input'); ins[ins.length - 1].focus();
+});
+document.querySelectorAll('.seg[data-opt]').forEach(seg => {
+  seg.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const k = seg.dataset.opt, v = b.dataset.v;
+    S.opts[k] = (k === 'mode') ? v : +v;
+    renderOpts(); saveSetup(); sfx.key();
+  });
+});
+$('rulesBtn').addEventListener('click', () => openOverlay('oRules'));
+$('rulesClose').addEventListener('click', () => closeOverlay('oRules'));
+$('startBtn').addEventListener('click', () => {
+  ac();
+  const names = S.names.map((n, i) => (n || '').trim() || `Player ${i + 1}`);
+  const seen = {};
+  const uniq = names.map(n => { const k = n.toLowerCase(); seen[k] = (seen[k] || 0) + 1; return seen[k] > 1 ? `${n} ${seen[k]}` : n; });
+  if (uniq.length < 2) { $('setupMsg').textContent = 'You need at least 2 players.'; return; }
+  $('setupMsg').textContent = '';
+  newGame(uniq);
+});
+
+// ---------- overlays ----------
+function openOverlay(id) { $(id).classList.add('on'); if (S.phase === 'turn') S.paused = true; }
+function closeOverlay(id) {
+  $(id).classList.remove('on');
+  if (!document.querySelector('.overlay.on')) S.paused = false;
+}
+
+// ---------- game flow ----------
+function alive() { return S.players.filter(p => !p.out); }
+function nextAlive(i, dir = S.dir) {
+  const n = S.players.length;
+  for (let k = 1; k <= n; k++) {
+    const j = ((i + dir * k) % n + n) % n;
+    if (!S.players[j].out) return j;
+  }
+  return i;
+}
+function effMin() { return S.card && S.card.id === 'long' ? Math.max(S.opts.minLen, 6) : S.opts.minLen; }
+function turnSec() { return S.card && S.card.id === 'light' ? 8 : S.opts.timer; }
+// how a challenge word must relate to the fragment
+function matchKind() {
+  if (S.opts.mode === 'classic') return 'prefix';
+  if (S.card && S.card.id === 'front') return 'suffix';
+  return 'substring';
+}
+function fits(word, frag, kind) {
+  if (kind === 'prefix') return word.startsWith(frag);
+  if (kind === 'suffix') return word.endsWith(frag);
+  return word.includes(frag);
+}
+function kindText(kind, frag) {
+  if (kind === 'prefix') return `must START with ${frag}`;
+  if (kind === 'suffix') return `must END with ${frag}`;
+  return `must contain ${frag}`;
+}
+
+function newGame(names) {
+  S.players = names.map((name, i) => ({ name, color: COLORS[i % COLORS.length], letters: 0, out: false, hauntRound: -1, won: 0 }));
+  S.round = 0;
+  S.starter = 0;
+  S.lastCardId = null;
+  saveSetup();
+  startRound();
+}
+
+function drawCard() {
+  if (!S.opts.cards) return CARDS[0];
+  const pool = CARDS.filter(c => (!c.superOnly || S.opts.mode === 'super') && !(c.id === 'long' && S.opts.minLen >= 6));
+  // avoid the same twist twice running (Standard may repeat)
+  const choices = pool.filter(c => c.id === 'std' || c.id !== S.lastCardId);
+  const total = choices.reduce((a, c) => a + c.w, 0);
+  let r = Math.random() * total;
+  for (const c of choices) { r -= c.w; if (r < 0) return c; }
+  return choices[0];
+}
+
+function startRound() {
+  S.round++;
+  S.card = drawCard();
+  S.lastCardId = S.card.id;
+  S.banLetter = S.card.id === 'ban' ? BAN_LETTERS[rnd(BAN_LETTERS.length)] : null;
+  S.dir = S.card.id === 'reverse' ? -1 : 1;
+  S.frag = '';
+  S.last = null;
+  S.lastAdded = '';
+  if (S.players[S.starter].out) S.starter = nextAlive(S.starter, 1);
+  S.cur = S.starter;
+  S.players.forEach(p => { if (p.out) p.hauntRound = -1; });
+  $('cardRound').textContent = `Round ${S.round}`;
+  fillCard();
+  $('cardStarter').innerHTML = `<b>${esc(S.players[S.cur].name)}</b> places the first letter. Words count from <b>${effMin()}</b> letters.`;
+  S.phase = 'card';
+  show('sCard');
+  sfx.gong();
+}
+function fillCard() {
+  $('cardIc').textContent = S.card.ic;
+  $('cardNm').textContent = S.card.nm;
+  $('cardTx').innerHTML = S.card.tx.replace('%L%', S.banLetter || '');
+}
+$('cardGo').addEventListener('click', () => {
+  if (S.phase === 'card') beginTurn();
+  else show('sTurn');
+});
+
+function beginTurn() {
+  S.phase = 'turn';
+  S.sel = null;
+  S.turnBan = null;
+  S.hauntedBy = null;
+  S.side = defaultSide();
+  S.timeLeft = turnSec();
+  show('sTurn');
+  renderTurn();
+  startTimer();
+}
+function defaultSide() {
+  if (S.opts.mode === 'classic') return 'R';
+  if (S.card && S.card.id === 'front') return 'L';
+  return 'R';
+}
+function sidesAllowed() {
+  if (S.opts.mode === 'classic') return ['R'];
+  if (S.card && S.card.id === 'front') return ['L'];
+  return ['L', 'R'];
+}
+
+function keyBlock(ch) {
+  if (S.banLetter === ch) return 'Banned this round';
+  if (S.turnBan === ch) return 'Haunted!';
+  if (S.card && S.card.id === 'vowel' && S.lastAdded && VOWELS.includes(S.lastAdded) && VOWELS.includes(ch)) return 'Vowel Drought';
+  return '';
+}
+
+function renderTurn() {
+  const p = S.players[S.cur];
+  $('tRound').textContent = `R${S.round}`;
+  $('tCard').textContent = `${S.card.ic} ${S.card.nm}${S.banLetter ? ' · no ' + S.banLetter : ''}`;
+  // strip
+  $('strip').innerHTML = S.players.map((q, i) => `
+    <div class="pchip ${i === S.cur ? 'cur' : ''} ${i === S.last ? 'last' : ''} ${q.out ? 'out' : ''}">
+      <span style="color:${q.color}">${q.out ? '👻 ' : ''}${esc(q.name)}</span>
+      <span class="gl">${glHTML(q.letters)}</span>
+    </div>`).join('');
+  const curChip = $('strip').children[S.cur];
+  if (curChip && curChip.scrollIntoView) curChip.scrollIntoView({ block: 'nearest', inline: 'center' });
+  const lastName = S.last !== null ? S.players[S.last].name : '';
+  $('tWho').innerHTML = `<span style="color:${p.color}">${esc(p.name)}</span>'s turn<small>${S.frag ? `last letter by ${esc(lastName)}` : 'place the first letter'}</small>`;
+  // fragment
+  const allowed = sidesAllowed();
+  $('sideL').hidden = !allowed.includes('L') || allowed.length === 1;
+  $('sideR').hidden = !allowed.includes('R') || allowed.length === 1;
+  $('sideL').classList.toggle('on', S.side === 'L');
+  $('sideR').classList.toggle('on', S.side === 'R');
+  const tiles = S.frag.split('').map(c => `<span class="tile">${c}</span>`);
+  const pend = S.sel ? `<span class="tile pend">${S.sel}</span>` : (S.frag ? `<span class="tile slot">?</span>` : '');
+  if (!S.frag && !S.sel) $('frag').innerHTML = `<span class="emptyfrag">Empty &mdash; pick any letter to begin</span>`;
+  else $('frag').innerHTML = S.side === 'L' ? pend + tiles.join('') : tiles.join('') + pend;
+  // notice
+  const note = $('tNote');
+  if (S.turnBan) { note.className = 'notice haunt'; note.textContent = `👻 ${S.players[S.hauntedBy].name} haunts you: no ${S.turnBan} this turn!`; }
+  else if (S.sel) { note.className = 'notice'; note.textContent = allowed.length > 1 ? `Placing ${S.sel} at the ${S.side === 'L' ? 'FRONT' : 'END'} — tap ◀ ▶ to switch sides` : `Placing ${S.sel} — tap Place letter to lock it in`; }
+  else { note.className = 'notice'; note.textContent = allowed.length > 1 ? 'Pick a letter, then a side ◀ ▶' : (S.card.id === 'front' && S.opts.mode === 'super' ? 'Front Door: letters go at the front' : 'Pick a letter'); }
+  // keys
+  $('keys').innerHTML = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(ch => {
+    const blk = keyBlock(ch);
+    return `<button class="key ${ch === S.sel ? 'sel' : ''} ${blk ? 'ban' : ''}" data-k="${ch}" ${blk ? `aria-disabled="true" title="${blk}"` : ''}>${ch}</button>`;
+  }).join('');
+  // actions
+  $('chalBtn').disabled = !(S.frag.length >= 1 && S.last !== null && S.last !== S.cur);
+  $('wordBtn').disabled = !(S.frag.length >= effMin() && S.last !== null && S.last !== S.cur);
+  $('okBtn').disabled = !S.sel;
+  $('hauntBtn').style.display = canHaunt() ? '' : 'none';
+  renderTimer();
+}
+
+function canHaunt() {
+  return !!S.opts.haunts && S.phase === 'turn' && !S.turnBan && S.players.some(p => p.out && p.hauntRound !== S.round);
+}
+
+$('keys').addEventListener('click', e => {
+  const b = e.target.closest('[data-k]'); if (!b || S.phase !== 'turn' || S.paused) return;
+  const ch = b.dataset.k, blk = keyBlock(ch);
+  if (blk) { sfx.bad(); const n = $('tNote'); n.className = 'notice bad'; n.textContent = `${ch} is off limits: ${blk}`; return; }
+  S.sel = ch; sfx.key(); renderTurn();
+});
+$('sideL').addEventListener('click', () => { if (sidesAllowed().includes('L')) { S.side = 'L'; sfx.key(); renderTurn(); } });
+$('sideR').addEventListener('click', () => { if (sidesAllowed().includes('R')) { S.side = 'R'; sfx.key(); renderTurn(); } });
+$('frag').addEventListener('click', () => {
+  // tapping the fragment flips the side in either-end mode
+  if (sidesAllowed().length > 1) { S.side = S.side === 'L' ? 'R' : 'L'; sfx.key(); renderTurn(); }
+});
+$('okBtn').addEventListener('click', () => {
+  if (S.phase !== 'turn' || !S.sel || keyBlock(S.sel)) return;
+  S.frag = S.side === 'L' ? S.sel + S.frag : S.frag + S.sel;
+  S.lastAdded = S.sel;
+  S.last = S.cur;
+  sfx.place();
+  S.cur = nextAlive(S.cur);
+  beginTurn();
+});
+
+// ---------- timer ----------
+function startTimer() {
+  stopTimer();
+  if (!turnSec()) return;
+  let prev = performance.now();
+  S.timerId = setInterval(() => {
+    const now = performance.now(), dt = (now - prev) / 1000; prev = now;
+    if (S.phase !== 'turn' || S.paused) return;
+    const before = S.timeLeft;
+    S.timeLeft = Math.max(0, S.timeLeft - dt);
+    if (Math.ceil(S.timeLeft) !== Math.ceil(before) && S.timeLeft <= 5 && S.timeLeft > 0) sfx.tick();
+    renderTimer();
+    if (S.timeLeft <= 0) {
+      stopTimer();
+      loseRound(S.cur, `${S.players[S.cur].name} ran out of time.`, 'timeout');
+    }
+  }, 100);
+}
+function stopTimer() { if (S.timerId) { clearInterval(S.timerId); S.timerId = null; } }
+function renderTimer() {
+  const sec = turnSec();
+  $('tBar').hidden = !sec;
+  if (sec) $('tBarFill').style.transform = `scaleX(${Math.max(0, S.timeLeft / sec)})`;
+}
+
+// ---------- haunt ----------
+let hGhost = null, hLetter = null;
+$('hauntBtn').addEventListener('click', () => {
+  if (!canHaunt()) return;
+  const ghosts = S.players.map((p, i) => ({ p, i })).filter(o => o.p.out && o.p.hauntRound !== S.round);
+  hGhost = ghosts.length === 1 ? ghosts[0].i : null; hLetter = null;
+  $('hVictim').textContent = S.players[S.cur].name;
+  $('hGhosts').innerHTML = ghosts.map(o => `<button data-g="${o.i}" class="${o.i === hGhost ? 'on' : ''}">👻 ${esc(o.p.name)}</button>`).join('');
+  renderHauntKeys();
+  openOverlay('oHaunt');
+});
+function renderHauntKeys() {
+  $('hKeys').innerHTML = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(ch =>
+    `<button class="key ${ch === hLetter ? 'sel' : ''} ${ch === S.banLetter ? 'ban' : ''}" data-h="${ch}">${ch}</button>`).join('');
+  $('hOk').disabled = hGhost === null || !hLetter;
+}
+$('hGhosts').addEventListener('click', e => {
+  const b = e.target.closest('[data-g]'); if (!b) return;
+  hGhost = +b.dataset.g;
+  $('hGhosts').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+  renderHauntKeys();
+});
+$('hKeys').addEventListener('click', e => {
+  const b = e.target.closest('[data-h]'); if (!b || b.dataset.h === S.banLetter) return;
+  hLetter = b.dataset.h; sfx.key(); renderHauntKeys();
+});
+$('hCancel').addEventListener('click', () => closeOverlay('oHaunt'));
+$('hOk').addEventListener('click', () => {
+  if (hGhost === null || !hLetter) return;
+  S.players[hGhost].hauntRound = S.round;
+  S.turnBan = hLetter;
+  S.hauntedBy = hGhost;
+  if (S.sel === hLetter) S.sel = null;
+  closeOverlay('oHaunt');
+  sfx.boo(); floaty('👻');
+  renderTurn();
+});
+
+// ---------- challenge ----------
+$('chalBtn').addEventListener('click', () => {
+  if (S.phase !== 'turn' || $('chalBtn').disabled) return;
+  stopTimer();
+  S.phase = 'proof';
+  S.showdown = { type: 'chal', chal: S.cur, acc: S.last, frag: S.frag };
+  $('pChal').textContent = S.players[S.cur].name;
+  $('pAcc').textContent = S.players[S.last].name;
+  $('pFrag').textContent = S.frag;
+  const kind = matchKind();
+  $('pRule').innerHTML = `<b>${esc(S.players[S.last].name)}</b>, name a real word that ${kindText(kind, esc(S.frag))}, at least ${Math.max(effMin(), S.frag.length + 1)} letters${S.banLetter ? `, with no ${S.banLetter}` : ''}. Everyone else: no peeking at phones!`;
+  $('proofIn').value = '';
+  $('pMsg').textContent = '';
+  sfx.bad();
+  show('sProof');
+  setTimeout(() => $('proofIn').focus(), 50);
+});
+function checkProof(raw) {
+  const w = String(raw || '').trim().toUpperCase();
+  const f = S.showdown.frag, kind = matchKind(), min = effMin();
+  if (!w) return { err: 'Type a word first (or admit the bluff).' };
+  if (!/^[A-Z]+$/.test(w)) return { err: 'Letters only - no spaces, numbers or symbols.' };
+  if (w === f) return { err: `${f} is the fragment itself. If that's already a word, it was completed - pick a longer word.` };
+  if (w.length <= f.length) return { err: 'Your word must be longer than the fragment.' };
+  if (!fits(w, f, kind)) return { err: `${w} doesn't fit - it ${kindText(kind, f)}.` };
+  if (w.length < min) return { err: `Words only count from ${min} letters this round.` };
+  if (S.banLetter && w.includes(S.banLetter)) return { err: `No ${S.banLetter} allowed this round.` };
+  return { word: w };
+}
+$('proofIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('proofOk').click(); });
+$('proofOk').addEventListener('click', () => {
+  if (S.phase !== 'proof') return;
+  const r = checkProof($('proofIn').value);
+  if (r.err) { $('pMsg').textContent = r.err; sfx.bad(); return; }
+  $('proofIn').blur();
+  S.showdown.word = r.word;
+  openVote(r.word, `Is <b>${r.word}</b> a real word? If yes, ${esc(S.players[S.showdown.chal].name)} loses the round.`);
+});
+$('proofFold').addEventListener('click', () => {
+  if (S.phase !== 'proof') return;
+  const sd = S.showdown;
+  $('proofIn').blur();
+  S.players[sd.chal].won++;
+  loseRound(sd.acc, `${S.players[sd.acc].name} admitted the bluff! ${S.players[sd.chal].name} saw right through it.`, 'fold');
+});
+
+// ---------- WORD! ----------
+$('wordBtn').addEventListener('click', () => {
+  if (S.phase !== 'turn' || $('wordBtn').disabled) return;
+  stopTimer();
+  S.showdown = { type: 'word', chal: S.cur, acc: S.last, frag: S.frag, word: S.frag };
+  openVote(S.frag, `${esc(S.players[S.cur].name)} says <b>${esc(S.players[S.last].name)}</b> just finished a word. Real word &rarr; ${esc(S.players[S.last].name)} loses. Not a word &rarr; ${esc(S.players[S.cur].name)} loses.`);
+  sfx.bad();
+});
+
+// ---------- vote ----------
+function openVote(word, ask) {
+  S.phase = 'vote';
+  $('vTitle').textContent = S.showdown.type === 'word' ? 'WORD! called' : 'Challenge!';
+  $('vWord').textContent = word;
+  $('vAsk').innerHTML = ask;
+  const inDict = BANKSET.has(word);
+  $('vDict').className = 'dictflag ' + (inDict ? 'yes' : 'no');
+  $('vDict').textContent = inDict ? '📖 The ghost\'s dictionary knows this word.' : '❔ Not in the ghost\'s little dictionary - that proves nothing. The room decides.';
+  show('sVote');
+}
+function resolveVote(real) {
+  if (S.phase !== 'vote') return;
+  const sd = S.showdown, C = S.players[sd.chal].name, A = S.players[sd.acc].name;
+  if (sd.type === 'chal') {
+    if (real) { S.players[sd.acc].won++; loseRound(sd.chal, `${A} had a real word: ${sd.word}. The challenge backfires on ${C}.`, 'chal-real'); }
+    else { S.players[sd.chal].won++; loseRound(sd.acc, `The room rejects ${sd.word}. ${A} was bluffing!`, 'chal-fake'); }
+  } else {
+    if (real) { S.players[sd.chal].won++; loseRound(sd.acc, `${sd.word} is a word - ${A} completed it.`, 'word-real'); }
+    else { S.players[sd.acc].won++; loseRound(sd.chal, `${sd.word} isn't a word yet. ${C}'s call backfires.`, 'word-fake'); }
+  }
+}
+$('vReal').addEventListener('click', () => resolveVote(true));
+$('vFake').addEventListener('click', () => resolveVote(false));
+
+// ---------- round end ----------
+function suggestions(frag) {
+  if (!frag) return [];
+  const kind = matchKind(), min = effMin();
+  const hits = BANK.filter(w => w.length > frag.length && w.length >= min && fits(w, frag, kind) && !(S.banLetter && w.includes(S.banLetter)));
+  for (let i = hits.length - 1; i > 0; i--) { const j = rnd(i + 1); [hits[i], hits[j]] = [hits[j], hits[i]]; }
+  return hits.slice(0, 6);
+}
+function loseRound(idx, why, how) {
+  stopTimer();
+  closeOverlay('oHaunt');
+  S.phase = 'end';
+  const p = S.players[idx];
+  const before = p.letters;
+  const add = S.card && S.card.id === 'double' ? 2 : 1;
+  p.letters = Math.min(5, p.letters + add);
+  const eliminated = p.letters >= 5;
+  if (eliminated) p.out = true;
+  S.starter = idx;
+  $('eIc').textContent = eliminated ? '👻' : '😱';
+  $('eTitle').innerHTML = `<span style="color:${p.color}">${esc(p.name)}</span> loses the round`;
+  $('eWhy').textContent = why;
+  $('eLetters').innerHTML = GHOST.split('').map((c, i) => `<span class="${i < p.letters ? 'got' : ''} ${i >= before && i < p.letters ? 'new' : ''}">${c}</span>`).join('');
+  const left = alive().length;
+  $('eStatus').innerHTML = eliminated
+    ? `<b>${esc(p.name)} is a GHOST!</b> No more talking to the living${S.opts.haunts ? ' &mdash; but you can haunt them with 👻' : ''}.`
+    : `${5 - p.letters} letter${5 - p.letters === 1 ? '' : 's'} from becoming a ghost.`;
+  // what the dictionary would have played from the final fragment
+  const frag = S.frag;
+  const sug = suggestions(frag);
+  const re = new RegExp(frag.replace(/[^A-Z]/g, ''));
+  if (frag && sug.length) {
+    $('eWordsPanel').style.display = '';
+    $('eWordsLbl').textContent = `Words hiding in ${frag}`;
+    $('eWords').innerHTML = sug.map(w => `<span>${w.replace(re, m => `<b>${m}</b>`)}</span>`).join('');
+  } else if (frag) {
+    $('eWordsPanel').style.display = '';
+    $('eWordsLbl').textContent = `Words hiding in ${frag}`;
+    $('eWords').innerHTML = `<span style="color:var(--muted)">The ghost's dictionary is stumped too</span>`;
+  } else {
+    $('eWordsPanel').style.display = 'none';
+  }
+  $('eNext').textContent = left <= 1 ? 'See the winner' : 'Next round';
+  show('sEnd');
+  if (eliminated) { sfx.boo(); floaty('👻'); } else sfx.lose();
+}
+$('eNext').addEventListener('click', () => {
+  if (S.phase !== 'end') return;
+  if (alive().length <= 1) gameOver();
+  else startRound();
+});
+
+// ---------- game over ----------
+function boardHTML(winIdx) {
+  const order = S.players.map((p, i) => ({ p, i })).sort((a, b) => a.p.letters - b.p.letters || b.p.won - a.p.won);
+  return order.map(({ p, i }) => `
+    <div class="brow ${p.out ? 'dead' : ''} ${i === winIdx ? 'win' : ''}">
+      <span class="n" style="color:${p.out ? '' : p.color}">${i === winIdx ? '🏆 ' : p.out ? '👻 ' : ''}${esc(p.name)}</span>
+      <span style="font-size:12px;color:var(--muted)">${p.won} showdown${p.won === 1 ? '' : 's'}</span>
+      <span class="gl">${glHTML(p.letters)}</span>
+    </div>`).join('');
+}
+function gameOver() {
+  S.phase = 'over';
+  const w = S.players.findIndex(p => !p.out);
+  const wp = S.players[w];
+  $('oWin').textContent = wp ? wp.name : 'Nobody';
+  $('oSub').textContent = wp ? `survives ${S.round} round${S.round === 1 ? '' : 's'} as the last one living` : 'the ghosts take the house';
+  $('oBoard').innerHTML = boardHTML(w);
+  show('sOver');
+  sfx.win();
+}
+$('oAgain').addEventListener('click', () => newGame(S.players.map(p => p.name)));
+$('oSetup').addEventListener('click', () => { S.phase = 'setup'; renderNames(); renderOpts(); show('sSetup'); });
+
+// ---------- menu ----------
+$('menuBtn').addEventListener('click', () => {
+  $('mBoard').innerHTML = boardHTML(-1);
+  openOverlay('oMenu');
+});
+$('mClose').addEventListener('click', () => closeOverlay('oMenu'));
+$('mRules').addEventListener('click', () => { closeOverlay('oMenu'); openOverlay('oRules'); });
+$('mCard').addEventListener('click', () => { closeOverlay('oMenu'); openOverlay('oCardPeek'); });
+$('tCard').addEventListener('click', () => openOverlay('oCardPeek'));
+$('mQuit').addEventListener('click', () => {
+  stopTimer();
+  closeOverlay('oMenu');
+  S.phase = 'setup';
+  renderNames(); renderOpts();
+  show('sSetup');
+});
+
+// round-card peek overlay (built once)
+(function buildPeek() {
+  const o = document.createElement('div');
+  o.className = 'overlay'; o.id = 'oCardPeek';
+  o.innerHTML = `<div class="sheet"><div class="cardbig"><div class="ic" id="pkIc"></div><div class="nm" id="pkNm"></div><div class="tx" id="pkTx"></div></div>
+    <p class="hint" id="pkMin"></p><button class="btn primary" id="pkClose">Back to the game</button></div>`;
+  document.body.appendChild(o);
+  const fill = () => {
+    if (!S.card) return;
+    $('pkIc').textContent = S.card.ic; $('pkNm').textContent = S.card.nm;
+    $('pkTx').innerHTML = S.card.tx.replace('%L%', S.banLetter || '');
+    $('pkMin').innerHTML = `Words count from <b>${effMin()}</b> letters &middot; letters go ${sidesAllowed().length > 1 ? 'at either end' : sidesAllowed()[0] === 'L' ? 'at the front' : 'at the end'}.`;
+  };
+  new MutationObserver(() => { if (o.classList.contains('on')) fill(); }).observe(o, { attributes: true, attributeFilter: ['class'] });
+  $('pkClose').addEventListener('click', () => closeOverlay('oCardPeek'));
+})();
+
+// keyboard support for laptops
+document.addEventListener('keydown', e => {
+  if (S.phase !== 'turn' || S.paused || e.target.tagName === 'INPUT') return;
+  const k = e.key.toUpperCase();
+  if (/^[A-Z]$/.test(k)) { const b = $('keys').querySelector(`[data-k="${k}"]`); if (b) b.click(); }
+  else if (e.key === 'ArrowLeft') $('sideL').click();
+  else if (e.key === 'ArrowRight') $('sideR').click();
+  else if (e.key === 'Enter') $('okBtn').click();
+});
+
+// ---------- boot ----------
+loadSetup();
+renderNames();
+renderOpts();
+window.__ghost = S;
+</script>
+</body>
+</html>

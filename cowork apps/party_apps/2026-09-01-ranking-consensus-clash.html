@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<!-- CONCEPT: ranking/consensus - Pass-the-device party game where everyone secretly picks what the GROUP will rank first and last from a 6-item card; points for reading the room, not for being right. Bucket: RANKING & CONSENSUS. First party game in this folder. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Consensus Clash — Read the Room</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#12071f; --bg2:#1e0d33;
+    --ink:#fff4ff;
+    --hot:#ff2e88; --sun:#ffcf3d; --aqua:#22e0d0; --grape:#8b5cf6;
+    --dim:#a48ec0;
+    --card:#2a1147; --line:#4a2470;
+  }
+  html,body{height:100%}
+  body{
+    font-family:'Trebuchet MS','Segoe UI',system-ui,sans-serif;
+    background:radial-gradient(120% 90% at 50% 0%,#3a1263 0%,var(--bg2) 45%,var(--bg) 100%);
+    color:var(--ink); overflow:hidden; user-select:none;
+  }
+  #app{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;max-width:1100px;margin:0 auto}
+  .scr{width:100%;display:none;flex-direction:column;align-items:center;gap:14px;animation:in .28s ease}
+  .scr.on{display:flex}
+  @keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  h1{font-size:clamp(38px,8.5vw,86px);line-height:.92;letter-spacing:-2px;text-transform:uppercase;
+     background:linear-gradient(94deg,var(--sun),var(--hot) 45%,var(--aqua));
+     -webkit-background-clip:text;background-clip:text;color:transparent;text-align:center;font-weight:900}
+  .tag{color:var(--dim);text-align:center;font-size:clamp(14px,2.5vw,19px);max-width:640px;line-height:1.45}
+  .meta{color:var(--sun);font-weight:bold;letter-spacing:2px;font-size:clamp(11px,2vw,14px);text-transform:uppercase;text-align:center}
+
+  button{font-family:inherit;cursor:pointer;border:none;font-weight:900}
+  .btn{background:linear-gradient(180deg,var(--hot),#c4126a);color:#fff;font-size:clamp(20px,4vw,30px);
+       padding:18px 44px;border-radius:60px;text-transform:uppercase;letter-spacing:1.5px;
+       box-shadow:0 8px 0 #7d0742,0 14px 30px rgba(255,46,136,.35);transition:transform .08s,box-shadow .08s}
+  .btn:active{transform:translateY(6px);box-shadow:0 2px 0 #7d0742}
+  .btn.alt{background:linear-gradient(180deg,var(--aqua),#0e9c92);box-shadow:0 8px 0 #076a63,0 14px 30px rgba(34,224,208,.3)}
+  .btn.alt:active{box-shadow:0 2px 0 #076a63}
+  .btn.sm{font-size:clamp(14px,2.6vw,18px);padding:12px 26px;box-shadow:0 5px 0 #7d0742}
+  .btn.alt.sm{box-shadow:0 5px 0 #076a63}
+  .btn.ghost{background:transparent;border:3px solid var(--line);color:var(--dim);box-shadow:none;font-size:15px;padding:10px 22px}
+  .btn:disabled{opacity:.32;filter:grayscale(.7);cursor:not-allowed}
+
+  .panel{background:rgba(42,17,71,.78);border:3px solid var(--line);border-radius:24px;padding:18px;width:100%}
+
+  .prow{display:flex;gap:10px;align-items:center;margin-bottom:9px}
+  .prow input{flex:1;font-family:inherit;font-size:clamp(17px,3.4vw,23px);font-weight:bold;padding:13px 16px;
+    border-radius:14px;border:3px solid var(--line);background:#1a0a2e;color:var(--ink)}
+  .prow input:focus{outline:none;border-color:var(--aqua)}
+  .xb{background:#4a2470;color:#ffb0d6;border-radius:12px;width:48px;height:48px;font-size:22px;flex:0 0 48px}
+  .lenrow{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .chip{background:#1a0a2e;border:3px solid var(--line);color:var(--dim);border-radius:40px;
+        padding:11px 24px;font-size:17px;font-weight:900}
+  .chip.sel{background:var(--grape);border-color:#c4a6ff;color:#fff}
+
+  .passname{font-size:clamp(40px,10vw,90px);font-weight:900;color:var(--sun);text-align:center;line-height:1;word-break:break-word}
+
+  .cat{font-size:clamp(24px,5.2vw,46px);font-weight:900;text-transform:uppercase;letter-spacing:-1px;text-align:center;color:var(--sun);line-height:1.05}
+  .instr{text-align:center;color:var(--aqua);font-size:clamp(15px,2.9vw,22px);font-weight:bold;margin-top:2px}
+  .items{display:grid;grid-template-columns:1fr;gap:9px;width:100%}
+  @media(min-width:620px){.items{grid-template-columns:1fr 1fr}}
+  .item{display:flex;align-items:center;gap:10px;background:#1a0a2e;border:3px solid var(--line);
+        border-radius:18px;padding:13px 14px;font-size:clamp(16px,3.2vw,23px);font-weight:bold;text-align:left}
+  .item .lbl{flex:1;line-height:1.15}
+  .pk{width:52px;height:52px;flex:0 0 52px;border-radius:14px;font-size:24px;background:#33174f;color:#7a5c9c;border:3px solid transparent}
+  .pk.top.on{background:var(--sun);color:#3a2500;border-color:#fff}
+  .pk.bot.on{background:var(--hot);color:#fff;border-color:#fff}
+  .item.chosen{border-color:#fff}
+  .legend{display:flex;gap:16px;justify-content:center;color:var(--dim);font-size:clamp(12px,2.3vw,16px);font-weight:bold;flex-wrap:wrap}
+  .legend b{color:var(--sun)} .legend i{color:var(--hot);font-style:normal;font-weight:900}
+
+  .bar{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+  .rk{width:44px;flex:0 0 44px;text-align:center;font-size:22px;font-weight:900;color:var(--dim)}
+  .btrack{flex:1;background:#1a0a2e;border-radius:12px;height:46px;position:relative;overflow:hidden;border:2px solid var(--line)}
+  .bfill{position:absolute;top:0;bottom:0;left:50%;width:0;transition:width .55s cubic-bezier(.2,1.1,.4,1),left .55s cubic-bezier(.2,1.1,.4,1)}
+  .btxt{position:absolute;inset:0;display:flex;align-items:center;padding:0 12px;font-weight:900;
+        font-size:clamp(14px,2.7vw,20px);z-index:2;text-shadow:0 2px 4px rgba(0,0,0,.7)}
+  .bnum{position:absolute;right:10px;top:0;bottom:0;display:flex;align-items:center;font-weight:900;z-index:2;font-size:17px}
+  .bar.win .rk{color:var(--sun);font-size:28px}
+  .bar.lose .rk{color:var(--hot);font-size:28px}
+
+  .sb{width:100%;max-height:52vh;overflow-y:auto}
+  .srow{display:flex;align-items:center;gap:12px;background:#1a0a2e;border:3px solid var(--line);
+        border-radius:16px;padding:11px 14px;margin-bottom:8px}
+  .srow.lead{border-color:var(--sun);background:#2e1f0a}
+  .spos{font-size:22px;font-weight:900;color:var(--dim);width:38px;flex:0 0 38px}
+  .snm{flex:1;font-size:clamp(17px,3.2vw,24px);font-weight:900;word-break:break-word}
+  .sgain{color:var(--aqua);font-size:16px;font-weight:900;margin-right:6px}
+  .spts{font-size:clamp(22px,4.2vw,32px);font-weight:900;color:var(--sun);min-width:56px;text-align:right}
+
+  .scrollzone{width:100%;overflow-y:auto;max-height:60vh}
+  .foot{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .prog{color:var(--dim);font-size:14px;font-weight:900;letter-spacing:2px;text-align:center}
+  .rules{text-align:left;color:var(--dim);font-size:16px;line-height:1.55;max-width:620px}
+  .rules b{color:var(--ink)}
+  .confetti{position:fixed;inset:0;pointer-events:none;z-index:99}
+  .cf{position:absolute;width:11px;height:16px;animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(112vh) rotate(760deg);opacity:.15}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="scr on" id="s-title">
+    <h1>Consensus<br>Clash</h1>
+    <div class="tag">Six things on a card. You secretly pick which one <b style="color:var(--sun)">the group</b> will crown #1 and which they'll dump in last place. Points for reading the room — not for being right.</div>
+    <div class="meta">3–10 players &nbsp;•&nbsp; 15–25 min &nbsp;•&nbsp; one device, passed around</div>
+    <button class="btn" onclick="go('s-setup')">Start</button>
+    <button class="btn ghost" onclick="go('s-rules')">How to play</button>
+  </div>
+
+  <div class="scr" id="s-rules">
+    <div class="cat">How to play</div>
+    <div class="panel rules">
+      <p><b>1.</b> A card appears with a category and six items. Somebody reads it out loud. Argue about it — that's half the fun.</p>
+      <p style="margin-top:10px"><b>2.</b> Pass the device around. Each player secretly taps one <b style="color:var(--sun)">★ TOP</b> (what the group will rank first) and one <b style="color:var(--hot)">▼ BOTTOM</b> (what the group will rank last).</p>
+      <p style="margin-top:10px"><b>3.</b> The screen tallies every vote and reveals the group's true ranking.</p>
+      <p style="margin-top:10px"><b>4. Scoring —</b> ★ on the real #1 = <b>3 pts</b>, on #2 = <b>1 pt</b>. ▼ on the real last = <b>3 pts</b>, on second-to-last = <b>1 pt</b>. And if you were the <b style="color:var(--aqua)">only person</b> to call it and you nailed it: <b>+2 Lone Wolf bonus</b>.</p>
+      <p style="margin-top:10px">You're not guessing the truth. You're guessing <b>your friends</b>.</p>
+    </div>
+    <button class="btn alt" onclick="go('s-title')">Got it</button>
+  </div>
+
+  <div class="scr" id="s-setup">
+    <div class="cat">Who's playing?</div>
+    <div class="panel scrollzone" style="max-height:38vh"><div id="plist"></div></div>
+    <button class="btn alt sm" onclick="addP()">+ Add player</button>
+    <div class="meta">Rounds</div>
+    <div class="lenrow" id="lenrow"></div>
+    <button class="btn" id="startBtn" onclick="startGame()">Play</button>
+    <div class="prog" id="setupWarn"></div>
+  </div>
+
+  <div class="scr" id="s-read">
+    <div class="prog" id="readProg"></div>
+    <div class="cat" id="readCat"></div>
+    <div class="instr" id="readInstr"></div>
+    <div class="panel scrollzone"><div class="items" id="readItems"></div></div>
+    <div class="tag" style="color:var(--aqua);font-weight:bold">Read it out loud. Debate freely. Then start passing.</div>
+    <button class="btn" onclick="beginPass()">Pass the device →</button>
+  </div>
+
+  <div class="scr" id="s-pass">
+    <div class="prog">HANDS OFF — THIS IS NOT YOUR TURN</div>
+    <div class="tag" style="font-size:22px">Pass the device to</div>
+    <div class="passname" id="passName"></div>
+    <button class="btn alt" onclick="showPick()">I'm ready</button>
+  </div>
+
+  <div class="scr" id="s-pick">
+    <div class="prog" id="pickWho"></div>
+    <div class="cat" id="pickCat" style="font-size:clamp(19px,4vw,32px)"></div>
+    <div class="legend"><span><b>★ TOP</b> = group's #1</span><span><i>▼ BOTTOM</i> = group's last</span></div>
+    <div class="panel scrollzone"><div class="items" id="pickItems"></div></div>
+    <button class="btn" id="lockBtn" onclick="lockIn()" disabled>Lock it in</button>
+  </div>
+
+  <div class="scr" id="s-reveal">
+    <div class="prog" id="revProg"></div>
+    <div class="cat" id="revCat" style="font-size:clamp(20px,4.2vw,34px)"></div>
+    <div class="panel scrollzone" id="revBars"></div>
+    <button class="btn" onclick="showScores()">Scores →</button>
+  </div>
+
+  <div class="scr" id="s-score">
+    <div class="prog" id="scoreProg"></div>
+    <div class="cat">Scoreboard</div>
+    <div class="sb" id="sbList"></div>
+    <button class="btn" id="nextBtn" onclick="nextRound()">Next round →</button>
+  </div>
+
+  <div class="scr" id="s-win">
+    <div class="meta">Best read of the room</div>
+    <h1 id="winName" style="font-size:clamp(34px,9vw,80px)"></h1>
+    <div class="cat" id="winPts" style="color:var(--aqua)"></div>
+    <div class="sb" id="finalList" style="max-height:36vh"></div>
+    <div class="foot">
+      <button class="btn" onclick="rematch()">Rematch</button>
+      <button class="btn alt sm" onclick="location.reload()">New game</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============ SOUND (Web Audio API, no external files) ============ */
+let AC=null;
+function ac(){ if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}} if(AC&&AC.state==='suspended')AC.resume(); return AC; }
+function tone(f,d,type,vol,slideTo){
+  const c=ac(); if(!c)return;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type||'square'; o.frequency.setValueAtTime(f,c.currentTime);
+  if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo,c.currentTime+d);
+  g.gain.setValueAtTime(0,c.currentTime);
+  g.gain.linearRampToValueAtTime(vol||.16,c.currentTime+.012);
+  g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+d);
+  o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+d+.02);
+}
+const sTap =()=>tone(560,.07,'square',.10);
+const sPick=()=>tone(820,.09,'triangle',.14);
+const sOff =()=>tone(300,.07,'sine',.10);
+const sLock=()=>{tone(440,.09,'square',.13);setTimeout(()=>tone(660,.13,'square',.13),85);};
+const sPass=()=>tone(300,.22,'sine',.13,700);
+const sBar =(i)=>tone(300+i*90,.11,'triangle',.10);
+const sBig =()=>{[523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone(f,.30,'triangle',.16),i*90));};
+const sWin =()=>{[523,659,784,1046,1318,1568].forEach((f,i)=>setTimeout(()=>tone(f,.42,'triangle',.17),i*115));};
+
+/* ============ DECK — 65 cards x 6 items ============ */
+const DECK=[
+["Snacks","most satisfying",["Popcorn","Pretzels","Potato chips","Trail mix","Cheese cubes","Gummy bears"]],
+["Smells","best",["Fresh bread","Rain on pavement","Cut grass","Coffee brewing","Clean laundry","Campfire smoke"]],
+["Chores","worst",["Washing dishes","Folding laundry","Vacuuming","Cleaning the bathroom","Taking out trash","Mowing the lawn"]],
+["Superpowers","most useful day-to-day",["Flight","Invisibility","Teleportation","Mind reading","Super speed","Talking to animals"]],
+["Pets","best to actually own",["Dog","Cat","Parrot","Rabbit","Ferret","Goldfish"]],
+["Breakfast","best",["Pancakes","Cold cereal","Eggs and toast","A bagel","Oatmeal","Leftover pizza"]],
+["Weather","most pleasant",["Light snow","Warm breeze","Thunderstorm","Foggy morning","Blazing sun","Steady drizzle"]],
+["Vacations","most fun",["Beach resort","Mountain cabin","Big city","Road trip","Cruise ship","Camping"]],
+["Annoying sounds","most annoying",["Alarm clock","Styrofoam squeak","Loud chewing","Car alarm","Leaf blower","A dripping tap"]],
+["Pizza toppings","best",["Pepperoni","Mushrooms","Pineapple","Olives","Extra cheese","Bell peppers"]],
+["School subjects","most useful in real life",["Math","History","Gym","Art","Science","Home economics"]],
+["Ways to travel","most enjoyable",["Train","Plane","Car","Bicycle","Boat","Walking"]],
+["Desserts","best",["Ice cream","Brownies","Cheesecake","Apple pie","Donuts","Warm cookies"]],
+["Fears","scariest",["Heights","Public speaking","Spiders","Deep water","The dark","Tight spaces"]],
+["Game night roles","most fun to be",["The banker","The rule reader","The trash talker","The quiet strategist","The chaos agent","The snack provider"]],
+["Morning rituals","most essential",["Coffee","A shower","Checking your phone","Stretching","Breakfast","Snooze button"]],
+["Gifts","best to receive",["Cash","Something handmade","A gift card","A surprise trip","Something off your wishlist","A plant"]],
+["Fictional homes","best to live in",["A treehouse village","An underwater city","A floating sky island","A cozy hobbit hole","A space station","A stone castle"]],
+["Ice cream flavors","best",["Vanilla","Chocolate","Mint chip","Strawberry","Cookie dough","Pistachio"]],
+["Awkward moments","worst",["Waving at the wrong person","Forgetting a name","Tripping in public","Talking over someone","Food in your teeth all day","Saying 'you too' wrongly"]],
+["Time periods","most fun to visit",["Ancient Egypt","The 1920s","The 1980s","The Wild West","Medieval times","The year 2200"]],
+["Pasta shapes","best",["Spaghetti","Penne","Ravioli","Macaroni elbows","Fettuccine","Bowties"]],
+["Ages","best age to be",["Age 8","Age 16","Age 25","Age 40","Age 60","Age 80"]],
+["Sports to watch","most exciting",["Soccer","Basketball","Gymnastics","Swimming","Tennis","Ice hockey"]],
+["House features","most worth having",["A big kitchen","A home theater","A pool","A library","A huge garage","A wraparound porch"]],
+["Candy","best",["Chocolate bar","Sour gummies","Licorice","Caramels","Lollipops","Peanut butter cups"]],
+["Things to collect","coolest",["Stamps","Vinyl records","Rocks","Sneakers","Old maps","Snow globes"]],
+["Party tricks","most impressive",["Whistling loudly","Tying a cherry stem","Perfect animal impressions","Solving a Rubik's cube","Juggling","Wiggling your ears"]],
+["Mythical creatures","coolest",["Dragon","Phoenix","Unicorn","Griffin","Mermaid","Yeti"]],
+["Habits in others","most annoying",["Interrupting","Being late","Loud typing","Leaving dishes","Constant phone checking","Humming nonstop"]],
+["Sandwiches","best",["Grilled cheese","Turkey club","Peanut butter and jelly","Egg salad","Falafel wrap","BLT"]],
+["Holidays","most fun",["New Year's Eve","Halloween","Thanksgiving","Fourth of July","Your birthday","Valentine's Day"]],
+["Jobs","most interesting",["Astronaut","Chef","Detective","Marine biologist","Architect","Wildlife photographer"]],
+["Overrated things","most overrated",["Brunch","Award shows","Sports cars","Fancy coffee","Cruises","Fireworks"]],
+["Saturdays","best way to spend one",["Sleeping in","Hiking","Board games","Shopping","Movie marathon","Cooking a big meal"]],
+["Tools","most useful to own",["A hammer","Duct tape","A flashlight","A multitool","A ladder","A wrench set"]],
+["Room temperature","most comfortable",["Chilly with blankets","Warm and cozy","Cool and breezy","Toasty hot","Fresh and crisp","Slightly humid"]],
+["First dates","best spot",["Coffee shop","Mini golf","A museum","A hiking trail","Bowling","Ice cream walk"]],
+["Cereals","best",["Cheerios","Frosted flakes","Granola","Raisin bran","Cinnamon squares","Fruit rings"]],
+["Junk drawer","most useful thing in it",["Rubber bands","Loose batteries","Takeout menus","Random keys","Scissors","Twist ties"]],
+["Night noises","creepiest",["A creaking floor","Wind howling","A tap dripping","Something scratching","A distant siren","Total silence"]],
+["Car features","most important",["Great sound system","Heated seats","Big trunk","Sunroof","Good gas mileage","Backup camera"]],
+["Movie genres","best",["Comedy","Horror","Action","Documentary","Animation","Romance"]],
+["Sidekick skills","most useful",["Perfect memory","Never gets tired","Talks to machines","Always finds parking","Unbreakable bones","Reads any map instantly"]],
+["Park activities","most fun",["Frisbee","A picnic","Feeding ducks","People watching","Climbing trees","Flying a kite"]],
+["Splurges","most worth the money",["A mattress","Shoes","Headphones","Kitchen knives","A backpack","Sunglasses"]],
+["Gifts","worst to receive",["Socks","A candle","A mug","Regifted lotion","A wall calendar","A gym membership"]],
+["Divisive foods","most divisive",["Cilantro","Blue cheese","Black licorice","Yeast spread","Anchovies","Durian"]],
+["Waking up","nicest way",["Sunlight through the window","Bird song","Smell of breakfast","A gentle alarm","Waking naturally","Someone humming"]],
+["Roommate sins","worst",["Loud late nights","Eating your food","Never cleaning","Endless guests","Hogging the bathroom","Passive-aggressive notes"]],
+["Skills to learn","most rewarding",["An instrument","A language","Woodworking","Cooking","Dancing","Coding"]],
+["Theme park rides","best",["Roller coaster","Ferris wheel","Bumper cars","Log flume","Carousel","Drop tower"]],
+["Leftovers","best the next day",["Pizza","Curry","Chinese takeout","Lasagna","Fries","Soup"]],
+["Small luxuries","best",["Fresh sheets","A hot shower","New socks","Perfectly ripe fruit","An empty inbox","A green-light streak"]],
+["Things in the sky","most beautiful",["A sunset","A full moon","A rainbow","Lightning","A field of stars","Clouds at dawn"]],
+["Cinema crimes","worst",["Phone light","Talking","Kicking your seat","Loud snacks","Arriving late","Spoiling it out loud"]],
+["Places to explore","coolest",["Abandoned library","A lighthouse","Old train station","A greenhouse","A clock tower","Underground bunker"]],
+["Drinks","most refreshing",["Ice water","Lemonade","Iced tea","Sparkling water","Coconut water","Fresh orange juice"]],
+["Desert island skills","most valuable",["Starting a fire","Fishing","Building shelter","Reading the stars","Finding water","Staying calm"]],
+["Weird loyalties","strongest",["A pen brand","A sports team","A grocery store","A coffee order","A phone brand","One specific route home"]],
+["Birthday cake","best flavor",["Chocolate","Vanilla","Red velvet","Carrot","Lemon","Funfetti"]],
+["Tiny victories","most satisfying",["Peeling a sticker cleanly","A perfect parallel park","Popping bubble wrap","Cracking an egg one-handed","Every green light","Untangling headphones"]],
+["Winter things","best",["Hot cocoa","Snowball fights","Cozy sweaters","A fireplace","A snow day","Ice skating"]],
+["Group chat roles","most necessary",["The planner","The joker","The one who never replies","The link sharer","The peacemaker","The early riser"]],
+["Should be free","most should be free",["Public bathrooms","Water at restaurants","Wi-Fi","Museums","Parking","Sunscreen"]]
+];
+
+/* ============ STATE ============ */
+let players=[], deck=[], roundLen=7, round=0, cur=null, turn=0, votes=[], sel={t:null,b:null};
+let names=['','',''];
+const $=id=>document.getElementById(id);
+function go(id){document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));$(id).classList.add('on');}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+/* ---- setup ---- */
+function drawSetup(){
+  $('plist').innerHTML=names.map((n,i)=>
+    `<div class="prow"><input maxlength="14" placeholder="Player ${i+1}" value="${esc(n)}" oninput="names[${i}]=this.value;checkStart()">`+
+    (names.length>3?`<button class="xb" onclick="delP(${i})">&#10005;</button>`:'')+`</div>`).join('');
+  checkStart();
+}
+function addP(){ if(names.length>=10){return;} sTap(); names.push(''); drawSetup(); }
+function delP(i){ sOff(); names.splice(i,1); drawSetup(); }
+function checkStart(){
+  const ok = names.length>=3 && names.every(n=>n.trim().length>0);
+  $('startBtn').disabled=!ok;
+  $('setupWarn').textContent = ok ? names.length+' PLAYERS READY' : 'FILL IN AT LEAST 3 NAMES';
+}
+function drawLen(){
+  $('lenrow').innerHTML=[5,7,10].map(v=>`<button class="chip ${v===roundLen?'sel':''}" onclick="roundLen=${v};sTap();drawLen()">${v}</button>`).join('');
+}
+drawSetup(); drawLen();
+
+/* ---- game flow ---- */
+function startGame(){
+  ac(); sBig();
+  players=names.filter(n=>n.trim()).map(n=>({name:n.trim(),pts:0,gain:0}));
+  deck=shuffle(DECK.slice()); round=0; nextRound();
+}
+function rematch(){
+  document.querySelectorAll('.confetti').forEach(c=>c.remove());
+  players.forEach(p=>{p.pts=0;p.gain=0;});
+  deck=shuffle(DECK.slice()); round=0; sBig(); nextRound();
+}
+function nextRound(){
+  if(round>=roundLen) return endGame();
+  const c=deck[round % deck.length];
+  cur=[c[0],c[1],shuffle(c[2].slice())];   // reshuffle item order so position never biases
+  round++;
+  $('readProg').textContent='ROUND '+round+' OF '+roundLen;
+  $('readCat').textContent=cur[0];
+  $('readInstr').textContent='Which will the group rank '+cur[1].toUpperCase()+'?';
+  $('readItems').innerHTML=cur[2].map(t=>'<div class="item"><div class="lbl">'+esc(t)+'</div></div>').join('');
+  votes=[]; turn=0;
+  go('s-read');
+}
+function beginPass(){ sPass(); turn=0; passNext(); }
+function passNext(){
+  if(turn>=players.length) return doReveal();
+  $('passName').textContent=players[turn].name;
+  go('s-pass');
+}
+function showPick(){
+  sTap(); sel={t:null,b:null};
+  $('pickWho').textContent=players[turn].name.toUpperCase()+' — SECRET PICK';
+  $('pickCat').textContent=cur[0]+' — group’s '+cur[1]+'?';
+  drawPick(); go('s-pick');
+}
+function drawPick(){
+  $('pickItems').innerHTML=cur[2].map((t,i)=>{
+    const isT=sel.t===i, isB=sel.b===i;
+    return '<div class="item '+((isT||isB)?'chosen':'')+'">'
+      +'<button class="pk top '+(isT?'on':'')+'" onclick="pick(\'t\','+i+')">&#9733;</button>'
+      +'<div class="lbl">'+esc(t)+'</div>'
+      +'<button class="pk bot '+(isB?'on':'')+'" onclick="pick(\'b\','+i+')">&#9660;</button></div>';
+  }).join('');
+  $('lockBtn').disabled = (sel.t===null||sel.b===null);
+}
+function pick(k,i){
+  if(sel[k]===i){ sel[k]=null; sOff(); }
+  else { const o = (k==='t')?'b':'t'; if(sel[o]===i) sel[o]=null; sel[k]=i; sPick(); }
+  drawPick();
+}
+function lockIn(){
+  if(sel.t===null||sel.b===null) return;
+  sLock(); votes.push({t:sel.t,b:sel.b}); turn++;
+  setTimeout(passNext,230);
+}
+
+/* ---- reveal + scoring ---- */
+function onlyOne(vs,key,val){ return vs.filter(v=>v[key]===val).length===1; }
+function doReveal(){
+  const n=cur[2].length;
+  const tc=new Array(n).fill(0), bc=new Array(n).fill(0);
+  votes.forEach(v=>{tc[v.t]++;bc[v.b]++;});
+  const rows=cur[2].map((t,i)=>({i:i,t:t,net:tc[i]-bc[i],tc:tc[i],bc:bc[i]}));
+  rows.sort((a,b)=> (b.net-a.net) || (b.tc-a.tc) || (a.bc-b.bc) || (a.i-b.i));
+
+  const first=rows[0].i, second=rows[1].i, last=rows[n-1].i, secLast=rows[n-2].i;
+  players.forEach(p=>p.gain=0);
+  votes.forEach((v,pi)=>{
+    let g=0;
+    if(v.t===first){ g+=3; if(onlyOne(votes,'t',v.t)) g+=2; }
+    else if(v.t===second) g+=1;
+    if(v.b===last){ g+=3; if(onlyOne(votes,'b',v.b)) g+=2; }
+    else if(v.b===secLast) g+=1;
+    players[pi].gain=g; players[pi].pts+=g;
+  });
+
+  const maxAbs=Math.max(1,...rows.map(r=>Math.abs(r.net)));
+  $('revProg').textContent='ROUND '+round+' — THE GROUP HAS SPOKEN';
+  $('revCat').textContent=cur[0]+' — '+cur[1];
+  $('revBars').innerHTML=rows.map((r,p)=>{
+    const cls = p===0?'win' : (p===rows.length-1?'lose':'');
+    const col = r.net>0 ? 'linear-gradient(90deg,#a87c00,#ffcf3d)'
+              : r.net<0 ? 'linear-gradient(270deg,#8d0f4c,#ff2e88)' : '#3d1f5e';
+    const tally=(r.tc?'&#9733;'+r.tc+' ':'')+(r.bc?'&#9660;'+r.bc:'');
+    const badge = p===0?'&#9733;' : (p===rows.length-1?'&#9660;':'#'+(p+1));
+    return '<div class="bar '+cls+'"><div class="rk">'+badge+'</div>'
+      +'<div class="btrack"><div class="bfill" data-net="'+r.net+'" data-max="'+maxAbs+'" style="background:'+col+'"></div>'
+      +'<div class="btxt">'+esc(r.t)+'</div><div class="bnum" style="color:var(--dim)">'+tally+'</div></div></div>';
+  }).join('');
+  go('s-reveal');
+
+  const fills=Array.prototype.slice.call(document.querySelectorAll('#revBars .bfill'));
+  fills.forEach((f,i)=>setTimeout(function(){
+    const net=+f.dataset.net, max=+f.dataset.max;
+    const w=Math.abs(net)/max*50;
+    f.style.width=Math.max(w,1.6)+'%';
+    f.style.left = (net>=0) ? '50%' : (50-w)+'%';
+    sBar(fills.length-i);
+  }, 160+i*150));
+}
+
+function showScores(){
+  sTap();
+  const sorted=players.slice().sort((a,b)=>b.pts-a.pts);
+  const top=sorted[0].pts;
+  $('scoreProg').textContent='AFTER ROUND '+round+' OF '+roundLen;
+  $('sbList').innerHTML=sorted.map((p,i)=>
+    '<div class="srow '+((p.pts===top&&top>0)?'lead':'')+'"><div class="spos">'+(i+1)+'</div>'
+    +'<div class="snm">'+esc(p.name)+'</div>'
+    +'<div class="sgain">'+(p.gain>0?'+'+p.gain:'—')+'</div>'
+    +'<div class="spts">'+p.pts+'</div></div>').join('');
+  $('nextBtn').textContent = (round>=roundLen) ? 'Final results →' : 'Next round →';
+  go('s-score');
+}
+function endGame(){
+  const sorted=players.slice().sort((a,b)=>b.pts-a.pts);
+  const top=sorted[0].pts;
+  const winners=sorted.filter(p=>p.pts===top);
+  $('winName').textContent = winners.length>1 ? winners.map(w=>w.name).join(' & ') : sorted[0].name;
+  $('winPts').textContent = top+' points'+(winners.length>1?' — dead tie!':'');
+  $('finalList').innerHTML=sorted.map((p,i)=>
+    '<div class="srow '+(p.pts===top?'lead':'')+'"><div class="spos">'+(i+1)+'</div>'
+    +'<div class="snm">'+esc(p.name)+'</div><div class="spts">'+p.pts+'</div></div>').join('');
+  go('s-win'); sWin(); confetti();
+}
+function confetti(){
+  const box=document.createElement('div'); box.className='confetti'; document.body.appendChild(box);
+  const cols=['#ff2e88','#ffcf3d','#22e0d0','#8b5cf6','#ffffff'];
+  for(let i=0;i<110;i++){
+    const d=document.createElement('div'); d.className='cf';
+    d.style.left=(Math.random()*100)+'vw'; d.style.top=(-14-Math.random()*30)+'vh';
+    d.style.background=cols[Math.random()*cols.length|0];
+    d.style.animationDuration=(2.1+Math.random()*2.4)+'s';
+    d.style.animationDelay=(Math.random()*0.9)+'s';
+    box.appendChild(d);
+  }
+  setTimeout(()=>box.remove(),6400);
+}
+document.addEventListener('touchstart',()=>ac(),{once:true});
+document.addEventListener('click',()=>ac(),{once:true});
+</script>
+</body>
+</html>

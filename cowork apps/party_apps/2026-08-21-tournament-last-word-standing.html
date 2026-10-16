@@ -1,0 +1,1467 @@
+<!-- CONCEPT: TOURNAMENT/DUEL - "Last Word Standing": a knockout bracket where two players at a time face off over a phone laid flat between them, alternating answers under a turn timer that shrinks every single turn. Most challenge cards are DEPENDENT on the opponent's answer (rhyme their word, start with its last letter, beat its length, dodge its first letter), and the waiting player can slam NOPE to put a dodgy answer to an instant room vote - with a time penalty for a bad challenge. Auto-seeded bracket with byes for 3-10 players, best-of-1 early rounds and first-to-2 from the semifinals, 120+ duel cards | Players: 3-10 | ~15-25 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Last Word Standing</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+}
+
+:root {
+  --bg: #0b0d18;
+  --bg2: #141830;
+  --panel: #1b2140;
+  --line: #2c3663;
+  --ink: #eef1ff;
+  --dim: #8e97c4;
+  --a: #ff3d81;
+  --b: #22e0e0;
+  --gold: #ffcc44;
+  --bad: #ff5c5c;
+  --pad: clamp(10px, 3vw, 18px);
+  --r: 16px;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+#app {
+  position: relative;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+}
+.screen.on { display: flex; }
+
+.scroller {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--pad);
+}
+
+/* ---------- shared bits ---------- */
+
+.brand {
+  font-size: clamp(28px, 9vw, 52px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  text-align: center;
+  background: linear-gradient(90deg, var(--a), var(--gold), var(--b));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0;
+}
+
+.tagline {
+  text-align: center;
+  color: var(--dim);
+  font-size: clamp(12px, 3.4vw, 15px);
+  margin: 6px 0 0;
+  line-height: 1.45;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.btn {
+  display: block;
+  width: 100%;
+  min-height: 56px;
+  border-radius: var(--r);
+  background: linear-gradient(135deg, var(--a), #c62d8f);
+  color: #fff;
+  font-size: clamp(15px, 4.2vw, 19px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 14px;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35); }
+.btn.ghost {
+  background: transparent;
+  border: 2px solid var(--line);
+  color: var(--dim);
+  box-shadow: none;
+  font-size: clamp(13px, 3.6vw, 15px);
+  min-height: 48px;
+}
+.btn.ghost:active { transform: none; background: var(--panel); }
+.btn.cyan { background: linear-gradient(135deg, var(--b), #12a3a3); color: #04222a; }
+.btn.gold { background: linear-gradient(135deg, var(--gold), #e09b12); color: #2a1d02; }
+.btn[disabled] { opacity: 0.35; }
+
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: var(--pad);
+  margin-bottom: 12px;
+}
+
+.h {
+  font-size: clamp(11px, 3vw, 13px);
+  letter-spacing: 0.16em;
+  color: var(--dim);
+  font-weight: 800;
+  text-transform: uppercase;
+  margin: 0 0 8px;
+}
+
+/* ---------- setup ---------- */
+
+#setup .scroller { padding-top: clamp(18px, 6vh, 44px); }
+
+.plist { display: flex; flex-direction: column; gap: 8px; }
+
+.prow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pnum {
+  width: 26px;
+  text-align: center;
+  color: var(--dim);
+  font-weight: 800;
+  font-size: 13px;
+  flex: none;
+}
+.prow input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: clamp(15px, 4vw, 17px);
+  font-weight: 700;
+  padding: 0 12px;
+  outline: none;
+}
+.prow input:focus { border-color: var(--b); }
+.prow .x {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
+  color: var(--dim);
+  font-size: 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.row2 { display: flex; gap: 8px; }
+.row2 > * { flex: 1; }
+
+.warn {
+  color: var(--gold);
+  font-size: 13px;
+  text-align: center;
+  min-height: 18px;
+  margin: 8px 0 0;
+  font-weight: 700;
+}
+
+.rules { color: var(--dim); font-size: clamp(12px, 3.4vw, 14px); line-height: 1.6; }
+.rules b { color: var(--ink); }
+.rules li { margin-bottom: 7px; }
+.rules ul { padding-left: 18px; margin: 0; }
+
+/* ---------- bracket ---------- */
+
+.rndlabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 8px;
+}
+.rndlabel span {
+  font-size: clamp(11px, 3vw, 13px);
+  letter-spacing: 0.16em;
+  font-weight: 900;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+.rndlabel i { flex: 1; height: 1px; background: var(--line); }
+
+.match {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg2);
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.match.next {
+  border-color: var(--a);
+  box-shadow: 0 0 0 2px rgba(255, 61, 129, 0.25);
+}
+.match.done { opacity: 0.62; }
+.mrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: clamp(14px, 3.8vw, 16px);
+  font-weight: 700;
+}
+.mrow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .sc {
+  flex: none;
+  min-width: 26px;
+  text-align: center;
+  font-weight: 900;
+  color: var(--dim);
+}
+.mrow.win .nm { color: var(--gold); }
+.mrow.win .sc { color: var(--gold); }
+.mrow.tbd .nm { color: var(--dim); font-style: italic; font-weight: 600; }
+.mrow.lose { opacity: 0.5; text-decoration: line-through; }
+.mvs { height: 1px; background: var(--line); margin: 2px 0; }
+.mtag {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+.mtag.bye { color: var(--b); }
+.mtag.hot { color: var(--a); }
+
+.footbar {
+  padding: var(--pad);
+  padding-top: 0;
+  flex: none;
+}
+
+/* ---------- duel ---------- */
+
+#duel { background: var(--bg); }
+
+.duel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.half {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(6px, 1.8vh, 14px) 10px;
+  background: #10131f;
+  transition: background 0.18s;
+}
+.half.flip { transform: rotate(180deg); }
+.half.act { background: radial-gradient(120% 110% at 50% 0%, #2a1533 0%, #12131f 70%); }
+.half.act.side-b { background: radial-gradient(120% 110% at 50% 0%, #10333a 0%, #12131f 70%); }
+
+.pname {
+  font-size: clamp(14px, 4vw, 18px);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.half.act .pname { color: var(--ink); }
+.pips { display: inline-flex; gap: 4px; }
+.pip { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.pip.on { background: var(--gold); }
+
+/* the prompt is the only part allowed to give up room on a short phone,
+   so the buttons and clock can never be pushed out of the half */
+.prompt {
+  text-align: center;
+  padding: 0 4px;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.ptag {
+  font-size: clamp(9px, 2.6vw, 11px);
+  letter-spacing: 0.2em;
+  font-weight: 900;
+  color: var(--b);
+  text-transform: uppercase;
+}
+.half.side-a .ptag { color: var(--a); }
+.ptopic {
+  font-size: clamp(17px, 5.6vw, 28px);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  margin: 2px 0 3px;
+  line-height: 1.05;
+}
+.prule {
+  font-size: clamp(11px, 3.1vw, 13.5px);
+  color: var(--dim);
+  line-height: 1.3;
+  max-width: 30ch;
+  margin: 0 auto;
+}
+.half.act .prule { color: #c3cbf0; }
+
+.clock {
+  font-size: clamp(34px, 11.5vw, 68px);
+  font-weight: 900;
+  line-height: 1;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+  opacity: 0.4;
+}
+.half.act .clock { color: var(--ink); opacity: 1; }
+.half.act .clock.hurry { color: var(--bad); }
+
+.actbtn {
+  width: 100%;
+  max-width: 420px;
+  min-height: clamp(58px, 10vh, 98px);
+  border-radius: 18px;
+  font-size: clamp(16px, 4.6vw, 22px);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: linear-gradient(135deg, var(--a), #b3246f);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.4);
+}
+.side-b .actbtn { background: linear-gradient(135deg, var(--b), #0f9c9c); color: #032027; }
+.actbtn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4); }
+
+.nopebtn {
+  width: 100%;
+  max-width: 420px;
+  min-height: 48px;
+  border-radius: 14px;
+  border: 2px solid #5a2740;
+  color: #ff8fb2;
+  background: #1a1020;
+  font-size: clamp(12px, 3.3vw, 15px);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.nopebtn:active { background: #2a1220; }
+
+.btnstack {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.waitlbl {
+  width: 100%;
+  max-width: 420px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 1px dashed var(--line);
+  color: var(--dim);
+  font-size: clamp(12px, 3.3vw, 14px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  padding: 6px 10px;
+}
+
+.strip {
+  flex: none;
+  height: clamp(38px, 6.5vh, 52px);
+  background: var(--bg2);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  gap: 8px;
+}
+.stripmid {
+  font-size: clamp(10px, 2.9vw, 12.5px);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+  text-transform: uppercase;
+  text-align: center;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.stripbtn {
+  flex: none;
+  min-width: 46px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  font-size: 15px;
+  font-weight: 800;
+  background: var(--panel);
+}
+
+/* ---------- overlay (two-sided) ---------- */
+
+#overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  background: rgba(6, 7, 15, 0.94);
+  backdrop-filter: blur(3px);
+  z-index: 40;
+}
+#overlay.on { display: flex; }
+#overlay.solo .ovhalf.flip { display: none; }
+
+.ovhalf {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.6vh, 14px);
+  padding: 12px;
+  text-align: center;
+  overflow: hidden;
+}
+.ovhalf.flip { transform: rotate(180deg); }
+
+.ovkick {
+  font-size: clamp(10px, 3vw, 12px);
+  letter-spacing: 0.22em;
+  font-weight: 900;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+.ovbig {
+  font-size: clamp(24px, 8vw, 42px);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+}
+.ovbig.pink { color: var(--a); }
+.ovbig.cyan { color: var(--b); }
+.ovbig.gold { color: var(--gold); }
+.ovsub {
+  font-size: clamp(12px, 3.5vw, 15px);
+  color: var(--dim);
+  line-height: 1.45;
+  max-width: 34ch;
+}
+.ovsub b { color: var(--ink); }
+.ovbtns { display: flex; flex-direction: column; gap: 8px; width: min(100%, 380px); margin-top: 4px; }
+.ovbtns .btn { min-height: 52px; }
+.ovcount {
+  font-size: clamp(64px, 26vw, 150px);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- champion ---------- */
+
+#champ { background: radial-gradient(120% 90% at 50% 0%, #2a1b3d 0%, var(--bg) 65%); }
+#confetti { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+#champ .scroller { position: relative; z-index: 2; display: flex; flex-direction: column; justify-content: center; }
+.trophy { font-size: clamp(58px, 22vw, 120px); text-align: center; line-height: 1; }
+.champname {
+  font-size: clamp(30px, 11vw, 62px);
+  font-weight: 900;
+  text-align: center;
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, var(--gold), #fff6d0, var(--gold));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 6px 0 2px;
+  overflow-wrap: anywhere;
+}
+.hall { display: flex; flex-direction: column; gap: 6px; }
+.hallrow {
+  display: flex;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--dim);
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: 5px;
+}
+.hallrow b { color: var(--gold); flex: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ SETUP ============ -->
+  <section class="screen on" id="setup">
+    <div class="scroller">
+      <h1 class="brand">LAST WORD<br>STANDING</h1>
+      <p class="tagline">Knockout duels, two players at a time.<br>Answer before the clock dies. Survive the bracket.</p>
+
+      <div class="card" style="margin-top:16px">
+        <p class="h">Who's playing? (3&ndash;10)</p>
+        <div class="plist" id="plist"></div>
+        <p class="warn" id="warn"></p>
+        <div class="row2" style="margin-top:10px">
+          <button class="btn ghost" id="addBtn">+ ADD PLAYER</button>
+          <button class="btn ghost" id="clearBtn">CLEAR ALL</button>
+        </div>
+      </div>
+
+      <button class="btn gold" id="startBtn">SHUFFLE &amp; DRAW THE BRACKET</button>
+
+      <div class="card" style="margin-top:12px">
+        <p class="h">How to play</p>
+        <div class="rules">
+          <ul>
+            <li><b>Lay the phone flat between the two duellists.</b> Each half of the screen faces one of you &mdash; the top is upside down on purpose.</li>
+            <li>A <b>challenge card</b> flips. Most of them depend on your opponent: rhyme their word, start with its last letter, beat its length.</li>
+            <li>Say your answer <b>out loud</b>, then slap your big button to pass the turn. The timer resets <b>shorter every single turn</b>.</li>
+            <li>Clock hits zero on your turn &rarr; <b>you lose the round.</b></li>
+            <li>Think what they just said doesn&rsquo;t count? On your turn, tap <b>&#9995; THEIR ANSWER DIDN&rsquo;T COUNT</b> instead of answering &mdash; the <b>room votes on the spot</b>. If the room says it counted, your next turn is <b>2 seconds shorter</b>. Challenge cheaply at your peril.</li>
+            <li>Early rounds are one round, winner takes it. <b>Semifinal and final are first to 2.</b></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card" id="hallCard" style="display:none">
+        <p class="h">&#127942; Hall of champions</p>
+        <div class="hall" id="hall"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ BRACKET ============ -->
+  <section class="screen" id="bracket">
+    <div class="scroller" id="bracketBody"></div>
+    <div class="footbar">
+      <button class="btn" id="nextMatchBtn">NEXT MATCH</button>
+      <button class="btn ghost" id="quitBtn" style="margin-top:8px">END TOURNAMENT</button>
+    </div>
+  </section>
+
+  <!-- ============ DUEL ============ -->
+  <section class="screen" id="duel">
+    <div class="duel">
+      <div class="half flip side-a" id="halfA"></div>
+      <div class="strip">
+        <button class="stripbtn" id="stripQuit">&#10005;</button>
+        <div class="stripmid" id="stripMid"></div>
+        <button class="stripbtn" id="stripSound">&#128266;</button>
+      </div>
+      <div class="half side-b" id="halfB"></div>
+    </div>
+  </section>
+
+  <!-- ============ CHAMPION ============ -->
+  <section class="screen" id="champ">
+    <canvas id="confetti"></canvas>
+    <div class="scroller">
+      <div class="trophy">&#127942;</div>
+      <p class="h" style="text-align:center;color:var(--gold)">Last Word Standing</p>
+      <div class="champname" id="champName">&mdash;</div>
+      <p class="tagline" id="champSub"></p>
+      <div style="margin-top:18px">
+        <button class="btn gold" id="againBtn">REMATCH &mdash; SAME PLAYERS</button>
+        <button class="btn ghost" id="newBtn" style="margin-top:8px">NEW PLAYER LIST</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ OVERLAY ============ -->
+  <div id="overlay">
+    <div class="ovhalf flip" id="ovTop"></div>
+    <div class="ovhalf" id="ovBot"></div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   Storage
+   ============================================================ */
+const LS_PLAYERS = 'cowork-lastword-players';
+const LS_HALL = 'cowork-lastword-hall';
+const LS_SOUND = 'cowork-lastword-sound';
+
+const load = (k, d) => {
+  try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }
+  catch (e) { return d; }
+};
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+/* ============================================================
+   Sound
+   ============================================================ */
+let AC = null;
+let soundOn = load(LS_SOUND, true);
+
+function ac() {
+  if (!AC) {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return null;
+    AC = new C();
+  }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+
+function tone(freq, dur, type, vol, slideTo) {
+  if (!soundOn) return;
+  const c = ac();
+  if (!c) return;
+  const o = c.createOscillator();
+  const g = c.createGain();
+  o.type = type || 'square';
+  o.frequency.setValueAtTime(freq, c.currentTime);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, c.currentTime + dur);
+  g.gain.setValueAtTime(0.0001, c.currentTime);
+  g.gain.exponentialRampToValueAtTime(vol || 0.16, c.currentTime + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(); o.stop(c.currentTime + dur + 0.02);
+}
+
+const sfx = {
+  tick:  () => tone(760, 0.05, 'square', 0.07),
+  hurry: () => tone(1180, 0.06, 'square', 0.12),
+  pass:  () => { tone(620, 0.07, 'triangle', 0.16); setTimeout(() => tone(930, 0.09, 'triangle', 0.14), 55); },
+  buzz:  () => { tone(180, 0.42, 'sawtooth', 0.2, 70); },
+  nope:  () => { tone(300, 0.12, 'square', 0.18); setTimeout(() => tone(230, 0.18, 'square', 0.16), 110); },
+  win:   () => { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.16, 'triangle', 0.16), i * 90)); },
+  fanfare: () => {
+    [523, 659, 784, 1046, 1318, 1046, 1318, 1568].forEach((f, i) =>
+      setTimeout(() => tone(f, 0.26, 'triangle', 0.17), i * 130));
+  },
+  go: () => tone(880, 0.16, 'triangle', 0.18, 1320)
+};
+
+/* ============================================================
+   Challenge deck  (majority DEPENDENT on the opponent's answer)
+   ============================================================ */
+const CHAIN_TOPICS = ['ANIMALS', 'FOODS', 'COUNTRIES', 'MOVIES', 'FIRST NAMES', 'THINGS IN A KITCHEN',
+  'SPORTS', 'JOBS', 'CITIES', 'CARTOON CHARACTERS', 'BOARD GAMES', 'SUPERHEROES',
+  'MUSICAL INSTRUMENTS', 'SCHOOL SUBJECTS', 'THINGS IN A FRIDGE', 'BODY PARTS',
+  'CLOTHING', 'VEHICLES', 'BIRDS', 'SNACKS &amp; CANDY', 'TV SHOWS', 'THINGS AT THE BEACH',
+  'BOOK TITLES', 'THINGS THAT ARE COLD'];
+
+const RHYME_SEEDS = ['LIGHT', 'MOON', 'BAKE', 'CHAIN', 'SHOUT', 'FLOOR', 'CHEESE', 'RING', 'SNAP',
+  'BRAVE', 'GLOW', 'TRIP', 'DREAM', 'SPOON', 'WALL', 'MICE', 'GRIN', 'STONE', 'CRASH',
+  'JAM', 'HOOK', 'PLATE', 'COOL', 'STING', 'WEST', 'TRUCK', 'SMILE', 'CLOUD', 'BLUE',
+  'SHARP', 'TALL', 'DUCK', 'FROST', 'PEAR'];
+
+const LOCK_PAIRS = [['ST', 'ANY WORD'], ['OO', 'ANY WORD'], ['TH', 'ANY WORD'], ['CH', 'ANY WORD'],
+  ['R', 'ANIMALS'], ['E', 'FOODS'], ['A', 'COUNTRIES'], ['L', 'THINGS IN A HOUSE'],
+  ['N', 'SPORTS &amp; GAMES'], ['S', 'JOBS'], ['P', 'ANY WORD'], ['LL', 'ANY WORD'],
+  ['I', 'MOVIES'], ['G', 'THINGS YOU WEAR'], ['CK', 'ANY WORD'], ['Y', 'FOODS']];
+
+const LONGER_TOPICS = ['ANY WORD AT ALL', 'ANIMALS', 'FOODS', 'THINGS IN A SCHOOL', 'PLACES',
+  'THINGS YOU CAN BUY', 'ADJECTIVES', 'JOBS', 'THINGS THAT MOVE', 'ANY WORD AT ALL'];
+
+const ALPHA_TOPICS = ['ANIMALS', 'FOODS', 'FIRST NAMES', 'COUNTRIES &amp; CITIES', 'THINGS IN A ROOM',
+  'ANY WORD AT ALL', 'JOBS', 'ANY WORD AT ALL', 'THINGS YOU CAN EAT', 'MOVIES OR SHOWS'];
+
+const TWO_TOPICS = ['ANY WORD AT ALL', 'ANIMALS OR FOOD', 'ANY WORD AT ALL', 'PLACES OR NAMES',
+  'ANY WORD AT ALL', 'THINGS YOU CAN TOUCH', 'ANY WORD AT ALL', 'ANY WORD AT ALL'];
+
+const BAN_TOPICS = ['ANIMALS', 'FOODS', 'MOVIES', 'THINGS IN A CAR', 'SPORTS', 'JOBS',
+  'THINGS IN A GARDEN', 'FAMOUS PEOPLE'];
+
+const PLAIN_TOPICS = ['BREAKFAST FOODS', 'THINGS WITH WHEELS', 'PIZZA TOPPINGS', 'THINGS IN THE SKY',
+  'DISNEY CHARACTERS', 'THINGS IN A BACKPACK', 'ICE CREAM FLAVOURS', 'THINGS THAT SMELL BAD',
+  'WATER SPORTS', 'THINGS IN A HOSPITAL', 'BOARD GAME NAMES', 'THINGS THAT FLY',
+  'CEREAL BRANDS', 'THINGS YOU SHOULDN’T MICROWAVE'];
+
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+function buildDeck() {
+  const d = [];
+  CHAIN_TOPICS.forEach(t => d.push({
+    tag: 'LAST-LETTER CHAIN', topic: t,
+    rule: 'Your answer must START with the LAST LETTER of the answer they just said.'
+  }));
+  RHYME_SEEDS.forEach(w => d.push({
+    tag: 'RHYME DUEL', topic: 'RHYME WITH &ldquo;' + w + '&rdquo;',
+    rule: 'Every answer has to rhyme with ' + w + '. No repeating a rhyme that has already been used.'
+  }));
+  LOCK_PAIRS.forEach(p => d.push({
+    tag: 'LETTER LOCK', topic: p[1] === 'ANY WORD' ? 'MUST CONTAIN &ldquo;' + p[0] + '&rdquo;' : p[1],
+    rule: 'Every answer must CONTAIN the letters &ldquo;' + p[0] + '&rdquo; somewhere inside it.'
+  }));
+  LONGER_TOPICS.forEach(t => d.push({
+    tag: 'GET LONGER', topic: t,
+    rule: 'Each answer must be LONGER (more letters) than the one before it. Start short!'
+  }));
+  ALPHA_TOPICS.forEach((t, i) => {
+    const start = ALPHABET[(i * 3 + 2) % 20];
+    d.push({
+      tag: 'ALPHABET CLIMB', topic: t + ' &mdash; START AT &ldquo;' + start + '&rdquo;',
+      rule: 'First answer starts with ' + start + '. Every answer after that starts with the NEXT letter of the alphabet.'
+    });
+  });
+  TWO_TOPICS.forEach(t => d.push({
+    tag: 'TAIL SWAP', topic: t,
+    rule: 'Your answer must START with the LAST TWO LETTERS of their answer.'
+  }));
+  BAN_TOPICS.forEach(t => d.push({
+    tag: 'BANNED LETTER', topic: t,
+    rule: 'You may NOT start your answer with the same letter they just started theirs with.'
+  }));
+  PLAIN_TOPICS.forEach(t => d.push({
+    tag: 'STRAIGHT RALLY', topic: t,
+    rule: 'Just alternate answers as fast as you can. Nothing repeated, ever.'
+  }));
+  return d;
+}
+
+const DECK = buildDeck();
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ============================================================
+   Bracket
+   ============================================================ */
+function seedOrder(size) {
+  let order = [1];
+  while (order.length < size) {
+    const n = order.length * 2;
+    const next = [];
+    for (const s of order) { next.push(s); next.push(n + 1 - s); }
+    order = next;
+  }
+  return order;
+}
+
+function roundName(r, total) {
+  const fromEnd = total - 1 - r;
+  if (fromEnd === 0) return 'THE FINAL';
+  if (fromEnd === 1) return 'SEMIFINALS';
+  if (fromEnd === 2) return 'QUARTERFINALS';
+  return 'ROUND ' + (r + 1);
+}
+
+function buildBracket(players) {
+  const n = players.length;
+  let size = 2;
+  while (size < n) size *= 2;
+  const order = seedOrder(size);
+  const slots = order.map(s => (s <= n ? players[s - 1] : null));
+
+  const totalRounds = Math.log2(size);
+  const rounds = [];
+  for (let r = 0; r < totalRounds; r++) {
+    const count = size / Math.pow(2, r + 1);
+    const arr = [];
+    for (let m = 0; m < count; m++) {
+      arr.push({
+        a: r === 0 ? slots[m * 2] : null,
+        b: r === 0 ? slots[m * 2 + 1] : null,
+        sa: 0, sb: 0, w: null,
+        need: (r >= totalRounds - 2) ? 2 : 1,
+        bye: false
+      });
+    }
+    rounds.push(arr);
+  }
+
+  // resolve byes in round 1 and cascade
+  rounds[0].forEach((m, i) => {
+    if (m.a && !m.b) { m.w = m.a; m.bye = true; propagate(rounds, 0, i, m.a); }
+    else if (!m.a && m.b) { m.w = m.b; m.bye = true; propagate(rounds, 0, i, m.b); }
+  });
+
+  return { rounds, totalRounds };
+}
+
+function propagate(rounds, r, i, winner) {
+  if (r + 1 >= rounds.length) return;
+  const nm = rounds[r + 1][Math.floor(i / 2)];
+  if (i % 2 === 0) nm.a = winner; else nm.b = winner;
+}
+
+function nextPending(bk) {
+  for (let r = 0; r < bk.rounds.length; r++) {
+    for (let i = 0; i < bk.rounds[r].length; i++) {
+      const m = bk.rounds[r][i];
+      if (!m.w && m.a && m.b) return { r, i, m };
+    }
+  }
+  return null;
+}
+
+/* ============================================================
+   Game state
+   ============================================================ */
+const S = {
+  players: [],
+  bk: null,
+  cur: null,          // {r,i,m}
+  deck: [],
+  deckAt: 0,
+  card: null,
+  turn: 'a',          // whose turn
+  turns: 0,
+  best: 0,
+  running: false,
+  endAt: 0,
+  lastWhole: 99,
+  lastHurry: 0,
+  lastLoser: null,
+  raf: 0,
+  matchNo: 0,
+  totalMatches: 0
+};
+
+/* ============================================================
+   Screens
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const screens = ['setup', 'bracket', 'duel', 'champ'];
+
+function show(name) {
+  screens.forEach(s => $(s).classList.toggle('on', s === name));
+}
+
+/* ============================================================
+   Overlay (mirrored top + bottom)
+   ============================================================ */
+const overlay = $('overlay');
+let ovHandlers = {};
+
+function ov(html, handlers, solo) {
+  ovHandlers = handlers || {};
+  $('ovTop').innerHTML = html;
+  $('ovBot').innerHTML = html;
+  overlay.classList.toggle('solo', !!solo);
+  overlay.classList.add('on');
+}
+
+function ovClose() {
+  overlay.classList.remove('on');
+  ovHandlers = {};
+  $('ovTop').innerHTML = '';
+  $('ovBot').innerHTML = '';
+}
+
+overlay.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]');
+  if (!t) return;
+  const fn = ovHandlers[t.dataset.act];
+  if (fn) fn();
+});
+
+function btnsHTML(list) {
+  return '<div class="ovbtns">' + list.map(b =>
+    '<button class="btn ' + (b.cls || '') + '" data-act="' + b.act + '">' + b.label + '</button>'
+  ).join('') + '</div>';
+}
+
+/* ============================================================
+   SETUP screen
+   ============================================================ */
+const MAXP = 10;
+
+function renderPlayers(names) {
+  const wrap = $('plist');
+  wrap.innerHTML = '';
+  names.forEach((nm, i) => {
+    const row = document.createElement('div');
+    row.className = 'prow';
+    row.innerHTML =
+      '<div class="pnum">' + (i + 1) + '</div>' +
+      '<input type="text" maxlength="14" placeholder="Player ' + (i + 1) + '" value="' + esc(nm) + '">' +
+      '<button class="x" aria-label="remove">&times;</button>';
+    row.querySelector('input').addEventListener('input', persistNames);
+    row.querySelector('.x').addEventListener('click', () => {
+      const cur = readNames(true);
+      cur.splice(i, 1);
+      renderPlayers(cur.length ? cur : ['', '', '']);
+      persistNames();
+    });
+    wrap.appendChild(row);
+  });
+}
+
+function readNames(keepBlank) {
+  const vals = [...$('plist').querySelectorAll('input')].map(i => i.value.trim());
+  return keepBlank ? vals : vals.filter(v => v.length);
+}
+
+function persistNames() { save(LS_PLAYERS, readNames(true)); }
+
+$('addBtn').addEventListener('click', () => {
+  const cur = readNames(true);
+  if (cur.length >= MAXP) { warn('Ten players is the cap &mdash; any more and the night runs long.'); return; }
+  cur.push('');
+  renderPlayers(cur);
+  const inputs = $('plist').querySelectorAll('input');
+  inputs[inputs.length - 1].focus();
+});
+
+$('clearBtn').addEventListener('click', () => {
+  renderPlayers(['', '', '']);
+  persistNames();
+  warn('');
+});
+
+function warn(msg) { $('warn').innerHTML = msg; }
+
+$('startBtn').addEventListener('click', () => {
+  const names = readNames();
+  if (names.length < 3) { warn('Need at least 3 players for a bracket.'); return; }
+  if (names.length > MAXP) { warn('Maximum 10 players.'); return; }
+  const seen = new Set();
+  for (const n of names) {
+    const k = n.toLowerCase();
+    if (seen.has(k)) { warn('Two players named &ldquo;' + esc(n) + '&rdquo; &mdash; give one a nickname.'); return; }
+    seen.add(k);
+  }
+  warn('');
+  ac();
+  startTournament(names);
+});
+
+/* ============================================================
+   Tournament flow
+   ============================================================ */
+function startTournament(names) {
+  S.players = names.slice();
+  S.bk = buildBracket(shuffle(names));
+  S.deck = shuffle(DECK);
+  S.deckAt = 0;
+  S.matchNo = 0;
+  S.totalMatches = names.length - 1;
+  renderBracket();
+  show('bracket');
+}
+
+function renderBracket() {
+  const body = $('bracketBody');
+  const nx = nextPending(S.bk);
+  let html = '<h2 class="brand" style="font-size:clamp(20px,6.5vw,32px)">THE BRACKET</h2>';
+  html += '<p class="tagline">' + S.players.length + ' players &middot; ' + S.totalMatches + ' duels &middot; one survivor</p>';
+
+  S.bk.rounds.forEach((rnd, r) => {
+    html += '<div class="rndlabel"><i></i><span>' + roundName(r, S.bk.totalRounds) + '</span><i></i></div>';
+    rnd.forEach((m, i) => {
+      const isNext = nx && nx.r === r && nx.i === i;
+      const cls = 'match' + (isNext ? ' next' : '') + (m.w ? ' done' : '');
+      html += '<div class="' + cls + '">';
+      html += mrow(m.a, m.sa, m.w, m.b, m.bye);
+      html += '<div class="mvs"></div>';
+      html += mrow(m.b, m.sb, m.w, m.a, m.bye);
+      if (m.bye) html += '<div class="mtag bye">&#9193; Bye &mdash; walks into the next round</div>';
+      else if (isNext) html += '<div class="mtag hot">&#128293; Up next &middot; first to ' + m.need + '</div>';
+      else if (!m.w && m.a && m.b) html += '<div class="mtag">First to ' + m.need + '</div>';
+      else if (!m.w) html += '<div class="mtag">Waiting on earlier duels</div>';
+      html += '</div>';
+    });
+  });
+  body.innerHTML = html;
+  body.scrollTop = 0;
+
+  $('nextMatchBtn').textContent = nx
+    ? 'START: ' + nx.m.a.toUpperCase() + ' vs ' + nx.m.b.toUpperCase()
+    : 'CROWN THE CHAMPION';
+}
+
+function mrow(name, score, winner, other, bye) {
+  if (!name) return '<div class="mrow tbd"><div class="nm">' +
+    (bye ? 'nobody &mdash; free pass' : 'to be decided') + '</div><div class="sc">&ndash;</div></div>';
+  let cls = 'mrow';
+  if (winner === name) cls += ' win';
+  else if (winner === other && other) cls += ' lose';
+  return '<div class="' + cls + '"><div class="nm">' + esc(name) + '</div><div class="sc">' + score + '</div></div>';
+}
+
+$('nextMatchBtn').addEventListener('click', () => {
+  ac();
+  const nx = nextPending(S.bk);
+  if (!nx) { crown(); return; }
+  S.cur = nx;
+  S.matchNo++;
+  matchIntro();
+});
+
+$('quitBtn').addEventListener('click', () => {
+  ov('<div class="ovkick">End it here?</div>' +
+     '<div class="ovbig">ABANDON<br>THE BRACKET</div>' +
+     '<div class="ovsub">Results are lost. Player names are kept.</div>' +
+     btnsHTML([
+       { label: 'YES, BACK TO SETUP', act: 'yes', cls: 'gold' },
+       { label: 'KEEP PLAYING', act: 'no', cls: 'ghost' }
+     ]),
+     { yes: () => { ovClose(); show('setup'); }, no: ovClose }, true);
+});
+
+/* ============================================================
+   Match
+   ============================================================ */
+function matchIntro() {
+  const m = S.cur.m;
+  S.lastLoser = null;
+  const rn = roundName(S.cur.r, S.bk.totalRounds);
+  show('duel');
+  paintHalves(true);
+  ov('<div class="ovkick">' + rn + ' &middot; Duel ' + S.matchNo + ' of ' + S.totalMatches + '</div>' +
+     '<div class="ovbig pink">' + esc(m.a.toUpperCase()) + '</div>' +
+     '<div class="ovsub" style="font-weight:900;letter-spacing:.2em;color:var(--gold)">VS</div>' +
+     '<div class="ovbig cyan">' + esc(m.b.toUpperCase()) + '</div>' +
+     '<div class="ovsub">First to <b>' + m.need + '</b> round' + (m.need > 1 ? 's' : '') +
+     '.<br>Lay the phone flat between you &mdash; ' + esc(m.a) + ' at the top, ' + esc(m.b) + ' at the bottom.</div>' +
+     btnsHTML([{ label: 'DEAL THE CHALLENGE', act: 'go', cls: 'gold' }]),
+     { go: () => { ovClose(); dealRound(); } });
+}
+
+function nextCard() {
+  if (S.deckAt >= S.deck.length) { S.deck = shuffle(DECK); S.deckAt = 0; }
+  return S.deck[S.deckAt++];
+}
+
+function dealRound() {
+  const m = S.cur.m;
+  S.card = nextCard();
+  S.turns = 0;
+  S.best = 0;
+  // whoever lost the previous round gets to start; first round of a duel, the top player does
+  S.turn = S.lastLoser || 'a';
+  const starter = S.turn === 'a' ? m.a : m.b;
+
+  paintHalves(true);
+  ov('<div class="ovkick">' + S.card.tag + '</div>' +
+     '<div class="ovbig">' + S.card.topic + '</div>' +
+     '<div class="ovsub">' + S.card.rule + '</div>' +
+     '<div class="ovsub" style="color:var(--gold)"><b>' + esc(starter) + '</b> goes first.</div>' +
+     btnsHTML([{ label: 'READY &mdash; COUNT US IN', act: 'go', cls: 'gold' }]),
+     { go: () => { ovClose(); countIn(); } });
+}
+
+function countIn() {
+  let n = 3;
+  const paint = () => {
+    ov('<div class="ovkick">' + S.card.tag + '</div>' +
+       '<div class="ovcount">' + (n > 0 ? n : 'GO!') + '</div>' +
+       '<div class="ovsub">' + esc(S.turn === 'a' ? S.cur.m.a : S.cur.m.b) + ' starts</div>', {});
+  };
+  paint();
+  tone(520, 0.1, 'triangle', 0.14);
+  const iv = setInterval(() => {
+    n--;
+    if (n > 0) { paint(); tone(520, 0.1, 'triangle', 0.14); }
+    else if (n === 0) { paint(); sfx.go(); }
+    else { clearInterval(iv); ovClose(); beginTurn(); }
+  }, 700);
+}
+
+/* ---------- turn timing ---------- */
+function turnDuration() {
+  let d = 9 - S.turns * 0.4;
+  if (d < 3.5) d = 3.5;
+  return d;
+}
+
+function timeLeft() {
+  return (S.endAt - performance.now()) / 1000;
+}
+
+function beginTurn() {
+  startClock(turnDuration());
+}
+
+// Resume the SAME turn with the clock it had left (never a fresh one) so that
+// pausing or throwing a challenge can't be used to buy thinking time.
+function resumeTurn(secs) {
+  startClock(Math.max(1, secs));
+}
+
+function startClock(secs) {
+  S.endAt = performance.now() + secs * 1000;
+  S.running = true;
+  S.lastWhole = 99;
+  S.lastHurry = 0;
+  paintHalves(false);
+  loop();
+}
+
+function loop() {
+  cancelAnimationFrame(S.raf);
+  const step = () => {
+    if (!S.running) return;
+    const left = (S.endAt - performance.now()) / 1000;
+    if (left <= 0) { S.running = false; timeUp(); return; }
+    paintClock(left);
+    const whole = Math.ceil(left);
+    if (left > 2.6) {
+      if (whole !== S.lastWhole) { S.lastWhole = whole; sfx.tick(); }
+    } else {
+      const now = performance.now();
+      if (now - S.lastHurry > 230) { S.lastHurry = now; sfx.hurry(); }
+    }
+    S.raf = requestAnimationFrame(step);
+  };
+  S.raf = requestAnimationFrame(step);
+}
+
+function paintClock(left) {
+  const txt = left >= 10 ? String(Math.ceil(left)) : left.toFixed(1);
+  const hurry = left <= 2.6;
+  ['A', 'B'].forEach(k => {
+    const el = $('half' + k).querySelector('.clock');
+    if (!el) return;
+    el.textContent = txt;
+    el.classList.toggle('hurry', hurry);
+  });
+}
+
+function stopClock() {
+  S.running = false;
+  cancelAnimationFrame(S.raf);
+}
+
+/* ---------- half rendering ---------- */
+function paintHalves(idle) {
+  const m = S.cur ? S.cur.m : { a: '', b: '', sa: 0, sb: 0, need: 1 };
+  half('A', 'a', m.a, m.sa, m, idle);
+  half('B', 'b', m.b, m.sb, m, idle);
+  $('stripMid').innerHTML = S.card
+    ? (S.card.tag + ' &middot; turn ' + (S.turns + 1) + ' &middot; best run ' + S.best)
+    : 'Get ready';
+}
+
+function half(id, side, name, score, m, idle) {
+  const el = $('half' + id);
+  const active = !idle && S.turn === side;
+  el.classList.toggle('act', active);
+
+  let pips = '';
+  for (let i = 0; i < m.need; i++) pips += '<div class="pip' + (i < score ? ' on' : '') + '"></div>';
+
+  const card = S.card || { tag: '', topic: 'GET READY', rule: 'Lay the phone flat between the two of you.' };
+
+  el.innerHTML =
+    '<div class="pname">' + esc(name || '') + '<span class="pips">' + pips + '</span></div>' +
+    '<div class="prompt">' +
+      '<div class="ptag">' + card.tag + '</div>' +
+      '<div class="ptopic">' + card.topic + '</div>' +
+      '<div class="prule">' + card.rule + '</div>' +
+    '</div>' +
+    '<div class="clock">&ndash;</div>' +
+    (active
+      ? '<div class="btnstack">' +
+          '<button class="actbtn" data-side="' + side + '">SAID IT &mdash; PASS &#9654;</button>' +
+          (S.turns > 0
+            ? '<button class="nopebtn" data-nope="' + side + '">&#9995; THEIR ANSWER DIDN&rsquo;T COUNT</button>'
+            : '') +
+        '</div>'
+      : '<div class="waitlbl">' + (idle ? 'GET READY' : 'THEIR TURN &mdash; SHOUT AT THEM') + '</div>');
+}
+
+// event delegation for both halves
+['halfA', 'halfB'].forEach(id => {
+  $(id).addEventListener('click', e => {
+    const pass = e.target.closest('[data-side]');
+    if (pass) { doPass(pass.dataset.side); return; }
+    const nope = e.target.closest('[data-nope]');
+    if (nope && !nope.disabled) { doNope(nope.dataset.nope); }
+  });
+});
+
+function doPass(side) {
+  if (!S.running || side !== S.turn) return;
+  sfx.pass();
+  S.turns++;
+  if (S.turns > S.best) S.best = S.turns;
+  S.turn = side === 'a' ? 'b' : 'a';
+  beginTurn();
+}
+
+/* ---------- NOPE: room arbitration ----------
+   Only the player whose turn it is can challenge: instead of answering,
+   you object to the answer your opponent just gave.                    */
+function doNope(challenger) {
+  if (!S.running || challenger !== S.turn) return;
+  if (S.turns === 0) return;                        // nothing has been said yet
+  const left = timeLeft();                          // frozen here — no free reset
+  stopClock();
+  sfx.nope();
+  const m = S.cur.m;
+  const accused = challenger === 'a' ? 'b' : 'a';   // the one who just answered
+  const accusedName = accused === 'a' ? m.a : m.b;
+  const challengerName = challenger === 'a' ? m.a : m.b;
+
+  ov('<div class="ovkick">&#9995; Challenge!</div>' +
+     '<div class="ovbig pink">DID IT COUNT?</div>' +
+     '<div class="ovsub"><b>' + esc(challengerName) + '</b> says <b>' + esc(accusedName) +
+     '</b>&rsquo;s last answer broke the rule.<br><br><b>The room decides.</b> Anyone can tap.</div>' +
+     '<div class="ovsub" style="color:var(--gold)">' + S.card.rule + '</div>' +
+     btnsHTML([
+       { label: 'IT COUNTED &mdash; PLAY ON', act: 'ok', cls: 'cyan' },
+       { label: 'NOPE &mdash; ' + esc(accusedName.toUpperCase()) + ' IS OUT', act: 'out', cls: '' }
+     ]),
+     {
+       ok: () => {
+         ovClose();
+         resumeAfterChallenge(challengerName, left - 2);   // bad challenge costs 2s off this turn
+       },
+       out: () => {
+         ovClose();
+         endRound(challenger, esc(accusedName) + '&rsquo;s answer was thrown out by the room.');
+       }
+     });
+}
+
+function resumeAfterChallenge(challengerName, secs) {
+  ov('<div class="ovkick">Challenge overruled</div>' +
+     '<div class="ovbig cyan">PLAY ON</div>' +
+     '<div class="ovsub">The room says it counted. <b>' + esc(challengerName) +
+     '</b> is still on the clock &mdash; and loses <b>2 seconds</b> right now.</div>' +
+     '<div class="ovsub" style="color:var(--gold)">' + Math.max(1, secs).toFixed(1) + 's left. Answer!</div>' +
+     btnsHTML([{ label: 'RESUME', act: 'go', cls: 'gold' }]),
+     { go: () => { ovClose(); resumeTurn(secs); } });
+}
+
+/* ---------- round end ---------- */
+function timeUp() {
+  stopClock();
+  sfx.buzz();
+  const winner = S.turn === 'a' ? 'b' : 'a';
+  const loserName = S.turn === 'a' ? S.cur.m.a : S.cur.m.b;
+  endRound(winner, esc(loserName) + ' ran out of clock.');
+}
+
+function endRound(winnerSide, why) {
+  stopClock();
+  const m = S.cur.m;
+  if (winnerSide === 'a') m.sa++; else m.sb++;
+  S.lastLoser = winnerSide === 'a' ? 'b' : 'a';   // loser starts the next round
+  const winName = winnerSide === 'a' ? m.a : m.b;
+  const matchOver = (winnerSide === 'a' ? m.sa : m.sb) >= m.need;
+
+  paintHalves(true);
+  sfx.win();
+
+  const score = esc(m.a) + ' ' + m.sa + ' &ndash; ' + m.sb + ' ' + esc(m.b);
+
+  if (!matchOver) {
+    const rally = S.best === 0
+      ? 'Not one answer landed.'
+      : 'The rally ran <b>' + S.best + '</b> answer' + (S.best === 1 ? '' : 's') + ' deep.';
+    ov('<div class="ovkick">Round to</div>' +
+       '<div class="ovbig gold">' + esc(winName.toUpperCase()) + '</div>' +
+       '<div class="ovsub">' + why + '<br>' + rally + '</div>' +
+       '<div class="ovsub" style="color:var(--gold)">' + score + '</div>' +
+       btnsHTML([{ label: 'NEXT ROUND', act: 'go', cls: 'gold' }]),
+       { go: () => { ovClose(); dealRound(); } });
+    return;
+  }
+
+  m.w = winName;
+  propagate(S.bk.rounds, S.cur.r, S.cur.i, winName);
+  const loseName = winnerSide === 'a' ? m.b : m.a;
+  const isFinal = S.cur.r === S.bk.rounds.length - 1;
+
+  ov('<div class="ovkick">' + (isFinal ? 'Tournament over' : 'Duel over &mdash; ' + esc(loseName) + ' is knocked out') + '</div>' +
+     '<div class="ovbig gold">' + esc(winName.toUpperCase()) + '</div>' +
+     '<div class="ovsub">' + why + '<br>' + score + '</div>' +
+     btnsHTML([{ label: isFinal ? 'CROWN THE CHAMPION' : 'BACK TO THE BRACKET', act: 'go', cls: 'gold' }]),
+     {
+       go: () => {
+         ovClose();
+         S.card = null;
+         if (isFinal) { crown(); }
+         else { renderBracket(); show('bracket'); }
+       }
+     });
+}
+
+$('stripQuit').addEventListener('click', () => {
+  const left = S.running ? timeLeft() : 0;
+  stopClock();
+  ov('<div class="ovkick">Pause</div>' +
+     '<div class="ovbig">DUEL PAUSED</div>' +
+     '<div class="ovsub">The clock is frozen at <b>' + Math.max(0, left).toFixed(1) +
+     's</b> &mdash; you get exactly that back.<br>Bail out and this duel restarts from scratch next time.</div>' +
+     btnsHTML([
+       { label: 'RESUME THE TURN', act: 'go', cls: 'gold' },
+       { label: 'BACK TO BRACKET', act: 'out', cls: 'ghost' }
+     ]),
+     {
+       go: () => { ovClose(); if (S.card && left > 0) resumeTurn(left); },
+       out: () => {
+         ovClose();
+         if (S.cur) { S.cur.m.sa = 0; S.cur.m.sb = 0; S.matchNo = Math.max(0, S.matchNo - 1); }
+         S.card = null;
+         renderBracket();
+         show('bracket');
+       }
+     }, true);
+});
+
+$('stripSound').addEventListener('click', () => {
+  soundOn = !soundOn;
+  save(LS_SOUND, soundOn);
+  $('stripSound').innerHTML = soundOn ? '&#128266;' : '&#128263;';
+  if (soundOn) sfx.pass();
+});
+
+/* ============================================================
+   Champion
+   ============================================================ */
+function crown() {
+  const finalMatch = S.bk.rounds[S.bk.rounds.length - 1][0];
+  const name = finalMatch.w || '?';
+  $('champName').textContent = name;
+
+  let duelsWon = 0, byes = 0;
+  S.bk.rounds.forEach(rnd => rnd.forEach(m => {
+    if (m.w !== name) return;
+    if (m.bye) byes++; else duelsWon++;
+  }));
+
+  $('champSub').innerHTML = 'Won ' + duelsWon + ' duel' + (duelsWon === 1 ? '' : 's') +
+    (byes ? ' (and got a free pass in round 1)' : '') +
+    ', outlasting ' + (S.players.length - 1) + ' rival' + (S.players.length - 1 === 1 ? '' : 's') +
+    '.<br>Nobody got the last word.';
+
+  const hall = load(LS_HALL, []);
+  hall.unshift({ n: name, p: S.players.length });
+  save(LS_HALL, hall.slice(0, 12));
+
+  show('champ');
+  sfx.fanfare();
+  confetti();
+  renderHall();
+}
+
+$('againBtn').addEventListener('click', () => { stopConfetti(); ac(); startTournament(S.players); });
+$('newBtn').addEventListener('click', () => { stopConfetti(); show('setup'); renderHall(); });
+
+function renderHall() {
+  const hall = load(LS_HALL, []);
+  if (!hall.length) { $('hallCard').style.display = 'none'; return; }
+  $('hallCard').style.display = '';
+  $('hall').innerHTML = hall.map(h =>
+    '<div class="hallrow"><b>&#127942; ' + esc(h.n) + '</b><span>' + h.p + ' players</span></div>'
+  ).join('');
+}
+
+/* ---------- confetti ---------- */
+const cv = $('confetti');
+const ctx = cv.getContext('2d');
+let bits = [], craf = 0;
+
+function confetti() {
+  cv.width = cv.clientWidth;
+  cv.height = cv.clientHeight;
+  const cols = ['#ff3d81', '#22e0e0', '#ffcc44', '#ffffff', '#9b5cff'];
+  bits = Array.from({ length: 90 }, () => ({
+    x: Math.random() * cv.width,
+    y: -Math.random() * cv.height,
+    w: 5 + Math.random() * 7,
+    h: 8 + Math.random() * 10,
+    vy: 1.2 + Math.random() * 2.4,
+    vx: -0.6 + Math.random() * 1.2,
+    rot: Math.random() * 6.28,
+    vr: -0.09 + Math.random() * 0.18,
+    c: cols[Math.floor(Math.random() * cols.length)]
+  }));
+  cancelAnimationFrame(craf);
+  drawConfetti();
+}
+
+function drawConfetti() {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  bits.forEach(b => {
+    b.y += b.vy; b.x += b.vx; b.rot += b.vr;
+    if (b.y > cv.height + 20) { b.y = -20; b.x = Math.random() * cv.width; }
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.rot);
+    ctx.fillStyle = b.c;
+    ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+    ctx.restore();
+  });
+  craf = requestAnimationFrame(drawConfetti);
+}
+
+function stopConfetti() { cancelAnimationFrame(craf); ctx.clearRect(0, 0, cv.width, cv.height); }
+
+window.addEventListener('resize', () => {
+  if ($('champ').classList.contains('on')) { cv.width = cv.clientWidth; cv.height = cv.clientHeight; }
+});
+
+/* ============================================================
+   Boot
+   ============================================================ */
+(function boot() {
+  const saved = load(LS_PLAYERS, null);
+  renderPlayers(saved && saved.length >= 3 ? saved.slice(0, MAXP) : ['', '', '']);
+  renderHall();
+  $('stripSound').innerHTML = soundOn ? '&#128266;' : '&#128263;';
+})();
+
+// expose a tiny hook so the game can be driven headlessly for testing
+window.__LWS = S;
+</script>
+</body>
+</html>

@@ -1,0 +1,592 @@
+<!-- CONCEPT: team-relay - Pass The Gauntlet: teams race one device down their line, each player clearing a random micro-challenge (say/act/do/think/sound) before passing; fastest total time across rounds wins. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>PASS THE GAUNTLET — Team Relay Party Game</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#120a2a; --bg2:#1e0f45; --ink:#fff;
+    --say:#ffd23f; --act:#ff4d9d; --do:#3ddc84; --think:#4dc3ff; --sound:#c084fc;
+    --gold:#ffd23f; --dim:rgba(255,255,255,.62);
+  }
+  html,body{height:100%}
+  body{
+    font-family:"Trebuchet MS",Verdana,Geneva,sans-serif;
+    background:radial-gradient(1100px 700px at 50% -10%,#3a1a7a 0%,var(--bg2) 45%,var(--bg) 100%);
+    color:var(--ink); overflow:hidden; display:flex; flex-direction:column;
+    height:100dvh; user-select:none;
+  }
+  .screen{display:none; flex:1; flex-direction:column; padding:2.2vmin 3vmin; overflow-y:auto}
+  .screen.on{display:flex}
+  h1{font-size:clamp(34px,8.4vmin,90px); line-height:.95; letter-spacing:-.02em; text-align:center;
+     background:linear-gradient(180deg,#fff 20%,var(--gold) 110%); -webkit-background-clip:text;
+     background-clip:text; color:transparent; text-shadow:0 6px 30px rgba(255,210,63,.25)}
+  .tag{text-align:center;color:var(--dim);font-size:clamp(13px,2.1vmin,20px);margin-top:.7vmin;line-height:1.45}
+  .meta{text-align:center;color:var(--gold);font-weight:bold;letter-spacing:.16em;
+        font-size:clamp(11px,1.7vmin,16px);margin-top:1.4vmin;text-transform:uppercase}
+  .card{background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.14);
+        border-radius:20px;padding:2.4vmin 2.6vmin;margin-top:2vmin}
+  .lbl{color:var(--dim);font-size:clamp(11px,1.7vmin,15px);letter-spacing:.16em;text-transform:uppercase;font-weight:bold}
+  button{font-family:inherit;font-weight:bold;cursor:pointer;border:none;color:#1a0c3a}
+  .btn{background:linear-gradient(180deg,#ffe27a,#ffb703);border-radius:18px;
+       padding:2.2vmin 3vmin;font-size:clamp(18px,3.4vmin,34px);letter-spacing:.04em;
+       box-shadow:0 8px 0 #a86e00, 0 14px 26px rgba(0,0,0,.4); transition:transform .06s,box-shadow .06s}
+  .btn:active{transform:translateY(6px);box-shadow:0 2px 0 #a86e00,0 6px 14px rgba(0,0,0,.4)}
+  .btn.ghost{background:transparent;color:#fff;border:3px solid rgba(255,255,255,.35);box-shadow:none}
+  .btn.ghost:active{transform:translateY(3px);background:rgba(255,255,255,.1)}
+  .btn.red{background:linear-gradient(180deg,#ff8a8a,#e4344b);color:#fff;box-shadow:0 8px 0 #8c1023,0 14px 26px rgba(0,0,0,.4)}
+  .btn.red:active{box-shadow:0 2px 0 #8c1023}
+  .row{display:flex;gap:1.6vmin;flex-wrap:wrap;justify-content:center}
+  .stack{display:flex;flex-direction:column;gap:1.6vmin}
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:1.4vmin;text-align:center}
+  input[type=text]{font-family:inherit;font-size:clamp(16px,2.8vmin,26px);padding:1.5vmin 2vmin;
+    border-radius:14px;border:2px solid rgba(255,255,255,.25);background:rgba(0,0,0,.3);color:#fff;width:100%}
+  input[type=text]:focus{outline:none;border-color:var(--gold)}
+  .teamrow{display:flex;gap:1.2vmin;align-items:center;margin-bottom:1.2vmin}
+  .swatch{width:4.4vmin;height:4.4vmin;min-width:26px;min-height:26px;border-radius:10px;border:2px solid rgba(255,255,255,.4)}
+  .stepper{display:flex;align-items:center;gap:1.6vmin;justify-content:center;margin-top:1vmin}
+  .stepper button{width:8vmin;height:8vmin;min-width:48px;min-height:48px;border-radius:50%;
+    font-size:clamp(22px,4vmin,38px);background:rgba(255,255,255,.16);color:#fff}
+  .stepper .val{font-size:clamp(30px,6vmin,58px);min-width:2.4em;text-align:center;font-weight:bold;color:var(--gold)}
+  /* PLAY */
+  .hud{display:flex;justify-content:space-between;align-items:center;gap:1.4vmin;flex-wrap:wrap}
+  .pill{background:rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.16);border-radius:999px;
+        padding:.9vmin 2vmin;font-size:clamp(12px,2.1vmin,20px);font-weight:bold}
+  .clock{font-size:clamp(40px,10vmin,110px);font-weight:bold;font-variant-numeric:tabular-nums;
+         letter-spacing:-.02em;color:#fff;text-align:center;line-height:1}
+  .taskcard{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    border-radius:26px;margin:1.6vmin 0;padding:3vmin;text-align:center;min-height:26vh;
+    border:5px solid #fff;box-shadow:0 0 0 4px rgba(0,0,0,.35), 0 18px 40px rgba(0,0,0,.45)}
+  .ttype{font-size:clamp(14px,2.6vmin,26px);letter-spacing:.3em;font-weight:bold;opacity:.85;margin-bottom:1.6vmin}
+  .ttext{font-size:clamp(24px,5.6vmin,64px);line-height:1.12;font-weight:bold;max-width:20ch}
+  .dots{display:flex;gap:1vmin;justify-content:center;flex-wrap:wrap;margin-top:.6vmin}
+  .dot{width:3.4vmin;height:3.4vmin;min-width:18px;min-height:18px;border-radius:50%;
+       border:3px solid rgba(255,255,255,.5)}
+  .dot.done{background:var(--do);border-color:var(--do)}
+  .dot.now{background:var(--gold);border-color:#fff;transform:scale(1.18)}
+  .big{font-size:clamp(46px,16vmin,190px);font-weight:bold;line-height:.9}
+  table{width:100%;border-collapse:collapse;font-size:clamp(14px,2.6vmin,26px)}
+  th,td{padding:1.3vmin 1vmin;text-align:left;border-bottom:1px solid rgba(255,255,255,.14)}
+  th{color:var(--dim);font-size:clamp(11px,1.7vmin,15px);letter-spacing:.14em;text-transform:uppercase}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:bold}
+  .win{color:var(--gold)}
+  .twist{border:3px dashed var(--gold);border-radius:18px;padding:2vmin;background:rgba(255,210,63,.1);max-width:34ch}
+  .twist b{display:block;font-size:clamp(18px,3.4vmin,32px);color:var(--gold);letter-spacing:.06em}
+  .twist span{font-size:clamp(13px,2.3vmin,22px);color:#fff;opacity:.92;line-height:1.35}
+  .foot{text-align:center;color:var(--dim);font-size:clamp(10px,1.6vmin,14px);margin-top:1.2vmin}
+  .err{color:#ff8a8a;text-align:center;font-weight:bold;min-height:1.2em;font-size:clamp(12px,2vmin,18px)}
+  @keyframes pop{0%{transform:scale(.86);opacity:0}100%{transform:scale(1);opacity:1}}
+  .pop{animation:pop .18s ease-out}
+</style>
+</head>
+<body>
+
+<!-- ============ TITLE ============ -->
+<section class="screen on" id="s-title">
+  <div class="center">
+    <h1>PASS THE<br>GAUNTLET</h1>
+    <div class="tag">A team relay you run on one device: each player clears one wild<br>micro-challenge, slaps PASS, and hands it down the line.<br>Fastest team clock wins.</div>
+    <div class="meta">2–4 teams &nbsp;•&nbsp; 3–10 players &nbsp;•&nbsp; 15–25 min</div>
+    <div class="row" style="margin-top:3vmin">
+      <button class="btn" id="go-setup">START A GAME</button>
+      <button class="btn ghost" id="go-rules">HOW TO PLAY</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RULES ============ -->
+<section class="screen" id="s-rules">
+  <h1 style="font-size:clamp(26px,5.6vmin,56px)">HOW TO PLAY</h1>
+  <div class="card">
+    <div class="lbl">One sentence</div>
+    <p style="font-size:clamp(17px,3vmin,30px);margin-top:1vmin;line-height:1.3">
+      Your team lines up, the device starts at player 1, and each player must finish
+      the challenge on screen — <b>their teammates decide when it's done</b> — then tap
+      <b>PASS</b> and hand the device on. The clock stops when the last player finishes.
+    </p>
+  </div>
+  <div class="card">
+    <div class="lbl">The details</div>
+    <ul style="margin:1.2vmin 0 0 3vmin;font-size:clamp(14px,2.5vmin,24px);line-height:1.65">
+      <li>Teams take turns running a leg. One team at a time — everyone else watches and heckles.</li>
+      <li>Teammates are the judges. If they say it's done, it's done. Be generous, it's faster.</li>
+      <li>Stuck? Tap <b>SKIP</b> — new card, but a time penalty gets added.</li>
+      <li>Each round has a <b>TWIST</b> that changes penalties or hands out time bonuses.</li>
+      <li>Lowest total time after all rounds wins the Gauntlet.</li>
+    </ul>
+  </div>
+  <div class="row" style="margin-top:2vmin"><button class="btn" id="rules-back">GOT IT</button></div>
+</section>
+
+<!-- ============ SETUP ============ -->
+<section class="screen" id="s-setup">
+  <h1 style="font-size:clamp(26px,5.6vmin,56px)">SET UP THE RELAY</h1>
+  <div class="card">
+    <div class="lbl">Teams</div>
+    <div id="team-inputs" style="margin-top:1.4vmin"></div>
+    <div class="row" style="justify-content:flex-start;margin-top:.6vmin">
+      <button class="btn ghost" id="add-team" style="padding:1.2vmin 2.2vmin;font-size:clamp(14px,2.2vmin,20px)">+ ADD TEAM</button>
+      <button class="btn ghost" id="rm-team" style="padding:1.2vmin 2.2vmin;font-size:clamp(14px,2.2vmin,20px)">– REMOVE</button>
+    </div>
+  </div>
+  <div class="row" style="gap:2vmin;align-items:stretch">
+    <div class="card" style="flex:1;min-width:240px">
+      <div class="lbl" style="text-align:center">Players per leg</div>
+      <div class="stepper">
+        <button data-step="legs,-1">–</button><div class="val" id="v-legs">4</div><button data-step="legs,1">+</button>
+      </div>
+      <div class="foot">How many people are in each team's line</div>
+    </div>
+    <div class="card" style="flex:1;min-width:240px">
+      <div class="lbl" style="text-align:center">Rounds</div>
+      <div class="stepper">
+        <button data-step="rounds,-1">–</button><div class="val" id="v-rounds">3</div><button data-step="rounds,1">+</button>
+      </div>
+      <div class="foot">Each team runs one leg per round</div>
+    </div>
+  </div>
+  <div class="err" id="setup-err"></div>
+  <div class="row" style="margin-top:1.4vmin">
+    <button class="btn ghost" id="setup-back">BACK</button>
+    <button class="btn" id="start-game">START THE GAUNTLET</button>
+  </div>
+</section>
+
+<!-- ============ ROUND INTRO ============ -->
+<section class="screen" id="s-round">
+  <div class="center">
+    <div class="lbl" id="ri-round">ROUND 1</div>
+    <div class="big pop" id="ri-team" style="font-size:clamp(34px,9vmin,100px)">TEAM</div>
+    <div class="twist pop" id="ri-twist"><b>TWIST</b><span>...</span></div>
+    <div class="tag" id="ri-line">Line up! Player 1 holds the device.</div>
+    <button class="btn" id="ri-go" style="margin-top:1.6vmin">WE'RE READY →</button>
+  </div>
+</section>
+
+<!-- ============ COUNTDOWN ============ -->
+<section class="screen" id="s-count">
+  <div class="center"><div class="big" id="cd-num">3</div><div class="tag" id="cd-team"></div></div>
+</section>
+
+<!-- ============ PLAY ============ -->
+<section class="screen" id="s-play">
+  <div class="hud">
+    <div class="pill" id="p-team">TEAM</div>
+    <div class="pill" id="p-player">PLAYER 1 / 4</div>
+    <div class="pill" id="p-twist">TWIST</div>
+  </div>
+  <div class="clock" id="p-clock">0.0</div>
+  <div class="dots" id="p-dots"></div>
+  <div class="taskcard" id="p-card">
+    <div class="ttype" id="p-type">SAY</div>
+    <div class="ttext" id="p-text">…</div>
+  </div>
+  <div class="row">
+    <button class="btn red" id="p-skip" style="flex:1;max-width:34%">SKIP <span id="p-pen">+10s</span></button>
+    <button class="btn" id="p-pass" style="flex:2;min-width:44%">DONE — PASS IT ON ▸</button>
+  </div>
+  <div class="foot">Teammates are the judges. Hand the device to the next player after every PASS.</div>
+</section>
+
+<!-- ============ LEG RESULT ============ -->
+<section class="screen" id="s-leg">
+  <div class="center">
+    <div class="lbl" id="lr-team">TEAM</div>
+    <div class="big" id="lr-time">0.0</div>
+    <div class="tag" id="lr-detail"></div>
+    <button class="btn" id="lr-next" style="margin-top:1.6vmin">NEXT →</button>
+  </div>
+</section>
+
+<!-- ============ STANDINGS ============ -->
+<section class="screen" id="s-stand">
+  <h1 style="font-size:clamp(26px,5.6vmin,56px)" id="st-title">STANDINGS</h1>
+  <div class="card"><table id="st-table"></table></div>
+  <div class="row" style="margin-top:1.8vmin">
+    <button class="btn" id="st-next">CONTINUE →</button>
+  </div>
+</section>
+
+<!-- ============ FINAL ============ -->
+<section class="screen" id="s-final">
+  <div class="center">
+    <div class="lbl">GAUNTLET CHAMPIONS</div>
+    <div class="big pop win" id="fn-team" style="font-size:clamp(34px,9vmin,100px)">TEAM</div>
+    <div class="tag" id="fn-time"></div>
+    <div class="card" style="width:min(760px,94vw)"><table id="fn-table"></table></div>
+    <div class="row" style="margin-top:1.8vmin">
+      <button class="btn" id="fn-again">SAME TEAMS, NEW GAUNTLET</button>
+      <button class="btn ghost" id="fn-new">NEW GAME</button>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------------- AUDIO (Web Audio API, no files) ---------------- */
+var AC=null;
+function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ AC=null; } } if(AC&&AC.state==="suspended"){AC.resume();} return AC; }
+function tone(f1,f2,dur,type,vol){
+  var c=ac(); if(!c) return;
+  var o=c.createOscillator(), g=c.createGain();
+  o.type=type||"square"; o.frequency.setValueAtTime(f1,c.currentTime);
+  if(f2) o.frequency.exponentialRampToValueAtTime(Math.max(40,f2),c.currentTime+dur);
+  g.gain.setValueAtTime(0.0001,c.currentTime);
+  g.gain.exponentialRampToValueAtTime(vol||0.22,c.currentTime+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+dur);
+  o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+dur+0.03);
+}
+function sPass(){ tone(520,980,0.16,"square",0.2); setTimeout(function(){tone(880,1320,0.14,"square",0.16);},70); }
+function sSkip(){ tone(220,90,0.34,"sawtooth",0.22); }
+function sTick(){ tone(700,700,0.09,"square",0.16); }
+function sGo(){ tone(500,900,0.3,"square",0.24); setTimeout(function(){tone(900,1400,0.35,"square",0.2);},140); }
+function sEnd(){ [523,659,784,1047].forEach(function(f,i){ setTimeout(function(){tone(f,f,0.28,"triangle",0.2);},i*110); }); }
+function sWin(){ [523,659,784,1047,784,1047,1319].forEach(function(f,i){ setTimeout(function(){tone(f,f,0.3,"triangle",0.22);},i*150); }); }
+
+/* ---------------- TASK DECK (72 cards) ---------------- */
+var TYPES={
+  SAY:{c:"#ffd23f",ink:"#3a2500"}, ACT:{c:"#ff4d9d",ink:"#3d0020"},
+  DO:{c:"#3ddc84",ink:"#00331a"},  THINK:{c:"#4dc3ff",ink:"#002438"},
+  SOUND:{c:"#c084fc",ink:"#26003f"}
+};
+var TASKS=[
+ ["SAY","Name 4 things you'd find in a kitchen drawer"],
+ ["SAY","Name 3 countries starting with the letter B"],
+ ["SAY","Say the months backwards: December to July"],
+ ["SAY","Name 5 animals that have tails"],
+ ["SAY","Name 3 things that are always cold"],
+ ["SAY","Count backwards out loud from 30 to 20"],
+ ["SAY","Name 4 fruits — apples don't count"],
+ ["SAY","Say the alphabet from M to Z, no stumbles"],
+ ["SAY","Name 3 jobs that need a uniform"],
+ ["SAY","Name 5 things you'd find in a park"],
+ ["SAY","Name 3 words that rhyme with LIGHT"],
+ ["SAY","Name 4 board games or card games"],
+ ["SAY","Spell your first name backwards, out loud"],
+ ["SAY","Name 3 things that come in pairs"],
+ ["SAY","Name 5 clothing items you are NOT wearing"],
+ ["SAY","Name 3 planets"],
+ ["SAY","Name 4 things that are round"],
+ ["SAY","Spell REFRIGERATOR out loud — no help"],
+ ["SAY","Name 3 things in this room that are blue"],
+ ["SAY","Name 4 things you'd pack for a beach day"],
+ ["ACT","ACT IT OUT: an astronaut — until a teammate says the word"],
+ ["ACT","ACT IT OUT: making pancakes"],
+ ["ACT","ACT IT OUT: a cat waking up from a nap"],
+ ["ACT","ACT IT OUT: carrying something extremely heavy"],
+ ["ACT","ACT IT OUT: taking the perfect selfie"],
+ ["ACT","ACT IT OUT: a robot running out of battery"],
+ ["ACT","ACT IT OUT: fishing — and catching a big one"],
+ ["ACT","ACT IT OUT: the worst dancer at a wedding"],
+ ["ACT","ACT IT OUT: brushing your teeth in a huge hurry"],
+ ["ACT","ACT IT OUT: a chicken"],
+ ["ACT","ACT IT OUT: opening a jar that will not open"],
+ ["ACT","ACT IT OUT: a tightrope walker"],
+ ["ACT","ACT IT OUT: a very angry chef"],
+ ["ACT","ACT IT OUT: sneezing in slow motion"],
+ ["ACT","ACT IT OUT: swimming the backstroke"],
+ ["ACT","ACT IT OUT: a toddler refusing broccoli"],
+ ["ACT","ACT IT OUT: a magician pulling a rabbit from a hat"],
+ ["ACT","ACT IT OUT: waiting for a very slow lift"],
+ ["DO","Do 6 jumping jacks"],
+ ["DO","Balance on one foot while your team counts to 8"],
+ ["DO","Spin around 3 times, then point at the nearest door"],
+ ["DO","Touch 3 different pieces of furniture, then sit back down"],
+ ["DO","Strike a superhero landing pose — hold it for 3 seconds"],
+ ["DO","High-five every single teammate"],
+ ["DO","Walk 5 steps like a penguin"],
+ ["DO","Hold your arms straight out while your team counts to 6"],
+ ["DO","Touch your toes 3 times"],
+ ["DO","Take a slow-motion victory lap around your chair"],
+ ["DO","Make an X with your arms, then a Y, then an O"],
+ ["DO","Stand up and sit down — twice, fast"],
+ ["DO","Pat your head and rub your stomach for 5 seconds"],
+ ["DO","Touch something soft, something hard, and something red"],
+ ["DO","Do 3 squats and shout your team name on the last one"],
+ ["DO","March on the spot while singing any 5 words"],
+ ["THINK","Say a word starting with each letter of C-A-T"],
+ ["THINK","Out loud, add these: 17 + 26"],
+ ["THINK","Say any word that contains the letter Q"],
+ ["THINK","Sum up your whole day in exactly 5 words"],
+ ["THINK","Invent a name for a new ice cream flavour"],
+ ["THINK","Say three words that all start with SP"],
+ ["THINK","What is 7 x 8? Then say that number doubled"],
+ ["THINK","Name something in this room starting with T, then S"],
+ ["THINK","Make up a two-line rhyme about your team"],
+ ["THINK","Say a movie title with one word swapped for BANANA"],
+ ["THINK","Pick a colour, then name 3 things that colour"],
+ ["THINK","Give a convincing fake definition of FLUMBERDASH"],
+ ["THINK","Name 3 things you could use as an umbrella"],
+ ["SOUND","Hum a song until a teammate names it"],
+ ["SOUND","Make the sound of a car that will not start"],
+ ["SOUND","Do an animal noise — teammates must guess the animal"],
+ ["SOUND","Beatbox for 5 solid seconds"],
+ ["SOUND","Sing HAPPY BIRTHDAY in an opera voice"],
+ ["SOUND","Make a sound effect for a door creaking open"],
+ ["SOUND","Whistle any tune until a teammate says STOP"],
+ ["SOUND","Say HELLO in three completely different voices"],
+ ["SOUND","Imitate a phone ringing, then a kettle boiling"],
+ ["SOUND","Sing the alphabet to a tune that isn't the normal one"]
+];
+
+/* ---------------- TWISTS ---------------- */
+var TWISTS=[
+ {t:"STRAIGHT RELAY", d:"No twist. Just be fast. Skip costs +10s.", pen:10, per:0, fast:0},
+ {t:"SILENT LEG", d:"Nobody on the team may speak — mime it, point at it, hum it. Skip costs +10s.", pen:10, per:0, fast:0},
+ {t:"REVERSE LINE", d:"Run the relay from the LAST player back to the first. Skip costs +10s.", pen:10, per:0, fast:0},
+ {t:"DOUBLE OR NOTHING", d:"Every card you finish shaves 2s off — but a skip costs a brutal +20s.", pen:20, per:2, fast:0},
+ {t:"SPEED DEMON", d:"Any card cleared in under 10 seconds shaves 3s off your clock. Skip costs +12s.", pen:12, per:0, fast:3},
+ {t:"MIRROR MODE", d:"Before your own card, copy the last thing the previous player did. Skip costs +10s.", pen:10, per:0, fast:0},
+ {t:"CHEER SQUAD", d:"The whole team must be loudly cheering the whole leg — if it goes quiet, the holder restarts their card. Skip +10s.", pen:10, per:0, fast:0},
+ {t:"STANDING ORDERS", d:"Everyone on the team stays standing for the entire leg. Skip costs +10s.", pen:10, per:0, fast:0}
+];
+
+/* ---------------- STATE ---------------- */
+var COLORS=["#ff4d9d","#4dc3ff","#3ddc84","#ffd23f"];
+var NAMES=["THE ROCKETS","THE BADGERS","THE COMETS","THE WALRUSES"];
+var S={teams:[],legSize:4,rounds:3,round:0,teamIdx:0,order:[],
+       deck:[],dp:0,twist:null,twistIdx:-1,usedTwists:[],
+       start:0,cardStart:0,skips:0,bonus:0,player:0,raf:null,task:null};
+
+function $(id){return document.getElementById(id);}
+function show(id){
+  var ss=document.querySelectorAll(".screen");
+  for(var i=0;i<ss.length;i++) ss[i].classList.remove("on");
+  $(id).classList.add("on");
+}
+function shuffle(a){ for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;} return a; }
+function fmt(ms){ var s=Math.max(0,ms)/1000; return s.toFixed(1)+"s"; }
+function fmtLong(ms){ var s=Math.max(0,ms)/1000; if(s<60) return s.toFixed(1)+"s";
+  var m=Math.floor(s/60); var r=s-m*60; return m+"m "+r.toFixed(1)+"s"; }
+
+/* ---------------- SETUP UI ---------------- */
+var teamCount=2;
+function renderTeams(){
+  var box=$("team-inputs"); box.innerHTML="";
+  for(var i=0;i<teamCount;i++){
+    var d=document.createElement("div"); d.className="teamrow";
+    var sw=document.createElement("div"); sw.className="swatch"; sw.style.background=COLORS[i];
+    var inp=document.createElement("input"); inp.type="text"; inp.maxLength=18;
+    inp.id="tname"+i; inp.value=(S.teams[i]&&S.teams[i].name)||NAMES[i];
+    d.appendChild(sw); d.appendChild(inp); box.appendChild(d);
+  }
+}
+$("add-team").onclick=function(){ if(teamCount<4){ cacheNames(); teamCount++; renderTeams(); } };
+$("rm-team").onclick=function(){ if(teamCount>2){ cacheNames(); teamCount--; renderTeams(); } };
+function cacheNames(){ for(var i=0;i<teamCount;i++){ var el=$("tname"+i); if(el){ S.teams[i]=S.teams[i]||{}; S.teams[i].name=el.value; } } }
+
+document.addEventListener("click",function(e){
+  var b=e.target.closest?e.target.closest("[data-step]"):null;
+  if(!b) return;
+  var p=b.getAttribute("data-step").split(","), k=p[0], d=parseInt(p[1],10);
+  if(k==="legs"){ S.legSize=Math.min(10,Math.max(2,S.legSize+d)); $("v-legs").textContent=S.legSize; }
+  else { S.rounds=Math.min(6,Math.max(1,S.rounds+d)); $("v-rounds").textContent=S.rounds; }
+});
+
+$("go-setup").onclick=function(){ ac(); renderTeams(); show("s-setup"); };
+$("go-rules").onclick=function(){ show("s-rules"); };
+$("rules-back").onclick=function(){ show("s-title"); };
+$("setup-back").onclick=function(){ show("s-title"); };
+
+$("start-game").onclick=function(){
+  cacheNames();
+  var teams=[];
+  for(var i=0;i<teamCount;i++){
+    var n=($("tname"+i).value||"").trim() || NAMES[i];
+    teams.push({name:n.toUpperCase(),color:COLORS[i],legs:[],total:0});
+  }
+  var seen={},dupe=false;
+  teams.forEach(function(t){ if(seen[t.name]) dupe=true; seen[t.name]=1; });
+  if(dupe){ $("setup-err").textContent="Two teams have the same name — make them different."; return; }
+  $("setup-err").textContent="";
+  S.teams=teams; S.round=0; S.teamIdx=0; S.usedTwists=[];
+  newDeck();
+  startRound();
+};
+
+/* ---------------- DECK ---------------- */
+function newDeck(){ S.deck=shuffle(TASKS.slice()); S.dp=0; }
+function drawTask(){
+  for(var tries=0;tries<4;tries++){
+    if(S.dp>=S.deck.length){ newDeck(); }
+    var t=S.deck[S.dp++];
+    if(!S.legSeen || S.legSeen.indexOf(t[1])<0){ if(S.legSeen) S.legSeen.push(t[1]); return t; }
+  }
+  return S.deck[Math.floor(Math.random()*S.deck.length)];
+}
+
+/* ---------------- ROUND / LEG FLOW ---------------- */
+function pickTwist(){
+  var pool=[];
+  for(var i=0;i<TWISTS.length;i++) if(S.usedTwists.indexOf(i)<0) pool.push(i);
+  if(!pool.length){ S.usedTwists=[]; for(i=0;i<TWISTS.length;i++) pool.push(i); }
+  var idx=pool[Math.floor(Math.random()*pool.length)];
+  S.usedTwists.push(idx); S.twistIdx=idx; S.twist=TWISTS[idx];
+}
+function startRound(){
+  S.teamIdx=0;
+  pickTwist();               // one twist per round, same for every team = fair
+  showRoundIntro();
+}
+function showRoundIntro(){
+  var t=S.teams[S.teamIdx];
+  $("ri-round").textContent="ROUND "+(S.round+1)+" OF "+S.rounds+"  •  TEAM "+(S.teamIdx+1)+" OF "+S.teams.length;
+  $("ri-team").textContent=t.name;
+  $("ri-team").style.color=t.color;
+  $("ri-twist").innerHTML="<b>TWIST: "+S.twist.t+"</b><span>"+S.twist.d+"</span>";
+  $("ri-line").textContent="Line up "+S.legSize+" players. Player 1 holds the device.";
+  show("s-round");
+}
+$("ri-go").onclick=function(){ ac(); countdown(); };
+
+function countdown(){
+  var t=S.teams[S.teamIdx];
+  $("cd-team").textContent=t.name+" — GET READY";
+  $("cd-num").style.color=t.color;
+  show("s-count");
+  var n=3;
+  $("cd-num").textContent=n; sTick();
+  var iv=setInterval(function(){
+    n--;
+    if(n>0){ $("cd-num").textContent=n; $("cd-num").classList.remove("pop"); void $("cd-num").offsetWidth; $("cd-num").classList.add("pop"); sTick(); }
+    else { clearInterval(iv); $("cd-num").textContent="GO!"; sGo(); setTimeout(beginLeg,450); }
+  },800);
+}
+
+function beginLeg(){
+  S.player=0; S.skips=0; S.bonus=0; S.legSeen=[];
+  S.start=performance.now();
+  var t=S.teams[S.teamIdx];
+  $("p-team").textContent=t.name;
+  $("p-team").style.color=t.color;
+  $("p-twist").textContent="⚡ "+S.twist.t;
+  $("p-pen").textContent="+"+S.twist.pen+"s";
+  renderDots();
+  nextCard();
+  show("s-play");
+  loop();
+}
+function loop(){
+  $("p-clock").textContent=fmt(performance.now()-S.start + S.skips*S.twist.pen*1000 - S.bonus*1000);
+  S.raf=requestAnimationFrame(loop);
+}
+function renderDots(){
+  var d=$("p-dots"); d.innerHTML="";
+  for(var i=0;i<S.legSize;i++){
+    var e=document.createElement("div"); e.className="dot"+(i<S.player?" done":(i===S.player?" now":""));
+    d.appendChild(e);
+  }
+  $("p-player").textContent="PLAYER "+(S.player+1)+" / "+S.legSize;
+}
+function nextCard(){
+  S.task=drawTask(); S.cardStart=performance.now();
+  var ty=TYPES[S.task[0]];
+  var c=$("p-card");
+  c.style.background="linear-gradient(160deg,"+ty.c+" 0%, "+ty.c+"cc 100%)";
+  c.style.color=ty.ink; c.style.borderColor="#fff";
+  c.classList.remove("pop"); void c.offsetWidth; c.classList.add("pop");
+  $("p-type").textContent=S.task[0];
+  $("p-text").textContent=S.task[1];
+}
+$("p-pass").onclick=function(){
+  var el=performance.now()-S.cardStart;
+  if(S.twist.per) S.bonus+=S.twist.per;
+  if(S.twist.fast && el<10000) S.bonus+=S.twist.fast;
+  sPass();
+  S.player++;
+  if(S.player>=S.legSize){ endLeg(); return; }
+  renderDots(); nextCard();
+};
+$("p-skip").onclick=function(){ sSkip(); S.skips++; nextCard(); };
+
+function endLeg(){
+  cancelAnimationFrame(S.raf);
+  var raw=performance.now()-S.start;
+  var pen=S.skips*S.twist.pen*1000;
+  var bon=S.bonus*1000;
+  var fin=Math.max(0, raw+pen-bon);
+  var t=S.teams[S.teamIdx];
+  t.legs.push({round:S.round,ms:fin,skips:S.skips,twist:S.twist.t});
+  t.total+=fin;
+  sEnd();
+  $("lr-team").textContent=t.name+" — LEG COMPLETE";
+  $("lr-time").textContent=fmt(fin);
+  $("lr-time").style.color=t.color;
+  var bits=["raw "+fmt(raw)];
+  if(S.skips) bits.push(S.skips+" skip"+(S.skips>1?"s":"")+" +"+(S.skips*S.twist.pen)+"s");
+  if(S.bonus) bits.push("bonus −"+S.bonus+"s");
+  $("lr-detail").textContent=bits.join("  •  ");
+  var last=(S.teamIdx>=S.teams.length-1);
+  $("lr-next").textContent= last ? "SEE STANDINGS →" : "NEXT TEAM →";
+  show("s-leg");
+}
+$("lr-next").onclick=function(){
+  if(S.teamIdx<S.teams.length-1){ S.teamIdx++; showRoundIntro(); }
+  else { standings(); }
+};
+
+/* ---------------- STANDINGS ---------------- */
+function sorted(){
+  return S.teams.slice().sort(function(a,b){ return a.total-b.total; });
+}
+function buildTable(el,final){
+  var rows=sorted();
+  var h="<tr><th>#</th><th>Team</th>";
+  for(var r=0;r<=S.round;r++) h+="<th style='text-align:right'>R"+(r+1)+"</th>";
+  h+="<th style='text-align:right'>Total</th></tr>";
+  rows.forEach(function(t,i){
+    h+="<tr><td class='num' style='text-align:left'>"+(i+1)+"</td>"+
+       "<td style='color:"+t.color+";font-weight:bold'>"+t.name+"</td>";
+    for(var r=0;r<=S.round;r++){
+      var leg=null; for(var k=0;k<t.legs.length;k++) if(t.legs[k].round===r) leg=t.legs[k];
+      h+="<td class='num'>"+(leg?fmt(leg.ms):"—")+"</td>";
+    }
+    h+="<td class='num "+(i===0?"win":"")+"'>"+fmtLong(t.total)+"</td></tr>";
+  });
+  el.innerHTML=h;
+}
+function standings(){
+  buildTable($("st-table"),false);
+  var more=(S.round<S.rounds-1);
+  $("st-title").textContent= more ? "AFTER ROUND "+(S.round+1) : "FINAL TIMES";
+  $("st-next").textContent= more ? "ROUND "+(S.round+2)+" →" : "CROWN THE CHAMPIONS →";
+  show("s-stand");
+}
+$("st-next").onclick=function(){
+  if(S.round<S.rounds-1){ S.round++; startRound(); }
+  else { finale(); }
+};
+
+function finale(){
+  var w=sorted()[0];
+  $("fn-team").textContent=w.name;
+  $("fn-team").style.color=w.color;
+  $("fn-time").textContent="Total gauntlet time "+fmtLong(w.total)+" across "+S.rounds+" round"+(S.rounds>1?"s":"");
+  buildTable($("fn-table"),true);
+  sWin();
+  show("s-final");
+}
+$("fn-again").onclick=function(){
+  S.teams.forEach(function(t){ t.legs=[]; t.total=0; });
+  S.round=0; S.teamIdx=0; S.usedTwists=[]; newDeck(); startRound();
+};
+$("fn-new").onclick=function(){ show("s-title"); };
+
+/* keyboard shortcuts for laptop hosts */
+document.addEventListener("keydown",function(e){
+  if($("s-play").classList.contains("on")){
+    if(e.code==="Space"||e.code==="Enter"){ e.preventDefault(); $("p-pass").click(); }
+    if(e.code==="KeyS"){ e.preventDefault(); $("p-skip").click(); }
+  }
+});
+
+renderTeams();
+})();
+</script>
+</body>
+</html>

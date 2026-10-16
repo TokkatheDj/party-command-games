@@ -1,0 +1,900 @@
+<!-- CONCEPT: ROUND-ROBIN STORYTELLING - "Twist of Fate": the room builds one spoken story a sentence at a time, and every sentence must FLIP the hero's luck (Fortunately... / Unfortunately...). On your turn you draw 3 word cards and STAKE how many you'll weave into your one sentence (1 word = 1 pt, 2 = 3 pts, 3 = 6 pts) - the room ticks each word as they hear it, and miss a single one or forget to flip the luck and you score nothing. Random Twist cards (pirate voice, eight words max, rhyme the last line) add bonus points, the last player must tie it all up in a double-points Final Chapter, and the game ends by titling the tale from its best words. 240 words in 4 decks, 60 openers, 36 twists | Players: 3-10 | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Twist of Fate</title>
+<style>
+:root {
+  --bg: #120d24;
+  --bg2: #1b1236;
+  --panel: #231a44;
+  --panel2: #2d2356;
+  --line: #3d3170;
+  --ink: #f6f0ff;
+  --muted: #b9acd9;
+  --gold: #ffc857;
+  --rose: #ff6b9a;
+  --violet: #9b7bff;
+  --teal: #4fd8c4;
+  --red: #ff5a5f;
+  --green: #5ee08a;
+  --parch: #fff4dc;
+  --parch-ink: #3b2a14;
+  --r: 18px;
+  --gap: clamp(10px, 2.6vw, 16px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+  background: radial-gradient(120% 80% at 50% 0%, #2a1a52 0%, var(--bg) 60%) fixed, var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+button { font: inherit; color: inherit; cursor: pointer; border: 0; }
+input { font: inherit; user-select: text; -webkit-user-select: text; }
+
+.stars { position: fixed; inset: 0; pointer-events: none; opacity: .55;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 78% 12%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 42% 8%, #ffe9b0 50%, transparent 51%),
+    radial-gradient(1px 1px at 88% 40%, #fff 50%, transparent 51%),
+    radial-gradient(1px 1px at 6% 62%, #fff 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 64% 30%, #d9c8ff 50%, transparent 51%),
+    radial-gradient(1px 1px at 30% 44%, #fff 50%, transparent 51%); }
+
+.screen { position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; display: none;
+  padding: max(14px, env(safe-area-inset-top)) var(--gap) 28px; }
+.screen.on { display: block; animation: fadeIn .28s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.wrap { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--gap); }
+
+h1.title { margin: 6px 0 0; text-align: center; font-size: clamp(38px, 11vw, 64px); line-height: 1; font-weight: 900; letter-spacing: -1px;
+  background: linear-gradient(90deg, var(--gold), var(--rose) 55%, var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.tag { text-align: center; color: var(--muted); font-size: clamp(14px, 3.8vw, 18px); line-height: 1.4; margin: 0 6px; }
+.meta { text-align: center; font-size: clamp(12px, 3.2vw, 14px); color: var(--gold); font-weight: 700; letter-spacing: .5px; }
+
+.panel { background: linear-gradient(180deg, var(--panel), var(--bg2)); border: 1px solid var(--line); border-radius: var(--r); padding: clamp(12px, 3.4vw, 18px); }
+.panel h2 { margin: 0 0 10px; font-size: clamp(15px, 4vw, 19px); color: var(--gold); letter-spacing: .5px; text-transform: uppercase; }
+.hint { color: var(--muted); font-size: clamp(12px, 3.3vw, 14px); line-height: 1.4; margin: 6px 0 0; }
+
+.addrow { display: flex; gap: 8px; }
+.addrow input { flex: 1; min-width: 0; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: #140e2b; color: var(--ink); padding: 0 14px; font-size: 17px; }
+.btn { min-height: 48px; padding: 0 18px; border-radius: 14px; background: var(--panel2); border: 1px solid var(--line); font-weight: 800; font-size: clamp(15px, 4vw, 18px); }
+.btn:active { transform: scale(.97); }
+.btn.gold { background: linear-gradient(180deg, #ffd978, #f5a623); color: #2b1a00; border: 0; }
+.btn.rose { background: linear-gradient(180deg, #ff8db1, #e84a7f); color: #2a0614; border: 0; }
+.btn.teal { background: linear-gradient(180deg, #7ff0dc, #2fb8a4); color: #032520; border: 0; }
+.btn.ghost { background: transparent; }
+.btn.big { min-height: 64px; font-size: clamp(19px, 5.4vw, 26px); border-radius: 18px; width: 100%; }
+.btn:disabled { opacity: .38; filter: grayscale(.6); cursor: not-allowed; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.pchip { display: inline-flex; align-items: center; gap: 4px; background: #140e2b; border: 1px solid var(--line); border-radius: 999px; padding: 0 4px 0 14px; min-height: 44px; font-weight: 700; }
+.pchip button { width: 36px; height: 36px; border-radius: 50%; background: transparent; color: var(--muted); font-size: 20px; }
+
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; background: #140e2b; border-radius: 14px; padding: 5px; border: 1px solid var(--line); }
+.seg button { min-height: 44px; border-radius: 10px; background: transparent; font-weight: 800; color: var(--muted); }
+.seg button.on { background: var(--panel2); color: var(--ink); box-shadow: inset 0 0 0 2px var(--gold); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.row > span { font-weight: 700; }
+.row .seg { flex: 0 1 230px; }
+
+.decks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.deck { min-height: 58px; border-radius: 14px; background: #140e2b; border: 2px solid var(--line); text-align: left; padding: 8px 12px; display: flex; flex-direction: column; justify-content: center; }
+.deck b { font-size: 16px; }
+.deck small { color: var(--muted); font-size: 12px; }
+.deck.on { border-color: var(--teal); background: linear-gradient(180deg, #173b3d, #10282c); }
+
+.toggle { min-width: 86px; min-height: 44px; border-radius: 999px; font-weight: 800; background: #140e2b; border: 1px solid var(--line); color: var(--muted); }
+.toggle.on { background: var(--teal); color: #032520; border-color: var(--teal); }
+
+.how { margin: 0; padding-left: 20px; line-height: 1.5; font-size: clamp(14px, 3.7vw, 16px); }
+.how li { margin-bottom: 6px; }
+.how b { color: var(--gold); }
+
+/* top bar */
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pill { background: #140e2b; border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font-weight: 800; font-size: clamp(12px, 3.3vw, 14px); color: var(--muted); white-space: nowrap; }
+.iconbtn { min-width: 44px; min-height: 44px; border-radius: 12px; background: #140e2b; border: 1px solid var(--line); font-size: 18px; padding: 0 10px; font-weight: 800; }
+
+.who { text-align: center; font-size: clamp(30px, 9vw, 52px); font-weight: 900; line-height: 1.05; margin: 4px 0 0; word-break: break-word; }
+.who small { display: block; font-size: clamp(13px, 3.5vw, 16px); color: var(--muted); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
+
+.fate { border-radius: var(--r); padding: 14px 12px; text-align: center; font-weight: 900; letter-spacing: 1px; font-size: clamp(24px, 7.4vw, 40px); line-height: 1.05; position: relative; overflow: hidden; }
+.fate small { display: block; font-size: clamp(12px, 3.2vw, 14px); font-weight: 700; letter-spacing: .5px; margin-top: 6px; opacity: .9; }
+.fate.good { background: linear-gradient(135deg, #ffe08a, #f5a623); color: #3a2200; box-shadow: 0 0 30px #f5a62355; }
+.fate.bad { background: linear-gradient(135deg, #7c5cff, #4b2a9e); color: #fff; box-shadow: 0 0 30px #7c5cff55; }
+.fate.final { background: linear-gradient(135deg, #ff8db1, #9b7bff 60%, #4fd8c4); color: #fff; box-shadow: 0 0 34px #ff6b9a66; }
+.fate.mini { font-size: clamp(18px, 5.4vw, 26px); padding: 10px; }
+
+.twist { background: repeating-linear-gradient(45deg, #2d1440, #2d1440 12px, #341848 12px, #341848 24px); border: 2px dashed var(--rose); border-radius: var(--r); padding: 12px 14px; display: flex; gap: 12px; align-items: center; }
+.twist .ic { font-size: 34px; }
+.twist b { color: var(--rose); font-size: clamp(16px, 4.6vw, 21px); display: block; }
+.twist span { font-size: clamp(14px, 3.8vw, 17px); }
+.twist em { color: var(--gold); font-style: normal; font-weight: 800; font-size: 13px; }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(6px, 2vw, 12px); }
+.wcard { position: relative; min-height: clamp(110px, 30vw, 150px); border-radius: 16px; background: var(--parch); color: var(--parch-ink); padding: 10px 6px; display: flex; align-items: center; justify-content: center; text-align: center;
+  font-weight: 900; font-size: clamp(15px, 4.4vw, 22px); line-height: 1.1; word-break: break-word; box-shadow: 0 6px 0 #b99b6a, 0 10px 20px #0007; transition: transform .15s, box-shadow .15s; border: 3px solid transparent; }
+.wcard::before { content: attr(data-deck); position: absolute; top: 6px; left: 0; right: 0; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #8a6d45; font-weight: 800; }
+.wcard.sel { transform: translateY(-6px) rotate(-1.5deg); border-color: var(--teal); box-shadow: 0 10px 0 #1f8f80, 0 16px 26px #0009; }
+.wcard.sel::after { content: '✓'; position: absolute; bottom: 6px; right: 8px; width: 26px; height: 26px; border-radius: 50%; background: var(--teal); color: #032520; font-size: 16px; display: grid; place-items: center; }
+.wcard.deal { animation: deal .38s cubic-bezier(.2,1.4,.5,1) both; }
+@keyframes deal { from { opacity: 0; transform: translateY(40px) rotate(8deg) scale(.8); } to { opacity: 1; transform: none; } }
+
+.stake { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.stake div { border-radius: 12px; background: #140e2b; border: 1px solid var(--line); text-align: center; padding: 8px 4px; color: var(--muted); font-weight: 700; font-size: clamp(12px, 3.3vw, 14px); transition: all .15s; }
+.stake div b { display: block; font-size: clamp(20px, 6vw, 28px); color: var(--ink); }
+.stake div.on { background: linear-gradient(180deg, #173b3d, #10282c); border-color: var(--teal); color: var(--teal); transform: scale(1.04); }
+.stake div.on b { color: var(--gold); }
+
+.timerwrap { display: grid; place-items: center; margin: 6px 0; }
+.ring { width: min(58vw, 250px); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; position: relative;
+  background: conic-gradient(var(--ringc, var(--gold)) calc(var(--p, 1) * 360deg), #2a2150 0); transition: --p .1s; }
+.ring::before { content: ''; position: absolute; inset: 12px; border-radius: 50%; background: var(--bg); }
+.ring span { position: relative; font-size: clamp(56px, 18vw, 96px); font-weight: 900; font-variant-numeric: tabular-nums; }
+.ring.warn span { color: var(--red); animation: pulse .5s infinite alternate; }
+@keyframes pulse { to { transform: scale(1.08); } }
+
+.ticks { display: flex; flex-direction: column; gap: 8px; }
+.tick { min-height: 60px; border-radius: 14px; background: var(--parch); color: var(--parch-ink); font-weight: 900; font-size: clamp(20px, 6vw, 28px); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border: 3px solid transparent; }
+.tick i { font-style: normal; width: 36px; height: 36px; border-radius: 50%; border: 3px solid #b99b6a; display: grid; place-items: center; font-size: 20px; color: transparent; }
+.tick.done { background: linear-gradient(180deg, #d9ffe7, #a9f0c4); border-color: var(--green); }
+.tick.done i { background: var(--green); border-color: var(--green); color: #053018; }
+
+.judge { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #140e2b; border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.judge p { margin: 0; font-weight: 700; font-size: clamp(14px, 3.8vw, 17px); line-height: 1.3; }
+.judge p small { display: block; color: var(--muted); font-weight: 600; font-size: 12px; }
+.yn { display: flex; gap: 6px; flex-shrink: 0; }
+.yn button { min-width: 56px; min-height: 48px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); font-weight: 900; font-size: 16px; }
+.yn button.yes.on { background: var(--green); color: #053018; border-color: var(--green); }
+.yn button.no.on { background: var(--red); color: #fff; border-color: var(--red); }
+
+.verdict { text-align: center; }
+.verdict .pts { font-size: clamp(72px, 24vw, 140px); font-weight: 900; line-height: 1; margin: 6px 0;
+  background: linear-gradient(180deg, var(--gold), var(--rose)); -webkit-background-clip: text; background-clip: text; color: transparent; animation: pop .5s cubic-bezier(.2,1.6,.4,1); }
+.verdict .pts.zero { background: linear-gradient(180deg, #9a8fbf, #5c5480); -webkit-background-clip: text; background-clip: text; }
+@keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+.verdict h3 { margin: 0; font-size: clamp(22px, 6.4vw, 32px); }
+.verdict p { margin: 6px 0 0; color: var(--muted); font-size: clamp(14px, 3.8vw, 17px); }
+
+.board { display: flex; flex-direction: column; gap: 6px; }
+.brow { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 10px; background: #140e2b; border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; }
+.brow .rk { font-weight: 900; color: var(--muted); text-align: center; }
+.brow .nm { font-weight: 800; font-size: clamp(15px, 4.2vw, 19px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brow .nm small { display: block; color: var(--muted); font-weight: 600; font-size: 12px; }
+.brow .sc { font-weight: 900; font-size: clamp(20px, 5.6vw, 26px); color: var(--gold); font-variant-numeric: tabular-nums; }
+.brow.lead { border-color: var(--gold); background: linear-gradient(90deg, #3a2b0c, #140e2b); }
+.brow.now { box-shadow: inset 4px 0 0 var(--teal); }
+
+.trail { display: flex; flex-direction: column; gap: 6px; max-height: none; }
+.tline { display: grid; grid-template-columns: 28px 1fr; gap: 8px; align-items: start; font-size: clamp(13px, 3.6vw, 15px); line-height: 1.35; }
+.tline .dot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; font-weight: 900; }
+.tline .dot.good { background: var(--gold); color: #3a2200; }
+.tline .dot.bad { background: var(--violet); color: #fff; }
+.tline .dot.final { background: var(--rose); color: #fff; }
+.tline .dot.miss { background: #3a3358; color: #9a8fbf; }
+.tline b { color: var(--ink); }
+.tline .w { color: var(--gold); font-weight: 800; }
+.tline .x { color: var(--muted); text-decoration: line-through; }
+
+.opener { background: var(--parch); color: var(--parch-ink); border-radius: 20px; padding: clamp(20px, 6vw, 34px) clamp(16px, 5vw, 28px); font-family: Georgia, 'Times New Roman', serif; font-size: clamp(22px, 6.4vw, 32px); line-height: 1.3; text-align: center; box-shadow: 0 8px 0 #b99b6a, 0 18px 40px #000a; position: relative; }
+.opener::before { content: '❝'; position: absolute; top: -18px; left: 14px; font-size: 64px; color: var(--gold); text-shadow: 0 2px 0 #7a5410; }
+.taletitle { text-align: center; font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: clamp(24px, 7vw, 38px); line-height: 1.2; font-weight: 700; margin: 0;
+  background: linear-gradient(90deg, var(--gold), var(--rose)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.crown { text-align: center; font-size: clamp(56px, 16vw, 90px); line-height: 1; animation: pop .6s cubic-bezier(.2,1.6,.4,1); }
+
+.btnrow { display: flex; gap: 8px; }
+.btnrow .btn { flex: 1; }
+.center { text-align: center; }
+.err { color: var(--rose); font-weight: 700; min-height: 1.2em; font-size: 14px; margin: 6px 0 0; }
+
+.modal { position: fixed; inset: 0; background: #07041299; backdrop-filter: blur(4px); display: none; align-items: flex-end; justify-content: center; z-index: 20; padding: 12px; }
+.modal.on { display: flex; }
+.modal .sheet { width: 100%; max-width: 620px; max-height: 86vh; overflow-y: auto; }
+
+.confetti { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
+</style>
+</head>
+<body>
+<div class="stars"></div>
+
+<!-- SETUP -->
+<section class="screen on" id="s-setup">
+  <div class="wrap">
+    <h1 class="title">Twist of Fate</h1>
+    <p class="tag">Build one story together, a sentence at a time. Every line must <b style="color:var(--gold)">flip the luck</b> — and weave in the words you dared to stake.</p>
+    <div class="meta">ROUND-ROBIN STORYTELLING · 3–10 PLAYERS · 20–30 MIN · ONE SHARED SCREEN</div>
+
+    <div class="panel">
+      <h2>Storytellers</h2>
+      <div class="addrow">
+        <input id="nameIn" maxlength="14" placeholder="Add a player name" autocomplete="off">
+        <button class="btn gold" id="addBtn">Add</button>
+      </div>
+      <div class="chips" id="plist"></div>
+      <p class="hint">Add them in seating order — the story travels around the circle.</p>
+      <p class="err" id="setupErr"></p>
+    </div>
+
+    <div class="panel">
+      <h2>How to play</h2>
+      <ol class="how">
+        <li>Each turn starts with <b>FORTUNATELY…</b> or <b>UNFORTUNATELY…</b> — your one sentence must swing the hero's luck that way.</li>
+        <li>Draw 3 word cards and <b>stake</b> how many you'll weave in: 1 word = 1 pt, 2 = 3 pts, all 3 = 6 pts.</li>
+        <li>Hit Go and speak before the timer ends. The room taps each word as they hear it.</li>
+        <li>Miss one staked word, or forget to flip the luck? <b>Zero.</b> Twist cards add a +2 bonus challenge.</li>
+        <li>The very last turn is the <b>Final Chapter</b>: wrap up the whole tale for double points.</li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <h2>Options</h2>
+      <div class="row"><span>Laps of the circle</span><div class="seg" id="segLaps"><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button></div></div>
+      <div class="row"><span>Speaking time</span><div class="seg" id="segTime"><button data-v="20">20s</button><button data-v="30">30s</button><button data-v="45">45s</button></div></div>
+      <div class="row"><span>Twist cards</span><button class="toggle" id="twTog">ON</button></div>
+      <div class="row"><span>Sound</span><button class="toggle" id="sndTog">ON</button></div>
+      <h2 style="margin-top:16px">Word decks</h2>
+      <div class="decks" id="decks"></div>
+    </div>
+
+    <button class="btn big gold" id="startBtn">Open the storybook ✨</button>
+  </div>
+</section>
+
+<!-- OPENER -->
+<section class="screen" id="s-opener">
+  <div class="wrap">
+    <div class="bar"><span class="pill">CHAPTER 1</span><button class="iconbtn" data-act="quit">✕</button></div>
+    <p class="who"><small>Host, read this aloud</small>Once upon a time…</p>
+    <div class="opener" id="openerTxt"></div>
+    <button class="btn ghost" id="rerollOpener">↻ Different opening</button>
+    <button class="btn big gold" id="beginBtn">Begin</button>
+  </div>
+</section>
+
+<!-- DRAW / STAKE -->
+<section class="screen" id="s-draw">
+  <div class="wrap">
+    <div class="bar"><span class="pill" id="drawLap"></span><div style="display:flex;gap:6px"><button class="iconbtn" data-act="board">🏆</button><button class="iconbtn" data-act="quit">✕</button></div></div>
+    <p class="who" id="drawWho"></p>
+    <div class="fate" id="drawFate"></div>
+    <div class="twist" id="drawTwist" hidden></div>
+    <p class="hint center" style="margin:0">Tap the words you'll weave into your sentence</p>
+    <div class="cards" id="cards"></div>
+    <div class="stake" id="stake">
+      <div data-n="1"><b>1 pt</b>1 word</div>
+      <div data-n="2"><b>3 pts</b>2 words</div>
+      <div data-n="3"><b>6 pts</b>all 3</div>
+    </div>
+    <button class="btn big teal" id="goBtn" disabled>Pick at least one word</button>
+    <div class="btnrow"><button class="btn ghost" id="undoBtn" hidden>↶ Undo last turn</button></div>
+  </div>
+</section>
+
+<!-- SPEAK -->
+<section class="screen" id="s-speak">
+  <div class="wrap">
+    <div class="bar"><span class="pill" id="speakWho"></span><span class="pill" id="speakStake"></span></div>
+    <div class="fate mini" id="speakFate"></div>
+    <div class="timerwrap"><div class="ring" id="ring"><span id="tnum">30</span></div></div>
+    <div class="twist" id="speakTwist" hidden></div>
+    <p class="hint center" style="margin:0">Room: tap each word the moment you hear it</p>
+    <div class="ticks" id="speakTicks"></div>
+    <button class="btn big rose" id="doneBtn">Done speaking</button>
+  </div>
+</section>
+
+<!-- JUDGE -->
+<section class="screen" id="s-judge">
+  <div class="wrap">
+    <div class="bar"><span class="pill" id="judgeWho"></span><span class="pill" id="judgeTime"></span></div>
+    <p class="who"><small>The room decides</small>Did it land?</p>
+    <div class="ticks" id="judgeTicks"></div>
+    <div class="judge" id="jFate"><p id="jFateQ"></p><div class="yn"><button class="yes">YES</button><button class="no">NO</button></div></div>
+    <div class="judge" id="jTwist" hidden><p id="jTwistQ"></p><div class="yn"><button class="yes">YES</button><button class="no">NO</button></div></div>
+    <p class="hint center" id="judgePreview"></p>
+    <button class="btn big gold" id="scoreBtn" disabled>Score it</button>
+  </div>
+</section>
+
+<!-- RESULT -->
+<section class="screen" id="s-result">
+  <div class="wrap">
+    <div class="verdict">
+      <p class="who" id="resWho" style="font-size:clamp(22px,6vw,32px)"></p>
+      <div class="pts" id="resPts"></div>
+      <h3 id="resHead"></h3>
+      <p id="resMsg"></p>
+    </div>
+    <div class="panel"><h2>Scoreboard</h2><div class="board" id="resBoard"></div></div>
+    <button class="btn big gold" id="nextBtn"></button>
+    <button class="btn ghost" id="resUndo">↶ Undo this score</button>
+  </div>
+</section>
+
+<!-- LAP BREAK -->
+<section class="screen" id="s-lap">
+  <div class="wrap">
+    <p class="who" id="lapHead"></p>
+    <p class="tag" id="lapTag"></p>
+    <div class="panel"><h2>Scoreboard</h2><div class="board" id="lapBoard"></div></div>
+    <div class="panel"><h2>The story so far</h2><div class="trail" id="lapTrail"></div></div>
+    <button class="btn big gold" id="lapBtn"></button>
+  </div>
+</section>
+
+<!-- END -->
+<section class="screen" id="s-end">
+  <div class="wrap">
+    <div class="crown">📖</div>
+    <p class="hint center" style="margin:0;letter-spacing:2px;text-transform:uppercase;font-weight:800">The End of</p>
+    <p class="taletitle" id="taleTitle"></p>
+    <div class="panel center">
+      <h2 id="winHead" style="margin-bottom:4px"></h2>
+      <p class="hint" id="winSub" style="margin:0"></p>
+    </div>
+    <div class="panel"><h2>Final scores</h2><div class="board" id="endBoard"></div></div>
+    <div class="panel"><h2>Awards</h2><div class="board" id="awards"></div></div>
+    <div class="panel"><h2>The whole tale, word by word</h2><div class="trail" id="endTrail"></div></div>
+    <button class="btn big gold" id="againBtn">Play again (same storytellers)</button>
+    <button class="btn" id="newBtn">New game</button>
+  </div>
+</section>
+
+<!-- SCOREBOARD MODAL -->
+<div class="modal" id="mBoard">
+  <div class="sheet panel">
+    <h2>Scoreboard</h2>
+    <div class="board" id="modalBoard"></div>
+    <h2 style="margin-top:16px">The story so far</h2>
+    <div class="trail" id="modalTrail"></div>
+    <button class="btn big" style="margin-top:14px" data-act="close">Back to the tale</button>
+  </div>
+</div>
+<div class="modal" id="mQuit">
+  <div class="sheet panel center">
+    <h2>Close the storybook?</h2>
+    <p class="hint">This ends the current game and returns to setup.</p>
+    <div class="btnrow" style="margin-top:14px"><button class="btn" data-act="close">Keep playing</button><button class="btn rose" id="quitYes">End game</button></div>
+  </div>
+</div>
+<canvas class="confetti" id="confetti"></canvas>
+
+<script>
+const DECKS = {
+  everyday: { name: 'Everyday', icon: '🏠', words: ['toaster','umbrella','grandma','parking ticket','bicycle','lawnmower','odd sock','library','birthday cake','elevator','garden gnome','vacuum cleaner','bus driver','sandwich','shopping cart','doorbell','rubber duck','washing machine','pizza','alarm clock','traffic cone','neighbour\'s cat','trampoline','ice cream truck','dentist','backpack','flashlight','spaghetti','garage sale','school bus','hamster','lost key','paint bucket','bathtub','mailbox','pancake','fire hydrant','sunglasses','piano lesson','raincoat','supermarket','garden hose','laundry basket','remote control','cereal box','taxi','swimming pool','jigsaw puzzle','museum','bake sale','picnic blanket','goldfish','stapler','trombone','wheelbarrow','headphones','bowling alley','snow globe','cookie jar','ferris wheel'] },
+  fantasy: { name: 'Fantasy', icon: '🐉', words: ['dragon','wizard\'s hat','enchanted forest','troll bridge','unicorn','magic mirror','bubbling potion','castle','brave knight','talking frog','crystal ball','giant beanstalk','mermaid','treasure chest','fairy godmother','spell book','griffin','haunted tower','golden goose','flying carpet','genie lamp','grumpy ogre','pixie dust','sword in the stone','moat','witch\'s broom','gingerbread house','phoenix','glass slipper','riddle','cursed crown','secret door','elf','sea serpent','royal banquet','invisibility cloak','wishing well','dwarf miner','magic beans','dungeon','centaur','court jester','hourglass','ancient map','cauldron','friendly werewolf','tooth fairy','sleeping giant','rainbow bridge','crown jewels','stone golem','singing sword','ice queen','fortune teller','hedge maze','cloud castle','wandering bard','silver key','dragon egg','moon goddess'] },
+  scifi: { name: 'Sci-Fi', icon: '🚀', words: ['robot','spaceship','alien ambassador','laser','time machine','black hole','moon base','teleporter','hologram','jetpack','space station','meteor','clone','flying saucer','Mars rover','robot butler','force field','asteroid','zero gravity','mission control','space suit','starship captain','galaxy map','wormhole','cyborg dog','rocket fuel','radar','satellite','lunar buggy','shrink ray','drone','computer virus','glowing crystal','escape pod','space pirate','comet','planet made of cheese','tractor beam','alien zoo','hoverboard','sleep pod','mind-reading helmet','submarine','moon boots','martian','sonic boom','solar sail','nebula','space hamster','ray gun','cosmic storm','gravity boots','portal','mad scientist','secret lab','giant tomato','radio signal','countdown','UFO','star map'] },
+  silly: { name: 'Silly', icon: '🤪', words: ['rubber chicken','whoopee cushion','clown shoes','banana peel','custard pie','googly eyes','dancing llama','giant sneeze','tickle monster','walrus in a tutu','underpants','wobbly jelly','disco ball','kazoo','bubble wrap','fake moustache','burp','confetti cannon','penguin waiter','sock puppet','pogo stick','belly flop','marshmallow','hiccups','singing fish','pickle','whipped cream','bouncy castle','noodle','grumpy goat','karate grandpa','inflatable dinosaur','tap-dancing cow','cheese wheel','snoring baby','pirate parrot','sneaky raccoon','wig','toilet paper','boomerang','hot sauce','tiny hat','yodelling','slippery floor','hamster wheel','ukulele','giant meatball','polka dots','mime','flamingo','potato','bagpipes','silly string','chicken dance','lost shoe','sleepy sloth','burrito','bubble bath','trumpet','spinning chair'] }
+};
+
+const OPENERS = [
+  'A very ordinary family found a mysterious parcel on their doorstep, addressed to "Whoever Is Bravest."',
+  'The town\'s oldest tortoise woke up one morning and announced it was going on an adventure.',
+  'Nobody at Maple Street School knew the new lunch lady had once been a famous explorer.',
+  'On the first day of summer, a girl named Poppy found a door in her garden that hadn\'t been there yesterday.',
+  'The king of a tiny island decided, quite suddenly, that he wanted to learn to surf.',
+  'A lonely robot at the recycling centre dreamed of becoming a chef.',
+  'Every Tuesday, Mr Pickering\'s umbrella opened all by itself — but this Tuesday it began to float.',
+  'Two best friends built a raft to cross the pond behind the school.',
+  'The lighthouse keeper received a letter written entirely in seagull footprints.',
+  'Grandpa Joe swore his old radio could pick up messages from the future.',
+  'A dragon moved into the empty flat above the bakery.',
+  'The circus came to town, but the ringmaster had lost his voice.',
+  'Deep in the forest, a shy bear opened a very small café.',
+  'The school\'s science fair volcano was supposed to be baking soda and vinegar.',
+  'An astronaut on her first mission noticed a sticky note on the outside of the window.',
+  'The village held its annual Giant Vegetable Contest, and Ada\'s pumpkin had grown overnight to the size of a car.',
+  'A pirate captain who got seasick decided to find treasure on land instead.',
+  'A snowman woke up in the middle of July.',
+  'The zoo\'s penguins had been planning their escape for weeks.',
+  'Sir Reginald was the only knight in the kingdom who was afraid of horses.',
+  'Everyone\'s phones in town switched off at exactly noon, and the only working screen was in the library.',
+  'A young wizard accidentally turned her homework into a flock of pigeons.',
+  'The family road trip began with a map, a picnic basket, and one very loud goat.',
+  'A detective who could smell lies was hired to find the missing town trophy.',
+  'The museum\'s dinosaur skeleton was found one morning in a slightly different pose.',
+  'At the bottom of the swimming pool, a lifeguard spotted a glowing coin.',
+  'A cloud got stuck on top of the tallest building in the city.',
+  'The ice cream van played its song, but this time the music was backwards.',
+  'A retired superhero opened a flower shop, hoping for a quiet life.',
+  'A time traveller arrived in the present day with only a spoon and a strong sense of purpose.',
+  'Every cat in the neighbourhood gathered on one rooftop for a secret meeting.',
+  'The new kid in class claimed to have been raised by friendly wolves.',
+  'Aunt Bea\'s cookbook had one page that was always blank — until tonight.',
+  'An inventor unveiled a machine that could make any wish come true, but only a little bit.',
+  'The spaceship\'s computer announced they had taken a wrong turn at Jupiter.',
+  'A small mouse wanted to be the first mouse to climb the Eiffel Tower.',
+  'The world\'s grumpiest scarecrow was in charge of guarding the prize-winning cornfield.',
+  'A scout troop set up camp next to a lake that hummed at night.',
+  'The mayor accidentally declared that everybody must wear a hat shaped like a fish.',
+  'Two rival bakers were entered in the biggest baking contest in the land.',
+  'Late one night, the toys in the attic heard footsteps on the stairs.',
+  'A ghost who was terribly afraid of people lived in the old theatre.',
+  'The weather forecast said "sunny with a chance of spaghetti."',
+  'A mermaid decided to spend one whole week living on land.',
+  'The class hamster escaped during the school play.',
+  'Captain Nova\'s starship was running on its very last drop of fuel.',
+  'The world\'s tallest giraffe needed a new scarf before winter.',
+  'A farmer discovered that one of his chickens laid eggs that could bounce.',
+  'Everyone in the kingdom lost their sense of humour, except the royal jester.',
+  'A treasure map fell out of a second-hand library book.',
+  'At the county fair, the fortune teller\'s crystal ball began to crack.',
+  'Professor Plum\'s shrink ray was supposed to stay locked in the lab.',
+  'The family dog could talk, but only on the first day of every month.',
+  'A knight, a wizard and a very confused accountant set off on a quest together.',
+  'On the night of the big storm, the power went out at the Grand Hotel.',
+  'A shy volcano on a tropical island was trying very hard not to erupt.',
+  'A boy found a pair of trainers that made him run slightly faster than time.',
+  'The underground city of moles was about to hold its first election.',
+  'Grandma entered the town talent show and refused to tell anyone what her talent was.',
+  'A little cloud wanted nothing more than to become a rainbow.'
+];
+
+const TWISTS = [
+  ['🦜','Pirate voice','Say your whole sentence like a pirate.'],
+  ['🤫','Whisper it','Say the entire sentence in a whisper.'],
+  ['🤖','Robot voice','Speak like a malfunctioning robot.'],
+  ['🎙️','Commentator','Narrate it like an over-excited sports commentator.'],
+  ['✂️','Eight words max','Your sentence can be no longer than eight words (after the opener).'],
+  ['❓','End on a question','Your sentence must finish with a question.'],
+  ['💥','Sound effect','Include at least one big sound effect.'],
+  ['🔁','Callback','Bring back a character or object from earlier in the story.'],
+  ['🎵','Rhyme time','End with a word that rhymes with the last line\'s final word.'],
+  ['🚫','No "and"','You may not say the word "and".'],
+  ['🐌','Slow motion','Say the whole thing in slow motion.'],
+  ['🎭','Opera','Sing your sentence like an opera star.'],
+  ['👐','Act it out','Act out every action as you say it.'],
+  ['⛅','Weather report','Deliver it like a TV weather forecast.'],
+  ['🔤','Alliteration','Use three words in a row that start with the same letter.'],
+  ['😈','Villain laugh','Finish with your best evil laugh.'],
+  ['👵','Grandma says','Include what someone\'s grandma thinks about it.'],
+  ['🔢','Exact number','Include a very specific number (like 47 or 1,003).'],
+  ['🌈','Three colours','Mention three different colours.'],
+  ['🤧','Sneeze','Someone in the story must sneeze.'],
+  ['👉','You\'re in it','Point at another player — they are now a character in the story.'],
+  ['🐭','Tiny voice','Say it in the tiniest, squeakiest voice you can.'],
+  ['⏸️','Dramatic pause','Stop for a full three-second pause in the middle.'],
+  ['🎬','Movie trailer','Say it like a booming movie-trailer voice: "In a world…"'],
+  ['📰','Breaking news','Start with "Breaking news!" before your opener.'],
+  ['🐾','Animal cameo','A brand-new animal must appear.'],
+  ['🍝','Food involved','Food has to play a part in what happens.'],
+  ['🫁','One breath','Say it all in a single breath.'],
+  ['🦸','Hero pose','Stand up and deliver it in a heroic pose.'],
+  ['📜','Shakespeare','Use "thee", "thou" or "forsooth" at least once.'],
+  ['😭','Happy tears','Say it while pretending to cry tears of joy.'],
+  ['🕵️','Secret agent','Deliver it like a spy passing on secret orders.'],
+  ['🔄','Backwards glance','Start with "Meanwhile, back at…" before your opener.'],
+  ['👑','Royal decree','Say it like a king or queen making an announcement.'],
+  ['🎤','Rap it','Rap your sentence with a beat.'],
+  ['🥶','Freezing cold','Say it with chattering teeth like you\'re freezing.']
+];
+
+const STAKE_PTS = { 1: 1, 2: 3, 3: 6 };
+const LS_KEY = 'cowork-twistoffate-setup';
+const LS_OPEN = 'cowork-twistoffate-openers';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+/* ---------- config ---------- */
+let cfg = { players: [], laps: 3, time: 30, twists: true, sound: true, decks: ['everyday', 'fantasy', 'scifi', 'silly'] };
+try { const saved = JSON.parse(localStorage.getItem(LS_KEY)); if (saved && Array.isArray(saved.players)) cfg = Object.assign(cfg, saved); } catch (e) {}
+const saveCfg = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch (e) {} };
+
+/* ---------- audio ---------- */
+let actx = null;
+const ac = () => { if (!cfg.sound) return null; if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } } if (actx.state === 'suspended') actx.resume(); return actx; };
+function tone(freq, dur, type = 'sine', vol = 0.18, when = 0, slideTo = null) {
+  const a = ac(); if (!a) return;
+  const t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.05);
+}
+function swish(when = 0) {
+  const a = ac(); if (!a) return;
+  const len = Math.floor(a.sampleRate * 0.18), buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  src.buffer = buf; f.type = 'bandpass'; f.frequency.value = 2400; f.Q.value = 0.8; g.gain.value = 0.35;
+  src.connect(f).connect(g).connect(a.destination); src.start(a.currentTime + when);
+}
+const sfx = {
+  deal: () => { swish(0); swish(0.09); swish(0.18); },
+  pick: () => tone(660, 0.08, 'triangle', 0.14),
+  unpick: () => tone(440, 0.08, 'triangle', 0.1),
+  tick: () => tone(1200, 0.05, 'square', 0.06),
+  heard: () => { tone(880, 0.09, 'triangle', 0.16); tone(1320, 0.12, 'triangle', 0.12, 0.06); },
+  go: () => { tone(523, 0.12, 'triangle', 0.16); tone(784, 0.2, 'triangle', 0.16, 0.1); },
+  buzz: () => { tone(160, 0.5, 'sawtooth', 0.18, 0, 90); },
+  win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, 'triangle', 0.16, i * 0.09)),
+  fail: () => { tone(392, 0.2, 'triangle', 0.15); tone(330, 0.2, 'triangle', 0.15, 0.16); tone(247, 0.4, 'triangle', 0.15, 0.32); },
+  fanfare: () => [523, 659, 784, 659, 784, 1047].forEach((f, i) => tone(f, i === 5 ? 0.7 : 0.18, 'triangle', 0.17, i * 0.14))
+};
+
+/* ---------- screens ---------- */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  const el = $(id); if (el) el.scrollTop = 0;
+}
+
+/* ---------- setup UI ---------- */
+function renderPlayers() {
+  $('plist').innerHTML = cfg.players.map((p, i) => `<span class="pchip">${esc(p)}<button data-rm="${i}" aria-label="Remove ${esc(p)}">×</button></span>`).join('');
+  $('setupErr').textContent = '';
+}
+function addPlayer() {
+  const v = $('nameIn').value.trim().replace(/\s+/g, ' ');
+  if (!v) return;
+  if (cfg.players.length >= 10) { $('setupErr').textContent = 'Ten storytellers is the maximum.'; return; }
+  if (cfg.players.some(p => p.toLowerCase() === v.toLowerCase())) { $('setupErr').textContent = 'That name is already in the circle.'; return; }
+  cfg.players.push(v); $('nameIn').value = ''; saveCfg(); renderPlayers(); sfx.pick();
+}
+function renderOptions() {
+  [['segLaps', 'laps'], ['segTime', 'time']].forEach(([id, key]) => $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.v === cfg[key])));
+  $('twTog').classList.toggle('on', cfg.twists); $('twTog').textContent = cfg.twists ? 'ON' : 'OFF';
+  $('sndTog').classList.toggle('on', cfg.sound); $('sndTog').textContent = cfg.sound ? 'ON' : 'OFF';
+  $('decks').innerHTML = Object.entries(DECKS).map(([k, d]) => `<button class="deck ${cfg.decks.includes(k) ? 'on' : ''}" data-deck="${k}"><b>${d.icon} ${d.name}</b><small>${d.words.length} words</small></button>`).join('');
+}
+$('addBtn').onclick = addPlayer;
+$('nameIn').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
+$('plist').onclick = e => { const b = e.target.closest('[data-rm]'); if (!b) return; cfg.players.splice(+b.dataset.rm, 1); saveCfg(); renderPlayers(); sfx.unpick(); };
+['segLaps', 'segTime'].forEach(id => $(id).onclick = e => { const b = e.target.closest('button'); if (!b) return; cfg[id === 'segLaps' ? 'laps' : 'time'] = +b.dataset.v; saveCfg(); renderOptions(); sfx.pick(); });
+$('twTog').onclick = () => { cfg.twists = !cfg.twists; saveCfg(); renderOptions(); sfx.pick(); };
+$('sndTog').onclick = () => { cfg.sound = !cfg.sound; saveCfg(); renderOptions(); sfx.pick(); };
+$('decks').onclick = e => {
+  const b = e.target.closest('[data-deck]'); if (!b) return;
+  const k = b.dataset.deck;
+  if (cfg.decks.includes(k)) { if (cfg.decks.length === 1) { $('setupErr').textContent = 'Keep at least one word deck.'; return; } cfg.decks = cfg.decks.filter(x => x !== k); }
+  else cfg.decks.push(k);
+  saveCfg(); renderOptions(); sfx.pick();
+};
+
+/* ---------- game state ---------- */
+let G = null;
+let timer = null;
+
+function fateOf(t) { return t === G.total - 1 ? 'final' : (t % 2 === 0 ? 'bad' : 'good'); }
+const FATE = {
+  bad: { label: 'UNFORTUNATELY…', sub: 'Something goes wrong for our hero', q: 'Did it start with "Unfortunately" and make things WORSE?' },
+  good: { label: 'FORTUNATELY…', sub: 'Luck swings back their way', q: 'Did it start with "Fortunately" and make things BETTER?' },
+  final: { label: 'AND AT LAST…', sub: 'The Final Chapter · end the whole tale · DOUBLE points', q: 'Did it bring the whole story to a proper ending?' }
+};
+
+function refillBag() {
+  const all = [];
+  cfg.decks.forEach(k => DECKS[k].words.forEach(w => all.push({ w, deck: k })));
+  const inPlay = new Set(G.used);
+  let fresh = all.filter(x => !inPlay.has(x.w));
+  if (fresh.length < 3) { G.used = []; fresh = all; }
+  G.bag = shuffle(fresh);
+}
+function pickOpener() {
+  let recent = [];
+  try { recent = JSON.parse(localStorage.getItem(LS_OPEN)) || []; } catch (e) {}
+  let pool = OPENERS.map((_, i) => i).filter(i => !recent.includes(i) && i !== G.openerIdx);
+  if (!pool.length) { recent = []; pool = OPENERS.map((_, i) => i).filter(i => i !== G.openerIdx); }
+  G.openerIdx = pool[Math.floor(Math.random() * pool.length)];
+  recent.push(G.openerIdx); if (recent.length > 40) recent = recent.slice(-40);
+  try { localStorage.setItem(LS_OPEN, JSON.stringify(recent)); } catch (e) {}
+}
+
+function startGame() {
+  if (cfg.players.length < 3) { $('setupErr').textContent = 'Add at least 3 storytellers to begin.'; return; }
+  const n = cfg.players.length;
+  G = {
+    players: cfg.players.map(name => ({ name, score: 0, turns: 0, landed: 0, fumbles: 0, bold: 0, twists: 0, words: 0 })),
+    n, laps: cfg.laps, time: cfg.time, twistsOn: cfg.twists,
+    total: n * cfg.laps, turn: 0, used: [], bag: [], trail: [], history: [], cur: null, lastTwist: -1, openerIdx: -1
+  };
+  refillBag(); pickOpener();
+  $('openerTxt').textContent = OPENERS[G.openerIdx];
+  $('beginBtn').textContent = `Begin → ${cfg.players[0]} goes first`;
+  sfx.go(); show('s-opener');
+}
+
+function dealTurn() {
+  const t = G.turn, fate = fateOf(t);
+  if (G.bag.length < 3) refillBag();
+  const cards = G.bag.splice(0, 3);
+  cards.forEach(c => G.used.push(c.w));
+  let twist = -1;
+  if (G.twistsOn && t > 0 && fate !== 'final' && Math.random() < 0.34) {
+    do { twist = Math.floor(Math.random() * TWISTS.length); } while (twist === G.lastTwist);
+    G.lastTwist = twist;
+  }
+  G.cur = { cards, sel: [], twist, fate, ticks: [], fateOk: null, twistOk: null, timeUp: false, spoke: 0 };
+  renderDraw(); sfx.deal(); show('s-draw');
+}
+
+function twistHTML(i) {
+  const [ic, name, rule] = TWISTS[i];
+  return `<div class="ic">${ic}</div><div><b>TWIST: ${esc(name)}</b><span>${esc(rule)}</span><br><em>+2 bonus if you nail it</em></div>`;
+}
+
+function renderDraw() {
+  const c = G.cur, p = G.players[G.turn % G.n], lap = Math.floor(G.turn / G.n) + 1;
+  $('drawLap').textContent = `CHAPTER ${lap}/${G.laps} · TURN ${G.turn + 1}/${G.total}`;
+  $('drawWho').innerHTML = `<small>${c.fate === 'final' ? 'The Final Chapter' : 'Your line'}</small>${esc(p.name)}`;
+  const f = FATE[c.fate];
+  $('drawFate').className = 'fate ' + c.fate;
+  $('drawFate').innerHTML = `${f.label}<small>${f.sub}</small>`;
+  const tw = $('drawTwist');
+  tw.hidden = c.twist < 0; if (c.twist >= 0) tw.innerHTML = twistHTML(c.twist);
+  $('cards').innerHTML = c.cards.map((cd, i) => `<button class="wcard deal ${c.sel.includes(i) ? 'sel' : ''}" style="animation-delay:${i * 90}ms" data-i="${i}" data-deck="${DECKS[cd.deck].icon} ${DECKS[cd.deck].name}">${esc(cd.w)}</button>`).join('');
+  $('undoBtn').hidden = !G.history.length;
+  renderStake();
+}
+function renderStake() {
+  const c = G.cur, k = c.sel.length, mult = c.fate === 'final' ? 2 : 1;
+  $('stake').querySelectorAll('div').forEach(d => {
+    const n = +d.dataset.n;
+    d.classList.toggle('on', n === k);
+    d.querySelector('b').textContent = `${STAKE_PTS[n] * mult} pt${STAKE_PTS[n] * mult > 1 ? 's' : ''}`;
+  });
+  const go = $('goBtn');
+  go.disabled = k === 0;
+  go.textContent = k === 0 ? 'Pick at least one word' : `Go! Weave ${k} word${k > 1 ? 's' : ''} for ${STAKE_PTS[k] * mult}`;
+}
+$('cards').onclick = e => {
+  const b = e.target.closest('.wcard'); if (!b || !G) return;
+  const i = +b.dataset.i, c = G.cur, at = c.sel.indexOf(i);
+  if (at >= 0) { c.sel.splice(at, 1); sfx.unpick(); } else { c.sel.push(i); sfx.pick(); }
+  c.sel.sort();
+  b.classList.remove('deal');
+  b.classList.toggle('sel', at < 0);
+  renderStake();
+};
+
+/* ---------- speaking ---------- */
+function tickRows(container) {
+  const c = G.cur;
+  container.innerHTML = c.sel.map((ci, j) => `<button class="tick ${c.ticks[j] ? 'done' : ''}" data-j="${j}">${esc(c.cards[ci].w)}<i>✓</i></button>`).join('');
+}
+function onTick(e) {
+  const b = e.target.closest('.tick'); if (!b || !G) return;
+  const j = +b.dataset.j; G.cur.ticks[j] = !G.cur.ticks[j];
+  b.classList.toggle('done', G.cur.ticks[j]);
+  G.cur.ticks[j] ? sfx.heard() : sfx.unpick();
+  if (this.id === 'judgeTicks') renderJudge();
+}
+$('speakTicks').onclick = onTick;
+$('judgeTicks').onclick = onTick;
+
+function startSpeaking() {
+  const c = G.cur; if (!c.sel.length) return;
+  c.ticks = c.sel.map(() => false);
+  const p = G.players[G.turn % G.n], f = FATE[c.fate];
+  $('speakWho').textContent = p.name.toUpperCase();
+  $('speakStake').textContent = `STAKE ${STAKE_PTS[c.sel.length] * (c.fate === 'final' ? 2 : 1)} PTS`;
+  $('speakFate').className = 'fate mini ' + c.fate; $('speakFate').textContent = f.label;
+  const tw = $('speakTwist'); tw.hidden = c.twist < 0; if (c.twist >= 0) tw.innerHTML = twistHTML(c.twist);
+  tickRows($('speakTicks'));
+  show('s-speak'); sfx.go();
+  const dur = G.time * 1000, t0 = performance.now();
+  let lastSec = G.time;
+  const ring = $('ring'), num = $('tnum');
+  stopTimer();
+  const loop = now => {
+    const left = Math.max(0, dur - (now - t0)), sec = Math.ceil(left / 1000);
+    ring.style.setProperty('--p', left / dur);
+    ring.style.setProperty('--ringc', sec <= 5 ? 'var(--red)' : 'var(--gold)');
+    ring.classList.toggle('warn', sec <= 5 && left > 0);
+    num.textContent = sec;
+    if (sec !== lastSec) { lastSec = sec; if (sec <= 5 && sec > 0) sfx.tick(); }
+    c.spoke = (now - t0) / 1000;
+    if (left <= 0) { timer = null; c.timeUp = true; sfx.buzz(); toJudge(); return; }
+    timer = requestAnimationFrame(loop);
+  };
+  timer = requestAnimationFrame(loop);
+}
+function stopTimer() { if (timer) cancelAnimationFrame(timer); timer = null; }
+$('goBtn').onclick = startSpeaking;
+$('doneBtn').onclick = () => { stopTimer(); toJudge(); };
+
+/* ---------- judging ---------- */
+function toJudge() {
+  const c = G.cur, p = G.players[G.turn % G.n];
+  $('judgeWho').textContent = p.name.toUpperCase();
+  $('judgeTime').textContent = c.timeUp ? "⏰ TIME'S UP" : `⏱ ${Math.min(G.time, c.spoke).toFixed(1)}s`;
+  tickRows($('judgeTicks'));
+  $('jFateQ').innerHTML = esc(FATE[c.fate].q) + (c.fate === 'final' ? '' : '<small>No flip, no points — that\'s the Twist of Fate rule</small>');
+  $('jTwist').hidden = c.twist < 0;
+  if (c.twist >= 0) $('jTwistQ').innerHTML = `Twist nailed: ${esc(TWISTS[c.twist][1])}?<small>${esc(TWISTS[c.twist][2])} (+2)</small>`;
+  renderJudge(); show('s-judge');
+}
+function computePts(c) {
+  const allWords = c.ticks.length > 0 && c.ticks.every(Boolean);
+  const ok = allWords && c.fateOk === true;
+  const base = ok ? STAKE_PTS[c.sel.length] * (c.fate === 'final' ? 2 : 1) : 0;
+  const bonus = c.twist >= 0 && c.twistOk === true ? 2 : 0;
+  return { ok, allWords, base, bonus, total: base + bonus };
+}
+function renderJudge() {
+  const c = G.cur;
+  const setYN = (el, v) => { el.querySelector('.yes').classList.toggle('on', v === true); el.querySelector('.no').classList.toggle('on', v === false); };
+  setYN($('jFate'), c.fateOk); setYN($('jTwist'), c.twistOk);
+  const ready = c.fateOk !== null && (c.twist < 0 || c.twistOk !== null);
+  $('scoreBtn').disabled = !ready;
+  const r = computePts(c), heard = c.ticks.filter(Boolean).length;
+  $('judgePreview').textContent = ready ? `${heard}/${c.ticks.length} words heard → ${r.total} point${r.total === 1 ? '' : 's'}` : `${heard}/${c.ticks.length} words heard · answer the question${c.twist >= 0 ? 's' : ''} above`;
+}
+$('jFate').onclick = e => { const b = e.target.closest('button'); if (!b) return; G.cur.fateOk = b.classList.contains('yes'); sfx.pick(); renderJudge(); };
+$('jTwist').onclick = e => { const b = e.target.closest('button'); if (!b) return; G.cur.twistOk = b.classList.contains('yes'); sfx.pick(); renderJudge(); };
+
+$('scoreBtn').onclick = () => {
+  const c = G.cur; if ($('scoreBtn').disabled) return;
+  G.history.push(JSON.stringify({ ...G, history: [] }));
+  if (G.history.length > 30) G.history.shift();
+  const p = G.players[G.turn % G.n], r = computePts(c);
+  p.score += r.total; p.turns++;
+  if (r.ok) { p.landed++; p.words += c.sel.length; } else p.fumbles++;
+  if (c.sel.length === 3) p.bold++;
+  if (r.bonus) p.twists++;
+  G.trail.push({
+    who: p.name, fate: c.fate, ok: r.ok, pts: r.total, bonus: r.bonus,
+    words: c.sel.map((ci, j) => ({ w: c.cards[ci].w, heard: !!c.ticks[j] })),
+    twist: c.twist >= 0 ? TWISTS[c.twist][1] : null
+  });
+  G.turn++;
+  showResult(p, r, c);
+};
+function showResult(p, r, c) {
+  $('resWho').textContent = p.name;
+  const pts = $('resPts');
+  pts.textContent = (r.total > 0 ? '+' : '') + r.total;
+  pts.classList.toggle('zero', r.total === 0);
+  pts.style.animation = 'none'; void pts.offsetWidth; pts.style.animation = '';
+  const words = c.sel.map(ci => c.cards[ci].w);
+  if (r.ok) {
+    $('resHead').textContent = c.fate === 'final' ? 'What an ending!' : (c.sel.length === 3 ? 'Triple weave!' : 'The tale lives on!');
+    $('resMsg').innerHTML = `Wove in <b style="color:var(--gold)">${words.map(esc).join(', ')}</b>${r.bonus ? ' and nailed the twist' : ''}.`;
+    sfx.win();
+  } else {
+    const missed = c.sel.filter((ci, j) => !c.ticks[j]).map(ci => c.cards[ci].w);
+    const why = [];
+    if (missed.length) why.push(`missed ${missed.map(w => `<b style="color:var(--rose)">${esc(w)}</b>`).join(', ')}`);
+    if (c.fateOk === false) why.push(c.fate === 'final' ? 'never tied the story up' : 'forgot to flip the luck');
+    $('resHead').textContent = c.timeUp && missed.length ? 'Out of time!' : 'Fumbled!';
+    $('resMsg').innerHTML = (why.length ? 'So close — ' + why.join(' and ') + '.' : '') + (r.bonus ? ' The twist still earns +2.' : '');
+    r.bonus ? sfx.win() : sfx.fail();
+  }
+  $('resBoard').innerHTML = boardHTML(G.turn % G.n);
+  const nb = $('nextBtn');
+  if (G.turn >= G.total) nb.textContent = 'The End → reveal the tale';
+  else if (G.turn % G.n === 0) nb.textContent = `End of Chapter ${G.turn / G.n} →`;
+  else nb.textContent = `Next: ${G.players[G.turn % G.n].name}'s line →`;
+  show('s-result');
+}
+function undo() {
+  if (!G || !G.history.length) return;
+  const hist = G.history;
+  const prev = JSON.parse(hist.pop());
+  prev.history = hist;
+  G = prev;
+  sfx.unpick(); toJudge();
+}
+$('resUndo').onclick = undo;
+$('undoBtn').onclick = undo;
+
+$('nextBtn').onclick = () => {
+  if (G.turn >= G.total) return endGame();
+  if (G.turn % G.n === 0) return lapBreak();
+  dealTurn();
+};
+
+/* ---------- boards & trail ---------- */
+function ranked() { return G.players.map((p, i) => ({ ...p, i })).sort((a, b) => b.score - a.score || b.landed - a.landed); }
+function boardHTML(nowIdx = -1) {
+  const r = ranked(), top = r[0].score;
+  let rank = 0, prev = null;
+  return r.map((p, k) => {
+    if (p.score !== prev) { rank = k + 1; prev = p.score; }
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    return `<div class="brow ${p.score === top && top > 0 ? 'lead' : ''} ${p.i === nowIdx ? 'now' : ''}"><span class="rk">${medal}</span><span class="nm">${esc(p.name)}<small>${p.landed}/${p.turns} lines landed${p.twists ? ` · ${p.twists} twist${p.twists > 1 ? 's' : ''}` : ''}</small></span><span class="sc">${p.score}</span></div>`;
+  }).join('');
+}
+function trailHTML() {
+  if (!G.trail.length) return '<p class="hint">Nothing has happened yet… the hero is still asleep.</p>';
+  const opener = `<div class="tline"><span class="dot good" style="background:var(--parch);color:var(--parch-ink)">✎</span><span><i>${esc(OPENERS[G.openerIdx])}</i></span></div>`;
+  return opener + G.trail.map(t => {
+    const cls = !t.ok ? 'miss' : t.fate, ic = !t.ok ? '✕' : t.fate === 'good' ? '☀' : t.fate === 'bad' ? '☾' : '★';
+    const lab = t.fate === 'good' ? 'Fortunately' : t.fate === 'bad' ? 'Unfortunately' : 'And at last';
+    const ws = t.words.map(w => `<span class="${t.ok || w.heard ? 'w' : 'x'}">${esc(w.w)}</span>`).join(', ');
+    return `<div class="tline"><span class="dot ${cls}">${ic}</span><span><b>${esc(t.who)}</b> · ${lab}… ${ws}${t.twist ? ` · <i>${esc(t.twist)}</i>` : ''} <b style="color:var(--gold)">+${t.pts}</b></span></div>`;
+  }).join('');
+}
+function lapBreak() {
+  const ch = G.turn / G.n, left = G.laps - ch;
+  $('lapHead').innerHTML = `<small>Chapter ${ch} complete</small>${left === 1 ? 'Final lap!' : `${left} laps to go`}`;
+  $('lapTag').textContent = left === 1 ? `The last storyteller this lap — ${G.players[G.n - 1].name} — gets the double-points Final Chapter.` : 'Recap the story out loud before the next chapter begins.';
+  $('lapBoard').innerHTML = boardHTML();
+  $('lapTrail').innerHTML = trailHTML();
+  $('lapBtn').textContent = `Chapter ${ch + 1}: ${G.players[0].name} begins →`;
+  sfx.go(); show('s-lap');
+}
+$('lapBtn').onclick = dealTurn;
+
+/* ---------- end ---------- */
+function taleTitle() {
+  const words = [];
+  G.trail.forEach(t => { if (t.ok) t.words.forEach(w => words.push(w.w)); });
+  const cap = w => w.replace(/(^|[\s-])([a-z])/g, (m, a, b) => a + b.toUpperCase());
+  const art = w => /^[A-Z][a-z]/.test(w) || /'s /.test(w) ? cap(w) : 'the ' + cap(w);
+  if (!words.length) return 'The Tale Nobody Could Quite Tell';
+  if (words.length === 1) return `The Tale of ${art(words[0])}`;
+  if (words.length === 2) return `The Tale of ${art(words[0])} and ${art(words[1])}`;
+  const mid = words[Math.floor(words.length / 2)];
+  return `The Tale of ${art(words[0])}, ${art(mid)} and ${art(words[words.length - 1])}`;
+}
+function endGame() {
+  stopTimer();
+  $('taleTitle').textContent = taleTitle();
+  const r = ranked(), top = r[0].score, winners = r.filter(p => p.score === top);
+  $('winHead').textContent = winners.length > 1 ? `🤝 A shared ending: ${winners.map(p => p.name).join(' & ')}` : `👑 ${winners[0].name} wins!`;
+  $('winSub').textContent = `${top} point${top === 1 ? '' : 's'} · ${G.trail.filter(t => t.ok).length} of ${G.trail.length} lines landed by the whole circle`;
+  $('endBoard').innerHTML = boardHTML();
+  const award = (icon, label, key, fmt, min = 1) => {
+    const best = Math.max(...G.players.map(p => p[key]));
+    if (best < min) return '';
+    const who = G.players.filter(p => p[key] === best).map(p => p.name).join(' & ');
+    return `<div class="brow"><span class="rk">${icon}</span><span class="nm">${esc(label)}<small>${esc(who)}</small></span><span class="sc" style="font-size:15px">${fmt(best)}</span></div>`;
+  };
+  $('awards').innerHTML = [
+    award('🎲', 'Boldest Gambler', 'bold', v => `${v}× all-in`),
+    award('📚', 'Word Weaver', 'words', v => `${v} words`),
+    award('🌀', 'Twist Master', 'twists', v => `${v} nailed`),
+    award('🙈', 'Most Heroic Fumble', 'fumbles', v => `${v} fumble${v > 1 ? 's' : ''}`)
+  ].join('') || '<p class="hint">No awards this time — a quiet little tale.</p>';
+  $('endTrail').innerHTML = trailHTML();
+  show('s-end'); sfx.fanfare(); confetti();
+}
+$('againBtn').onclick = startGame;
+$('newBtn').onclick = () => { G = null; renderPlayers(); renderOptions(); show('s-setup'); };
+
+/* ---------- modals ---------- */
+document.addEventListener('click', e => {
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const act = a.dataset.act;
+  if (act === 'board' && G) { $('modalBoard').innerHTML = boardHTML(G.turn % G.n); $('modalTrail').innerHTML = trailHTML(); $('mBoard').classList.add('on'); }
+  if (act === 'quit') $('mQuit').classList.add('on');
+  if (act === 'close') document.querySelectorAll('.modal').forEach(m => m.classList.remove('on'));
+});
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('on'); }));
+$('quitYes').onclick = () => { stopTimer(); G = null; document.querySelectorAll('.modal').forEach(m => m.classList.remove('on')); renderPlayers(); renderOptions(); show('s-setup'); };
+
+$('startBtn').onclick = startGame;
+$('rerollOpener').onclick = () => { pickOpener(); $('openerTxt').textContent = OPENERS[G.openerIdx]; sfx.deal(); };
+$('beginBtn').onclick = dealTurn;
+
+/* ---------- confetti ---------- */
+function confetti() {
+  const cv = $('confetti'), ctx = cv.getContext('2d');
+  cv.width = innerWidth; cv.height = innerHeight;
+  const cols = ['#ffc857', '#ff6b9a', '#9b7bff', '#4fd8c4', '#fff4dc'];
+  const ps = Array.from({ length: 140 }, () => ({ x: Math.random() * cv.width, y: -20 - Math.random() * cv.height * 0.5, vx: (Math.random() - 0.5) * 2, vy: 2 + Math.random() * 3, r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.3, s: 5 + Math.random() * 6, c: cols[Math.floor(Math.random() * cols.length)] }));
+  const t0 = performance.now();
+  const step = now => {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ps.forEach(p => { p.x += p.vx; p.y += p.vy; p.r += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); ctx.restore(); });
+    if (now - t0 < 3800) requestAnimationFrame(step); else ctx.clearRect(0, 0, cv.width, cv.height);
+  };
+  requestAnimationFrame(step);
+}
+
+renderPlayers(); renderOptions();
+window.__tof = { state: () => G, cfg: () => cfg, decks: DECKS, openers: OPENERS, twists: TWISTS };
+</script>
+</body>
+</html>
