@@ -1,0 +1,605 @@
+<!-- CONCEPT: Pretend-play post office where kids weigh a parcel on a dial scale, choose the matching number of stamps, then sort it into the right animal-town postbag. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Pip's Post Office — Weigh, Stamp, Sort!</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin:0; padding:0; height:100%; }
+  body {
+    font-family: "Trebuchet MS", "Segoe UI", Verdana, sans-serif;
+    background: radial-gradient(circle at 50% 0%, #9be7ff 0%, #6fd0f5 38%, #4ab3e8 100%);
+    color:#20344a;
+    min-height:100%;
+    display:flex; flex-direction:column; align-items:center;
+    padding: 10px 10px 24px;
+    overflow-x:hidden;
+    user-select:none;
+  }
+
+  h1 { margin:2px 0 0; font-size: clamp(22px, 5vw, 38px); color:#fff;
+       text-shadow: 0 3px 0 #2a86b8, 0 6px 12px rgba(0,0,0,.25); letter-spacing:.5px; }
+  .tagline { margin:4px 0 8px; font-size: clamp(12px,2.6vw,15px); color:#0d4c6b;
+       background:rgba(255,255,255,.72); padding:5px 14px; border-radius:999px; font-weight:bold; text-align:center;}
+
+  .wrap { width:100%; max-width: 940px; }
+
+  /* ---------- top bar ---------- */
+  .bar { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-bottom:8px; }
+  .chip { background:#fff; border:4px solid #ffd23f; border-radius:16px;
+          padding:5px 14px; font-weight:bold; font-size: clamp(13px,3vw,18px);
+          box-shadow:0 4px 0 #d9a900; display:flex; align-items:center; gap:6px; }
+  .chip.stars { border-color:#ff8fab; box-shadow:0 4px 0 #d95d7c; }
+
+  /* ---------- stage ---------- */
+  .stage { background:#fff8e7; border:6px solid #fff; border-radius:26px;
+           box-shadow:0 10px 0 rgba(0,0,0,.18), inset 0 0 0 4px #ffe9b8;
+           padding:12px; position:relative; overflow:hidden; }
+
+  .owlrow { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .owl { font-size: clamp(30px,7vw,44px); line-height:1; transition:transform .2s; }
+  .owl.talk { transform: translateY(-6px) rotate(-6deg); }
+  .bubble { flex:1; background:#fff; border:4px solid #7ae582; border-radius:18px;
+            padding:8px 14px; font-weight:bold; font-size: clamp(14px,3.2vw,20px);
+            box-shadow:0 4px 0 #4bb96a; min-height:44px; display:flex; align-items:center; }
+
+  /* ---------- scale ---------- */
+  .scalezone { display:flex; align-items:flex-end; justify-content:center; gap: clamp(8px,3vw,26px); margin: 4px 0 8px; }
+
+  .dial { width: clamp(120px,30vw,180px); position:relative; }
+  .dialface { width:100%; aspect-ratio:2/1.15; background:#fff; border:6px solid #20344a;
+              border-radius: 999px 999px 14px 14px; position:relative; overflow:hidden;
+              box-shadow:0 5px 0 #12222f; }
+  .arc { position:absolute; left:0; top:0; width:100%; height:100%;
+         background: conic-gradient(from 270deg,
+             #7ae582 0deg 30deg, #ffd23f 30deg 60deg, #ff8fab 60deg 90deg, transparent 90deg);
+         opacity:.65; }
+  .needle { position:absolute; left:50%; bottom:6px; width:6px; height:64%;
+            background:#e63946; border-radius:4px; transform-origin:50% 100%;
+            transform: translateX(-50%) rotate(-62deg);
+            transition: transform 1.05s cubic-bezier(.34,1.56,.64,1); }
+  .hub { position:absolute; left:50%; bottom:0px; width:18px; height:18px; background:#20344a;
+         border-radius:50%; transform:translate(-50%,40%); }
+  .pan { width:100%; height:16px; background:#c0d6e4; border:5px solid #20344a; border-radius:8px;
+         margin-top:4px; box-shadow:0 4px 0 #12222f; }
+
+  .weightword { text-align:center; font-weight:bold; margin-top:6px; font-size: clamp(13px,3vw,18px);
+                min-height:26px; color:#0d4c6b; opacity:0; transition:opacity .3s; }
+  .weightword.show { opacity:1; }
+  .wdots { letter-spacing:2px; }
+
+  /* ---------- the parcel ---------- */
+  .itemslot { width: clamp(130px,34vw,200px); display:flex; flex-direction:column; align-items:center; }
+  .parcel { position:relative; width: clamp(105px,26vw,150px); aspect-ratio:1/1;
+            background:#ffe0a3; border:6px solid #b9762e; border-radius:18px;
+            display:flex; align-items:center; justify-content:center;
+            font-size: clamp(38px,10vw,58px); box-shadow:0 6px 0 #8a5620;
+            transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .35s; }
+  .parcel.arrive { animation: dropIn .55s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes dropIn { 0%{ transform: translateY(-140px) rotate(-18deg); opacity:0 }
+                      100%{ transform: translateY(0) rotate(0); opacity:1 } }
+  .parcel.wiggle { animation: wig .45s; }
+  @keyframes wig { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-7deg)} 75%{transform:rotate(7deg)} }
+  .parcel.gone { transform: translateY(-120px) scale(.35) rotate(20deg); opacity:0; }
+
+  .tag { position:absolute; bottom:-14px; left:50%; transform:translateX(-50%);
+         background:#fff; border:4px solid #20344a; border-radius:12px; padding:2px 10px;
+         font-size: clamp(15px,3.6vw,20px); font-weight:bold; white-space:nowrap;
+         display:flex; align-items:center; gap:5px; box-shadow:0 3px 0 rgba(0,0,0,.2); }
+  .tagdot { width:14px; height:14px; border-radius:50%; border:2px solid #20344a; display:inline-block; }
+
+  .stampstrip { position:absolute; top:6px; right:6px; display:flex; gap:3px; }
+  .ministamp { width:16px; height:20px; background:#ff8fab; border:2px dashed #fff;
+               border-radius:3px; font-size:9px; display:flex; align-items:center; justify-content:center;
+               animation: pop .3s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes pop { 0%{ transform:scale(2.6) rotate(-20deg); opacity:0 } 100%{ transform:scale(1); opacity:1 } }
+
+  /* ---------- buttons ---------- */
+  .rowlabel { text-align:center; font-weight:bold; color:#0d4c6b; margin:10px 0 4px;
+              font-size: clamp(12px,2.8vw,16px); text-transform:uppercase; letter-spacing:1px; }
+
+  .btnrow { display:flex; justify-content:center; gap: clamp(6px,2.4vw,16px); flex-wrap:wrap; }
+
+  .bigbtn { border:none; cursor:pointer; font-family:inherit; font-weight:bold;
+            border-radius:20px; padding: 10px 8px; transition: transform .12s, filter .12s;
+            display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .bigbtn:active { transform: translateY(4px); }
+  .bigbtn[disabled] { filter: grayscale(.72) brightness(.95); cursor:default; opacity:.55; }
+  .bigbtn.shake { animation: shk .4s; }
+  @keyframes shk { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-9px)} 60%{transform:translateX(9px)} }
+
+  .stampbtn { width: clamp(84px,22vw,120px); background:#fff3c4; box-shadow:0 6px 0 #d9a900;
+              border:5px solid #ffd23f; color:#7a5a00; }
+  .stamps { display:flex; gap:3px; }
+  .stampimg { width:20px; height:26px; background:#ff8fab; border:2px dashed #fff; border-radius:4px;
+              display:flex; align-items:center; justify-content:center; font-size:11px; }
+  .stampbtn span.lbl { font-size: clamp(12px,2.8vw,16px); }
+
+  .townbtn { width: clamp(78px,20vw,124px); border:5px solid #20344a; color:#20344a;
+             box-shadow:0 6px 0 rgba(0,0,0,.28); }
+  .townbtn .face { font-size: clamp(26px,7vw,40px); line-height:1; }
+  .townbtn .nm { font-size: clamp(10px,2.4vw,14px); }
+  .townbtn.correct { animation: yay .5s; }
+  @keyframes yay { 0%{transform:scale(1)} 40%{transform:scale(1.18) rotate(-4deg)} 100%{transform:scale(1)} }
+
+  /* ---------- overlays ---------- */
+  .overlay { position:absolute; inset:0; background:rgba(255,248,231,.96); border-radius:20px;
+             display:flex; flex-direction:column; align-items:center; justify-content:center;
+             gap:10px; text-align:center; padding:16px; z-index:20; }
+  .overlay h2 { margin:0; font-size: clamp(22px,6vw,38px); color:#0d4c6b; }
+  .overlay p { margin:0; font-size: clamp(14px,3.4vw,19px); font-weight:bold; max-width:520px; }
+  .van { font-size: clamp(44px,12vw,72px); animation: drive 2.1s ease-in; }
+  @keyframes drive { 0%{ transform:translateX(-120%) } 100%{ transform:translateX(0) } }
+  .goBtn { border:none; cursor:pointer; font-family:inherit; font-weight:bold;
+           font-size: clamp(16px,4vw,24px); padding:14px 30px; border-radius:999px;
+           background:#7ae582; color:#0c4a1f; border:5px solid #4bb96a; box-shadow:0 7px 0 #348a4c; }
+  .goBtn:active { transform:translateY(5px); box-shadow:0 2px 0 #348a4c; }
+  .starline { font-size: clamp(26px,7vw,44px); letter-spacing:4px; }
+
+  .confetti { position:fixed; top:-20px; width:12px; height:16px; z-index:60; pointer-events:none; border-radius:3px; }
+  @keyframes fall { to { transform: translateY(115vh) rotate(720deg); opacity:0 } }
+
+  .footer { color:#0d4c6b; font-size:12px; margin-top:10px; opacity:.8; text-align:center; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <h1>📮 Pip's Post Office</h1>
+  <div class="tagline">Weigh each parcel on the big dial, give it the right number of stamps, then drop it in the matching animal town's bag.</div>
+
+  <div class="bar">
+    <div class="chip">📅 Day <span id="dayNum">1</span> of 5</div>
+    <div class="chip">📦 <span id="doneNum">0</span> / <span id="totalNum">4</span> posted</div>
+    <div class="chip stars">⭐ <span id="starNum">0</span></div>
+  </div>
+
+  <div class="stage" id="stage">
+
+    <div class="owlrow">
+      <div class="owl" id="owl">🦉</div>
+      <div class="bubble" id="bubble">Morning! Tap START to open the post office.</div>
+    </div>
+
+    <div class="scalezone">
+      <div class="dial">
+        <div class="dialface">
+          <div class="arc"></div>
+          <div class="needle" id="needle"></div>
+          <div class="hub"></div>
+        </div>
+        <div class="pan"></div>
+        <div class="weightword" id="weightWord">&nbsp;</div>
+      </div>
+
+      <div class="itemslot">
+        <div class="parcel" id="parcel" style="visibility:hidden">
+          <span id="parcelIcon">📦</span>
+          <div class="stampstrip" id="stampStrip"></div>
+          <div class="tag" id="parcelTag"><span class="tagdot"></span><span>🐰</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rowlabel">How many stamps?</div>
+    <div class="btnrow" id="stampRow"></div>
+
+    <div class="rowlabel">Which town?</div>
+    <div class="btnrow" id="townRow"></div>
+
+    <div class="overlay" id="overlay">
+      <div style="font-size:clamp(46px,13vw,80px)">📮</div>
+      <h2>Pip's Post Office</h2>
+      <p>Help Pip the owl get every parcel home! Weigh it, stamp it, sort it. 5 busy days to become the Golden Postmaster.</p>
+      <button class="goBtn" id="overlayBtn">START</button>
+    </div>
+
+  </div>
+
+  <div class="footer">Tap or click only — no reading required. Ages 4–11.</div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ================= AUDIO ================= */
+  var actx = null;
+  function AC(){
+    if (!actx) {
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      try { actx = new C(); } catch(e) { return null; }
+    }
+    if (actx.state === "suspended" && actx.resume) { try { actx.resume(); } catch(e){} }
+    return actx;
+  }
+  function tone(freq, start, dur, type, vol){
+    var a = AC(); if (!a) return;
+    var t0 = a.currentTime + start;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.18, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(t0); o.stop(t0 + dur + 0.03);
+  }
+  function slide(f1, f2, start, dur, type, vol){
+    var a = AC(); if (!a) return;
+    var t0 = a.currentTime + start;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(f1, t0);
+    o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.14, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(t0); o.stop(t0 + dur + 0.03);
+  }
+  function noiseThunk(){
+    var a = AC(); if (!a) return;
+    var len = Math.floor(a.sampleRate * 0.16);
+    var buf = a.createBuffer(1, len, a.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i=0;i<len;i++){ d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 3); }
+    var s = a.createBufferSource(); s.buffer = buf;
+    var f = a.createBiquadFilter(); f.type="lowpass"; f.frequency.value = 900;
+    var g = a.createGain(); g.gain.value = 0.35;
+    s.connect(f); f.connect(g); g.connect(a.destination);
+    s.start();
+  }
+  var S = {
+    ding:  function(){ tone(880,0,.16,"triangle",.18); tone(1320,.07,.22,"sine",.14); },
+    stamp: function(){ noiseThunk(); tone(170,0,.14,"square",.12); },
+    good:  function(){ tone(523,0,.13,"triangle",.16); tone(659,.09,.13,"triangle",.16); tone(784,.18,.26,"triangle",.18); },
+    oops:  function(){ tone(392,0,.13,"sine",.13); tone(330,.11,.2,"sine",.12); },
+    whoosh:function(){ slide(300,1200,0,.28,"sine",.10); },
+    scale: function(){ slide(220,520,0,.6,"sine",.08); },
+    van:   function(){ slide(90,150,0,1.2,"sawtooth",.07); tone(120,1.2,.5,"sawtooth",.05); },
+    fan:   function(){ var n=[523,659,784,1047,1319];
+                       for (var i=0;i<n.length;i++) tone(n[i], i*0.11, .35, "triangle", .17);
+                       tone(1568, .62, .7, "sine", .16); }
+  };
+
+  /* ================= DATA ================= */
+  var TOWNS = [
+    { name:"Sunny Meadow", face:"🐰", color:"#ffd23f", dark:"#c79c00" },
+    { name:"Blue Harbour", face:"🐳", color:"#7fd8f7", dark:"#3a9dc4" },
+    { name:"Green Forest", face:"🐿️", color:"#9ff0a5", dark:"#48a558" },
+    { name:"Pink Hilltop", face:"🐷", color:"#ffb3c6", dark:"#d1758f" }
+  ];
+  var KINDS = ["✉️","📦","🎁","🧸","📚","🍪","👟","🪁"];
+  var WORDS = [
+    { w:"LIGHT",  dots:"●", ang:-42 },
+    { w:"MEDIUM", dots:"●●", ang:0 },
+    { w:"HEAVY",  dots:"●●●", ang:42 }
+  ];
+  var DAY_COUNTS = [4,5,5,6,6];
+
+  /* ================= ELEMENTS ================= */
+  var el = {
+    stage:      document.getElementById("stage"),
+    owl:        document.getElementById("owl"),
+    bubble:     document.getElementById("bubble"),
+    needle:     document.getElementById("needle"),
+    weightWord: document.getElementById("weightWord"),
+    parcel:     document.getElementById("parcel"),
+    parcelIcon: document.getElementById("parcelIcon"),
+    parcelTag:  document.getElementById("parcelTag"),
+    stampStrip: document.getElementById("stampStrip"),
+    stampRow:   document.getElementById("stampRow"),
+    townRow:    document.getElementById("townRow"),
+    overlay:    document.getElementById("overlay"),
+    overlayBtn: document.getElementById("overlayBtn"),
+    dayNum:     document.getElementById("dayNum"),
+    doneNum:    document.getElementById("doneNum"),
+    totalNum:   document.getElementById("totalNum"),
+    starNum:    document.getElementById("starNum")
+  };
+
+  /* ================= STATE ================= */
+  var day = 1, stars = 0, queue = [], current = null;
+  var phase = "idle";              // idle | weigh | stamp | sort | between
+  var cleanStamp = true, cleanSort = true;
+  var doneToday = 0, dayTotal = 0, busy = false;
+
+  /* ================= BUILD BUTTONS ================= */
+  var stampBtns = [], townBtns = [];
+
+  function buildStampButtons(){
+    el.stampRow.innerHTML = "";
+    stampBtns = [];
+    for (var n=1; n<=3; n++){
+      (function(n){
+        var b = document.createElement("button");
+        b.className = "bigbtn stampbtn";
+        b.type = "button";
+        var row = document.createElement("div");
+        row.className = "stamps";
+        for (var k=0;k<n;k++){
+          var s = document.createElement("div");
+          s.className = "stampimg";
+          s.textContent = "★";
+          row.appendChild(s);
+        }
+        var lbl = document.createElement("span");
+        lbl.className = "lbl";
+        lbl.textContent = n === 1 ? "1 stamp" : n + " stamps";
+        b.appendChild(row); b.appendChild(lbl);
+        b.setAttribute("aria-label", lbl.textContent);
+        b.addEventListener("click", function(){ chooseStamp(n, b); });
+        el.stampRow.appendChild(b);
+        stampBtns.push(b);
+      })(n);
+    }
+  }
+
+  function buildTownButtons(count){
+    el.townRow.innerHTML = "";
+    townBtns = [];
+    for (var i=0;i<count;i++){
+      (function(i){
+        var t = TOWNS[i];
+        var b = document.createElement("button");
+        b.className = "bigbtn townbtn";
+        b.type = "button";
+        b.style.background = t.color;
+        b.style.boxShadow = "0 6px 0 " + t.dark;
+        var f = document.createElement("div"); f.className = "face"; f.textContent = t.face;
+        var n = document.createElement("div"); n.className = "nm"; n.textContent = t.name;
+        b.appendChild(f); b.appendChild(n);
+        b.setAttribute("aria-label", t.name);
+        b.addEventListener("click", function(){ chooseTown(i, b); });
+        el.townRow.appendChild(b);
+        townBtns.push(b);
+      })(i);
+    }
+  }
+
+  function setEnabled(list, on){
+    for (var i=0;i<list.length;i++){ list[i].disabled = !on; }
+  }
+
+  /* ================= HELPERS ================= */
+  function say(msg){
+    el.bubble.textContent = msg;
+    el.owl.classList.add("talk");
+    setTimeout(function(){ el.owl.classList.remove("talk"); }, 220);
+  }
+  function rnd(n){ return Math.floor(Math.random()*n); }
+
+  function confetti(count){
+    var colors = ["#ffd23f","#ff8fab","#7ae582","#7fd8f7","#ffffff","#ffa552"];
+    for (var i=0;i<count;i++){
+      (function(i){
+        var c = document.createElement("div");
+        c.className = "confetti";
+        c.style.left = (Math.random()*100) + "vw";
+        c.style.background = colors[rnd(colors.length)];
+        c.style.animation = "fall " + (1.6 + Math.random()*1.4) + "s linear " + (Math.random()*0.5) + "s forwards";
+        document.body.appendChild(c);
+        setTimeout(function(){ if (c.parentNode) c.parentNode.removeChild(c); }, 4200);
+      })(i);
+    }
+  }
+
+  /* ================= DAY FLOW ================= */
+  function townCountForDay(d){ return d <= 2 ? 3 : 4; }
+
+  function buildQueue(d){
+    var count = DAY_COUNTS[d-1] || 5;
+    var tc = townCountForDay(d);
+    var maxBand = d === 1 ? 2 : 3;   // day 1 uses light+medium only
+    var list = [];
+    for (var i=0;i<count;i++){
+      list.push({
+        icon: KINDS[rnd(KINDS.length)],
+        band: rnd(maxBand),
+        town: rnd(tc)
+      });
+    }
+    return list;
+  }
+
+  function startDay(){
+    queue = buildQueue(day);
+    dayTotal = queue.length;
+    doneToday = 0;
+    buildTownButtons(townCountForDay(day));
+    el.dayNum.textContent = day;
+    el.totalNum.textContent = dayTotal;
+    el.doneNum.textContent = 0;
+    el.overlay.style.display = "none";
+    nextItem();
+  }
+
+  function nextItem(){
+    if (queue.length === 0){ endDay(); return; }
+    current = queue.shift();
+    cleanStamp = true; cleanSort = true;
+    phase = "weigh";
+    busy = true;
+
+    setEnabled(stampBtns, false);
+    setEnabled(townBtns, false);
+
+    // reset visuals
+    el.stampStrip.innerHTML = "";
+    el.weightWord.classList.remove("show");
+    el.needle.style.transform = "translateX(-50%) rotate(-62deg)";
+    el.parcel.className = "parcel";
+    el.parcel.style.visibility = "visible";
+    el.parcelIcon.textContent = current.icon;
+
+    var t = TOWNS[current.town];
+    el.parcelTag.innerHTML = "";
+    var dot = document.createElement("span");
+    dot.className = "tagdot"; dot.style.background = t.color;
+    var fc = document.createElement("span"); fc.textContent = t.face;
+    el.parcelTag.appendChild(dot); el.parcelTag.appendChild(fc);
+
+    say("A new parcel! Let's weigh it…");
+    S.whoosh();
+
+    // force reflow so the arrive animation replays
+    void el.parcel.offsetWidth;
+    el.parcel.classList.add("arrive");
+
+    setTimeout(function(){
+      S.scale();
+      el.needle.style.transform = "translateX(-50%) rotate(" + WORDS[current.band].ang + "deg)";
+    }, 420);
+
+    setTimeout(function(){
+      var w = WORDS[current.band];
+      el.weightWord.innerHTML = w.w + '<br><span class="wdots">' + w.dots + '</span>';
+      el.weightWord.classList.add("show");
+      S.ding();
+      phase = "stamp";
+      busy = false;
+      setEnabled(stampBtns, true);
+      say("It is " + w.w.toLowerCase() + ". How many stamps?");
+    }, 1600);
+  }
+
+  function chooseStamp(n, btn){
+    if (phase !== "stamp" || busy) return;
+    if (n === current.band + 1){
+      S.stamp();
+      setEnabled(stampBtns, false);
+      for (var k=0;k<n;k++){
+        (function(k){
+          setTimeout(function(){
+            var m = document.createElement("div");
+            m.className = "ministamp"; m.textContent = "★";
+            el.stampStrip.appendChild(m);
+            if (k > 0) S.stamp();
+          }, k*150);
+        })(k);
+      }
+      phase = "sort";
+      setTimeout(function(){
+        setEnabled(townBtns, true);
+        var t = TOWNS[current.town];
+        say("Stamped! Now find " + t.face + " " + t.name + ".");
+      }, n*150 + 200);
+    } else {
+      cleanStamp = false;
+      S.oops();
+      btn.classList.remove("shake"); void btn.offsetWidth; btn.classList.add("shake");
+      el.parcel.classList.remove("wiggle"); void el.parcel.offsetWidth; el.parcel.classList.add("wiggle");
+      say("Not quite — look at the dots on the scale. Try again!");
+    }
+  }
+
+  function chooseTown(i, btn){
+    if (phase !== "sort" || busy) return;
+    if (i === current.town){
+      busy = true;
+      setEnabled(townBtns, false);
+      btn.classList.remove("correct"); void btn.offsetWidth; btn.classList.add("correct");
+      S.good();
+      el.parcel.classList.add("gone");
+      doneToday++;
+      el.doneNum.textContent = doneToday;
+      var perfect = cleanStamp && cleanSort;
+      if (perfect){
+        stars++;
+        el.starNum.textContent = stars;
+        say("Perfect posting! ⭐");
+        confetti(10);
+      } else {
+        say("You got it there! Nice work.");
+      }
+      setTimeout(function(){
+        el.parcel.style.visibility = "hidden";
+        busy = false;
+        nextItem();
+      }, 700);
+    } else {
+      cleanSort = false;
+      S.oops();
+      btn.classList.remove("shake"); void btn.offsetWidth; btn.classList.add("shake");
+      var t = TOWNS[current.town];
+      say("Check the label — it says " + t.face + " " + t.name + ".");
+    }
+  }
+
+  function endDay(){
+    phase = "between";
+    setEnabled(stampBtns, false);
+    setEnabled(townBtns, false);
+    el.parcel.style.visibility = "hidden";
+    S.van();
+    var last = (day >= 5);
+
+    el.overlay.style.display = "flex";
+    el.overlay.innerHTML = "";
+
+    var van = document.createElement("div");
+    van.className = "van";
+    van.textContent = "🚚";
+    el.overlay.appendChild(van);
+
+    var h = document.createElement("h2");
+    h.textContent = last ? "🏅 Golden Postmaster!" : "Day " + day + " — all posted!";
+    el.overlay.appendChild(h);
+
+    var sl = document.createElement("div");
+    sl.className = "starline";
+    var shown = Math.min(stars, 12);
+    var str = "";
+    for (var i=0;i<shown;i++) str += "⭐";
+    sl.textContent = str || "📬";
+    el.overlay.appendChild(sl);
+
+    var p = document.createElement("p");
+    p.textContent = last
+      ? "You posted every single parcel for a whole week. Pip says thank you! You earned " + stars + " perfect-posting stars."
+      : "The mail van is off! You have " + stars + " star" + (stars===1?"":"s") + " so far. Ready for tomorrow?";
+    el.overlay.appendChild(p);
+
+    var b = document.createElement("button");
+    b.className = "goBtn";
+    b.type = "button";
+    b.textContent = last ? "PLAY AGAIN" : "NEXT DAY ▶";
+    b.addEventListener("click", function(){
+      if (last){ day = 1; stars = 0; el.starNum.textContent = 0; }
+      else { day++; }
+      startDay();
+    });
+    el.overlay.appendChild(b);
+
+    if (last){ setTimeout(function(){ S.fan(); confetti(70); }, 1500); }
+    else { setTimeout(function(){ confetti(18); }, 1200); }
+  }
+
+  /* ================= BOOT ================= */
+  buildStampButtons();
+  buildTownButtons(3);
+  setEnabled(stampBtns, false);
+  setEnabled(townBtns, false);
+
+  el.overlayBtn.addEventListener("click", function(){
+    AC();
+    day = 1; stars = 0;
+    el.starNum.textContent = 0;
+    startDay();
+  });
+
+  // expose a little state for testing
+  window.__post = {
+    peek: function(){ return { day:day, phase:phase, stars:stars, doneToday:doneToday,
+                               dayTotal:dayTotal, left:queue.length, current:current }; },
+    stampBtns: function(){ return stampBtns; },
+    townBtns: function(){ return townBtns; }
+  };
+})();
+</script>
+</body>
+</html>
