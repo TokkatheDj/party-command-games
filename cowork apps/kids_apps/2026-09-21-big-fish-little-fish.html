@@ -1,0 +1,829 @@
+<!-- CONCEPT: A friendly turn-taking reef game where you and Bloop take turns dropping big, middle and little fish onto a 3x3 coral grid - a bigger fish can gulp a smaller one right off the board, and when it swims away the gulped fish pops back out - first to show three fish in a row wins. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Big Fish, Little Fish</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+}
+
+:root {
+  --deep: #042a45;
+  --mid: #0a5a86;
+  --shallow: #16a0c4;
+  --sand: #f6dda6;
+  --coral: #ff7a8a;
+  --p-main: #ff9b3d;
+  --p-dark: #dd5510;
+  --a-main: #5ad2f7;
+  --a-dark: #1785bd;
+  --gold: #ffd84d;
+  --ink: #06243a;
+  --panel: rgba(255,255,255,0.14);
+  --panel-hi: rgba(255,255,255,0.28);
+  --font: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  background: linear-gradient(180deg, var(--shallow) 0%, var(--mid) 45%, var(--deep) 100%);
+  color: #fff;
+}
+
+/* ---------- floating bubbles backdrop ---------- */
+#bubbles { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.bub {
+  position: absolute; bottom: -60px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, rgba(255,255,255,.85), rgba(255,255,255,.12) 60%, rgba(255,255,255,.05));
+  animation: rise linear infinite;
+}
+@keyframes rise {
+  0%   { transform: translateY(0) translateX(0); opacity: 0; }
+  10%  { opacity: .55; }
+  90%  { opacity: .45; }
+  100% { transform: translateY(-112vh) translateX(var(--drift, 20px)); opacity: 0; }
+}
+
+/* ---------- shell ---------- */
+#app {
+  position: relative; z-index: 1;
+  height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center;
+  padding: 6px 8px 8px;
+  gap: 4px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(20px, 6.4vw, 34px);
+  letter-spacing: .5px;
+  background: linear-gradient(90deg, var(--gold), #ffb3c1, var(--a-main));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(0,0,0,.28));
+  text-align: center;
+}
+
+/* ---------- player strips ---------- */
+.strip {
+  width: 100%; max-width: 460px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 7px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 2px solid transparent;
+  transition: border-color .2s, background .2s;
+}
+.strip.active { border-color: var(--gold); background: rgba(255,216,77,.2); }
+
+.who {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 52px; line-height: 1.05;
+}
+.who .face { font-size: clamp(20px, 5.6vw, 26px); }
+.who .nm { font-size: clamp(10px, 2.8vw, 13px); font-weight: bold; }
+
+.tray { display: flex; gap: 5px; flex: 1; justify-content: space-around; }
+
+.slot {
+  position: relative;
+  flex: 1;
+  min-height: 56px;
+  border-radius: 14px;
+  background: rgba(255,255,255,.12);
+  border: 3px solid rgba(255,255,255,.22);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: transform .12s, border-color .15s, background .15s;
+}
+.strip.opp .slot { min-height: 44px; cursor: default; }
+.slot.pick { border-color: var(--gold); background: rgba(255,216,77,.3); transform: translateY(-4px) scale(1.06); }
+.slot.empty { opacity: .3; }
+.slot .pips {
+  position: absolute; bottom: 3px; left: 0; right: 0;
+  display: flex; justify-content: center; gap: 3px;
+}
+.slot .pips i { width: 7px; height: 7px; border-radius: 50%; background: var(--gold); display: block; }
+.slot .pips i.off { background: rgba(255,255,255,.22); }
+
+/* ---------- board ---------- */
+#boardWrap {
+  --board: min(92vw, 44vh, 430px);
+  width: var(--board); height: var(--board);
+  padding: 8px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,.07));
+  box-shadow: 0 10px 0 rgba(0,0,0,.18), inset 0 0 0 3px rgba(255,255,255,.22);
+  flex: 0 0 auto;
+}
+#board {
+  width: 100%; height: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 6px;
+}
+.cell {
+  position: relative;
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 42%, rgba(4,42,69,.45), rgba(4,42,69,.68));
+  box-shadow: inset 0 0 0 3px rgba(255,255,255,.16);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition: box-shadow .15s, background .15s;
+}
+.cell.target { box-shadow: inset 0 0 0 4px var(--gold); background: radial-gradient(circle at 50% 42%, rgba(255,216,77,.34), rgba(4,42,69,.6)); animation: pulseT 1s ease-in-out infinite; }
+@keyframes pulseT { 50% { box-shadow: inset 0 0 0 7px var(--gold); } }
+.cell.pick { box-shadow: inset 0 0 0 5px #fff; }
+.cell.win { background: radial-gradient(circle at 50% 42%, rgba(255,216,77,.75), rgba(255,140,60,.5)); }
+.cell.nope { animation: wob .38s ease; }
+@keyframes wob { 25% { transform: translateX(-5px) rotate(-3deg); } 75% { transform: translateX(5px) rotate(3deg); } }
+
+.fishwrap { display: block; pointer-events: none; }
+.fishwrap.pop { animation: pop .34s cubic-bezier(.26,1.6,.5,1); }
+@keyframes pop { 0% { transform: scale(.2) rotate(-18deg); } 60% { transform: scale(1.14) rotate(5deg); } 100% { transform: scale(1); } }
+.fishwrap.swim { animation: swim 2.6s ease-in-out infinite; }
+@keyframes swim { 50% { transform: translateY(-4px) rotate(2deg); } }
+
+.under {
+  position: absolute; bottom: 4px; left: 0; right: 0;
+  display: flex; justify-content: center; gap: 4px; pointer-events: none;
+}
+.under b { width: 10px; height: 10px; border-radius: 50%; display: block; box-shadow: inset 0 -2px 0 rgba(0,0,0,.25); }
+
+/* ---------- status + buttons ---------- */
+#status {
+  width: 100%; max-width: 460px;
+  min-height: 34px;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+  font-size: clamp(14px, 4vw, 20px);
+  font-weight: bold;
+  text-shadow: 0 2px 0 rgba(0,0,0,.3);
+}
+#status.cheer { animation: cheer .45s ease; }
+@keyframes cheer { 50% { transform: scale(1.16); } }
+
+#controls { display: flex; gap: 8px; width: 100%; max-width: 460px; }
+.btn {
+  flex: 1;
+  min-height: 46px;
+  border: none; border-radius: 15px;
+  font-family: var(--font); font-weight: bold;
+  font-size: clamp(13px, 3.6vw, 17px);
+  color: var(--ink);
+  background: linear-gradient(180deg, #ffe89a, var(--gold));
+  box-shadow: 0 5px 0 #c9a21f;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #c9a21f; }
+.btn.alt { background: linear-gradient(180deg, #8fe6ff, var(--a-main)); box-shadow: 0 5px 0 #157fb3; }
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 30;
+  background: rgba(3,26,44,.9);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px; padding: 18px; text-align: center;
+}
+.overlay.hide { display: none; }
+.overlay h2 { margin: 0; font-size: clamp(22px, 7vw, 38px); }
+.overlay p { margin: 0; font-size: clamp(13px, 3.8vw, 18px); max-width: 420px; line-height: 1.45; }
+.bigbtn {
+  width: 100%; max-width: 330px;
+  min-height: 62px;
+  border: none; border-radius: 20px;
+  font-family: var(--font); font-weight: bold;
+  font-size: clamp(16px, 4.6vw, 22px);
+  color: var(--ink);
+  background: linear-gradient(180deg, #ffe89a, var(--gold));
+  box-shadow: 0 6px 0 #c9a21f;
+  cursor: pointer; padding: 8px 12px;
+}
+.bigbtn.alt { background: linear-gradient(180deg, #8fe6ff, var(--a-main)); box-shadow: 0 6px 0 #157fb3; }
+.bigbtn:active { transform: translateY(5px); box-shadow: 0 1px 0 #c9a21f; }
+.bigbtn small { display: block; font-size: .72em; font-weight: normal; opacity: .8; }
+#howRow { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+
+/* floating chomp word */
+.word {
+  position: fixed; z-index: 25; pointer-events: none;
+  font-size: clamp(20px, 6vw, 32px); font-weight: bold;
+  color: var(--gold); text-shadow: 0 3px 0 rgba(0,0,0,.4);
+  animation: wordUp 1s ease-out forwards;
+}
+@keyframes wordUp {
+  0% { transform: translate(-50%,-50%) scale(.4); opacity: 0; }
+  25% { transform: translate(-50%,-70%) scale(1.2); opacity: 1; }
+  100% { transform: translate(-50%,-150%) scale(1); opacity: 0; }
+}
+.conf { position: fixed; z-index: 26; pointer-events: none; border-radius: 3px; }
+@keyframes fall { to { transform: translateY(105vh) rotate(var(--spin,540deg)); opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div id="bubbles"></div>
+
+<div id="app">
+  <h1>Big Fish, Little Fish</h1>
+
+  <div class="strip opp" id="oppStrip">
+    <div class="who"><span class="face">🐬</span><span class="nm">Bloop</span></div>
+    <div class="tray" id="oppTray"></div>
+  </div>
+
+  <div id="boardWrap"><div id="board"></div></div>
+
+  <div id="status"><span id="statusText">Your turn!</span></div>
+
+  <div class="strip you" id="youStrip">
+    <div class="who"><span class="face">🧒</span><span class="nm">You</span></div>
+    <div class="tray" id="youTray"></div>
+  </div>
+
+  <div id="controls">
+    <button class="btn alt" id="hintBtn">💡 Hint</button>
+    <button class="btn" id="againBtn">🔄 New Game</button>
+  </div>
+</div>
+
+<div class="overlay" id="startScreen">
+  <h2>🐠 Big Fish, Little Fish 🐟</h2>
+  <p>A <b>big</b> fish can gulp a <b>smaller</b> fish!<br>Get <b>three</b> of your fish in a row.</p>
+  <button class="bigbtn" id="playLittle">🐟 Little Reef <small>ages 4-6 &middot; just drop fish in</small></button>
+  <button class="bigbtn alt" id="playBig">🐋 Big Reef <small>ages 7+ &middot; move your fish too</small></button>
+  <div id="howRow">
+    <button class="btn" id="skillBtn" style="max-width:240px">Bloop plays: 🙂 Gentle</button>
+  </div>
+</div>
+
+<div class="overlay hide" id="endScreen">
+  <h2 id="endTitle">You win!</h2>
+  <p id="endMsg"></p>
+  <button class="bigbtn" id="rematch">🔄 Play Again</button>
+  <button class="bigbtn alt" id="backMenu">🏠 Change Reef</button>
+</div>
+
+<script>
+'use strict';
+
+/* ============ constants ============ */
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+const SIZE_LABEL = ['Little','Middle','Big'];
+const LS = 'cowork-bigfish-';
+
+const $ = id => document.getElementById(id);
+const other = p => p === 'p' ? 'a' : 'p';
+
+/* ============ game state ============ */
+let G = null;
+let mode = 'little';          // 'little' = place only, 'big' = place + move
+let skill = 0;                // 0 = gentle, 1 = tricky
+let busy = false;             // true while Bloop thinks / animations run
+let aiTimer = null;           // pending "Bloop is thinking" timer
+let wins = +(localStorage.getItem(LS + 'wins') || 0);
+
+function freshGame(starter) {
+  return {
+    board: [[],[],[],[],[],[],[],[],[]],
+    res: { p: [2,2,2], a: [2,2,2] },   // index = size 0 little / 1 middle / 2 big
+    turn: starter || 'p',
+    sel: null,                          // {kind:'tray', size} | {kind:'cell', idx}
+    over: false, winner: null, winLine: null,
+    moves: 0,
+    lastTo: -1
+  };
+}
+
+const topOf = cell => cell.length ? cell[cell.length - 1] : null;
+
+/* ============ sound ============ */
+let AC = null;
+function audio() {
+  if (!AC) {
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; }
+  }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type, vol, delay, slideTo) {
+  const ac = audio(); if (!ac) return;
+  const t0 = ac.currentTime + (delay || 0);
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(40, slideTo), t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol || 0.22, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(ac.destination);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const sfxTap   = () => tone(620, 0.12, 'sine', 0.18);
+const sfxPlop  = () => { tone(300, 0.16, 'sine', 0.24, 0, 520); tone(880, 0.1, 'triangle', 0.1, 0.05); };
+const sfxGulp  = () => { tone(520, 0.2, 'sawtooth', 0.18, 0, 120); tone(180, 0.22, 'sine', 0.22, 0.08, 90); };
+const sfxFree  = () => { tone(440, 0.1, 'triangle', 0.16); tone(660, 0.12, 'triangle', 0.16, 0.08); tone(990, 0.16, 'triangle', 0.14, 0.16); };
+const sfxNope  = () => tone(210, 0.16, 'square', 0.1, 0, 170);
+const sfxHint  = () => { tone(880, 0.1, 'sine', 0.16); tone(1170, 0.14, 'sine', 0.14, 0.09); };
+function sfxWin() {
+  [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.26, 'triangle', 0.24, i * 0.13));
+  tone(1568, 0.5, 'sine', 0.16, 0.52);
+}
+function sfxGoodGame() {
+  [523, 587, 659].forEach((f, i) => tone(f, 0.24, 'sine', 0.2, i * 0.15));
+}
+
+/* ============ fish artwork ============ */
+function fishSVG(owner, size, px) {
+  const main = owner === 'p' ? 'var(--p-main)' : 'var(--a-main)';
+  const dark = owner === 'p' ? 'var(--p-dark)' : 'var(--a-dark)';
+  // Bloop's family faces left so the two teams look at each other
+  const flip = owner === 'a' ? ' transform="translate(104,0) scale(-1,1)"' : '';
+  return '<svg class="fishwrap pop swim" width="' + px + '" height="' + (px * 0.73) +
+    '" viewBox="0 0 104 76" aria-hidden="true"><g' + flip + '>' +
+      '<path d="M26 38 L3 13 L3 63 Z" fill="' + dark + '"/>' +
+      '<path d="M50 15 L70 3 L77 21 Z" fill="' + dark + '"/>' +
+      '<path d="M52 60 L61 73 L71 59 Z" fill="' + dark + '"/>' +
+      '<ellipse cx="58" cy="38" rx="40" ry="26" fill="' + main + '"/>' +
+      '<ellipse cx="40" cy="38" rx="4.5" ry="20" fill="' + dark + '" opacity=".45"/>' +
+      '<ellipse cx="60" cy="26" rx="21" ry="7.5" fill="#fff" opacity=".3"/>' +
+      '<circle cx="79" cy="32" r="8.5" fill="#fff"/>' +
+      '<circle cx="81.5" cy="32.5" r="4.3" fill="var(--ink)"/>' +
+      '<circle cx="83.5" cy="30.5" r="1.7" fill="#fff"/>' +
+      '<path d="M85 47 q6 5.5 11 -0.5" stroke="' + dark + '" stroke-width="3.4" fill="none" stroke-linecap="round"/>' +
+    '</g></svg>';
+}
+
+/* ============ rendering ============ */
+const SIZE_SCALE = [0.44, 0.63, 0.86];
+
+function render() {
+  const board = $('board');
+  const cellPx = board.clientWidth / 3 || 100;
+  board.innerHTML = '';
+  const legal = G && !G.over ? legalTargets(G, G.sel) : [];
+
+  for (let i = 0; i < 9; i++) {
+    const d = document.createElement('div');
+    d.className = 'cell';
+    d.dataset.i = i;
+    const stack = G.board[i];
+    const t = topOf(stack);
+    if (t) d.innerHTML = fishSVG(t.o, t.s, Math.round(cellPx * SIZE_SCALE[t.s]));
+    if (stack.length > 1) {
+      const u = document.createElement('div');
+      u.className = 'under';
+      for (let k = 0; k < stack.length - 1; k++) {
+        const b = document.createElement('b');
+        b.style.background = stack[k].o === 'p' ? 'var(--p-main)' : 'var(--a-main)';
+        u.appendChild(b);
+      }
+      d.appendChild(u);
+    }
+    if (legal.indexOf(i) >= 0) d.classList.add('target');
+    if (G.sel && G.sel.kind === 'cell' && G.sel.idx === i) d.classList.add('pick');
+    if (G.winLine && G.winLine.indexOf(i) >= 0) d.classList.add('win');
+    board.appendChild(d);
+  }
+
+  renderTray('youTray', 'p');
+  renderTray('oppTray', 'a');
+  $('youStrip').classList.toggle('active', !G.over && G.turn === 'p');
+  $('oppStrip').classList.toggle('active', !G.over && G.turn === 'a');
+}
+
+function renderTray(elId, owner) {
+  const el = $(elId);
+  const px = owner === 'p' ? 46 : 34;
+  el.innerHTML = '';
+  for (let s = 2; s >= 0; s--) {
+    const n = G.res[owner][s];
+    const slot = document.createElement('div');
+    slot.className = 'slot' + (n === 0 ? ' empty' : '');
+    slot.dataset.size = s;
+    slot.dataset.owner = owner;
+    slot.title = SIZE_LABEL[s];
+    if (n > 0) slot.innerHTML = fishSVG(owner, s, Math.round(px * (0.62 + s * 0.19)));
+    const pips = document.createElement('div');
+    pips.className = 'pips';
+    for (let k = 0; k < 2; k++) {
+      const pip = document.createElement('i');
+      if (k >= n) pip.className = 'off';
+      pips.appendChild(pip);
+    }
+    slot.appendChild(pips);
+    if (owner === 'p' && G.sel && G.sel.kind === 'tray' && G.sel.size === s) slot.classList.add('pick');
+    el.appendChild(slot);
+  }
+}
+
+function say(msg, cheer) {
+  const s = $('statusText');
+  s.textContent = msg;
+  if (cheer) {
+    const box = $('status');
+    box.classList.remove('cheer');
+    void box.offsetWidth;
+    box.classList.add('cheer');
+  }
+}
+/* ============ rules ============ */
+function canLandOn(st, idx, size) {
+  const t = topOf(st.board[idx]);
+  return !t || t.s < size;
+}
+
+function legalTargets(st, sel) {
+  if (!sel) return [];
+  const out = [];
+  if (sel.kind === 'tray') {
+    if (st.res[st.turn][sel.size] <= 0) return [];
+    for (let i = 0; i < 9; i++) if (canLandOn(st, i, sel.size)) out.push(i);
+  } else {
+    const t = topOf(st.board[sel.idx]);
+    if (!t || t.o !== st.turn) return [];
+    for (let i = 0; i < 9; i++) if (i !== sel.idx && canLandOn(st, i, t.s)) out.push(i);
+  }
+  return out;
+}
+
+function genMoves(st, who) {
+  const out = [];
+  for (let s = 0; s < 3; s++) {
+    if (st.res[who][s] <= 0) continue;
+    for (let i = 0; i < 9; i++) if (canLandOn(st, i, s)) out.push({ t: 'p', size: s, to: i });
+  }
+  if (mode === 'big') {
+    for (let i = 0; i < 9; i++) {
+      const t = topOf(st.board[i]);
+      if (!t || t.o !== who) continue;
+      for (let j = 0; j < 9; j++) if (j !== i && canLandOn(st, j, t.s)) out.push({ t: 'm', from: i, to: j });
+    }
+  }
+  return out;
+}
+
+function applyMv(st, mv, who) {
+  if (mv.t === 'p') {
+    st.board[mv.to].push({ o: who, s: mv.size });
+    st.res[who][mv.size]--;
+  } else {
+    mv._pc = st.board[mv.from].pop();
+    st.board[mv.to].push(mv._pc);
+  }
+}
+function undoMv(st, mv, who) {
+  if (mv.t === 'p') {
+    st.board[mv.to].pop();
+    st.res[who][mv.size]++;
+  } else {
+    st.board[mv.to].pop();
+    st.board[mv.from].push(mv._pc);
+  }
+}
+
+function lineFor(st, who) {
+  for (let k = 0; k < LINES.length; k++) {
+    const L = LINES[k];
+    const a = topOf(st.board[L[0]]), b = topOf(st.board[L[1]]), c = topOf(st.board[L[2]]);
+    if (a && b && c && a.o === who && b.o === who && c.o === who) return L;
+  }
+  return null;
+}
+
+// After `mover` plays, the opponent's line counts first: if you swim away and
+// uncover their three in a row, they win.
+function winnerAfter(st, mover) {
+  const opp = other(mover);
+  if (lineFor(st, opp)) return opp;
+  if (lineFor(st, mover)) return mover;
+  return null;
+}
+
+/* ============ Bloop's brain ============ */
+let nodes = 0;
+const NODE_CAP = 90000;
+
+function evaluate(st) {
+  let sc = 0;
+  for (let k = 0; k < LINES.length; k++) {
+    const L = LINES[k];
+    let mine = 0, yours = 0;
+    for (let z = 0; z < 3; z++) {
+      const t = topOf(st.board[L[z]]);
+      if (!t) continue;
+      if (t.o === 'a') mine++; else yours++;
+    }
+    if (mine && !yours) sc += [0, 3, 18, 500][mine];
+    else if (yours && !mine) sc -= [0, 3, 18, 500][yours];
+  }
+  const mid = topOf(st.board[4]);
+  if (mid) sc += mid.o === 'a' ? 6 : -6;
+  // keeping big fish in reserve is worth a little - they can gulp anything later
+  sc += (st.res.a[2] - st.res.p[2]) * 2;
+  return sc;
+}
+
+function search(st, depth, alpha, beta, who, ply) {
+  if (++nodes > NODE_CAP) return evaluate(st);
+  const moves = genMoves(st, who);
+  if (!moves.length) return 0;
+  const maxing = who === 'a';
+  let best = maxing ? -Infinity : Infinity;
+  for (let i = 0; i < moves.length; i++) {
+    const mv = moves[i];
+    applyMv(st, mv, who);
+    const w = winnerAfter(st, who);
+    let val;
+    if (w === 'a') val = 9000 - ply;
+    else if (w === 'p') val = -9000 + ply;
+    else if (depth <= 1) val = evaluate(st);
+    else val = search(st, depth - 1, alpha, beta, other(who), ply + 1);
+    undoMv(st, mv, who);
+    if (maxing) { if (val > best) best = val; if (best > alpha) alpha = best; }
+    else { if (val < best) best = val; if (best < beta) beta = best; }
+    if (beta <= alpha) break;
+  }
+  return best;
+}
+
+// Returns the best move for `who`, searched `depth` plies deep.
+function bestMove(st, who, depth) {
+  nodes = 0;
+  const moves = genMoves(st, who);
+  if (!moves.length) return null;
+  const maxing = who === 'a';
+  let best = maxing ? -Infinity : Infinity;
+  let picks = [];
+  for (let i = 0; i < moves.length; i++) {
+    const mv = moves[i];
+    applyMv(st, mv, who);
+    const w = winnerAfter(st, who);
+    let val;
+    if (w === who) val = maxing ? 9000 : -9000;
+    else if (w) val = maxing ? -9000 : 9000;
+    else if (depth <= 1) val = evaluate(st);
+    else val = search(st, depth - 1, -Infinity, Infinity, other(who), 1);
+    undoMv(st, mv, who);
+    if (val === best) picks.push(mv);
+    else if (maxing ? val > best : val < best) { best = val; picks = [mv]; }
+  }
+  return picks[(Math.random() * picks.length) | 0];
+}
+
+// Gentle Bloop mostly just plays somewhere fun and only now and then spots a
+// clever move; Tricky Bloop actually plans ahead. Tuned so a small child
+// genuinely wins about half the time on Gentle.
+const BLUNDER = [0.82, 0.28];
+const DEPTH = [1, 3];
+
+function bloopMove() {
+  const moves = genMoves(G, 'a');
+  if (!moves.length) return null;
+  if (Math.random() < BLUNDER[skill]) return moves[(Math.random() * moves.length) | 0];
+  return bestMove(G, 'a', DEPTH[skill]);
+}
+/* ============ sparkle effects ============ */
+function cellCentre(i) {
+  const el = $('board').children[i];
+  if (!el) return { x: innerWidth / 2, y: innerHeight / 2 };
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+function floatWord(txt, cellIdx) {
+  const c = cellCentre(cellIdx);
+  const d = document.createElement('div');
+  d.className = 'word';
+  d.textContent = txt;
+  // keep the word on screen even when the cell is right at the edge
+  d.style.left = Math.min(Math.max(c.x, 62), innerWidth - 62) + 'px';
+  d.style.top = Math.max(c.y, 64) + 'px';
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 1050);
+}
+function confetti(n) {
+  const cols = ['#ffd84d', '#ff9b3d', '#5ad2f7', '#ff7a8a', '#9bff9b', '#ffffff'];
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'conf';
+    const w = 7 + Math.random() * 9;
+    d.style.cssText = 'width:' + w + 'px;height:' + (w * 1.5) + 'px;left:' + (Math.random() * 100) +
+      'vw;top:-30px;background:' + cols[(Math.random() * cols.length) | 0] +
+      ';--spin:' + (360 + Math.random() * 720) + 'deg;animation:fall ' +
+      (1.7 + Math.random() * 1.6) + 's linear ' + (Math.random() * 0.5) + 's forwards;';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 4200);
+  }
+}
+
+/* ============ turn flow ============ */
+function yourTurnMsg() {
+  if (G.sel) return 'Now tap a glowing spot! ✨';
+  return mode === 'big' ? 'Your turn! Tap a fish 🐠' : 'Your turn! Pick a fish 🐠';
+}
+
+function doMove(mv, who) {
+  const covered = topOf(G.board[mv.to]);
+  const revealed = (mv.t === 'm' && G.board[mv.from].length > 1)
+    ? G.board[mv.from][G.board[mv.from].length - 2] : null;
+
+  applyMv(G, mv, who);
+  G.moves++;
+  G.lastTo = mv.to;
+  G.sel = null;
+  render();
+
+  if (covered) { sfxGulp(); floatWord('CHOMP!', mv.to); }
+  else sfxPlop();
+  if (revealed) { sfxFree(); floatWord('Free! ✨', mv.from); }
+
+  const w = winnerAfter(G, who);
+  if (w) { endGame(w); return; }
+
+  G.turn = other(who);
+  if (!genMoves(G, G.turn).length || G.moves >= 60) { endGame(null); return; }
+
+  if (G.turn === 'a') {
+    busy = true;
+    say('Bloop is thinking… 🐬');
+    clearTimeout(aiTimer);
+    aiTimer = setTimeout(aiTurn, 680);
+  } else {
+    busy = false;
+    say(covered ? 'Chomp! Your turn 🐠' : yourTurnMsg());
+  }
+}
+
+function aiTurn() {
+  // a pending timer must never fire into a game that has moved on (New Game etc.)
+  if (!G || G.over || G.turn !== 'a') { busy = false; return; }
+  const mv = bloopMove();
+  if (!mv) { endGame(null); return; }
+  doMove(mv, 'a');
+}
+
+function endGame(w) {
+  G.over = true;
+  G.winner = w;
+  G.winLine = w ? lineFor(G, w) : null;
+  G.sel = null;
+  busy = true;
+  render();
+
+  let title, msg;
+  if (w === 'p') {
+    wins++;
+    localStorage.setItem(LS + 'wins', wins);
+    title = '🎉 You win! 🎉';
+    msg = 'Three fish in a row! Bloop says: "Wow, great swimming!"  🏆 Wins: ' + wins;
+    say('You win! 🎉', true);
+    sfxWin(); confetti(90);
+  } else if (w === 'a') {
+    title = '🐬 Bloop got three!';
+    msg = 'Nice game! Bloop lined three up this time. Your turn to try again — you go first!';
+    say('Bloop got three! Good game 🐬', true);
+    sfxGoodGame();
+  } else {
+    title = '🐚 The reef is full!';
+    msg = 'Nobody got three in a row — that’s a tie! Shall we play again?';
+    say('It’s a tie! 🐚', true);
+    sfxGoodGame();
+  }
+  $('endTitle').textContent = title;
+  $('endMsg').textContent = msg;
+  setTimeout(() => $('endScreen').classList.remove('hide'), w === 'p' ? 1100 : 800);
+}
+
+/* ============ taps ============ */
+function wiggle(i) {
+  const el = $('board').children[i];
+  if (!el) return;
+  el.classList.remove('nope'); void el.offsetWidth; el.classList.add('nope');
+  sfxNope();
+}
+
+$('board').addEventListener('click', e => {
+  const cell = e.target.closest('.cell');
+  if (!cell || !G || G.over || busy || G.turn !== 'p') return;
+  const i = +cell.dataset.i;
+  const legal = legalTargets(G, G.sel);
+
+  if (G.sel && legal.indexOf(i) >= 0) { doMove(makeMove(i), 'p'); return; }
+
+  const t = topOf(G.board[i]);
+  if (G.sel && G.sel.kind === 'cell' && G.sel.idx === i) {   // tap again to change your mind
+    G.sel = null; render(); sfxTap(); say(yourTurnMsg()); return;
+  }
+  if (mode === 'big' && t && t.o === 'p') {
+    G.sel = { kind: 'cell', idx: i };
+    render(); sfxTap(); say('Now tap a glowing spot! ✨'); return;
+  }
+  wiggle(i);
+  if (G.sel && t) say('Too big to gulp! Try a bigger fish 🐋');
+  else if (t && t.o === 'a') say('That’s Bloop’s fish — gulp it with a bigger one!');
+  else say(yourTurnMsg());
+});
+
+function makeMove(to) {
+  return G.sel.kind === 'tray'
+    ? { t: 'p', size: G.sel.size, to: to }
+    : { t: 'm', from: G.sel.idx, to: to };
+}
+
+$('youTray').addEventListener('click', e => {
+  const slot = e.target.closest('.slot');
+  if (!slot || !G || G.over || busy || G.turn !== 'p') return;
+  const s = +slot.dataset.size;
+  if (G.res.p[s] <= 0) { sfxNope(); say('All your ' + SIZE_LABEL[s].toLowerCase() + ' fish are swimming already!'); return; }
+  if (G.sel && G.sel.kind === 'tray' && G.sel.size === s) G.sel = null;
+  else G.sel = { kind: 'tray', size: s };
+  render(); sfxTap(); say(yourTurnMsg());
+});
+
+$('hintBtn').addEventListener('click', () => {
+  if (!G || G.over || busy || G.turn !== 'p') return;
+  const mv = bestMove(G, 'p', 2);
+  if (!mv) return;
+  G.sel = mv.t === 'p' ? { kind: 'tray', size: mv.size } : { kind: 'cell', idx: mv.from };
+  render();
+  floatWord('👉 here!', mv.to);
+  sfxHint();
+  say('Try this one! ✨');
+});
+
+/* ============ start / restart ============ */
+function startGame() {
+  audio();
+  clearTimeout(aiTimer);
+  G = freshGame('p');
+  busy = false;
+  $('startScreen').classList.add('hide');
+  $('endScreen').classList.add('hide');
+  $('hintBtn').style.display = '';
+  render();
+  say(yourTurnMsg());
+}
+
+$('playLittle').addEventListener('click', () => { mode = 'little'; localStorage.setItem(LS + 'mode', mode); startGame(); });
+$('playBig').addEventListener('click', () => { mode = 'big'; localStorage.setItem(LS + 'mode', mode); startGame(); });
+$('againBtn').addEventListener('click', startGame);
+$('rematch').addEventListener('click', startGame);
+$('backMenu').addEventListener('click', () => {
+  $('endScreen').classList.add('hide');
+  $('startScreen').classList.remove('hide');
+});
+$('skillBtn').addEventListener('click', () => {
+  skill = skill === 0 ? 1 : 0;
+  localStorage.setItem(LS + 'skill', skill);
+  updateSkillBtn();
+  audio(); sfxTap();
+});
+function updateSkillBtn() {
+  $('skillBtn').textContent = 'Bloop plays: ' + (skill === 0 ? '🙂 Gentle' : '😎 Tricky');
+}
+
+/* ============ boot ============ */
+(function boot() {
+  const bw = $('bubbles');
+  for (let i = 0; i < 16; i++) {
+    const b = document.createElement('div');
+    const sz = 6 + Math.random() * 22;
+    b.className = 'bub';
+    b.style.cssText = 'width:' + sz + 'px;height:' + sz + 'px;left:' + (Math.random() * 100) +
+      'vw;--drift:' + (Math.random() * 60 - 30) + 'px;animation-duration:' +
+      (9 + Math.random() * 11) + 's;animation-delay:' + (-Math.random() * 14) + 's;';
+    bw.appendChild(b);
+  }
+  skill = +(localStorage.getItem(LS + 'skill') || 0);
+  updateSkillBtn();
+  G = freshGame('p');
+  render();
+  let rt = null;
+  addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 140); });
+})();
+
+/* headless test hook - lets the drive script play games without the UI */
+window.__bf = {
+  get G() { return G; },
+  setMode: m => { mode = m; },
+  setSkill: s => { skill = s; },
+  freshGame, genMoves, applyMv, undoMv, winnerAfter, lineFor, bloopMove, bestMove, topOf,
+  use: st => { G = st; },
+  tune: (b, d, i) => { BLUNDER[i || 0] = b; if (d) DEPTH[i || 0] = d; }
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,808 @@
+<!-- CONCEPT: Track Town — a route-building puzzle: tap the railway tiles to spin them until an unbroken track links the station to the farm, then Toot the Train auto-chugs along the exact path you built, puffing steam and delivering a happy animal. Levels grow from a gentle 3x3 up to 5x5 with decoy tracks. Sneaky-educational spatial-reasoning puzzle for ages 4-10 — no timer, no losing, every wrong turn is just one more tap. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Track Town</title>
+<style>
+:root{
+  --sky-a:#8fe3ff;
+  --sky-b:#c9f3ff;
+  --grass-a:#7ed957;
+  --grass-b:#4fb62f;
+  --ink:#33301f;
+  --cream:#fff6dd;
+  --bed:#e2caa0;
+  --bed-dark:#c9ab7a;
+  --rail:#6b4a2f;
+  --panel:#ffffffcc;
+  --hot-a:#ff7ac2;
+  --hot-b:#ffb03a;
+  --btn:#ffd23f;
+  --btn-dark:#e8a800;
+  --good:#28c76f;
+  --gap:4px;
+}
+*{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body{
+  margin:0; padding:0;
+  touch-action: manipulation;
+  user-select:none; -webkit-user-select:none;
+  overflow:hidden;
+  height:100%;
+  font-family:"Comic Sans MS","Trebuchet MS",system-ui,sans-serif;
+  color:var(--ink);
+  background:linear-gradient(180deg,var(--sky-a) 0%,var(--sky-b) 42%,var(--grass-a) 42%,var(--grass-b) 100%);
+}
+#app{
+  position:relative;
+  height:100%; height:100dvh;
+  display:flex; flex-direction:column;
+  align-items:center;
+  padding:6px 8px 10px;
+}
+
+/* ---------- header ---------- */
+header{ width:100%; max-width:560px; text-align:center; flex:0 0 auto; }
+h1{
+  margin:2px 0 0;
+  font-size:clamp(26px,7.5vw,42px);
+  letter-spacing:1px;
+  background:linear-gradient(90deg,var(--hot-a),var(--hot-b));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 2px 0 #fff);
+}
+#sub{
+  font-size:clamp(12px,3.4vw,17px);
+  margin:1px 0 4px; color:#2b4a5c; font-weight:bold;
+}
+#stars{
+  display:flex; justify-content:center; gap:3px; flex-wrap:wrap;
+  font-size:clamp(15px,4.2vw,22px); line-height:1;
+  background:var(--panel); border-radius:999px;
+  padding:5px 10px; width:fit-content; margin:0 auto;
+  box-shadow:0 2px 0 #ffffff88;
+}
+#stars span{ opacity:.28; filter:grayscale(1); transition:transform .3s, opacity .3s, filter .3s; }
+#stars span.on{ opacity:1; filter:none; transform:scale(1.15); }
+
+/* ---------- board ---------- */
+#boardWrap{
+  flex:1 1 auto; min-height:0; width:100%;
+  display:grid; place-items:center; padding:8px 0;
+  position:relative;
+}
+#board{
+  position:relative;
+  aspect-ratio:1;
+  height:min(100%,94vw); max-width:94vw; max-height:100%;
+  display:grid;
+  grid-template-columns:repeat(var(--n),1fr);
+  grid-template-rows:repeat(var(--n),1fr);
+  gap:var(--gap);
+  padding:var(--gap);
+  background:linear-gradient(160deg,#66c23f,#3f9c26);
+  border:5px solid #8a5a2b;
+  border-radius:18px;
+  box-shadow:0 8px 0 #6b431f,0 12px 24px #0003;
+}
+.tile{
+  position:relative;
+  border:0; padding:0; margin:0;
+  background:linear-gradient(160deg,#9be36a,#6cc244);
+  border-radius:11px;
+  overflow:hidden;
+  cursor:pointer;
+  box-shadow:inset 0 0 0 2px #ffffff33;
+  transition:transform .12s;
+}
+.tile:active{ transform:scale(.94); }
+.tile.locked{ cursor:default; }
+.tile .art{
+  position:absolute; inset:0;
+  transition:transform .22s cubic-bezier(.34,1.56,.64,1);
+  will-change:transform;
+}
+.tile .badge{
+  position:absolute; inset:0;
+  display:grid; place-items:center;
+  font-size:min(9vw,44px);
+  pointer-events:none;
+  filter:drop-shadow(0 2px 2px #0004);
+}
+.tile .deco{
+  position:absolute; inset:0;
+  display:grid; place-items:center;
+  font-size:min(6vw,26px); opacity:.75; pointer-events:none;
+}
+.tile.lit{ box-shadow:inset 0 0 0 3px #fff2, 0 0 0 3px #ffe14d, 0 0 14px #ffe14daa; }
+.tile.hint{ animation:hintPulse 1s ease-in-out infinite; }
+@keyframes hintPulse{
+  0%,100%{ box-shadow:inset 0 0 0 2px #ffffff33; }
+  50%{ box-shadow:0 0 0 4px #fff,0 0 20px #fff; }
+}
+.tile.nope{ animation:wiggle .35s; }
+@keyframes wiggle{
+  0%,100%{ transform:rotate(0); }
+  25%{ transform:rotate(-5deg); }
+  75%{ transform:rotate(5deg); }
+}
+
+/* ---------- train + fx ---------- */
+#train{
+  position:absolute; left:0; top:0;
+  font-size:min(9vw,46px); line-height:1;
+  display:none; pointer-events:none; z-index:6;
+  filter:drop-shadow(0 3px 3px #0005);
+}
+.puff{
+  position:absolute; pointer-events:none; z-index:5;
+  font-size:min(6vw,28px);
+  animation:puff 1.1s ease-out forwards;
+}
+@keyframes puff{
+  0%{ transform:translate(-50%,-50%) scale(.4); opacity:.95; }
+  100%{ transform:translate(-50%,-160%) scale(1.5); opacity:0; }
+}
+.spark{
+  position:absolute; pointer-events:none; z-index:7;
+  font-size:min(6vw,26px);
+  animation:spark .8s ease-out forwards;
+}
+@keyframes spark{
+  0%{ transform:translate(-50%,-50%) scale(.3); opacity:1; }
+  100%{ transform:translate(-50%,-50%) scale(1.7); opacity:0; }
+}
+#confetti{ position:fixed; inset:0; pointer-events:none; z-index:40; overflow:hidden; }
+.conf{
+  position:absolute; top:-8vh; font-size:22px;
+  animation:fall linear forwards;
+}
+@keyframes fall{
+  0%{ transform:translateY(0) rotate(0); opacity:1; }
+  100%{ transform:translateY(112vh) rotate(720deg); opacity:.9; }
+}
+
+/* ---------- controls ---------- */
+#controls{
+  flex:0 0 auto;
+  display:flex; gap:10px; justify-content:center; flex-wrap:wrap;
+  width:100%; max-width:560px;
+}
+button.big{
+  min-height:60px; min-width:130px;
+  font-family:inherit; font-weight:bold;
+  font-size:clamp(15px,4.2vw,20px);
+  color:var(--ink);
+  background:linear-gradient(180deg,#fff0a8,var(--btn));
+  border:3px solid var(--btn-dark);
+  border-radius:18px;
+  box-shadow:0 5px 0 var(--btn-dark);
+  cursor:pointer; padding:6px 16px;
+}
+button.big:active{ transform:translateY(4px); box-shadow:0 1px 0 var(--btn-dark); }
+button.big.alt{
+  background:linear-gradient(180deg,#bff2ff,#6fd9ff);
+  border-color:#2ba6d6; box-shadow:0 5px 0 #2ba6d6;
+}
+
+/* ---------- banner ---------- */
+#banner{
+  position:fixed; inset:0; z-index:50;
+  display:none; place-items:center;
+  background:#0b2d3caa; backdrop-filter:blur(2px);
+  padding:18px;
+}
+#banner.show{ display:grid; }
+#card{
+  background:var(--cream);
+  border:5px solid #ffb03a; border-radius:26px;
+  box-shadow:0 10px 0 #d98b1f,0 18px 40px #0006;
+  padding:20px 18px; text-align:center;
+  max-width:400px; width:100%;
+  animation:pop .4s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes pop{ 0%{ transform:scale(.6); opacity:0; } 100%{ transform:scale(1); opacity:1; } }
+#cardEmoji{ font-size:clamp(48px,16vw,80px); line-height:1; }
+#cardTitle{
+  font-size:clamp(22px,6.5vw,34px); margin:6px 0 2px;
+  background:linear-gradient(90deg,var(--hot-a),var(--hot-b));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+#cardText{ font-size:clamp(14px,4vw,18px); margin:0 0 14px; color:#5a4a2a; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Track Town</h1>
+    <div id="sub">Tap the tracks to spin them!</div>
+    <div id="stars"></div>
+  </header>
+
+  <div id="boardWrap">
+    <div id="board">
+      <div id="train">🚂</div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button class="big" id="hintBtn">💡 Hint</button>
+    <button class="big alt" id="newBtn">🔄 New Track</button>
+  </div>
+</div>
+
+<div id="confetti"></div>
+
+<div id="banner">
+  <div id="card">
+    <div id="cardEmoji">🎉</div>
+    <h2 id="cardTitle">Delivered!</h2>
+    <p id="cardText">The train made it to the farm!</p>
+    <button class="big" id="nextBtn">▶ Next Track</button>
+  </div>
+</div>
+
+<script>
+/* ============ tiny audio ============ */
+let ac = null;
+function AC(){
+  if(!ac){
+    const C = window.AudioContext || window.webkitAudioContext;
+    if(!C) return null;
+    ac = new C();
+  }
+  if(ac.state === 'suspended') ac.resume();
+  return ac;
+}
+function tone(freq, dur, type, vol, delay){
+  const c = AC(); if(!c) return;
+  const t0 = c.currentTime + (delay || 0);
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + (dur || 0.2));
+  o.connect(g); g.connect(c.destination);
+  o.start(t0); o.stop(t0 + (dur || 0.2) + 0.05);
+}
+function sClick(){ tone(420, 0.08, 'square', 0.12, 0); tone(640, 0.1, 'triangle', 0.1, 0.04); }
+function sNope(){ tone(200, 0.14, 'sine', 0.14, 0); }
+function sSpark(){ [880,1180,1560].forEach((f,i)=>tone(f, 0.14, 'triangle', 0.13, i*0.06)); }
+function sWhistle(){
+  tone(700, 0.5, 'sawtooth', 0.09, 0);
+  tone(930, 0.5, 'sawtooth', 0.07, 0);
+  tone(560, 0.45, 'sawtooth', 0.06, 0.28);
+}
+function sChug(){ tone(120, 0.09, 'square', 0.06, 0); tone(90, 0.07, 'sine', 0.05, 0.05); }
+function sFanfare(){
+  [523,659,784,1046].forEach((f,i)=>{
+    tone(f, 0.3, 'triangle', 0.18, i*0.11);
+    tone(f/2, 0.3, 'sine', 0.1, i*0.11);
+  });
+  tone(1318, 0.55, 'triangle', 0.16, 0.5);
+}
+
+/* ============ direction bitmask ============ */
+/* N=1, E=2, S=4, W=8.  One 90deg CW turn rotates the mask left by one. */
+const N = 1, E = 2, S = 4, W = 8;
+const DELTA = { 1:[-1,0], 2:[0,1], 4:[1,0], 8:[0,-1] };
+const OPP   = { 1:4, 2:8, 4:1, 8:2 };
+const BITS  = [1,2,4,8];
+function rot(m, k){
+  m &= 15;
+  for(let i = 0; i < ((k % 4) + 4) % 4; i++) m = ((m << 1) | (m >> 3)) & 15;
+  return m;
+}
+function bitFor(dr, dc){
+  if(dr === -1) return N;
+  if(dr === 1)  return S;
+  if(dc === 1)  return E;
+  return W;
+}
+
+/* ============ track art ============ */
+function svgOpen(){ return '<svg viewBox="0 0 100 100" width="100%" height="100%">'; }
+function ties(list){
+  return list.map(t =>
+    '<rect x="' + (t.x - 16) + '" y="' + (t.y - 3.6) + '" width="32" height="7.2" rx="2.5" ' +
+    'fill="#8a5f38" transform="rotate(' + t.a + ' ' + t.x + ' ' + t.y + ')"/>'
+  ).join('');
+}
+function artStraight(){          /* base mask N|S = 5 */
+  let t = [];
+  for(const y of [10, 30, 50, 70, 90]) t.push({ x:50, y:y, a:90 });
+  return svgOpen() +
+    '<path d="M50,-2 L50,102" stroke="var(--bed)" stroke-width="46" fill="none"/>' +
+    ties(t) +
+    '<path d="M39,-2 L39,102" stroke="var(--rail)" stroke-width="6.5" fill="none"/>' +
+    '<path d="M61,-2 L61,102" stroke="var(--rail)" stroke-width="6.5" fill="none"/>' +
+    '</svg>';
+}
+function artCurve(){             /* base mask N|E = 3, arc centred on (100,0) */
+  let t = [];
+  for(let i = 0; i < 5; i++){
+    const p = (172 - i * 20) * Math.PI / 180;
+    t.push({ x:100 + 50 * Math.cos(p), y:50 * Math.sin(p), a:172 - i * 20 });
+  }
+  return svgOpen() +
+    '<path d="M50,0 A50,50 0 0 1 100,50" stroke="var(--bed)" stroke-width="46" fill="none"/>' +
+    ties(t) +
+    '<path d="M61,0 A39,39 0 0 1 100,39" stroke="var(--rail)" stroke-width="6.5" fill="none"/>' +
+    '<path d="M39,0 A61,61 0 0 1 100,61" stroke="var(--rail)" stroke-width="6.5" fill="none"/>' +
+    '</svg>';
+}
+function artEnd(){               /* base mask N = 1, stub from centre up */
+  let t = [];
+  for(const y of [10, 30, 46]) t.push({ x:50, y:y, a:90 });
+  return svgOpen() +
+    '<circle cx="50" cy="50" r="27" fill="var(--bed-dark)"/>' +
+    '<path d="M50,-2 L50,52" stroke="var(--bed)" stroke-width="46" fill="none"/>' +
+    ties(t) +
+    '<path d="M39,-2 L39,50" stroke="var(--rail)" stroke-width="6.5" fill="none"/>' +
+    '<path d="M61,-2 L61,50" stroke="var(--rail)" stroke-width="6.5" fill="none"/>' +
+    '</svg>';
+}
+const ART = { straight: artStraight(), curve: artCurve(), end: artEnd() };
+const BASE = { straight: N | S, curve: N | E, end: N };
+
+/* ============ helpers ============ */
+const rnd = n => Math.floor(Math.random() * n);
+function shuffle(a){
+  for(let i = a.length - 1; i > 0; i--){
+    const j = rnd(i + 1); const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+const GRASS = ['🌼','🌿','🌷','🍄','🌻','🪨','🐞','🌾'];
+const CARGO = ['🐮','🐑','🐷','🐔','🐰','🦆','🐴','🐐'];
+
+/* ============ state ============ */
+const boardEl   = document.getElementById('board');
+const trainEl   = document.getElementById('train');
+const starsEl   = document.getElementById('stars');
+const subEl     = document.getElementById('sub');
+const bannerEl  = document.getElementById('banner');
+const confettiEl= document.getElementById('confetti');
+const GOAL = 8;
+const SAVE = 'cowork-tracktown-progress';
+
+let n = 3, grid = [], path = [], solved = false, busy = false;
+let level = 1, delivered = 0, cargo = '🐮';
+let idleTimer = null;
+
+try{
+  const raw = localStorage.getItem(SAVE);
+  if(raw){
+    const d = JSON.parse(raw);
+    if(d && d.level > 0){ level = Math.min(d.level, 40); delivered = d.delivered || 0; }
+  }
+}catch(e){}
+function save(){
+  try{ localStorage.setItem(SAVE, JSON.stringify({ level: level, delivered: delivered })); }catch(e){}
+}
+
+/* ============ level design ============ */
+function spec(lv){
+  if(lv <= 2) return { n:3, len: lv === 1 ? 4 : 5, wrong:3,  decoy:0.15 };
+  if(lv <= 4) return { n:4, len: 5 + lv,           wrong:5,  decoy:0.30 };
+  if(lv <= 6) return { n:4, len: 9,                wrong:99, decoy:0.40 };
+  return       { n:5, len: Math.min(9 + (lv - 7), 14), wrong:99, decoy:0.45 };
+}
+
+/* Build the path FIRST as a self-avoiding walk, then read off the piece each
+   cell needs. Rotation is reversible, so a scrambled solution is always solvable. */
+function walk(size, target){
+  const dirs = [[-1,0],[0,1],[1,0],[0,-1]];
+  function dfs(p, seen){
+    const cur = p[p.length - 1];
+    if(p.length >= target){
+      const s = p[0];
+      if(Math.abs(cur[0] - s[0]) + Math.abs(cur[1] - s[1]) >= 2) return true;
+    }
+    if(p.length >= target + 3) return false;
+    for(const d of shuffle(dirs.slice())){
+      const r = cur[0] + d[0], c = cur[1] + d[1];
+      if(r < 0 || c < 0 || r >= size || c >= size) continue;
+      const k = r + ',' + c;
+      if(seen.has(k)) continue;
+      seen.add(k); p.push([r, c]);
+      if(dfs(p, seen)) return true;
+      p.pop(); seen.delete(k);
+    }
+    return false;
+  }
+  for(let a = 0; a < 300; a++){
+    const start = [rnd(size), rnd(size)];
+    const p = [start], seen = new Set([start[0] + ',' + start[1]]);
+    if(dfs(p, seen)) return p;
+  }
+  /* fallback: along the top row then down the last column */
+  const p = [];
+  for(let c = 0; c < size; c++) p.push([0, c]);
+  for(let r = 1; r < size; r++) p.push([r, size - 1]);
+  return p;
+}
+
+function build(attempt){
+  attempt = attempt || 0;
+  const sp = spec(level);
+  n = sp.n;
+  path = walk(n, Math.min(sp.len, n * n));
+  cargo = CARGO[rnd(CARGO.length)];
+
+  grid = [];
+  for(let r = 0; r < n; r++){
+    const row = [];
+    for(let c = 0; c < n; c++) row.push(null);
+    grid.push(row);
+  }
+
+  /* every path cell gets the piece its real entry/exit edges demand */
+  for(let i = 0; i < path.length; i++){
+    const [r, c] = path[i];
+    let mask = 0;
+    if(i > 0)                mask |= bitFor(path[i-1][0] - r, path[i-1][1] - c);
+    if(i < path.length - 1)  mask |= bitFor(path[i+1][0] - r, path[i+1][1] - c);
+    const kind = (i === 0 || i === path.length - 1) ? 'end'
+               : (mask === (N|S) || mask === (E|W))  ? 'straight'
+               : 'curve';
+    let want = 0;
+    for(let k = 0; k < 4; k++) if(rot(BASE[kind], k) === mask){ want = k; break; }
+    grid[r][c] = {
+      kind: kind, solRot: want, r: want,
+      locked: (i === 0 || i === path.length - 1),
+      role: i === 0 ? 'station' : (i === path.length - 1 ? 'farm' : 'track'),
+      deco: null
+    };
+  }
+
+  /* decoy tracks + grass on the leftovers */
+  for(let r = 0; r < n; r++) for(let c = 0; c < n; c++){
+    if(grid[r][c]) continue;
+    if(Math.random() < sp.decoy){
+      const kind = Math.random() < 0.5 ? 'straight' : 'curve';
+      grid[r][c] = { kind: kind, solRot: -1, r: rnd(4), locked: false, role: 'decoy', deco: null };
+    }else{
+      grid[r][c] = { kind: null, solRot: -1, r: 0, locked: true, role: 'grass',
+                     deco: GRASS[rnd(GRASS.length)] };
+    }
+  }
+
+  /* scramble the movable path pieces */
+  const movable = path.slice(1, -1).map(p => grid[p[0]][p[1]]);
+  const decoys = [];
+  for(let r = 0; r < n; r++) for(let c = 0; c < n; c++)
+    if(grid[r][c].role === 'decoy') decoys.push(grid[r][c]);
+
+  const howMany = Math.min(sp.wrong, movable.length);
+  const picks = shuffle(movable.slice()).slice(0, howMany);
+  for(const t of picks) t.r = wrongRot(t);
+
+  /* never hand the kid an already-finished board (a decoy can close the loop too) */
+  let guard = 0;
+  while(movable.length && connected() && guard++ < 40){
+    for(const t of picks) t.r = wrongRot(t);
+    for(const d of decoys) d.r = rnd(4);
+  }
+
+  /* last resort: a fresh path rather than a board that starts finished */
+  if(connected() && attempt < 6) return build(attempt + 1);
+
+  solved = false; busy = false;
+  render();
+  armIdle();
+}
+function wrongRot(t){
+  const good = rot(BASE[t.kind], t.solRot);
+  const opts = [];
+  for(let k = 0; k < 4; k++) if(rot(BASE[t.kind], k) !== good) opts.push(k);
+  return opts.length ? opts[rnd(opts.length)] : (t.solRot + 1) % 4;
+}
+
+/* ============ connectivity ============ */
+function maskAt(r, c){
+  const t = grid[r][c];
+  if(!t || !t.kind) return 0;
+  return rot(BASE[t.kind], t.r);
+}
+/* Tiles (r,c) and (r+1,c) connect iff A has S and B has N. */
+function linked(r, c, bit){
+  const d = DELTA[bit];
+  const r2 = r + d[0], c2 = c + d[1];
+  if(r2 < 0 || c2 < 0 || r2 >= n || c2 >= n) return null;
+  if((maskAt(r, c) & bit) === 0) return null;
+  if((maskAt(r2, c2) & OPP[bit]) === 0) return null;
+  return [r2, c2];
+}
+/* Flood fill from the station: does it reach the farm? Returns the route. */
+function route(){
+  const st = path[0], fm = path[path.length - 1];
+  const from = {}, q = [st];
+  const seen = new Set([st[0] + ',' + st[1]]);
+  while(q.length){
+    const [r, c] = q.shift();
+    if(r === fm[0] && c === fm[1]){
+      const out = [];
+      let k = r + ',' + c;
+      while(k){ out.push(k.split(',').map(Number)); k = from[k]; }
+      return out.reverse();
+    }
+    for(const b of BITS){
+      const nx = linked(r, c, b);
+      if(!nx) continue;
+      const k = nx[0] + ',' + nx[1];
+      if(seen.has(k)) continue;
+      seen.add(k); from[k] = r + ',' + c; q.push(nx);
+    }
+  }
+  return null;
+}
+function connected(){ return !!route(); }
+
+/* how many path pieces are already pointing the right way (for the nudge line) */
+function wrongTiles(){
+  const out = [];
+  for(let i = 1; i < path.length - 1; i++){
+    const t = grid[path[i][0]][path[i][1]];
+    if(rot(BASE[t.kind], t.r) !== rot(BASE[t.kind], t.solRot)) out.push(path[i]);
+  }
+  return out;
+}
+
+/* ============ render ============ */
+function render(){
+  boardEl.style.setProperty('--n', n);
+  [...boardEl.querySelectorAll('.tile')].forEach(e => e.remove());
+  for(let r = 0; r < n; r++) for(let c = 0; c < n; c++){
+    const t = grid[r][c];
+    const el = document.createElement('button');
+    el.className = 'tile' + (t.locked ? ' locked' : '');
+    el.dataset.r = r; el.dataset.c = c;
+    el.setAttribute('aria-label', t.role);
+    if(t.kind){
+      const art = document.createElement('div');
+      art.className = 'art';
+      art.innerHTML = ART[t.kind];
+      t.spin = t.r * 90;                 /* keep spins going forwards, never snapping back */
+      art.style.transform = 'rotate(' + t.spin + 'deg)';
+      el.appendChild(art);
+    }
+    if(t.role === 'station' || t.role === 'farm'){
+      const b = document.createElement('div');
+      b.className = 'badge';
+      b.textContent = t.role === 'station' ? '🚉' : '🏡';
+      el.appendChild(b);
+    }else if(t.deco){
+      const d = document.createElement('div');
+      d.className = 'deco'; d.textContent = t.deco;
+      el.appendChild(d);
+    }
+    el.addEventListener('click', onTap);
+    boardEl.appendChild(el);
+  }
+  paintLit();
+  updateStars();
+  const left = wrongTiles().length;
+  subEl.textContent = left === 0 ? 'All aboard!' : 'Tap the tracks to spin them!';
+}
+function tileEl(r, c){ return boardEl.querySelector('.tile[data-r="' + r + '"][data-c="' + c + '"]'); }
+
+/* light up every tile the train can already reach from the station */
+function paintLit(){
+  const st = path[0];
+  const seen = new Set([st[0] + ',' + st[1]]), q = [st];
+  while(q.length){
+    const [r, c] = q.shift();
+    for(const b of BITS){
+      const nx = linked(r, c, b);
+      if(!nx) continue;
+      const k = nx[0] + ',' + nx[1];
+      if(seen.has(k)) continue;
+      seen.add(k); q.push(nx);
+    }
+  }
+  for(let r = 0; r < n; r++) for(let c = 0; c < n; c++){
+    const el = tileEl(r, c);
+    if(el) el.classList.toggle('lit', seen.has(r + ',' + c) && !!grid[r][c].kind);
+  }
+}
+function updateStars(){
+  starsEl.innerHTML = '';
+  for(let i = 0; i < GOAL; i++){
+    const s = document.createElement('span');
+    s.textContent = '⭐';
+    if(i < (delivered % GOAL === 0 && delivered > 0 ? GOAL : delivered % GOAL)) s.classList.add('on');
+    starsEl.appendChild(s);
+  }
+}
+
+/* ============ interaction ============ */
+function onTap(e){
+  if(busy) return;
+  const r = +e.currentTarget.dataset.r, c = +e.currentTarget.dataset.c;
+  const t = grid[r][c];
+  clearHint();
+  if(t.locked || !t.kind){
+    e.currentTarget.classList.remove('nope');
+    void e.currentTarget.offsetWidth;
+    e.currentTarget.classList.add('nope');
+    if(t.role === 'station' || t.role === 'farm') sWhistle(); else sNope();
+    armIdle();
+    return;
+  }
+  t.r = (t.r + 1) % 4;
+  const art = e.currentTarget.querySelector('.art');
+  t.spin = (t.spin || 0) + 90;           /* accumulates so it always spins clockwise */
+  art.style.transform = 'rotate(' + t.spin + 'deg)';
+  sClick();
+  paintLit();
+  armIdle();
+  if(connected()) win();
+}
+
+function armIdle(){
+  clearTimeout(idleTimer);
+  if(solved) return;
+  idleTimer = setTimeout(() => { showHint(true); }, 9000);
+}
+function clearHint(){
+  [...boardEl.querySelectorAll('.tile.hint')].forEach(e => e.classList.remove('hint'));
+}
+function showHint(quiet){
+  if(solved || busy) return;
+  clearHint();
+  const bad = wrongTiles();
+  if(!bad.length) return;
+  const [r, c] = bad[rnd(bad.length)];
+  const el = tileEl(r, c);
+  if(el) el.classList.add('hint');
+  if(!quiet) sSpark();
+  sparkleAt(r, c);
+  setTimeout(clearHint, 4000);
+}
+
+/* ============ celebration ============ */
+function centerOf(r, c){
+  const el = tileEl(r, c);
+  return { x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2 };
+}
+function edgeMid(a, b){
+  const p = centerOf(a[0], a[1]), q = centerOf(b[0], b[1]);
+  return { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 };
+}
+function sparkleAt(r, c){
+  const p = centerOf(r, c);
+  const s = document.createElement('div');
+  s.className = 'spark'; s.textContent = '✨';
+  s.style.left = p.x + 'px'; s.style.top = p.y + 'px';
+  boardEl.appendChild(s);
+  setTimeout(() => s.remove(), 820);
+}
+function puffAt(x, y){
+  const p = document.createElement('div');
+  p.className = 'puff'; p.textContent = '☁️';
+  p.style.left = x + 'px'; p.style.top = (y - 6) + 'px';
+  boardEl.appendChild(p);
+  setTimeout(() => p.remove(), 1150);
+}
+function confetti(count){
+  const bits = ['🎉','⭐','🎊','💚','🚂','🌟','🎈'];
+  for(let i = 0; i < count; i++){
+    const d = document.createElement('div');
+    d.className = 'conf';
+    d.textContent = bits[rnd(bits.length)];
+    d.style.left = Math.random() * 100 + 'vw';
+    d.style.animationDuration = (1.6 + Math.random() * 1.6) + 's';
+    d.style.animationDelay = (Math.random() * 0.5) + 's';
+    d.style.fontSize = (16 + Math.random() * 20) + 'px';
+    confettiEl.appendChild(d);
+    setTimeout(() => d.remove(), 4200);
+  }
+}
+
+function win(){
+  if(solved) return;
+  solved = true; busy = true;
+  clearTimeout(idleTimer); clearHint();
+  subEl.textContent = 'All aboard! 🚂';
+  paintLit();
+  sWhistle();
+  const rt = route();
+  const pts = [centerOf(rt[0][0], rt[0][1])];
+  for(let i = 1; i < rt.length; i++){
+    pts.push(edgeMid(rt[i-1], rt[i]));
+    pts.push(centerOf(rt[i][0], rt[i][1]));
+  }
+  runTrain(pts, rt);
+}
+
+function runTrain(pts, rt){
+  const tile = boardEl.querySelector('.tile').offsetWidth;
+  const speed = Math.max(90, tile * 2.0);   /* px per second */
+  trainEl.style.display = 'block';
+  let seg = 0, t0 = null, lastPuff = 0, lastChug = 0;
+
+  function place(x, y, flip){
+    trainEl.style.transform = 'translate(-50%,-50%) scaleX(' + (flip ? -1 : 1) + ')';
+    trainEl.style.left = x + 'px';
+    trainEl.style.top  = y + 'px';
+  }
+  place(pts[0].x, pts[0].y, false);
+
+  function step(ts){
+    if(t0 === null) t0 = ts;
+    const dt = (ts - t0) / 1000; t0 = ts;
+    let move = speed * dt;
+    while(move > 0 && seg < pts.length - 1){
+      const a = pts[seg], b = pts[seg + 1];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 0.001;
+      const prog = (trainEl._p || 0) + move / len;
+      if(prog >= 1){ move = (prog - 1) * len; trainEl._p = 0; seg++; }
+      else{
+        trainEl._p = prog; move = 0;
+        place(a.x + dx * prog, a.y + dy * prog, dx < -0.5);
+      }
+    }
+    if(ts - lastPuff > 220){ lastPuff = ts; puffAt(trainEl.offsetLeft, trainEl.offsetTop); }
+    if(ts - lastChug > 300){ lastChug = ts; sChug(); }
+    if(seg < pts.length - 1) requestAnimationFrame(step);
+    else{
+      const end = pts[pts.length - 1];
+      place(end.x, end.y, false);
+      trainEl._p = 0;
+      arrive(rt);
+    }
+  }
+  trainEl._p = 0;
+  requestAnimationFrame(step);
+}
+
+function arrive(rt){
+  const fm = rt[rt.length - 1];
+  sparkleAt(fm[0], fm[1]);
+  trainEl.textContent = '🚂' + cargo;
+  sFanfare();
+  confetti(60);
+  delivered++;
+  level++;
+  save();
+  updateStars();
+  setTimeout(() => {
+    const full = delivered % GOAL === 0;
+    document.getElementById('cardEmoji').textContent = full ? '🏆' : cargo;
+    document.getElementById('cardTitle').textContent = full ? 'Whole Town Delivered!' : 'Delivered!';
+    document.getElementById('cardText').textContent = full
+      ? 'You finished all ' + GOAL + ' deliveries. The whole town says thank you! Keep going for longer tracks.'
+      : 'The train found the farm. Deliveries: ' + delivered;
+    bannerEl.classList.add('show');
+    if(full) confetti(80);
+  }, 900);
+}
+
+function nextLevel(){
+  bannerEl.classList.remove('show');
+  trainEl.style.display = 'none';
+  trainEl.textContent = '🚂';
+  build();
+}
+
+/* ============ buttons ============ */
+document.getElementById('nextBtn').addEventListener('click', () => { AC(); nextLevel(); });
+document.getElementById('newBtn').addEventListener('click', () => {
+  AC(); sClick();
+  bannerEl.classList.remove('show');
+  trainEl.style.display = 'none'; trainEl.textContent = '🚂';
+  build();
+});
+document.getElementById('hintBtn').addEventListener('click', () => { AC(); showHint(false); });
+
+/* ============ go ============ */
+build();
+window.addEventListener('resize', () => { if(!busy) paintLit(); });
+</script>
+</body>
+</html>

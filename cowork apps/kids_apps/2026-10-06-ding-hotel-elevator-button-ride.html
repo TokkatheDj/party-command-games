@@ -1,0 +1,909 @@
+<!-- CONCEPT: CAUSE & EFFECT TOYS - Ding! Hotel: press the big chunky floor buttons to ride Zip the bellhop monkey's elevator up and down an animal hotel - buttons light up, doors whoosh shut, floors whizz past, DING, and the doors open on a surprise room (bubble bath, balloons, jungle, piano, pizza kitchen, aquarium, snow room, space) that you can poke to make something silly happen. Animal guests ring the bell and show a ticket for their floor (by colour, numeral, dots to count, or picture); take every guest home to light up the whole hotel, then press the roof button for a fireworks party. Three days grow the hotel from 4 to 6 to 8 floors, plus a Free Ride mode. No timer, no losing - a wrong floor is just a giggle and the right button starts to glow. Ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ding! Hotel</title>
+<style>
+:root{
+  --bg1:#1b2a6b; --bg2:#3b1d6e;
+  --panel:#2a2f5a; --panel2:#1d2147; --steel:#39406f;
+  --ink:#ffffff; --ink-soft:#c9cdf5;
+  --a:#ffd54f; --b:#ff8a65; --ok:#69f0ae;
+  --ticket:#fffbe6; --ticket-ink:#2b2b3a;
+  --gap:clamp(6px,1.6vw,10px);
+  --btn:clamp(56px,15.5vw,84px);
+  --font:"Comic Sans MS","Trebuchet MS",system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
+  margin:0;padding:0;height:100%;overflow:hidden;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  font-family:var(--font);color:var(--ink);
+  background:linear-gradient(160deg,var(--bg1),var(--bg2));
+}
+button{font-family:inherit;color:inherit;cursor:pointer}
+#app{position:relative;height:100vh;height:100dvh;max-width:760px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden}
+
+/* ---------- title screen ---------- */
+#title{display:none;flex-direction:column;align-items:center;justify-content:center;gap:clamp(8px,2vh,16px);height:100%;padding:12px 16px;text-align:center}
+#title.on{display:flex}
+.logo{font-size:clamp(48px,14vw,84px);line-height:1;animation:bob 2.4s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-8px) rotate(-6deg)}}
+h1{margin:0;font-size:clamp(38px,11vw,64px);line-height:1.05}
+.grad{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{margin:0;font-size:clamp(15px,4.2vw,22px);color:var(--ink-soft)}
+#modes{display:grid;grid-template-columns:repeat(2,1fr);gap:clamp(8px,2.4vw,14px);width:min(100%,460px)}
+.mode{position:relative;min-height:clamp(92px,17vh,130px);border:0;border-radius:22px;background:var(--panel);box-shadow:0 5px 0 rgba(0,0,0,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px}
+.mode:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.35)}
+.mode .mi{font-size:clamp(30px,8vw,44px);line-height:1.1}
+.mode .ml{font-weight:900;font-size:clamp(17px,4.6vw,24px)}
+.mode .ms{font-size:clamp(13px,3.4vw,16px);color:var(--ink-soft)}
+.mode .badge{position:absolute;top:6px;right:10px;font-size:clamp(20px,5vw,28px)}
+.mode.locked{opacity:.55}
+.mode.next{outline:4px solid var(--a)}
+.mode.wob,.fbtn.wob{animation:wob .35s}
+@keyframes wob{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+#btnReset{min-height:44px;border:0;border-radius:14px;background:transparent;color:var(--ink-soft);font-size:clamp(14px,3.6vw,16px);padding:8px 16px}
+
+/* ---------- game screen ---------- */
+#game{display:none;flex-direction:column;height:100%;min-height:0}
+#game.on{display:flex}
+.topbar{display:flex;align-items:center;gap:var(--gap);padding:6px 8px;flex:none}
+.ibtn{flex:none;width:48px;height:48px;border:0;border-radius:14px;font-size:24px;line-height:1;background:var(--panel);box-shadow:0 3px 0 rgba(0,0,0,.35)}
+.ibtn:active{transform:translateY(2px)}
+#dayBox{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px}
+#dayName{font-weight:900;font-size:clamp(15px,4.2vw,20px);white-space:nowrap}
+#pips{display:flex;gap:4px;min-height:10px}
+.pip{width:16px;height:10px;border-radius:4px;background:rgba(255,255,255,.18);transition:background .3s}
+#floorDisp{flex:none;min-width:66px;height:48px;padding:0 6px;border-radius:12px;background:#0b0b12;border:3px solid var(--steel);color:#ffb300;font:900 24px/42px "Courier New",monospace;text-align:center;white-space:nowrap}
+#tickets{flex:none;display:flex;gap:var(--gap);align-items:center;justify-content:center;min-height:64px;padding:0 8px 6px}
+.ticket{display:flex;align-items:center;gap:6px;background:var(--ticket);color:var(--ticket-ink);border-radius:16px;padding:4px 10px;font-size:clamp(26px,7.4vw,34px);line-height:1;box-shadow:0 3px 0 rgba(0,0,0,.3)}
+.ticket .arr{font-size:.7em;font-weight:900}
+.ticket .bell{display:inline-block;font-size:.8em;animation:ring .6s ease-in-out infinite;transform-origin:50% 10%}
+@keyframes ring{25%{transform:rotate(-18deg)}75%{transform:rotate(18deg)}}
+.chip{display:inline-grid;place-items:center;width:46px;height:46px;border-radius:13px;font-weight:900;font-size:27px;line-height:1;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.4);border:3px solid rgba(255,255,255,.55)}
+.chip.plain{background:#fff;color:#222;text-shadow:none;border-color:#333}
+.dots{display:grid;grid-template-columns:repeat(3,9px);gap:3px;justify-content:center;align-content:center}
+.dots i{width:9px;height:9px;border-radius:50%;background:#222}
+.free{font-weight:900;font-size:clamp(16px,4.4vw,22px);color:var(--ink-soft)}
+#btnRoof{min-height:56px;border:0;border-radius:18px;padding:6px 18px;font-weight:900;font-size:clamp(18px,5vw,24px);color:#3a2200;background:linear-gradient(180deg,#ffe082,#ffb300);box-shadow:0 4px 0 #b26a00,0 0 0 0 rgba(255,213,79,.8)}
+#btnRoof.big{animation:glow 1s ease-in-out infinite}
+@keyframes glow{50%{box-shadow:0 4px 0 #b26a00,0 0 0 10px rgba(255,213,79,0)}}
+#viewWrap{flex:1;min-height:0;position:relative;margin:0 8px;border-radius:16px;overflow:hidden;border:4px solid #0d1030;background:#0d1030}
+#view{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:pointer}
+#panel{flex:none;display:grid;grid-template-columns:repeat(5,var(--btn));gap:var(--gap);justify-content:center;padding:8px;background:var(--panel2);border-radius:18px 18px 0 0;margin-top:8px}
+.fbtn{position:relative;height:var(--btn);border-radius:22%;border:4px solid rgba(255,255,255,.4);font-weight:900;font-size:clamp(26px,7.5vw,38px);line-height:1;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.45);box-shadow:0 5px 0 rgba(0,0,0,.4),inset 0 -6px 0 rgba(0,0,0,.18);padding:0}
+.fbtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.4),inset 0 -6px 0 rgba(0,0,0,.18)}
+.fbtn .fi{position:absolute;right:2px;bottom:1px;font-size:.5em;text-shadow:none}
+.fbtn.lit{border-color:#fff;box-shadow:0 5px 0 rgba(0,0,0,.4),0 0 0 4px var(--a),0 0 22px 6px var(--a)}
+.fbtn.hint{animation:hint .9s ease-in-out infinite}
+@keyframes hint{50%{box-shadow:0 5px 0 rgba(0,0,0,.4),0 0 0 7px #fff,0 0 26px 10px #fff}}
+.fbtn.gap{visibility:hidden}
+
+/* ---------- day-done sheet ---------- */
+#done{position:absolute;left:0;right:0;bottom:0;z-index:5;display:none;justify-content:center;padding:0 8px}
+#done.on{display:flex;animation:rise .45s ease-out}
+@keyframes rise{from{transform:translateY(100%)}}
+.card{width:100%;background:var(--panel2);border:4px solid var(--a);border-bottom:0;border-radius:24px 24px 0 0;padding:12px 14px 16px;text-align:center}
+.card h2{margin:0 0 4px;font-size:clamp(22px,6.4vw,32px)}
+#doneGuests{font-size:clamp(22px,6vw,32px);line-height:1.2;min-height:1.2em}
+.row{display:flex;gap:10px;justify-content:center;margin-top:10px}
+.cta{min-height:60px;border:0;border-radius:18px;padding:8px 24px;font-weight:900;font-size:clamp(20px,5.6vw,26px);color:#06351c;background:linear-gradient(180deg,#b9f6ca,var(--ok));box-shadow:0 5px 0 #1b8a4b}
+.cta:active,.ghost:active{transform:translateY(3px)}
+.ghost{min-width:60px;min-height:60px;border:0;border-radius:18px;font-size:26px;background:var(--panel);box-shadow:0 5px 0 rgba(0,0,0,.35)}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="title" class="on">
+    <div class="logo">🛎️</div>
+    <h1><span class="grad">Ding! Hotel</span></h1>
+    <p class="sub">Press a button · Ride the elevator!</p>
+    <div id="modes"></div>
+    <button id="btnReset">↺ Start over</button>
+  </div>
+
+  <div id="game">
+    <div class="topbar">
+      <button class="ibtn" id="btnHome" aria-label="Home">🏠</button>
+      <div id="dayBox"><div id="dayName">Ding! Hotel</div><div id="pips"></div></div>
+      <div id="floorDisp">★</div>
+      <button class="ibtn" id="btnMute" aria-label="Sound">🔊</button>
+    </div>
+    <div id="tickets"></div>
+    <div id="viewWrap"><canvas id="view"></canvas></div>
+    <div id="panel"></div>
+    <div id="done">
+      <div class="card">
+        <h2 id="doneTitle">Day 1 done!</h2>
+        <div id="doneGuests"></div>
+        <div class="row">
+          <button class="ghost" id="btnHome2" aria-label="Home">🏠</button>
+          <button class="cta" id="btnNext">Next Day ▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const LS = 'cowork-ding-hotel-progress';
+
+// index 0 is the lobby; the roof is always floor n+1
+const FLOORS = [
+  { key: 'lobby',   icon: '🛎️', col: '#f9a825' },
+  { key: 'bath',    icon: '🛁', col: '#29b6f6' },
+  { key: 'balloon', icon: '🎈', col: '#e53935' },
+  { key: 'jungle',  icon: '🌴', col: '#43a047' },
+  { key: 'music',   icon: '🎹', col: '#8e24aa' },
+  { key: 'pizza',   icon: '🍕', col: '#fb8c00' },
+  { key: 'fish',    icon: '🐠', col: '#ec407a' },
+  { key: 'snow',    icon: '⛄', col: '#78909c' },
+  { key: 'space',   icon: '👽', col: '#283593' },
+];
+const DAYS = [
+  { n: 4, label: 'Day 1', icon: '🌅', hint: 4 },
+  { n: 6, label: 'Day 2', icon: '☀️', hint: 7 },
+  { n: 8, label: 'Day 3', icon: '🌙', hint: 9 },
+];
+const FREE = 3;
+const ANIMALS = ['🐰', '🐻', '🐼', '🐸', '🦊', '🐨', '🐯', '🐷', '🐶', '🐱', '🦁', '🐮', '🐹', '🐥'];
+const SCALE = [261.6, 293.7, 329.6, 349.2, 392, 440, 493.9, 523.3];
+const CONF = ['#ffd54f', '#ff8a65', '#69f0ae', '#40c4ff', '#ea80fc', '#ff5252'];
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const hash = n => { const s = Math.sin(n * 127.1) * 43758.5453; return s - Math.floor(s); };
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const ease = p => 0.5 - 0.5 * Math.cos(Math.PI * clamp(p, 0, 1));
+
+const loadSave = () => {
+  try { const s = JSON.parse(localStorage.getItem(LS)); if (s && Array.isArray(s.days)) return { days: [0, 1, 2].map(i => !!s.days[i]) }; } catch (e) {}
+  return { days: [false, false, false] };
+};
+const store = () => { try { localStorage.setItem(LS, JSON.stringify(save)); } catch (e) {} };
+let save = loadSave();
+
+// ---------- sound ----------
+let AC = null, master = null, humOsc = null, humGain = null, noiseBuf = null, muted = false;
+const initAudio = () => {
+  if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain(); master.gain.value = muted ? 0 : 0.9; master.connect(AC.destination);
+    noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    humOsc = AC.createOscillator(); humOsc.type = 'sawtooth'; humOsc.frequency.value = 60;
+    const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 320;
+    humGain = AC.createGain(); humGain.gain.value = 0;
+    humOsc.connect(lp); lp.connect(humGain); humGain.connect(master); humOsc.start();
+  } catch (e) { AC = null; }
+};
+const tone = (f, d = 0.15, type = 'sine', vol = 0.2, when = 0, f2 = 0) => {
+  if (!AC) return;
+  const t0 = AC.currentTime + when, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t0);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + d);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + d + 0.03);
+};
+const noise = (d = 0.3, vol = 0.15, freq = 1200, when = 0, type = 'bandpass') => {
+  if (!AC) return;
+  const t0 = AC.currentTime + when, s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  s.buffer = noiseBuf; f.type = type; f.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t0); s.stop(t0 + d + 0.02);
+};
+const setHum = v => {
+  if (!AC) return;
+  humOsc.frequency.setTargetAtTime(60 + v * 80, AC.currentTime, 0.05);
+  humGain.gain.setTargetAtTime(v > 0.02 ? 0.05 + v * 0.03 : 0, AC.currentTime, 0.08);
+};
+const SFX = {
+  click: () => tone(700, 0.06, 'square', 0.08),
+  door: () => noise(0.38, 0.12, 900),
+  tick: () => tone(990, 0.04, 'sine', 0.06),
+  ding: () => { tone(1318.5, 0.9, 'sine', 0.22); tone(1046.5, 1.1, 'sine', 0.2, 0.18); },
+  board: () => { tone(523, 0.1, 'triangle', 0.15); tone(784, 0.12, 'triangle', 0.15, 0.09); },
+  deliver: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, 'triangle', 0.18, i * 0.08)),
+  notMine: () => { tone(440, 0.16, 'triangle', 0.12); tone(370, 0.22, 'triangle', 0.12, 0.16); },
+  call: () => { tone(1568, 0.12, 'sine', 0.12); tone(1568, 0.12, 'sine', 0.12, 0.18); },
+  pops: () => { for (let i = 0; i < 3; i++) { const f = rnd(700, 1400); tone(f, 0.05, 'sine', 0.12, i * 0.05, f * 1.6); } },
+  pop: () => { noise(0.08, 0.3, 1800); tone(300, 0.08, 'square', 0.1, 0, 120); },
+  squeak: () => tone(900, 0.12, 'square', 0.07, 0, 1500),
+  monkey: () => [520, 700, 520, 820].forEach((f, i) => tone(f, 0.07, 'square', 0.06, i * 0.08)),
+  piano: i => tone(SCALE[i], 0.5, 'triangle', 0.22),
+  whistle: () => tone(400, 0.5, 'sine', 0.14, 0, 1400),
+  blub: () => { tone(180, 0.18, 'sine', 0.2, 0, 420); tone(240, 0.14, 'sine', 0.14, 0.12, 520); },
+  twinkle: () => [1568, 2093, 2637].forEach((f, i) => tone(f, 0.18, 'sine', 0.1, i * 0.06)),
+  pew: () => tone(1800, 0.35, 'sawtooth', 0.07, 0, 200),
+  bell: () => tone(2093, 0.6, 'sine', 0.2),
+  boom: () => { noise(0.5, 0.3, 300, 0, 'lowpass'); noise(0.25, 0.1, 4000, 0.15, 'highpass'); },
+  fanfare: () => [392, 523, 659, 784, 659, 784, 1047].forEach((f, i) => tone(f, i === 6 ? 0.7 : 0.16, 'triangle', 0.2, i * 0.13)),
+  rocket: () => { noise(1.6, 0.2, 500, 0, 'lowpass'); tone(120, 1.6, 'sawtooth', 0.08, 0, 700); },
+  knock: () => { tone(160, 0.07, 'sine', 0.2); tone(140, 0.07, 'sine', 0.2, 0.12); },
+  lock: () => tone(200, 0.1, 'square', 0.06),
+  ook: () => { tone(600, 0.08, 'square', 0.06); tone(800, 0.1, 'square', 0.06, 0.09); },
+};
+
+// ---------- game state ----------
+const G = {
+  mode: -1, n: 0, rooms: [], guests: [], waves: [], waveI: 0, queue: [], parts: [], timers: [], pool: [],
+  car: { y: 0, door: 1, state: 'open', from: 0, to: 0, t: 0, dur: 1, idle: 0, rocket: false, reopen: false },
+  t: 0, phase: 'play', hintT: 0, hintFloor: -1, zipT: -9, bubble: null, running: false, shown: '',
+};
+const roofI = () => G.n + 1;
+const curFloor = () => Math.round(G.car.y);
+const after = (sec, fn) => G.timers.push({ t: G.t + sec, fn });
+const nextAnimal = () => { if (!G.pool.length) G.pool = shuffle(ANIMALS.slice()); return G.pool.pop(); };
+const newGuest = o => {
+  const g = Object.assign({ e: nextAnimal(), floor: 0, to: -1, clue: 'color', state: 'resident', rx: 0.5, slotK: 0, slot: 0, at: 0, shakeT: -9, ph: Math.random() * 6 }, o);
+  if (g.trx === undefined) g.trx = g.rx;
+  return g;
+};
+
+// each wave is the set of guests on the go at once; the next wave rings when they are all home
+const makeWaves = mode => {
+  const n = DAYS[mode].n, fl = shuffle(Array.from({ length: n }, (_, i) => i + 1));
+  if (mode === 0) return fl.map(f => [{ from: 0, to: f, clue: 'color' }]);
+  if (mode === 1) {
+    const w = fl.map((f, i) => [{ from: 0, to: f, clue: i % 2 ? 'dots' : 'num' }]);
+    w.splice(4, 0, [{ from: fl[0], to: fl[2], clue: 'num', visit: true }]);
+    return w;
+  }
+  const w = [];
+  for (let i = 0; i < n; i += 2) w.push([{ from: 0, to: fl[i], clue: 'icon' }, { from: 0, to: fl[i + 1], clue: 'num' }]);
+  w.splice(2, 0, [{ from: fl[1], to: fl[2], clue: 'dots', visit: true }]);
+  w.push([{ from: fl[6], to: fl[0], clue: 'dots', visit: true }]);
+  return w;
+};
+
+const startMode = mode => {
+  initAudio();
+  G.mode = mode; G.n = mode === FREE ? 8 : DAYS[mode].n;
+  G.rooms = Array.from({ length: G.n + 2 }, (_, i) => ({ lit: mode === FREE || i === 0 || i === G.n + 1, litT: -9, pokeT: -9, knockT: -9, px: 0, ph: hash(i + 3) * 10, pops: [], key: -1 }));
+  G.guests = []; G.queue = []; G.parts = []; G.timers = []; G.pool = [];
+  Object.assign(G.car, { y: 0, door: 1, state: 'open', idle: 0, rocket: false, reopen: false });
+  G.t = 0; G.phase = 'play'; G.hintT = 0; G.hintFloor = -1; G.bubble = null; G.waveI = 0; G.shown = '';
+  G.waves = mode === FREE ? [] : makeWaves(mode);
+  if (mode === FREE) for (let f = 1; f <= G.n; f++) G.guests.push(newGuest({ floor: f }));
+  else after(0.7, spawnWave);
+  buildPanel(); renderTickets(); renderPips();
+  $('#dayName').textContent = mode === FREE ? '🎠 Free Ride' : `${DAYS[mode].icon} ${DAYS[mode].label}`;
+  $('#done').classList.remove('on');
+  $('#title').classList.remove('on'); $('#game').classList.add('on');
+  layout(); G.running = true;
+};
+
+const spawnWave = () => {
+  const wave = G.waves[G.waveI]; if (!wave) return;
+  wave.forEach((s, j) => {
+    if (s.visit) {
+      const g = G.guests.find(q => q.state === 'resident' && q.floor === s.from);
+      if (g) Object.assign(g, { to: s.to, clue: s.clue, state: 'arriving', trx: 0.14 + j * 0.16 });
+    } else G.guests.push(newGuest({ floor: 0, to: s.to, clue: s.clue, state: 'arriving', rx: 1.08 + j * 0.16, trx: 0.14 + j * 0.16 }));
+  });
+  if (!G.guests.some(g => g.to >= 0)) { waveDone(); return; }
+  SFX.call(); renderTickets();
+};
+const waveDone = () => {
+  G.waveI++;
+  if (G.waveI < G.waves.length) after(1.1, spawnWave);
+  else after(1.0, () => { G.phase = 'roofReady'; SFX.twinkle(); renderTickets(); });
+};
+const slotFor = f => {
+  const used = G.guests.filter(g => g.floor === f && g.to < 0).map(g => g.slotK);
+  for (let k = 0; k < 3; k++) if (!used.includes(k)) return k;
+  return 2;
+};
+const leave = (g, f) => {
+  const rm = G.rooms[f];
+  g.slotK = slotFor(f);
+  Object.assign(g, { floor: f, to: -1, at: 0, state: 'leaving', trx: 0.5 + 0.17 * g.slotK });
+  SFX.deliver();
+  if (!rm.lit) { rm.lit = true; rm.litT = G.t; }
+  for (let i = 0; i < 7; i++) part({ x: roomX(0.12) + rnd(-12, 40), f: f + 0.3, vx: rnd(-20, 20), vy: rnd(-80, -40), kind: 'em', ch: i % 2 ? '💖' : '⭐', s: FH * 0.11, life: 1.2, max: 1.2 });
+  renderTickets(); renderPips();
+};
+const notMine = g => { g.shakeT = G.t; G.bubble = { g, t: G.t }; SFX.notMine(); G.hintT = 99; };
+
+const tryBoard = () => {
+  const cur = curFloor(); if (cur > G.n) return;
+  for (const g of G.guests) {
+    if (g.state !== 'waiting' || g.floor !== cur) continue;
+    const used = G.guests.filter(q => q.state === 'riding' || q.state === 'boarding').map(q => q.slot);
+    if (used.length >= 2) break;
+    g.slot = used.includes(0) ? 1 : 0; g.state = 'boarding'; g.at = 0;
+    SFX.board(); renderTickets();
+  }
+};
+const arrive = f => {
+  if (f === roofI()) {
+    if (G.phase === 'launch') startParty();
+    else for (let i = 0; i < 4; i++) after(0.2 + i * 0.4, () => firework(rnd(0.3, 0.95) * VW, rnd(0.08, 0.35) * VH));
+    return;
+  }
+  const riders = G.guests.filter(g => g.state === 'riding');
+  let left = 0;
+  riders.forEach(g => { if (g.to === f) { leave(g, f); left++; } });
+  const here = G.guests.some(g => (g.state === 'waiting' || g.state === 'arriving') && g.to >= 0 && g.floor === f);
+  if (!left && riders.length && !here) notMine(riders[0]);
+  if (left && !G.guests.some(g => g.to >= 0)) waveDone();
+};
+
+const startParty = () => {
+  G.phase = 'party'; G.car.rocket = false;
+  if (G.mode < FREE) { save.days[G.mode] = true; store(); }
+  const all = G.guests;
+  all.forEach((g, i) => Object.assign(g, { floor: roofI(), state: 'resident', to: -1, rx: 0.08 + 0.84 * (all.length > 1 ? i / (all.length - 1) : 0.5), ph: i * 0.8 }));
+  SFX.fanfare(); renderTickets();
+  for (let i = 0; i < 12; i++) after(0.3 + i * 0.45, () => firework(rnd(0.15, 0.95) * VW, rnd(0.06, 0.4) * VH));
+  after(3.2, showDone);
+};
+const showDone = () => {
+  G.phase = 'done';
+  const last = G.mode === 2;
+  $('#doneTitle').textContent = last ? '🎉 The hotel is full!' : `⭐ ${DAYS[G.mode].label} done!`;
+  $('#doneGuests').textContent = G.guests.map(g => g.e).join(' ');
+  $('#btnNext').textContent = last ? '🎠 Free Ride ▶' : 'Next Day ▶';
+  $('#done').classList.add('on');
+};
+
+// ---------- elevator ----------
+const wob = el => { SFX.lock(); if (!el) return; el.classList.remove('wob'); void el.offsetWidth; el.classList.add('wob'); };
+const pressFloor = (f, el) => {
+  initAudio(); SFX.click(); G.hintT = 0;
+  if (G.mode !== FREE && G.phase !== 'play' && G.phase !== 'roofReady') return wob(el);
+  const car = G.car;
+  if (car.state === 'open' && f === curFloor() && !G.queue.length) { car.door = 0.5; car.state = 'opening'; car.reopen = true; SFX.tick(); return; }
+  if (G.queue.includes(f) || G.queue.length >= 3) return wob(el);
+  G.queue.push(f); updateButtons();
+};
+const pressRoof = () => {
+  initAudio(); SFX.click();
+  if (G.mode === FREE) return pressFloor(roofI(), $('#btnRoof'));
+  if (G.phase !== 'roofReady') return;
+  const car = G.car, going = car.state === 'moving' || car.state === 'closing';
+  G.phase = 'launch'; car.rocket = true;
+  G.queue = going && G.queue.length ? [G.queue[0], roofI()] : [roofI()];
+  updateButtons(); renderTickets();
+};
+const updateCar = dt => {
+  const car = G.car;
+  if (car.state === 'open') {
+    car.idle += dt; tryBoard();
+    const cur = curFloor();
+    const busy = G.guests.some(g => g.state === 'boarding' || g.state === 'leaving' || (g.state === 'arriving' && g.to >= 0 && g.floor === cur));
+    if (G.queue.length && car.idle > 0.45 && !busy) {
+      if (G.queue[0] === cur) { G.queue.shift(); updateButtons(); }
+      else { car.state = 'closing'; SFX.door(); }
+    }
+  } else if (car.state === 'closing') {
+    car.door -= dt / 0.4;
+    if (car.door <= 0) {
+      car.door = 0; car.from = car.y; car.to = G.queue[0];
+      const fast = car.rocket && car.to === roofI();
+      car.dur = fast ? 1.9 : 0.55 + 0.42 * Math.abs(car.to - car.from);
+      car.t = 0; car.state = 'moving';
+      if (fast) SFX.rocket();
+    }
+  } else if (car.state === 'moving') {
+    car.t += dt;
+    const prev = car.y;
+    car.y = car.from + (car.to - car.from) * ease(car.t / car.dur);
+    if (Math.round(prev) !== Math.round(car.y)) SFX.tick();
+    setHum(Math.min(1, Math.abs(car.y - prev) / Math.max(dt, 0.001) / 2.5));
+    if (car.rocket && car.to === roofI()) for (let i = 0; i < 2; i++) part({ x: rnd(10, SW - 10), f: car.y - 0.03, vx: rnd(-20, 20), vy: rnd(120, 260), kind: 'dot', col: CONF[i], s: rnd(5, 10), life: 0.4, max: 0.4 });
+    if (car.t >= car.dur) {
+      car.y = car.to; car.state = 'opening'; setHum(0);
+      SFX.ding(); SFX.door(); G.queue.shift(); updateButtons();
+    }
+  } else {
+    car.door += dt / 0.4;
+    if (car.door >= 1) {
+      car.door = 1; car.state = 'open'; car.idle = 0;
+      if (car.reopen) car.reopen = false; else arrive(curFloor());
+    }
+  }
+};
+const updateGuests = dt => {
+  for (const g of G.guests) {
+    if (g.state === 'arriving') {
+      const d = g.trx - g.rx, step = 0.55 * dt;
+      if (Math.abs(d) <= step) { g.rx = g.trx; g.state = g.to >= 0 ? 'waiting' : 'resident'; }
+      else g.rx += Math.sign(d) * step;
+    } else if (g.state === 'boarding') {
+      g.at += dt / 0.5;
+      if (g.at >= 1) { g.state = 'riding'; g.floor = -1; G.hintT = 0; renderTickets(); }
+    } else if (g.state === 'leaving') {
+      g.at += dt / 0.5;
+      if (g.at >= 1) { g.state = 'arriving'; g.rx = 0.1; }
+    }
+  }
+};
+
+// which button would help most right now (-1 = the kid is already on it)
+const need = () => {
+  if (G.phase !== 'play' || G.mode === FREE) return -1;
+  const riders = G.guests.filter(g => g.state === 'riding' || g.state === 'boarding');
+  if (riders.length) return riders.some(g => G.queue.includes(g.to)) ? -1 : riders[0].to;
+  const w = G.guests.find(g => (g.state === 'waiting' || g.state === 'arriving') && g.to >= 0);
+  const parked = G.car.state === 'open' || G.car.state === 'opening';
+  if (w && !G.queue.includes(w.floor) && !(w.floor === curFloor() && parked)) return w.floor;
+  return -1;
+};
+const setHint = f => { if (f !== G.hintFloor) { G.hintFloor = f; updateButtons(); } };
+
+// ---------- DOM bits ----------
+const chipHTML = (f, clue) => {
+  const F = FLOORS[f], lab = f === 0 ? '★' : f;
+  if (clue === 'dots') return `<span class="chip plain"><span class="dots">${'<i></i>'.repeat(f)}</span></span>`;
+  if (clue === 'icon') return `<span class="chip plain">${F.icon}</span>`;
+  if (clue === 'num') return `<span class="chip plain">${lab}</span>`;
+  return `<span class="chip" style="background:${F.col}">${lab}</span>`;
+};
+const renderTickets = () => {
+  const el = $('#tickets');
+  if (G.mode === FREE) { el.innerHTML = '<span class="free">Press any button!</span><button id="btnRoof">🎆 Roof</button>'; return; }
+  if (G.phase === 'roofReady') { el.innerHTML = '<button id="btnRoof" class="big">🎆 Roof party! ▲</button>'; return; }
+  if (G.phase !== 'play') { el.innerHTML = '<span class="free">🎆 Roof party!</span>'; return; }
+  el.innerHTML = G.guests.filter(g => g.to >= 0).map(g => (g.state === 'riding' || g.state === 'boarding')
+    ? `<div class="ticket" data-to="${g.to}">${g.e}<span class="arr">➜</span>${chipHTML(g.to, g.clue)}</div>`
+    : `<div class="ticket" data-at="${g.floor}">${g.e}<span class="bell">🔔</span>${chipHTML(g.floor, 'color')}</div>`).join('');
+};
+const renderPips = () => {
+  let h = '';
+  if (G.mode !== FREE) for (let f = 1; f <= G.n; f++) h += `<span class="pip"${G.rooms[f].lit ? ` style="background:${FLOORS[f].col}"` : ''}></span>`;
+  $('#pips').innerHTML = h;
+};
+const buildPanel = () => {
+  const btn = f => `<button class="fbtn" data-f="${f}" style="background:${FLOORS[f].col}" aria-label="${f ? 'Floor ' + f : 'Lobby'}">${f || '★'}<span class="fi">${FLOORS[f].icon}</span></button>`;
+  const gap = '<span class="fbtn gap"></span>';
+  const cells = [];
+  if (G.n > 4) { cells.push(gap); for (let f = 5; f <= 8; f++) cells.push(f <= G.n ? btn(f) : gap); }
+  for (let f = 0; f <= 4; f++) cells.push(btn(f));
+  $('#panel').innerHTML = cells.join('');
+};
+const updateButtons = () => {
+  document.querySelectorAll('.fbtn[data-f]').forEach(b => {
+    const f = +b.dataset.f, lit = G.queue.includes(f);
+    b.classList.toggle('lit', lit);
+    b.classList.toggle('hint', !lit && G.hintFloor === f);
+  });
+};
+const renderModes = () => {
+  const firstOpen = save.days.indexOf(false);
+  $('#modes').innerHTML = DAYS.map((d, i) => {
+    const locked = i > 0 && !save.days[i - 1];
+    return `<button class="mode${locked ? ' locked' : ''}${i === firstOpen ? ' next' : ''}" data-m="${i}"><span class="mi">${d.icon}</span><span class="ml">${d.label}</span><span class="ms">${d.n} floors</span><span class="badge">${save.days[i] ? '⭐' : locked ? '🔒' : ''}</span></button>`;
+  }).join('') + '<button class="mode" data-m="3"><span class="mi">🎠</span><span class="ml">Free Ride</span><span class="ms">8 floors</span></button>';
+};
+const goHome = () => {
+  G.running = false; setHum(0);
+  $('#game').classList.remove('on'); $('#title').classList.add('on');
+  renderModes();
+};
+
+// ---------- drawing ----------
+const cv = $('#view'), c = cv.getContext('2d');
+let VW = 300, VH = 300, DPR = 1, FH = 200, SW = 110, camF = 0.28;
+const EMO = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+const TXT = '"Trebuchet MS",system-ui,sans-serif';
+const layout = () => {
+  const r = cv.parentElement.getBoundingClientRect();
+  if (r.width < 10 || r.height < 10) return;
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  VW = r.width; VH = r.height;
+  cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
+  FH = clamp(VH * 0.5, 120, 320); SW = clamp(VW * 0.3, 96, 190);
+};
+const fy = f => VH * 0.7 - (f - camF) * FH;          // screen y of a floor line
+const toF = sy => camF + (VH * 0.7 - sy) / FH;       // and back again
+const roomX = rx => SW + (VW - SW) * rx;
+const rect = i => { const yb = fy(i); return { x: SW, y: yb - FH, w: VW - SW, h: FH, fy: yb - 8, yb }; };
+const roomSize = () => Math.min(FH * 0.25, (VW - SW) * 0.17);
+const carSize = () => Math.min(FH * 0.24, SW * 0.3);
+const slotX = s => 8 + (SW - 16) * (0.52 + 0.28 * s);
+
+const em = (ch, x, y, s, rot = 0, flip = false) => {
+  c.save(); c.translate(x, y); if (rot) c.rotate(rot); if (flip) c.scale(-1, 1);
+  c.fillStyle = '#000'; c.font = `${s}px ${EMO}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(ch, 0, 0); c.restore();
+};
+const label = (s, x, y, size, col) => {
+  c.fillStyle = col; c.font = `900 ${size}px ${TXT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(s, x, y + size * 0.05);
+};
+const rr = (x, y, w, h, r) => {
+  r = Math.min(r, w / 2, h / 2);
+  c.beginPath(); c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+};
+const wall = (R, a, b) => {
+  const g = c.createLinearGradient(0, R.y, 0, R.fy); g.addColorStop(0, a); g.addColorStop(1, b);
+  c.fillStyle = g; c.fillRect(R.x, R.y, R.w, R.h);
+};
+const kick = (rm, d = 0.8) => Math.max(0, 1 - (G.t - rm.pokeT) / d);
+const bubble = (x, y, r, a) => {
+  c.globalAlpha = clamp(a, 0, 1); c.fillStyle = 'rgba(255,255,255,.3)'; c.strokeStyle = '#fff'; c.lineWidth = 1.5;
+  c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); c.stroke(); c.globalAlpha = 1;
+};
+
+// particles live in floor units so they scroll with the building
+const part = o => { if (G.parts.length < 280) G.parts.push(Object.assign({ x: 0, f: 0, vx: 0, vy: 0, g: 0, life: 1, max: 1, kind: 'dot', col: '#fff', s: 6, ch: '' }, o)); };
+const burst = (sx, sy, kind, n, o = {}) => {
+  for (let i = 0; i < n; i++) {
+    const a = rnd(0, 6.283), v = rnd(40, 160) * (o.v || 1), life = rnd(0.5, 1.1) * (o.life || 1);
+    part(Object.assign({ x: sx, f: toF(sy), vx: Math.cos(a) * v, vy: Math.sin(a) * v, kind, life, max: life, col: CONF[i % CONF.length], s: rnd(4, 8), g: o.g || 0 }, o.p || {}));
+  }
+};
+const firework = (sx, sy) => { burst(sx, sy, 'fw', 28, { v: 1.3, life: 1.3, g: 70 }); SFX.boom(); };
+
+const BALLOON_X = i => 0.2 + 0.165 * i;
+const FISH = [{ e: '🐠', y: 0.3, s: 0.18, v: 0.09 }, { e: '🐟', y: 0.52, s: 0.15, v: -0.12 }, { e: '🐡', y: 0.4, s: 0.16, v: 0.06 }, { e: '🐙', y: 0.68, s: 0.18, v: -0.04 }];
+
+const THEME = {
+  lobby(R, rm) {
+    wall(R, '#ffe0b2', '#ffcc80');
+    c.fillStyle = 'rgba(255,255,255,.25)';
+    for (let x = R.x + 10; x < R.x + R.w; x += 28) c.fillRect(x, R.y, 10, R.h);
+    c.fillStyle = '#6d1b1b'; rr(R.x + R.w * 0.3, R.y + R.h * 0.08, R.w * 0.42, R.h * 0.17, 8); c.fill();
+    label('HOTEL', R.x + R.w * 0.51, R.y + R.h * 0.165, R.h * 0.11, Math.floor(G.t * 2) % 2 ? '#ffd54f' : '#fff3c4');
+    c.fillStyle = '#80deea'; c.fillRect(R.x + R.w * 0.9, R.fy - R.h * 0.55, R.w * 0.1, R.h * 0.55);
+    c.strokeStyle = '#5d4037'; c.lineWidth = 4; c.strokeRect(R.x + R.w * 0.9, R.fy - R.h * 0.55, R.w * 0.1, R.h * 0.55);
+    const k = kick(rm), dx = R.x + R.w * 0.52, dw = R.w * 0.3, dh = R.h * 0.24;
+    em('🦉', dx + dw * 0.3, R.fy - dh - R.h * 0.08 - k * R.h * 0.08, R.h * 0.2);
+    c.fillStyle = '#8d6e63'; rr(dx, R.fy - dh, dw, dh, 6); c.fill();
+    c.fillStyle = '#6d4c41'; c.fillRect(dx, R.fy - dh, dw, 6);
+    em('🛎️', dx + dw * 0.75, R.fy - dh - R.h * 0.05, R.h * 0.13, Math.sin(G.t * 40) * 0.25 * k);
+  },
+  bath(R, rm) {
+    wall(R, '#b3e5fc', '#81d4fa');
+    c.strokeStyle = 'rgba(255,255,255,.45)'; c.lineWidth = 1; c.beginPath();
+    const s = R.h / 6;
+    for (let x = R.x; x < R.x + R.w; x += s) { c.moveTo(x, R.y); c.lineTo(x, R.fy); }
+    for (let y = R.y; y < R.fy; y += s) { c.moveTo(R.x, y); c.lineTo(R.x + R.w, y); }
+    c.stroke();
+    em('🚿', R.x + R.w * 0.3, R.y + R.h * 0.3, R.h * 0.22);
+    const k = kick(rm), tx = R.x + R.w * 0.5, tw = R.w * 0.44, th = R.h * 0.26, ty = R.fy - th;
+    em('🦆', tx + tw * 0.3, ty - R.h * 0.05 - k * R.h * 0.2 + Math.sin(G.t * 2) * 2, R.h * 0.2);
+    c.fillStyle = '#fff'; rr(tx, ty, tw, th, th * 0.45); c.fill();
+    c.fillStyle = '#4fc3f7'; rr(tx + 8, ty + 4, tw - 16, 7, 4); c.fill();
+    for (let i = 0; i < 9; i++) {
+      const p = (G.t * 0.13 + hash(i + 1)) % 1;
+      bubble(tx + tw * hash(i + 11) + Math.sin(G.t * 1.5 + i) * 6, ty - p * R.h * 0.62, 3 + hash(i + 21) * R.h * 0.04, 1 - p);
+    }
+  },
+  balloon(R, rm) {
+    wall(R, '#ffcdd2', '#f8bbd0');
+    for (let i = 0; i < 9; i++) {
+      c.fillStyle = CONF[i % CONF.length]; c.beginPath();
+      const x = R.x + R.w * (i / 9);
+      c.moveTo(x, R.y); c.lineTo(x + R.w / 9, R.y); c.lineTo(x + R.w / 18, R.y + R.h * 0.12); c.fill();
+    }
+    em('🎁', R.x + R.w * 0.9, R.fy - R.h * 0.1, R.h * 0.2);
+    for (let i = 0; i < 5; i++) {
+      const age = G.t - (rm.pops[i] === undefined ? -9 : rm.pops[i]);
+      if (age < 1.4) continue;
+      const sc = Math.min(1, (age - 1.4) / 0.3), r = R.h * 0.1 * sc;
+      const bx = R.x + R.w * BALLOON_X(i), by = R.y + R.h * (0.34 + 0.1 * hash(i + 5)) + Math.sin(G.t * 1.5 + i) * 4;
+      c.strokeStyle = 'rgba(0,0,0,.35)'; c.lineWidth = 1; c.beginPath(); c.moveTo(bx, by + r * 1.2); c.lineTo(bx + Math.sin(G.t + i) * 4, R.fy); c.stroke();
+      c.fillStyle = CONF[i]; c.beginPath(); c.ellipse(bx, by, r, r * 1.2, 0, 0, 7); c.fill();
+      c.fillStyle = 'rgba(255,255,255,.55)'; c.beginPath(); c.ellipse(bx - r * 0.35, by - r * 0.45, r * 0.2, r * 0.32, -0.5, 0, 7); c.fill();
+    }
+  },
+  jungle(R, rm) {
+    wall(R, '#a5d6a7', '#66bb6a');
+    c.fillStyle = '#2e7d32';
+    for (let i = 0; i < 8; i++) { c.beginPath(); c.arc(R.x + R.w * (i / 7), R.y, R.h * (0.1 + 0.07 * hash(i + 2)), 0, 7); c.fill(); }
+    em('🌴', R.x + R.w * 0.86, R.fy - R.h * 0.3, R.h * 0.58);
+    em('🦜', R.x + R.w * 0.26, R.y + R.h * 0.3, R.h * 0.17);
+    const ang = Math.sin(G.t * 1.6) * (0.25 + 0.75 * kick(rm, 1.5)), ax = R.x + R.w * 0.56, len = R.h * 0.46;
+    const ex = ax + Math.sin(ang) * len, ey = R.y + Math.cos(ang) * len;
+    c.strokeStyle = '#1b5e20'; c.lineWidth = 4; c.beginPath(); c.moveTo(ax, R.y); c.lineTo(ex, ey); c.stroke();
+    em('🐒', ex, ey + R.h * 0.07, R.h * 0.21, -ang * 0.5);
+  },
+  music(R, rm) {
+    wall(R, '#e1bee7', '#ba68c8');
+    c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = 2;
+    for (let l = 0; l < 5; l++) {
+      c.beginPath();
+      for (let x = 0; x <= R.w; x += 12) { const y = R.y + R.h * (0.2 + l * 0.05) + Math.sin(x * 0.03 + G.t) * 5; x ? c.lineTo(R.x + x, y) : c.moveTo(R.x + x, y); }
+      c.stroke();
+    }
+    for (let i = 0; i < 3; i++) { const p = (G.t * 0.1 + hash(i + 7)) % 1; c.globalAlpha = 1 - p; em('🎵', R.x + R.w * (0.3 + 0.25 * i) + Math.sin(G.t + i) * 8, R.y + R.h * (0.62 - p * 0.45), R.h * 0.13); c.globalAlpha = 1; }
+    const kx = R.x + R.w * 0.06, kw = R.w * 0.88 / 8, kh = R.h * 0.2, ky = R.fy - kh, hot = kick(rm, 0.35) > 0 ? rm.key : -1;
+    for (let i = 0; i < 8; i++) {
+      c.fillStyle = i === hot ? '#ffe082' : '#fff'; c.fillRect(kx + i * kw, ky, kw - 2, kh);
+      if (i !== 2 && i !== 6 && i < 7) { c.fillStyle = '#311b3f'; c.fillRect(kx + (i + 1) * kw - kw * 0.22, ky, kw * 0.44, kh * 0.55); }
+    }
+  },
+  pizza(R, rm) {
+    wall(R, '#fff3e0', '#ffe0b2');
+    const q = R.h * 0.07;
+    for (let i = 0; i * q < R.w; i++) { c.fillStyle = i % 2 ? '#e53935' : '#fff'; c.fillRect(R.x + i * q, R.y, q, q); }
+    const ox = R.x + R.w * 0.68, ow = R.w * 0.28, oh = R.h * 0.5;
+    c.fillStyle = '#a1887f'; rr(ox, R.fy - oh, ow, oh, 14); c.fill();
+    c.fillStyle = '#3e2723'; c.beginPath(); c.arc(ox + ow / 2, R.fy - oh * 0.3, ow * 0.34, Math.PI, 0); c.lineTo(ox + ow * 0.84, R.fy - oh * 0.1); c.lineTo(ox + ow * 0.16, R.fy - oh * 0.1); c.fill();
+    em('🔥', ox + ow / 2, R.fy - oh * 0.3, R.h * 0.15 * (1 + 0.12 * Math.sin(G.t * 9)));
+    const k = kick(rm, 1.4), cx = R.x + R.w * 0.36, cs = R.h * 0.26;
+    em('🐻', cx, R.fy - cs * 0.52, cs);
+    c.fillStyle = '#fff'; rr(cx - cs * 0.24, R.fy - cs * 1.22, cs * 0.48, cs * 0.26, 6); c.fill();
+    c.beginPath(); c.arc(cx, R.fy - cs * 1.24, cs * 0.26, 0, 7); c.fill();
+    em('🍕', cx + cs * 0.1, R.fy - R.h * 0.5 - Math.abs(Math.sin(G.t * 2.4)) * R.h * (0.1 + 0.26 * k), R.h * 0.17, G.t * 4 * (1 + 2 * k));
+  },
+  fish(R, rm) {
+    wall(R, '#4dd0e1', '#00838f');
+    c.fillStyle = 'rgba(255,255,255,.1)';
+    for (let i = 0; i < 3; i++) { const x = R.x + R.w * (0.2 + 0.3 * i) + Math.sin(G.t * 0.5 + i) * 10; c.beginPath(); c.moveTo(x, R.y); c.lineTo(x + R.w * 0.1, R.y); c.lineTo(x - R.w * 0.05, R.fy); c.lineTo(x - R.w * 0.2, R.fy); c.fill(); }
+    c.fillStyle = '#ffe0b2'; c.fillRect(R.x, R.fy - R.h * 0.08, R.w, R.h * 0.08);
+    c.strokeStyle = '#2e7d32'; c.lineWidth = 5; c.lineCap = 'round';
+    for (let i = 0; i < 4; i++) { const x = R.x + R.w * (0.1 + 0.27 * i), sw = Math.sin(G.t * 1.4 + i) * 10; c.beginPath(); c.moveTo(x, R.fy); c.quadraticCurveTo(x + sw, R.fy - R.h * 0.15, x - sw * 0.6, R.fy - R.h * (0.26 + 0.06 * hash(i))); c.stroke(); }
+    c.lineCap = 'butt';
+    FISH.forEach((q, i) => {
+      const fr = (((rm.ph * q.v + hash(i + 9)) % 1) + 1) % 1;
+      em(q.e, R.x + (fr * 1.3 - 0.15) * R.w, R.y + R.h * q.y + Math.sin(G.t * 2 + i) * 4, R.h * q.s, 0, q.v > 0);
+    });
+    for (let i = 0; i < 6; i++) { const p = (G.t * 0.16 + hash(i + 31)) % 1; bubble(R.x + R.w * hash(i + 41), R.fy - p * R.h * 0.9, 2 + hash(i + 51) * 4, 1 - p); }
+  },
+  snow(R, rm) {
+    wall(R, '#e1f5fe', '#b3e5fc');
+    const wx = R.x + R.w * 0.34, wy = R.y + R.h * 0.16, ww = R.w * 0.26, wh = R.h * 0.3;
+    c.fillStyle = '#1a237e'; c.fillRect(wx, wy, ww, wh); em('🌙', wx + ww * 0.7, wy + wh * 0.35, wh * 0.4);
+    c.strokeStyle = '#fff'; c.lineWidth = 4; c.strokeRect(wx, wy, ww, wh);
+    c.fillStyle = '#fff';
+    for (let i = 0; i < 6; i++) { c.beginPath(); c.arc(R.x + R.w * (i / 5), R.fy + R.h * 0.02, R.h * (0.1 + 0.05 * hash(i + 4)), 0, 7); c.fill(); }
+    const k = kick(rm, 1);
+    em('⛄', R.x + R.w * 0.8, R.fy - R.h * 0.19, R.h * 0.34, Math.sin(G.t * 30) * 0.12 * k);
+    em('🐧', R.x + R.w * (0.2 + 0.42 * (0.5 + 0.5 * Math.sin(rm.ph * 0.6))), R.fy - R.h * 0.1, R.h * 0.19, k > 0 ? -1.5 : 0);
+    for (let i = 0; i < 14; i++) { const p = (G.t * 0.15 + hash(i + 61)) % 1; c.beginPath(); c.arc(R.x + hash(i + 71) * R.w + Math.sin(G.t + i) * 6, R.y + p * R.h, 2.2, 0, 7); c.fill(); }
+  },
+  space(R, rm) {
+    wall(R, '#1a237e', '#311b92');
+    c.fillStyle = '#fff';
+    for (let i = 0; i < 26; i++) { c.globalAlpha = 0.35 + 0.65 * Math.abs(Math.sin(G.t * 1.7 + i)); c.beginPath(); c.arc(R.x + hash(i + 81) * R.w, R.y + hash(i + 91) * R.h * 0.9, 1 + hash(i) * 1.6, 0, 7); c.fill(); }
+    c.globalAlpha = 1;
+    em('🌍', R.x + R.w * 0.84, R.y + R.h * 0.28, R.h * 0.2);
+    em('🛸', R.x + R.w * (0.5 + 0.3 * Math.sin(G.t * 0.7)), R.y + R.h * (0.24 + 0.05 * Math.sin(G.t * 2)), R.h * 0.18);
+    em('👽', R.x + R.w * 0.3, R.y + R.h * (0.5 + 0.06 * Math.sin(G.t * 1.3)), R.h * 0.2, kick(rm, 1) * 6.283);
+  },
+  roof(R) {
+    em('🌙', R.x + R.w * 0.86, R.yb - R.h * 0.86, R.h * 0.2);
+    em('🌴', R.x + R.w * 0.93, R.fy - R.h * 0.17, R.h * 0.34);
+    c.strokeStyle = '#90a4ae'; c.lineWidth = 3; c.beginPath();
+    c.moveTo(R.x, R.fy - R.h * 0.16); c.lineTo(R.x + R.w, R.fy - R.h * 0.16);
+    for (let i = 0; i <= 6; i++) { const x = R.x + R.w * (i / 6); c.moveTo(x, R.fy); c.lineTo(x, R.fy - R.h * 0.16); }
+    c.stroke();
+    for (let i = 0; i <= 10; i++) {
+      const p = i / 10, x = R.x + R.w * p, y = R.yb - R.h * 0.62 + Math.sin(p * Math.PI) * R.h * 0.1;
+      c.fillStyle = CONF[i % CONF.length]; c.globalAlpha = (Math.floor(G.t * 3) + i) % 2 ? 1 : 0.45;
+      c.beginPath(); c.arc(x, y, R.h * 0.022, 0, 7); c.fill();
+    }
+    c.globalAlpha = 1;
+  },
+};
+
+// what a poke does in each lit room
+const POKE = {
+  lobby() { SFX.bell(); },
+  bath(rm, x, y) { burst(x, y, 'bubble', 10, { v: 0.5, g: -90 }); SFX.pops(); SFX.squeak(); },
+  balloon(rm, x, y, R) {
+    const i = clamp(Math.round(((x - R.x) / R.w - 0.2) / 0.165), 0, 4);
+    if (G.t - (rm.pops[i] === undefined ? -9 : rm.pops[i]) < 1.7) return;
+    rm.pops[i] = G.t; SFX.pop();
+    burst(R.x + R.w * BALLOON_X(i), R.y + R.h * 0.38, 'conf', 14, { g: 320 });
+  },
+  jungle(rm, x, y) { SFX.monkey(); part({ x, f: toF(y), vy: -90, g: 420, kind: 'em', ch: '🍌', s: FH * 0.13, life: 1.1, max: 1.1 }); },
+  music(rm, x, y, R) {
+    rm.key = clamp(Math.floor((x - R.x - R.w * 0.06) / (R.w * 0.88 / 8)), 0, 7); SFX.piano(rm.key);
+    part({ x, f: toF(y), vx: rnd(-15, 15), vy: -70, g: -30, kind: 'em', ch: '🎵', s: FH * 0.12, life: 1.1, max: 1.1 });
+  },
+  pizza(rm, x, y, R) {
+    SFX.whistle();
+    ['🍅', '🧀', '🍄', '🍅', '🧀'].forEach((ch, i) => part({ x: x + (i - 2) * 16, f: toF(R.y + 10), vy: rnd(0, 60), g: 380, kind: 'em', ch, s: FH * 0.1, life: 1.2, max: 1.2 }));
+  },
+  fish(rm, x, y) { burst(x, y, 'bubble', 12, { v: 0.5, g: -110 }); SFX.blub(); },
+  snow(rm, x, y) { burst(x, y, 'dot', 16, { v: 0.8, g: 220, p: { col: '#fff' } }); SFX.twinkle(); },
+  space(rm, x, y) { part({ x, f: toF(y), vx: 440, vy: 150, kind: 'star', s: 5, life: 0.7, max: 0.7 }); SFX.pew(); },
+};
+
+const drawChip = (x, y, s, f, clue) => {
+  const colour = clue === 'color';
+  c.fillStyle = colour ? FLOORS[f].col : '#fff'; rr(x - s / 2, y - s / 2, s, s, s * 0.28); c.fill();
+  c.strokeStyle = colour ? 'rgba(255,255,255,.7)' : '#333'; c.lineWidth = 3; c.stroke();
+  if (clue === 'icon') em(FLOORS[f].icon, x, y, s * 0.62);
+  else if (clue === 'dots') {
+    c.fillStyle = '#222';
+    for (let i = 0; i < f; i++) { c.beginPath(); c.arc(x + ((i % 3) - 1) * s * 0.26, y + (Math.floor(i / 3) - (Math.ceil(f / 3) - 1) / 2) * s * 0.26, s * 0.09, 0, 7); c.fill(); }
+  } else label(f === 0 ? '★' : String(f), x, y, s * 0.62, colour ? '#fff' : '#222');
+};
+const drawGuest = (g, x, footY, s, lively) => {
+  const walking = g.state === 'arriving', party = G.phase === 'party' || G.phase === 'done';
+  const bob = walking ? Math.abs(Math.sin(G.t * 10 + g.ph)) * s * 0.14
+    : lively && g.state === 'resident' ? Math.abs(Math.sin(G.t * (party ? 7 : 3) + g.ph)) * s * (party ? 0.25 : 0.1) : 0;
+  const sh = Math.max(0, 1 - (G.t - g.shakeT) / 0.7), dx = Math.sin((G.t - g.shakeT) * 34) * 5 * sh;
+  const cy = footY - s * 0.52 - bob;
+  em(g.e, x + dx, cy, s);
+  if (g.to < 0 && g.floor <= G.n && FLOORS[g.floor] && FLOORS[g.floor].key === 'fish') bubble(x, cy, s * 0.66, 0.9);   // diving helmet
+  if (g.to >= 0 && (walking || g.state === 'waiting')) em('🔔', x + s * 0.45, footY - s * 1.2, s * 0.5, Math.sin(G.t * 14) * 0.35);
+};
+const drawFloor = i => {
+  const R = rect(i), rm = G.rooms[i], roof = i === roofI();
+  c.save(); c.beginPath(); c.rect(R.x, roof ? 0 : R.y, R.w, roof ? R.yb : R.h); c.clip();
+  (roof ? THEME.roof : THEME[FLOORS[i].key])(R, rm);
+  c.fillStyle = roof ? '#546e7a' : 'rgba(0,0,0,.35)'; c.fillRect(R.x, R.fy, R.w, 8);
+  const s = roomSize();
+  for (const g of G.guests) if (g.floor === i && (g.state === 'arriving' || g.state === 'waiting' || g.state === 'resident')) drawGuest(g, roomX(g.rx), R.fy, s, rm.lit);
+  if (!rm.lit) {
+    c.fillStyle = 'rgba(18,22,60,.74)'; c.fillRect(R.x, R.y, R.w, R.h);
+    const kn = Math.max(0, 1 - (G.t - rm.knockT) / 0.5);
+    em('💤', R.x + R.w * 0.55, R.y + R.h * 0.48 + Math.sin(G.t * 2) * 4, R.h * (0.22 + 0.1 * kn), Math.sin(G.t * 30) * 0.2 * kn);
+  } else {
+    const fl = 1 - (G.t - rm.litT) / 0.6;
+    if (fl > 0) { c.fillStyle = `rgba(255,255,255,${fl * 0.8})`; c.fillRect(R.x, R.y, R.w, R.h); }
+  }
+  if (!roof) {   // the same badge as the button, so floors can be matched by sight
+    const br = clamp(FH * 0.1, 14, 26);
+    c.fillStyle = FLOORS[i].col; c.beginPath(); c.arc(R.x + br + 8, R.y + br + 8, br, 0, 7); c.fill();
+    c.strokeStyle = '#fff'; c.lineWidth = 3; c.stroke();
+    label(i === 0 ? '★' : String(i), R.x + br + 8, R.y + br + 8, br * 1.25, '#fff');
+  }
+  c.restore();
+};
+const drawShaft = (lo, hi) => {
+  const topY = fy(roofI()) - FH * 0.6, botY = fy(0);
+  const g = c.createLinearGradient(0, 0, SW, 0); g.addColorStop(0, '#263238'); g.addColorStop(0.5, '#455a64'); g.addColorStop(1, '#263238');
+  c.fillStyle = g; c.fillRect(0, topY, SW, botY - topY);
+  c.fillStyle = '#c62828'; c.beginPath(); c.moveTo(-4, topY); c.lineTo(SW / 2, topY - FH * 0.2); c.lineTo(SW + 4, topY); c.fill();
+  for (let i = lo; i <= hi; i++) {
+    const yb = fy(i);
+    c.strokeStyle = 'rgba(255,255,255,.16)'; c.lineWidth = 3; c.strokeRect(5, yb - FH * 0.8, SW - 10, FH * 0.8 - 3);
+    c.fillStyle = '#1c2331'; c.fillRect(0, yb - 3, SW, 6);
+  }
+  const cyt = fy(G.car.y) - 6 - FH * 0.74;
+  c.strokeStyle = '#90a4ae'; c.lineWidth = 2; c.beginPath();
+  c.moveTo(SW * 0.4, topY); c.lineTo(SW * 0.4, cyt); c.moveTo(SW * 0.6, topY); c.lineTo(SW * 0.6, cyt); c.stroke();
+};
+const drawCar = () => {
+  const car = G.car, cx = 8, cw = SW - 16, ch = FH * 0.74, cyb = fy(car.y) - 6, cyt = cyb - ch, s = carSize();
+  c.fillStyle = '#fff3c4'; rr(cx, cyt, cw, ch, 8); c.fill();
+  c.fillStyle = '#ffcc80'; c.fillRect(cx, cyb - ch * 0.3, cw, ch * 0.3);
+  const hop = Math.max(0, 1 - (G.t - G.zipT) / 0.5), zx = cx + cw * 0.2, zy = cyb - s * 0.55 - Math.sin(hop * Math.PI) * s * 0.4;
+  em('🐵', zx, zy, s);
+  c.fillStyle = '#d32f2f'; rr(zx - s * 0.28, zy - s * 0.74, s * 0.56, s * 0.24, 4); c.fill();
+  c.fillStyle = '#ffd54f'; c.fillRect(zx - s * 0.28, zy - s * 0.58, s * 0.56, 3);
+  for (const g of G.guests) if (g.state === 'riding') drawGuest(g, slotX(g.slot), cyb - 2, s, false);
+  const pw = (cw / 2) * (1 - car.door);
+  if (pw > 0.5) {
+    const dg = c.createLinearGradient(cx, 0, cx + cw, 0); dg.addColorStop(0, '#90a4ae'); dg.addColorStop(0.5, '#cfd8dc'); dg.addColorStop(1, '#90a4ae');
+    c.fillStyle = dg; c.fillRect(cx, cyt, pw, ch); c.fillRect(cx + cw - pw, cyt, pw, ch);
+    c.strokeStyle = '#546e7a'; c.lineWidth = 2; c.strokeRect(cx, cyt, pw, ch); c.strokeRect(cx + cw - pw, cyt, pw, ch);
+  }
+  c.strokeStyle = '#ffd54f'; c.lineWidth = 4; rr(cx, cyt, cw, ch, 8); c.stroke();
+  const f = curFloor();
+  c.fillStyle = '#0b0b12'; rr(SW / 2 - 20, cyt - 24, 40, 20, 5); c.fill();
+  label(f === 0 ? '★' : f > G.n ? '▲' : String(f), SW / 2, cyt - 14, 15, '#ffb300');
+  // guests hopping between the car and the room
+  for (const g of G.guests) if (g.state === 'boarding' || g.state === 'leaving') {
+    const a = ease(g.state === 'boarding' ? g.at : 1 - g.at);
+    const x0 = roomX(g.state === 'boarding' ? g.rx : 0.1), y0 = fy(g.floor) - 8, sz = roomSize() + (s - roomSize()) * a;
+    em(g.e, x0 + (slotX(g.slot) - x0) * a, y0 + (cyb - 2 - y0) * a - Math.sin(a * Math.PI) * FH * 0.18 - sz * 0.52, sz);
+  }
+  if (G.bubble) {
+    const age = G.t - G.bubble.t;
+    if (age > 1.8) G.bubble = null;
+    else {
+      const bs = clamp(FH * 0.3, 44, 64), bx = SW * 0.5 + bs * 0.35, by = Math.max(bs * 0.6, cyt - bs * 0.75);
+      c.fillStyle = '#fff'; rr(bx - bs * 0.62, by - bs * 0.62, bs * 1.24, bs * 1.24, 12); c.fill();
+      c.beginPath(); c.moveTo(bx - 8, by + bs * 0.6); c.lineTo(bx + 8, by + bs * 0.6); c.lineTo(bx - 4, by + bs * 0.85); c.fill();
+      drawChip(bx, by, bs * 0.9, G.bubble.g.to, G.bubble.g.clue);
+    }
+  }
+};
+const drawParts = () => {
+  for (const p of G.parts) {
+    const y = fy(p.f), a = clamp(p.life / p.max * 1.6, 0, 1);
+    if (p.kind === 'bubble') { bubble(p.x, y, p.s, a); continue; }
+    c.globalAlpha = a;
+    if (p.kind === 'em') em(p.ch, p.x, y, p.s);
+    else if (p.kind === 'conf') { c.fillStyle = p.col; c.save(); c.translate(p.x, y); c.rotate(p.life * 9); c.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); c.restore(); }
+    else if (p.kind === 'star') { c.strokeStyle = '#fff59d'; c.lineWidth = 3; c.beginPath(); c.moveTo(p.x, y); c.lineTo(p.x - p.vx * 0.12, y - p.vy * 0.12); c.stroke(); c.fillStyle = '#fff'; c.beginPath(); c.arc(p.x, y, p.s, 0, 7); c.fill(); }
+    else { c.fillStyle = p.col; c.beginPath(); c.arc(p.x, y, p.s * (p.kind === 'fw' ? 0.5 : 0.6), 0, 7); c.fill(); }
+    c.globalAlpha = 1;
+  }
+};
+const draw = () => {
+  c.setTransform(DPR, 0, 0, DPR, 0, 0);
+  const sky = c.createLinearGradient(0, 0, 0, VH); sky.addColorStop(0, '#0b1038'); sky.addColorStop(1, '#283593');
+  c.fillStyle = sky; c.fillRect(0, 0, VW, VH);
+  c.fillStyle = '#fff';
+  for (let i = 0; i < 30; i++) { c.globalAlpha = 0.3 + 0.7 * Math.abs(Math.sin(G.t + i)); c.fillRect(hash(i + 101) * VW, hash(i + 131) * VH, 2, 2); }
+  c.globalAlpha = 1;
+  const gy = fy(0);
+  if (gy < VH) { c.fillStyle = '#37474f'; c.fillRect(0, gy, VW, VH - gy); c.fillStyle = '#ffd54f'; for (let x = 10; x < VW; x += 50) c.fillRect(x, gy + (VH - gy) * 0.5, 26, 4); }
+  const lo = Math.max(0, Math.floor(camF - 1)), hi = Math.min(roofI(), Math.ceil(camF + 2));
+  for (let i = lo; i <= hi; i++) drawFloor(i);
+  drawShaft(lo, hi); drawCar(); drawParts();
+};
+
+// ---------- loop ----------
+const update = dt => {
+  G.t += dt;
+  const due = G.timers.filter(q => q.t <= G.t);
+  if (due.length) { G.timers = G.timers.filter(q => q.t > G.t); due.forEach(q => q.fn()); }
+  updateCar(dt); updateGuests(dt);
+  for (const rm of G.rooms) rm.ph += dt * (1 + 5 * kick(rm, 1));
+  for (const p of G.parts) { p.life -= dt; p.vy += p.g * dt; p.x += p.vx * dt; p.f -= p.vy * dt / FH; }
+  G.parts = G.parts.filter(p => p.life > 0);
+  const nd = need();
+  if (nd < 0) { G.hintT = 0; setHint(-1); }
+  else { G.hintT += dt; setHint(G.hintT > DAYS[G.mode].hint ? nd : -1); }
+  camF = Math.max(G.car.y, 0.28);
+  const car = G.car, f = curFloor();
+  const txt = (car.state === 'moving' ? (car.to > car.from ? '▲' : '▼') : '') + (f === 0 ? '★' : f > G.n ? '🎆' : f);
+  if (txt !== G.shown) { G.shown = txt; $('#floorDisp').textContent = txt; }
+};
+let last = 0;
+const frame = ts => {
+  const dt = Math.min(0.05, Math.max(0, (ts - last) / 1000)); last = ts;
+  if (G.running) { update(dt); draw(); }
+  requestAnimationFrame(frame);
+};
+
+// ---------- input ----------
+cv.addEventListener('pointerdown', e => {
+  initAudio(); if (!G.running) return;
+  const b = cv.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
+  if (x < SW) { G.zipT = G.t; SFX.ook(); return; }
+  const f = Math.floor(toF(y));
+  if (f < 0) return;
+  if (f >= roofI()) { firework(x, y); return; }
+  const rm = G.rooms[f];
+  if (!rm.lit) { rm.knockT = G.t; SFX.knock(); return; }
+  rm.pokeT = G.t; rm.px = x;
+  POKE[FLOORS[f].key](rm, x, y, rect(f));
+});
+$('#panel').addEventListener('click', e => { const b = e.target.closest('.fbtn[data-f]'); if (b) pressFloor(+b.dataset.f, b); });
+$('#tickets').addEventListener('click', e => { if (e.target.closest('#btnRoof')) pressRoof(); });
+$('#modes').addEventListener('click', e => {
+  const b = e.target.closest('.mode'); if (!b) return;
+  initAudio();
+  if (b.classList.contains('locked')) return wob(b);
+  SFX.ding(); startMode(+b.dataset.m);
+});
+$('#btnHome').addEventListener('click', goHome);
+$('#btnHome2').addEventListener('click', goHome);
+$('#btnNext').addEventListener('click', () => startMode(G.mode === 2 ? FREE : G.mode + 1));
+$('#btnMute').addEventListener('click', () => {
+  initAudio(); muted = !muted;
+  if (master) master.gain.value = muted ? 0 : 0.9;
+  $('#btnMute').textContent = muted ? '🔇' : '🔊';
+});
+let resetArm = 0;
+$('#btnReset').addEventListener('click', () => {
+  const b = $('#btnReset');
+  if (Date.now() - resetArm < 3000) { save = { days: [false, false, false] }; store(); resetArm = 0; b.textContent = '↺ Start over'; renderModes(); return; }
+  resetArm = Date.now(); b.textContent = 'Tap again to erase ⭐';
+  setTimeout(() => { if (resetArm && Date.now() - resetArm >= 3000) { resetArm = 0; b.textContent = '↺ Start over'; } }, 3100);
+});
+window.addEventListener('resize', layout);
+if (window.ResizeObserver) new ResizeObserver(layout).observe(cv.parentElement);
+document.addEventListener('visibilitychange', () => { if (document.hidden) setHum(0); });
+
+renderModes();
+requestAnimationFrame(frame);
+window.__ding = { G, pressFloor, pressRoof, startMode, need, getSave: () => save };
+})();
+</script>
+</body>
+</html>

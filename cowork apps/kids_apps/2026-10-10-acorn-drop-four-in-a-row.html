@@ -1,0 +1,1077 @@
+<!-- CONCEPT: FRIENDLY TURN-TAKING - Acorn Drop: you and Barnaby the badger take turns dropping pieces into the holes of a big tree trunk (your golden acorns, his blueberries), and they fall to the lowest empty hole; get three in a row on the Little trunk or four in a row on the Big trunk, up, across or slanted. Barnaby can be Sleepy, Friendly or Clever, talks you through his moves, a Hint button glows the column to win or block, Oops undoes your last turn, and every win adds an acorn to your winter stash. No timer, no fail-shaming. Ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Acorn Drop</title>
+<style>
+:root {
+  --sky1: #8fd3ff;
+  --sky2: #fff1c9;
+  --grass: #7cc957;
+  --ink: #3a2410;
+  --panel: rgba(255, 255, 255, 0.86);
+  --acorn: #e89a2c;
+  --acorn-dark: #7a4a1f;
+  --berry: #6c5ce7;
+  --berry-dark: #3d2fa8;
+  --accent1: #ff8a3d;
+  --accent2: #c2410c;
+  --good: #22c55e;
+  --btn: #ffffff;
+  --btn-shadow: #c98a4b;
+  --radius: 18px;
+  --gap: clamp(6px, 1.6vh, 12px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+}
+body {
+  font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--sky1) 0%, var(--sky2) 72%, var(--grass) 72%, #5fae3e 100%);
+}
+#app {
+  height: 100vh; height: 100dvh;
+  display: flex; flex-direction: column;
+  max-width: 820px; margin: 0 auto;
+  padding: var(--gap) clamp(8px, 2.5vw, 18px);
+  gap: var(--gap);
+}
+header {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  flex: 0 0 auto;
+}
+.title-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.title-emoji { font-size: clamp(26px, 7vw, 40px); line-height: 1; }
+h1 {
+  margin: 0;
+  font-size: clamp(24px, 7vw, 42px);
+  line-height: 1.05;
+  background: linear-gradient(90deg, var(--accent1), var(--accent2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  white-space: nowrap;
+}
+.stash {
+  flex: 0 0 auto;
+  background: var(--panel);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-weight: bold;
+  font-size: clamp(16px, 4.4vw, 22px);
+  box-shadow: 0 3px 0 var(--btn-shadow);
+  display: flex; align-items: center; gap: 6px;
+}
+.stash.pop { animation: pop 0.6s ease; }
+@keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+.talk {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+}
+.barnaby {
+  font-size: clamp(40px, 11vw, 60px); line-height: 1;
+  filter: drop-shadow(0 3px 0 rgba(0,0,0,0.15));
+  transition: transform 0.2s;
+}
+.barnaby.think { animation: think 0.9s ease-in-out infinite; }
+.barnaby.happy { animation: hop 0.5s ease 3; }
+@keyframes think { 0%,100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes hop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+.bubble {
+  position: relative;
+  flex: 1 1 auto;
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  font-size: clamp(15px, 4.2vw, 21px);
+  min-height: 2.6em;
+  display: flex; align-items: center;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.08);
+}
+.bubble::before {
+  content: ""; position: absolute; left: -10px; top: 50%; margin-top: -8px;
+  border: 8px solid transparent; border-right: 10px solid var(--panel); border-left: 0;
+}
+.bubble span { display: block; }
+
+.turns {
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: clamp(14px, 3.8vw, 18px);
+  font-weight: bold;
+}
+.chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 999px;
+  background: rgba(255,255,255,0.55);
+  border: 3px solid transparent;
+  transition: all 0.2s;
+}
+.chip.on { background: #fff; border-color: var(--accent1); transform: scale(1.06); }
+.dot { width: 20px; height: 20px; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
+.dot.acorn { background: radial-gradient(circle at 35% 60%, #ffd27a, var(--acorn) 60%, #b86a17); box-shadow: inset 0 6px 0 var(--acorn-dark); }
+.dot.berry { background: radial-gradient(circle at 35% 35%, #b8adff, var(--berry) 55%, var(--berry-dark)); }
+.goal { display: flex; align-items: center; gap: 3px; background: rgba(255,255,255,0.55); padding: 5px 10px; border-radius: 999px; }
+.goal .dot { width: 14px; height: 14px; }
+
+#boardWrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+canvas { display: block; touch-action: manipulation; cursor: pointer; }
+
+.bar {
+  flex: 0 0 auto;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+}
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--btn);
+  color: var(--ink);
+  box-shadow: 0 4px 0 var(--btn-shadow);
+  min-height: 56px;
+  font-size: clamp(14px, 3.8vw, 18px);
+  font-weight: bold;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px;
+  padding: 4px;
+  transition: transform 0.08s, box-shadow 0.08s, opacity 0.2s;
+}
+button .ico { font-size: clamp(20px, 5.5vw, 26px); line-height: 1; }
+button:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--btn-shadow); }
+button:disabled { opacity: 0.45; cursor: default; }
+button.glow { animation: glow 1.1s ease-in-out infinite; }
+@keyframes glow { 0%,100% { box-shadow: 0 4px 0 var(--btn-shadow), 0 0 0 0 rgba(255,138,61,0.7); } 50% { box-shadow: 0 4px 0 var(--btn-shadow), 0 0 0 8px rgba(255,138,61,0); } }
+
+/* End card */
+#endCard {
+  position: absolute; left: 50%; top: 0;
+  transform: translate(-50%, -30px);
+  width: min(92%, 420px);
+  background: rgba(255,255,255,0.95);
+  border-radius: 22px;
+  padding: 12px 14px;
+  text-align: center;
+  box-shadow: 0 6px 0 var(--btn-shadow), 0 10px 30px rgba(0,0,0,0.2);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.35s, transform 0.35s;
+}
+#endCard.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+#endEmoji { font-size: 40px; line-height: 1; }
+#endText { font-size: clamp(18px, 5vw, 24px); font-weight: bold; margin: 4px 0 10px; }
+.endBtns { display: flex; gap: 8px; justify-content: center; }
+.endBtns button { flex: 1; flex-direction: row; gap: 6px; }
+#againBtn { background: var(--good); color: #fff; box-shadow: 0 4px 0 #15803d; }
+
+/* Menu */
+#menu {
+  position: fixed; inset: 0;
+  background: rgba(58, 36, 16, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 12px;
+  z-index: 10;
+}
+#menu.hide { display: none; }
+.card {
+  background: #fffaf0;
+  border-radius: 26px;
+  width: min(100%, 460px);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 16px;
+  box-shadow: 0 8px 0 var(--btn-shadow);
+  text-align: center;
+}
+.card h2 {
+  margin: 0 0 4px;
+  font-size: clamp(26px, 8vw, 38px);
+  background: linear-gradient(90deg, var(--accent1), var(--accent2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.card .hello { font-size: 50px; line-height: 1; }
+.card p { margin: 4px 0 10px; font-size: clamp(14px, 4vw, 18px); }
+.label { font-weight: bold; margin: 10px 0 6px; font-size: clamp(15px, 4.2vw, 19px); }
+.choices { display: grid; gap: 8px; }
+.choices.two { grid-template-columns: 1fr 1fr; }
+.choices.three { grid-template-columns: 1fr 1fr 1fr; }
+.choice {
+  border: 4px solid transparent;
+  min-height: 72px;
+}
+.choice.sel { border-color: var(--accent1); background: #fff3e0; }
+.choice .row { display: flex; gap: 3px; margin-bottom: 3px; }
+.choice .row .dot { width: 14px; height: 14px; }
+.choice small { font-size: clamp(12px, 3.3vw, 14px); font-weight: normal; }
+#playBtn {
+  width: 100%; margin-top: 14px;
+  background: var(--good); color: #fff;
+  font-size: clamp(22px, 6vw, 28px);
+  min-height: 64px;
+  box-shadow: 0 5px 0 #15803d;
+  flex-direction: row; gap: 8px;
+}
+.soundRow { display: flex; justify-content: center; margin-top: 10px; }
+.soundRow button { flex-direction: row; gap: 6px; padding: 6px 16px; min-height: 48px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="title-wrap"><span class="title-emoji">🌰</span><h1>Acorn Drop</h1></div>
+    <div class="stash" id="stash" title="Your winter acorn stash">🧺 <span id="stashNum">0</span></div>
+  </header>
+
+  <div class="talk">
+    <div class="barnaby" id="barnaby">🦡</div>
+    <div class="bubble"><span id="say">Hi! I'm Barnaby!</span></div>
+  </div>
+
+  <div class="turns">
+    <div class="chip on" id="chipYou"><span class="dot acorn"></span>You</div>
+    <div class="goal" id="goal"></div>
+    <div class="chip" id="chipAI"><span class="dot berry"></span>Barnaby</div>
+  </div>
+
+  <div id="boardWrap">
+    <canvas id="cv"></canvas>
+    <div id="endCard">
+      <div id="endEmoji">🎉</div>
+      <div id="endText">You did it!</div>
+      <div class="endBtns">
+        <button id="againBtn"><span class="ico">🔄</span>Play Again</button>
+        <button id="endMenuBtn"><span class="ico">⚙️</span>Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bar">
+    <button id="hintBtn"><span class="ico">💡</span>Hint</button>
+    <button id="undoBtn"><span class="ico">↩️</span>Oops</button>
+    <button id="newBtn"><span class="ico">🔄</span>New</button>
+    <button id="menuBtn"><span class="ico">⚙️</span>Menu</button>
+  </div>
+</div>
+
+<div id="menu">
+  <div class="card">
+    <div class="hello">🦡</div>
+    <h2>Acorn Drop</h2>
+    <p>Drop your acorns into the tree. Get them in a row to win!</p>
+
+    <div class="label">Which tree?</div>
+    <div class="choices two" id="modeChoices">
+      <button class="choice" data-mode="little">
+        <span class="row"><span class="dot acorn"></span><span class="dot acorn"></span><span class="dot acorn"></span></span>
+        Little Tree<small>3 in a row</small>
+      </button>
+      <button class="choice" data-mode="big">
+        <span class="row"><span class="dot acorn"></span><span class="dot acorn"></span><span class="dot acorn"></span><span class="dot acorn"></span></span>
+        Big Tree<small>4 in a row</small>
+      </button>
+    </div>
+
+    <div class="label">Barnaby is feeling...</div>
+    <div class="choices three" id="levelChoices">
+      <button class="choice" data-level="sleepy"><span class="ico">😴</span>Sleepy</button>
+      <button class="choice" data-level="friendly"><span class="ico">🙂</span>Friendly</button>
+      <button class="choice" data-level="clever"><span class="ico">🤓</span>Clever</button>
+    </div>
+
+    <button id="playBtn">▶️ Play!</button>
+    <div class="soundRow"><button id="soundBtn">🔊 Sound On</button></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Persistent settings ----------
+  const KEY = 'cowork-acorn-drop-';
+  const load = (k, d) => { try { const v = localStorage.getItem(KEY + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } };
+  const save = (k, v) => { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch (e) {} };
+
+  const MODES = {
+    little: { cols: 5, rows: 4, need: 3 },
+    big:    { cols: 7, rows: 6, need: 4 },
+  };
+
+  // ---------- Pure game logic (board = Int8Array rows*cols, row 0 at top) ----------
+  function makeGeo(cols, rows, need) {
+    const wins = [];
+    const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      for (const [dr, dc] of dirs) {
+        const er = r + dr * (need - 1), ec = c + dc * (need - 1);
+        if (er < 0 || er >= rows || ec < 0 || ec >= cols) continue;
+        const w = [];
+        for (let k = 0; k < need; k++) w.push((r + dr * k) * cols + (c + dc * k));
+        wins.push(w);
+      }
+    }
+    const byCell = Array.from({ length: rows * cols }, () => []);
+    wins.forEach(w => w.forEach(i => byCell[i].push(w)));
+    const mid = (cols - 1) / 2;
+    const order = [...Array(cols).keys()].sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b);
+    return { cols, rows, need, wins, byCell, order };
+  }
+
+  function dropRow(b, g, c) {
+    for (let r = g.rows - 1; r >= 0; r--) if (b[r * g.cols + c] === 0) return r;
+    return -1;
+  }
+  const canDrop = (b, g, c) => b[c] === 0;
+  const legal = (b, g) => g.order.filter(c => canDrop(b, g, c));
+  const isFull = (b, g) => { for (let c = 0; c < g.cols; c++) if (b[c] === 0) return false; return true; };
+
+  function winAt(b, g, idx, p) {
+    for (const w of g.byCell[idx]) {
+      let ok = true;
+      for (const i of w) if (b[i] !== p) { ok = false; break; }
+      if (ok) return w;
+    }
+    return null;
+  }
+  function findWin(b, g, p) {
+    for (const w of g.wins) if (w.every(i => b[i] === p)) return w;
+    return null;
+  }
+  // Column where player p wins right now, or -1
+  function winningCol(b, g, p) {
+    for (const c of g.order) {
+      const r = dropRow(b, g, c);
+      if (r < 0) continue;
+      const i = r * g.cols + c;
+      b[i] = p;
+      const w = winAt(b, g, i, p);
+      b[i] = 0;
+      if (w) return c;
+    }
+    return -1;
+  }
+  // Does dropping p at c hand the other player an immediate win on top?
+  function givesAway(b, g, c, p) {
+    const r = dropRow(b, g, c);
+    if (r <= 0) return false;
+    const i = r * g.cols + c;
+    b[i] = p;
+    const above = (r - 1) * g.cols + c;
+    b[above] = 3 - p;
+    const bad = !!winAt(b, g, above, 3 - p);
+    b[above] = 0; b[i] = 0;
+    return bad;
+  }
+
+  function evaluate(b, g, p) {
+    const o = 3 - p, n = g.need;
+    let s = 0;
+    for (const w of g.wins) {
+      let mine = 0, theirs = 0;
+      for (const i of w) { if (b[i] === p) mine++; else if (b[i] === o) theirs++; }
+      if (mine && theirs) continue;
+      if (mine === n - 1) s += 8; else if (mine === n - 2) s += 2;
+      if (theirs === n - 1) s -= 9; else if (theirs === n - 2) s -= 2;
+    }
+    const mc = Math.floor(g.cols / 2);
+    for (let r = 0; r < g.rows; r++) {
+      const v = b[r * g.cols + mc];
+      if (v === p) s += 3; else if (v === o) s -= 3;
+    }
+    return s;
+  }
+
+  const WIN = 1000000;
+  function negamax(b, g, depth, alpha, beta, p, lastIdx) {
+    if (lastIdx >= 0 && winAt(b, g, lastIdx, 3 - p)) return -(WIN + depth);
+    if (isFull(b, g)) return 0;
+    if (depth === 0) return evaluate(b, g, p);
+    let best = -Infinity;
+    for (const c of g.order) {
+      const r = dropRow(b, g, c);
+      if (r < 0) continue;
+      const i = r * g.cols + c;
+      b[i] = p;
+      const v = -negamax(b, g, depth - 1, -beta, -alpha, 3 - p, i);
+      b[i] = 0;
+      if (v > best) best = v;
+      if (v > alpha) alpha = v;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+  // Full window at every root move, so equal scores are truly equal: pick among them at random
+  function bestMove(b, g, p, depth, rnd = Math.random) {
+    let bestV = -Infinity, ties = [];
+    for (const c of g.order) {
+      const r = dropRow(b, g, c);
+      if (r < 0) continue;
+      const i = r * g.cols + c;
+      b[i] = p;
+      const v = -negamax(b, g, depth - 1, -Infinity, Infinity, 3 - p, i);
+      b[i] = 0;
+      if (v > bestV) { bestV = v; ties = [c]; } else if (v === bestV) ties.push(c);
+    }
+    return ties.length ? ties[Math.floor(rnd() * ties.length)] : -1;
+  }
+
+  function weightedRandom(b, g, cols, rnd) {
+    const mid = (g.cols - 1) / 2;
+    const ws = cols.map(c => 1 + (g.cols - Math.abs(c - mid)) * 0.6);
+    let t = ws.reduce((a, x) => a + x, 0) * rnd();
+    for (let k = 0; k < cols.length; k++) { t -= ws[k]; if (t <= 0) return cols[k]; }
+    return cols[cols.length - 1];
+  }
+
+  // Returns { col, why } where why is 'win' | 'block' | 'think'
+  function aiChoose(b, g, level, rnd = Math.random) {
+    const me = 2, you = 1;
+    const moves = legal(b, g);
+    if (!moves.length) return { col: -1, why: 'think' };
+    const myWin = winningCol(b, g, me);
+    const yourWin = winningCol(b, g, you);
+    if (level === 'clever') {
+      const depth = g.need === 3 ? 8 : 4;
+      const c = bestMove(b, g, me, depth, rnd);
+      return { col: c, why: c === myWin ? 'win' : (c === yourWin ? 'block' : 'think') };
+    }
+    if (level === 'friendly') {
+      if (myWin >= 0) return { col: myWin, why: 'win' };
+      if (yourWin >= 0 && rnd() < 0.75) return { col: yourWin, why: 'block' };
+      let pool = moves;
+      if (rnd() < 0.6) {
+        const safe = moves.filter(c => !givesAway(b, g, c, me));
+        if (safe.length) pool = safe;
+      }
+      return { col: weightedRandom(b, g, pool, rnd), why: 'think' };
+    }
+    // sleepy
+    // dozes past his own wins most of the time, and tends to doze away from your lines
+    if (myWin >= 0 && rnd() < 0.3) return { col: myWin, why: 'win' };
+    let pool = moves;
+    if (yourWin >= 0 && rnd() < 0.7) { const away = moves.filter(c => c !== yourWin); if (away.length) pool = away; }
+    else if (myWin >= 0) { const away = moves.filter(c => c !== myWin); if (away.length) pool = away; }
+    return { col: weightedRandom(b, g, pool, rnd), why: 'think' };
+  }
+
+  // Hint for the kid (player 1): win > block > good move
+  function hintFor(b, g) {
+    const w = winningCol(b, g, 1);
+    if (w >= 0) return { col: w, why: 'win' };
+    const bl = winningCol(b, g, 2);
+    if (bl >= 0) return { col: bl, why: 'block' };
+    const safe = legal(b, g).filter(c => !givesAway(b, g, c, 1));
+    if (!safe.length) return { col: legal(b, g)[0], why: 'good' };
+    let bestC = safe[0], bestV = -Infinity;
+    for (const c of safe) {
+      const r = dropRow(b, g, c), i = r * g.cols + c;
+      b[i] = 1;
+      const v = -negamax(b, g, 3, -Infinity, Infinity, 2, i);
+      b[i] = 0;
+      if (v > bestV) { bestV = v; bestC = c; }
+    }
+    return { col: bestC, why: 'good' };
+  }
+
+  // ---------- Words ----------
+  const LINES = {
+    start: ["Your turn first! Tap a spot on the tree.", "You go first! Pick a hole.", "Ready? Drop an acorn!"],
+    think: ["Hmm... let me see...", "Ooh, where shall I go?", "Thinking... thinking...", "Hmmmm!"],
+    aiMove: ["I'll pop a berry here!", "Plop! Your turn!", "There! Your go!", "Berry time! Your turn."],
+    aiBlock: ["Ooh, you nearly got me! I'll block that.", "Sneaky! I'll put mine here.", "Phew, caught that one!"],
+    kidNice: ["Nice drop!", "Ooh, good one!", "Great move!", "Plink! Lovely."],
+    kidBlock: ["You blocked me! Clever!", "Aww, you stopped me! Nice!"],
+    kidThreat: ["Uh oh, you've got a good line going!", "Whoa, you're close!"],
+    kidWin: ["You got it! Hooray for you!", "You win! That was super!", "Wow! You're an acorn champ!"],
+    aiWin: ["I got a row! Want to try again? You were so close!", "Lucky me! Rematch? You'll get me next time!"],
+    tie: ["The whole tree is full! We both win a hug!", "It's a tie! Great game, friend!"],
+    hintWin: ["Psst... drop it in the glowing spot to win!"],
+    hintBlock: ["Watch out! Block me at the glowing spot!"],
+    hintGood: ["Try the glowing spot!"],
+    undo: ["Take-backsies! Try again.", "Oops, no problem! Go again."],
+    sleepy: ["*yawn* ...I'm a bit sleepy today..."],
+  };
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+
+  // ---------- Audio ----------
+  let actx = null;
+  let soundOn = load('sound', true);
+  function ac() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
+    if (actx && actx.state === 'suspended') actx.resume();
+    return actx;
+  }
+  function tone(freq, dur, type = 'triangle', vol = 0.18, when = 0, slide = 0) {
+    if (!soundOn) return;
+    const a = ac(); if (!a) return;
+    const t = a.currentTime + when;
+    const o = a.createOscillator(), gn = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(gn).connect(a.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  const sfx = {
+    whoosh: () => tone(700, 0.18, 'sine', 0.07, 0, -400),
+    land: (p) => { tone(p === 1 ? 330 : 247, 0.12, 'triangle', 0.2); tone(p === 1 ? 660 : 494, 0.1, 'sine', 0.08, 0.02); },
+    win: () => [523, 659, 784, 1047, 784, 1047].forEach((f, k) => tone(f, 0.22, 'triangle', 0.18, k * 0.11)),
+    aiWin: () => [392, 494, 587].forEach((f, k) => tone(f, 0.25, 'sine', 0.14, k * 0.15)),
+    tie: () => [523, 587, 659, 698].forEach((f, k) => tone(f, 0.2, 'sine', 0.13, k * 0.1)),
+    hint: () => { tone(880, 0.12, 'sine', 0.1); tone(1175, 0.16, 'sine', 0.1, 0.1); },
+    undo: () => tone(500, 0.2, 'sine', 0.1, 0, -250),
+    tap: () => tone(600, 0.06, 'square', 0.04),
+  };
+  function speak(text) {
+    if (!soundOn || !('speechSynthesis' in window)) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text.replace(/\*/g, ''));
+      u.rate = 1.0; u.pitch = 1.25;
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const cv = $('cv'), ctx = cv.getContext('2d');
+  const wrap = $('boardWrap');
+  const sayEl = $('say'), barnEl = $('barnaby');
+  const hintBtn = $('hintBtn'), undoBtn = $('undoBtn');
+  const endCard = $('endCard');
+
+  // ---------- State ----------
+  const S = {
+    mode: load('mode', 'little'),
+    level: load('level', 'friendly'),
+    g: null, b: null,
+    turn: 1, over: false, result: null, winLine: null,
+    history: [],              // indices of moves in order
+    falling: null,            // { c, r, p, y, vy, targetY }
+    busy: false,
+    hint: null, hintUntil: 0,
+    pressCol: -1,
+    stash: load('stash', 0),
+    games: 0,
+    aiTimer: 0,
+    t0: performance.now(),
+  };
+  if (!MODES[S.mode]) S.mode = 'little';
+  if (!['sleepy', 'friendly', 'clever'].includes(S.level)) S.level = 'friendly';
+
+  function say(text, voice = true) {
+    sayEl.textContent = text;
+    if (voice) speak(text);
+  }
+  function setBarn(cls) {
+    barnEl.classList.remove('think', 'happy');
+    if (cls) { void barnEl.offsetWidth; barnEl.classList.add(cls); }
+  }
+
+  function renderGoal() {
+    const g = S.g;
+    $('goal').innerHTML = '<span class="dot acorn"></span>'.repeat(g.need);
+    $('goal').title = g.need + ' in a row';
+  }
+  function renderTurn() {
+    $('chipYou').classList.toggle('on', !S.over && S.turn === 1);
+    $('chipAI').classList.toggle('on', !S.over && S.turn === 2);
+    const kidTurn = !S.over && S.turn === 1 && !S.busy;
+    hintBtn.disabled = !kidTurn;
+    undoBtn.disabled = !canUndo();
+  }
+  function renderStash(popIt) {
+    $('stashNum').textContent = S.stash;
+    if (popIt) { const el = $('stash'); el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+  }
+
+  function newGame(firstTime) {
+    clearTimeout(S.aiTimer);
+    const m = MODES[S.mode];
+    S.g = makeGeo(m.cols, m.rows, m.need);
+    S.b = new Int8Array(m.cols * m.rows);
+    S.turn = 1; S.over = false; S.result = null; S.winLine = null;
+    S.history = []; S.falling = null; S.busy = false; S.hint = null;
+    confetti.length = 0;
+    endCard.classList.remove('show');
+    $('againBtn').classList.remove('glow');
+    renderGoal(); renderTurn(); resize();
+    setBarn(null);
+    say(S.level === 'sleepy' && Math.random() < 0.5 ? pick(LINES.sleepy) + ' ' + pick(LINES.start) : pick(LINES.start), !firstTime);
+  }
+
+  // ---------- Moves ----------
+  function play(c, p) {
+    const b = S.b, g = S.g;
+    const r = dropRow(b, g, c);
+    if (r < 0) return false;
+    S.busy = true;
+    S.hint = null;
+    const L = layout;
+    S.falling = { c, r, p, y: L.topY - L.cell * 0.1, vy: 0, targetY: L.cy(r), bounces: 0 };
+    sfx.whoosh();
+    renderTurn();
+    return true;
+  }
+
+  function landed(f) {
+    const b = S.b, g = S.g;
+    const i = f.r * g.cols + f.c;
+    // was this a block? (opponent had a win at this column before the drop)
+    let blocked = false;
+    if (f.p === 1) {
+      blocked = winningCol(b, g, 2) === f.c;
+    }
+    b[i] = f.p;
+    S.history.push(i);
+    S.falling = null;
+    sfx.land(f.p);
+    sparkleAt(layout.cx(f.c), layout.cy(f.r), f.p === 1 ? '#ffd27a' : '#b8adff', 8);
+
+    const w = winAt(b, g, i, f.p);
+    if (w) return finish(f.p === 1 ? 'kid' : 'ai', w);
+    if (isFull(b, g)) return finish('tie', null);
+
+    if (f.p === 1) {
+      S.turn = 2;
+      if (blocked) say(pick(LINES.kidBlock), false);
+      else if (winningCol(b, g, 1) >= 0) say(pick(LINES.kidThreat), false);
+      else if (Math.random() < 0.35) say(pick(LINES.kidNice), false);
+      renderTurn();
+      S.aiTimer = setTimeout(aiTurn, 450);
+    } else {
+      S.turn = 1; S.busy = false;
+      renderTurn();
+    }
+  }
+
+  function aiTurn() {
+    if (S.over) return;
+    setBarn('think');
+    say(pick(LINES.think), false);
+    const think = S.level === 'clever' ? 650 : 900;
+    S.aiTimer = setTimeout(() => {
+      if (S.over) return;
+      const choice = aiChoose(S.b, S.g, S.level);
+      setBarn(null);
+      if (choice.col < 0) return;
+      const msg = choice.why === 'block' ? pick(LINES.aiBlock) : pick(LINES.aiMove);
+      play(choice.col, 2);
+      if (choice.why !== 'win') say(msg);
+    }, think);
+  }
+
+  function finish(result, line) {
+    S.over = true; S.busy = false; S.result = result; S.winLine = line;
+    S.winT = performance.now();
+    S.games++;
+    renderTurn();
+    let emoji, text;
+    if (result === 'kid') {
+      S.stash++; save('stash', S.stash); renderStash(true);
+      sfx.win(); burst(); setBarn('happy');
+      emoji = '🎉'; text = 'You win! +1 acorn!';
+      say(pick(LINES.kidWin));
+    } else if (result === 'ai') {
+      sfx.aiWin(); setBarn('happy');
+      emoji = '🦡'; text = 'Barnaby got a row! Try again?';
+      say(pick(LINES.aiWin));
+    } else {
+      sfx.tie(); burst(0.5);
+      emoji = '🤗'; text = "It's a tie! Great game!";
+      say(pick(LINES.tie));
+    }
+    $('endEmoji').textContent = emoji;
+    $('endText').textContent = text;
+    setTimeout(() => {
+      if (S.over) { endCard.classList.add('show'); $('againBtn').classList.add('glow'); }
+    }, 2400);
+  }
+
+  // Allowed on the kid's turn, or after Barnaby wins / a tie ("try that again")
+  function canUndo() {
+    if (S.busy || S.falling || S.result === 'kid') return false;
+    if (!S.history.some(i => S.b[i] === 1)) return false;
+    return S.over || S.turn === 1;
+  }
+  function undo() {
+    if (!canUndo()) return;
+    clearTimeout(S.aiTimer);
+    // remove back to and including the kid's last move
+    while (S.history.length) {
+      const i = S.history.pop();
+      const p = S.b[i];
+      S.b[i] = 0;
+      if (p === 1) break;
+    }
+    S.over = false; S.result = null; S.winLine = null; S.turn = 1;
+    endCard.classList.remove('show'); $('againBtn').classList.remove('glow');
+    confetti.length = 0;
+    sfx.undo(); setBarn(null);
+    say(pick(LINES.undo), false);
+    renderTurn();
+  }
+
+  function showHint() {
+    if (S.over || S.turn !== 1 || S.busy) return;
+    const h = hintFor(S.b, S.g);
+    S.hint = h;
+    S.hintUntil = performance.now() + 3200;
+    sfx.hint();
+    say(h.why === 'win' ? LINES.hintWin[0] : h.why === 'block' ? LINES.hintBlock[0] : LINES.hintGood[0]);
+  }
+
+  // ---------- Layout & drawing ----------
+  const layout = { cell: 50, pad: 10, W: 0, H: 0, topY: 0, boardY: 0,
+    cx(c) { return this.pad + c * this.cell + this.cell / 2; },
+    cy(r) { return this.boardY + this.pad + r * this.cell + this.cell / 2; },
+  };
+  let dpr = 1;
+  function resize() {
+    const g = S.g; if (!g) return;
+    const rect = wrap.getBoundingClientRect();
+    const availW = Math.max(100, rect.width), availH = Math.max(100, rect.height);
+    // width: cols cells + 0.5 cell padding; height: rows cells + 1 cell drop zone + 0.5 padding + 0.25 roots
+    const cell = Math.floor(Math.min(availW / (g.cols + 0.5), availH / (g.rows + 1.75), 110));
+    const pad = Math.round(cell * 0.25);
+    layout.cell = cell; layout.pad = pad;
+    layout.W = cell * g.cols + pad * 2;
+    layout.boardY = Math.round(cell * 1.0);
+    layout.topY = Math.round(cell * 0.5);
+    layout.H = layout.boardY + cell * g.rows + pad * 2 + Math.round(cell * 0.25);
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    cv.width = Math.round(layout.W * dpr);
+    cv.height = Math.round(layout.H * dpr);
+    cv.style.width = layout.W + 'px';
+    cv.style.height = layout.H + 'px';
+  }
+  window.addEventListener('resize', resize);
+
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawFace(x, y, r, happy, blink) {
+    ctx.fillStyle = '#2a1608';
+    const ey = y - r * 0.02, ex = r * 0.28, er = Math.max(1.5, r * 0.1);
+    if (blink) {
+      ctx.fillRect(x - ex - er, ey, er * 2, Math.max(1, er * 0.5));
+      ctx.fillRect(x + ex - er, ey, er * 2, Math.max(1, er * 0.5));
+    } else {
+      ctx.beginPath(); ctx.arc(x - ex, ey, er, 0, Math.PI * 2); ctx.arc(x + ex, ey, er, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(x - ex + er * 0.35, ey - er * 0.35, er * 0.35, 0, Math.PI * 2); ctx.arc(x + ex + er * 0.35, ey - er * 0.35, er * 0.35, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.strokeStyle = '#2a1608'; ctx.lineWidth = Math.max(1.5, r * 0.08); ctx.lineCap = 'round';
+    ctx.beginPath();
+    if (happy) ctx.arc(x, y + r * 0.2, r * 0.28, 0.1 * Math.PI, 0.9 * Math.PI);
+    else ctx.arc(x, y + r * 0.22, r * 0.16, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+    // cheeks
+    ctx.fillStyle = 'rgba(255, 110, 130, 0.45)';
+    ctx.beginPath(); ctx.arc(x - r * 0.5, y + r * 0.2, r * 0.12, 0, Math.PI * 2); ctx.arc(x + r * 0.5, y + r * 0.2, r * 0.12, 0, Math.PI * 2); ctx.fill();
+  }
+
+  function drawAcorn(x, y, r, happy, blink, alpha = 1) {
+    ctx.save(); ctx.globalAlpha = alpha;
+    // body
+    const gr = ctx.createRadialGradient(x - r * 0.3, y, r * 0.1, x, y + r * 0.1, r * 1.05);
+    gr.addColorStop(0, '#ffd88a'); gr.addColorStop(0.55, '#e89a2c'); gr.addColorStop(1, '#a85e12');
+    ctx.fillStyle = gr;
+    ctx.beginPath();
+    ctx.ellipse(x, y + r * 0.08, r * 0.86, r * 0.9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // tip
+    ctx.fillStyle = '#a85e12';
+    ctx.beginPath(); ctx.moveTo(x - r * 0.12, y + r * 0.92); ctx.lineTo(x, y + r * 1.08); ctx.lineTo(x + r * 0.12, y + r * 0.92); ctx.fill();
+    // cap
+    ctx.fillStyle = '#7a4a1f';
+    ctx.beginPath();
+    ctx.ellipse(x, y - r * 0.38, r * 0.98, r * 0.5, 0, Math.PI, 0);
+    ctx.ellipse(x, y - r * 0.38, r * 0.98, r * 0.2, 0, 0, Math.PI);
+    ctx.fill();
+    ctx.fillStyle = '#5c3613';
+    for (let k = -2; k <= 2; k++) {
+      ctx.beginPath(); ctx.arc(x + k * r * 0.3, y - r * 0.5 - Math.abs(k) * r * -0.05, r * 0.07, 0, Math.PI * 2); ctx.fill();
+    }
+    // stem
+    ctx.strokeStyle = '#5c3613'; ctx.lineWidth = Math.max(2, r * 0.14); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y - r * 0.82); ctx.quadraticCurveTo(x + r * 0.1, y - r * 1.05, x + r * 0.25, y - r * 1.05); ctx.stroke();
+    drawFace(x, y + r * 0.12, r * 0.85, happy, blink);
+    ctx.restore();
+  }
+
+  function drawBerry(x, y, r, happy, blink, alpha = 1) {
+    ctx.save(); ctx.globalAlpha = alpha;
+    const gr = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+    gr.addColorStop(0, '#c4bbff'); gr.addColorStop(0.5, '#6c5ce7'); gr.addColorStop(1, '#3d2fa8');
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(x, y, r * 0.92, 0, Math.PI * 2); ctx.fill();
+    // crown
+    ctx.fillStyle = '#2f2486';
+    ctx.beginPath();
+    for (let k = 0; k < 5; k++) {
+      const a = -Math.PI / 2 + k * (Math.PI * 2 / 5);
+      const px = x + Math.cos(a) * r * 0.22, py = y - r * 0.7 + Math.sin(a) * r * 0.16;
+      k ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      const a2 = a + Math.PI / 5;
+      ctx.lineTo(x + Math.cos(a2) * r * 0.1, y - r * 0.7 + Math.sin(a2) * r * 0.07);
+    }
+    ctx.closePath(); ctx.fill();
+    // leaf
+    ctx.fillStyle = '#3fae49';
+    ctx.beginPath();
+    ctx.ellipse(x + r * 0.45, y - r * 0.92, r * 0.36, r * 0.16, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    // shine
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.beginPath(); ctx.ellipse(x - r * 0.42, y - r * 0.38, r * 0.16, r * 0.1, -0.7, 0, Math.PI * 2); ctx.fill();
+    drawFace(x, y + r * 0.08, r * 0.85, happy, blink);
+    ctx.restore();
+  }
+
+  const drawPiece = (p, ...a) => (p === 1 ? drawAcorn : drawBerry)(...a);
+
+  // ---------- Particles ----------
+  const confetti = [];
+  function sparkleAt(x, y, color, n) {
+    for (let k = 0; k < n; k++) {
+      const a = Math.random() * Math.PI * 2, s = 1 + Math.random() * 3;
+      confetti.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, g: 0.08, life: 1, decay: 0.03 + Math.random() * 0.02, color, size: 2 + Math.random() * 3, rot: 0, vr: 0, kind: 'spark' });
+    }
+  }
+  function burst(scale = 1) {
+    const cols = ['#ff6b6b', '#ffd93d', '#6bcB77', '#4d96ff', '#ff8fd0', '#ff9f43', '#a78bfa'];
+    const n = Math.round(110 * scale);
+    for (let k = 0; k < n; k++) {
+      confetti.push({ x: layout.W / 2 + (Math.random() - 0.5) * layout.W * 0.3, y: layout.H * 0.35, vx: (Math.random() - 0.5) * 9, vy: -3 - Math.random() * 7, g: 0.16, life: 1, decay: 0.006 + Math.random() * 0.006, color: cols[k % cols.length], size: 4 + Math.random() * 5, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 0.3, kind: 'conf' });
+    }
+    // a few falling leaves
+    for (let k = 0; k < Math.round(14 * scale); k++) {
+      confetti.push({ x: Math.random() * layout.W, y: -10 - Math.random() * 60, vx: (Math.random() - 0.5) * 1, vy: 0.6 + Math.random(), g: 0.005, life: 1, decay: 0.004, color: ['#f59e0b', '#ea580c', '#dc2626', '#facc15'][k % 4], size: 7 + Math.random() * 5, rot: Math.random() * 6, vr: 0.04, kind: 'leaf' });
+    }
+  }
+
+  // ---------- Main loop ----------
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const g = S.g; if (!g) return;
+    const L = layout, cell = L.cell, R = cell * 0.4;
+    const t = (now - S.t0) / 1000;
+
+    // physics of falling piece
+    const f = S.falling;
+    if (f) {
+      f.vy += cell * 0.022;
+      f.y += f.vy;
+      if (f.y >= f.targetY) {
+        f.y = f.targetY;
+        if (f.bounces < 1 && f.vy > cell * 0.12) { f.vy = -f.vy * 0.25; f.bounces++; }
+        else { landed(f); }
+      }
+    }
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, L.W, L.H);
+
+    // canopy hint behind drop zone
+    ctx.fillStyle = 'rgba(255,255,255,0.0)';
+
+    // trunk
+    const bx = 0, by = L.boardY, bw = L.W, bh = cell * g.rows + L.pad * 2;
+    // roots
+    ctx.fillStyle = '#6b4220';
+    ctx.beginPath();
+    ctx.moveTo(bx + bw * 0.05, by + bh - 4);
+    ctx.quadraticCurveTo(bx - cell * 0.1, by + bh + cell * 0.25, bx + bw * 0.02, by + bh + cell * 0.25);
+    ctx.lineTo(bx + bw * 0.98, by + bh + cell * 0.25);
+    ctx.quadraticCurveTo(bx + bw + cell * 0.1, by + bh + cell * 0.25, bx + bw * 0.95, by + bh - 4);
+    ctx.fill();
+    const tg = ctx.createLinearGradient(0, 0, bw, 0);
+    tg.addColorStop(0, '#6b4220'); tg.addColorStop(0.5, '#9a6534'); tg.addColorStop(1, '#6b4220');
+    ctx.fillStyle = tg;
+    rr(bx, by, bw, bh, cell * 0.35); ctx.fill();
+    // bark lines
+    ctx.strokeStyle = 'rgba(60, 34, 12, 0.35)'; ctx.lineWidth = Math.max(1.5, cell * 0.04); ctx.lineCap = 'round';
+    for (let c = 0; c <= g.cols; c++) {
+      const x = L.pad + c * cell;
+      ctx.beginPath();
+      ctx.moveTo(x + Math.sin(c * 3.1) * 4, by + 8);
+      for (let k = 1; k <= 6; k++) ctx.lineTo(x + Math.sin(c * 3.1 + k * 1.7) * cell * 0.06, by + 8 + (bh - 16) * k / 6);
+      ctx.stroke();
+    }
+
+    // hint glow column
+    const hintOn = S.hint && now < S.hintUntil && !S.over && S.turn === 1;
+    if (S.hint && now >= S.hintUntil) S.hint = null;
+    if (hintOn) {
+      const pulse = 0.5 + 0.5 * Math.sin(t * 7);
+      ctx.fillStyle = `rgba(255, 236, 120, ${0.25 + 0.3 * pulse})`;
+      rr(L.pad + S.hint.col * cell + 2, by + 4, cell - 4, bh - 8, cell * 0.3); ctx.fill();
+      // bouncing arrow above
+      const ax = L.cx(S.hint.col), ay = L.topY - cell * 0.15 + Math.sin(t * 7) * cell * 0.08;
+      ctx.fillStyle = '#ff8a3d';
+      ctx.beginPath(); ctx.moveTo(ax - cell * 0.22, ay - cell * 0.2); ctx.lineTo(ax + cell * 0.22, ay - cell * 0.2); ctx.lineTo(ax, ay + cell * 0.12); ctx.closePath(); ctx.fill();
+    }
+    // pressed column highlight
+    if (S.pressCol >= 0 && S.turn === 1 && !S.over) {
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      rr(L.pad + S.pressCol * cell + 2, by + 4, cell - 4, bh - 8, cell * 0.3); ctx.fill();
+    }
+
+    // holes + pieces
+    const winSet = S.winLine ? new Set(S.winLine) : null;
+    const blinkCycle = (t % 4.2);
+    for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
+      const x = L.cx(c), y = L.cy(r);
+      ctx.fillStyle = '#3b2412';
+      ctx.beginPath(); ctx.arc(x, y, R + 2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#24150a';
+      ctx.beginPath(); ctx.arc(x, y + 2, R - 1, 0, Math.PI * 2); ctx.fill();
+      const p = S.b[r * g.cols + c];
+      if (!p) continue;
+      const i = r * g.cols + c;
+      const inWin = winSet && winSet.has(i);
+      let dy = 0, sc = 1;
+      if (inWin) {
+        const k = S.winLine.indexOf(i);
+        dy = -Math.abs(Math.sin(t * 6 + k * 0.6)) * cell * 0.12;
+        sc = 1.08;
+      } else {
+        dy = Math.sin(t * 2 + c * 0.9 + r * 1.3) * cell * 0.012;
+      }
+      const blink = blinkCycle > 4.05 && ((r + c) % 3 === 0);
+      drawPiece(p, x, y + dy, R * sc, !!inWin || (S.result === 'tie'), blink);
+    }
+    // winning line glow
+    if (S.winLine) {
+      const a = S.winLine[0], z = S.winLine[S.winLine.length - 1];
+      const ax = L.cx(a % g.cols), ay = L.cy(Math.floor(a / g.cols));
+      const zx = L.cx(z % g.cols), zy = L.cy(Math.floor(z / g.cols));
+      const pulse = 0.5 + 0.5 * Math.sin(t * 5);
+      ctx.strokeStyle = S.result === 'kid' ? `rgba(255, 245, 140, ${0.55 + 0.35 * pulse})` : `rgba(200, 190, 255, ${0.55 + 0.35 * pulse})`;
+      ctx.lineWidth = cell * 0.16; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(zx, zy); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = cell * 0.05;
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(zx, zy); ctx.stroke();
+    }
+
+    // drop-zone preview (kid's turn): a waiting acorn above the pressed / hint column
+    if (!S.over && S.turn === 1 && !S.busy) {
+      const pc = S.pressCol >= 0 ? S.pressCol : (hintOn ? S.hint.col : -1);
+      if (pc >= 0 && !hintOn) drawAcorn(L.cx(pc), L.topY, R * 0.9, true, false, 0.9);
+    }
+
+    // falling piece on top
+    if (S.falling) drawPiece(S.falling.p, L.cx(S.falling.c), S.falling.y, R, true, false);
+
+    // particles
+    for (let k = confetti.length - 1; k >= 0; k--) {
+      const q = confetti[k];
+      q.vy += q.g; q.x += q.vx; q.y += q.vy; q.rot += q.vr; q.life -= q.decay;
+      if (q.kind === 'leaf') q.vx = Math.sin(t * 2 + k) * 0.8;
+      if (q.life <= 0 || q.y > L.H + 20) { confetti.splice(k, 1); continue; }
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, q.life * 1.5));
+      ctx.fillStyle = q.color;
+      ctx.translate(q.x, q.y); ctx.rotate(q.rot);
+      if (q.kind === 'spark') { ctx.beginPath(); ctx.arc(0, 0, q.size, 0, Math.PI * 2); ctx.fill(); }
+      else if (q.kind === 'leaf') { ctx.beginPath(); ctx.ellipse(0, 0, q.size, q.size * 0.5, 0, 0, Math.PI * 2); ctx.fill(); }
+      else ctx.fillRect(-q.size / 2, -q.size / 4, q.size, q.size / 2);
+      ctx.restore();
+    }
+  }
+
+  // ---------- Input ----------
+  function colFromEvent(e) {
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (layout.W / rect.width);
+    const c = Math.floor((x - layout.pad) / layout.cell);
+    return Math.max(0, Math.min(S.g.cols - 1, c));
+  }
+  function kidDrop(c) {
+    if (S.over || S.busy || S.turn !== 1) return false;
+    if (!canDrop(S.b, S.g, c)) { sfx.tap(); say('That one is full! Try another spot.', false); return false; }
+    return play(c, 1);
+  }
+  cv.addEventListener('pointerdown', e => {
+    ac();
+    if (S.over || S.busy || S.turn !== 1) return;
+    S.pressCol = colFromEvent(e);
+  });
+  cv.addEventListener('pointermove', e => {
+    if (S.pressCol >= 0) S.pressCol = colFromEvent(e);
+    else if (e.pointerType === 'mouse' && !S.over && S.turn === 1 && !S.busy) S.hoverMouse = true;
+  });
+  cv.addEventListener('pointerup', e => {
+    if (S.pressCol < 0) return;
+    const c = colFromEvent(e);
+    S.pressCol = -1;
+    kidDrop(c);
+  });
+  cv.addEventListener('pointercancel', () => { S.pressCol = -1; });
+  cv.addEventListener('pointerleave', () => { S.pressCol = -1; });
+  window.addEventListener('keydown', e => {
+    if (!$('menu').classList.contains('hide')) return;
+    const n = parseInt(e.key, 10);
+    if (n >= 1 && S.g && n <= S.g.cols) kidDrop(n - 1);
+  });
+
+  hintBtn.addEventListener('click', () => { ac(); showHint(); });
+  undoBtn.addEventListener('click', () => { ac(); undo(); });
+  $('newBtn').addEventListener('click', () => { ac(); newGame(); });
+  $('againBtn').addEventListener('click', () => { ac(); newGame(); });
+  const openMenu = () => { clearTimeout(S.aiTimer); renderMenu(); $('menu').classList.remove('hide'); };
+  $('menuBtn').addEventListener('click', openMenu);
+  $('endMenuBtn').addEventListener('click', openMenu);
+
+  // ---------- Menu ----------
+  function renderMenu() {
+    document.querySelectorAll('#modeChoices .choice').forEach(b => b.classList.toggle('sel', b.dataset.mode === S.mode));
+    document.querySelectorAll('#levelChoices .choice').forEach(b => b.classList.toggle('sel', b.dataset.level === S.level));
+    $('soundBtn').textContent = soundOn ? '🔊 Sound On' : '🔇 Sound Off';
+  }
+  document.querySelectorAll('#modeChoices .choice').forEach(b => b.addEventListener('click', () => { ac(); sfx.tap(); S.mode = b.dataset.mode; save('mode', S.mode); renderMenu(); }));
+  document.querySelectorAll('#levelChoices .choice').forEach(b => b.addEventListener('click', () => { ac(); sfx.tap(); S.level = b.dataset.level; save('level', S.level); renderMenu(); }));
+  $('soundBtn').addEventListener('click', () => {
+    soundOn = !soundOn; save('sound', soundOn);
+    if (!soundOn && 'speechSynthesis' in window) speechSynthesis.cancel();
+    renderMenu(); ac(); sfx.tap();
+  });
+  $('playBtn').addEventListener('click', () => {
+    ac();
+    $('menu').classList.add('hide');
+    newGame();
+  });
+
+  // ---------- Boot ----------
+  renderStash(false);
+  renderMenu();
+  newGame(true);
+  requestAnimationFrame(frame);
+
+  // test hooks
+  window.__acorn = { S, makeGeo, aiChoose, hintFor, winningCol, findWin, dropRow, legal, isFull, winAt, kidDrop, newGame, undo, showHint, layout, MODES };
+})();
+</script>
+</body>
+</html>

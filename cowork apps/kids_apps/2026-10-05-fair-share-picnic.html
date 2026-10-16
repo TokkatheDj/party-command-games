@@ -1,0 +1,674 @@
+<!-- CONCEPT: LEARNING (equal sharing / first division) - Fair Share Picnic: tap the plates to deal treats from the picnic basket until every animal friend has the same, give the leftovers that can't be shared fairly to the ant hill, re-share when a surprise guest rings the doorbell, and pick the pie that's cut into the right number of same-size slices; twelve picnic rounds plus a Free Share mode that auto-deals any number of treats and shows "13 ÷ 4 = 3 each, 1 for the ants". No timer, no losing. Ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fair Share Picnic</title>
+<style>
+:root{
+  --sky1:#7fd3ff; --sky2:#c8f0ff; --grass:#6cc24a; --grass2:#4fa335;
+  --red:#e53935; --gingham:rgba(229,57,53,.32);
+  --ink:#3b2a20; --white:#fffdf7; --gold:#ffc83d; --orange:#ff8a3d; --pink:#ff5fa2; --purple:#8a5cff;
+  --panel:#fff6e3; --btn:#ff8a3d; --btn2:#4fb3ff; --ok:#43c463;
+  --font:"Comic Sans MS","Trebuchet MS",system-ui,sans-serif;
+  --r:18px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  font-family:var(--font);color:var(--ink);background:linear-gradient(var(--sky1),var(--sky2) 38%,var(--grass) 38%,var(--grass2));}
+button{font-family:inherit;cursor:pointer;border:none;color:inherit}
+.screen{position:fixed;inset:0;display:none;flex-direction:column}
+.screen.on{display:flex}
+
+/* ---------- title ---------- */
+#title{align-items:center;justify-content:center;gap:clamp(10px,2.5vh,22px);padding:20px;text-align:center}
+.sun{position:absolute;top:18px;right:22px;font-size:54px;animation:spin 18s linear infinite}
+.cloud{position:absolute;font-size:46px;opacity:.95;animation:drift 26s linear infinite}
+h1{margin:0;font-size:clamp(38px,11vw,72px);line-height:1.02;
+  background:linear-gradient(90deg,var(--red),var(--orange),var(--pink),var(--purple));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 3px 0 #fff) drop-shadow(0 5px 0 rgba(0,0,0,.12))}
+.tag{font-size:clamp(16px,4.5vw,22px);background:var(--white);padding:8px 16px;border-radius:999px;box-shadow:0 4px 0 rgba(0,0,0,.12)}
+.parade{font-size:clamp(38px,11vw,60px);display:flex;gap:6px}
+.parade span{display:inline-block;animation:hop 1s ease-in-out infinite}
+.blanketMini{width:min(80vw,360px);height:56px;border-radius:14px;background-color:#fff;
+  background-image:linear-gradient(90deg,var(--gingham) 50%,transparent 50%),linear-gradient(var(--gingham) 50%,transparent 50%);
+  background-size:28px 28px;box-shadow:0 6px 0 rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:34px;gap:10px}
+.big{min-height:64px;min-width:230px;padding:12px 26px;border-radius:999px;font-size:clamp(22px,6vw,30px);font-weight:bold;
+  background:var(--btn);color:#fff;box-shadow:0 6px 0 #c95f1c;transition:transform .1s}
+.big.blue{background:var(--btn2);box-shadow:0 6px 0 #2a7fc0}
+.big.green{background:var(--ok);box-shadow:0 6px 0 #2b8c45}
+.big:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.25)}
+.small{font-size:14px;opacity:.75}
+
+/* ---------- game header ---------- */
+#game{gap:6px}
+header{display:flex;align-items:center;gap:6px;padding:8px 8px 0}
+.ib{width:48px;height:48px;border-radius:14px;background:var(--white);font-size:24px;box-shadow:0 4px 0 rgba(0,0,0,.15);flex:none;display:flex;align-items:center;justify-content:center}
+.ib:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.15)}
+.ib.off{opacity:.45}
+#dots{flex:1;display:flex;justify-content:center;flex-wrap:wrap;gap:4px;min-width:0}
+#dots i{width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.6);border:2px solid #fff}
+#dots i.done{background:var(--gold)}
+#dots i.now{background:var(--pink);transform:scale(1.3)}
+#dots .ftxt{font-size:16px;font-weight:bold;background:var(--white);padding:4px 12px;border-radius:999px}
+#msg{margin:0 10px;background:var(--white);border-radius:var(--r);padding:8px 12px;min-height:52px;display:flex;align-items:center;justify-content:center;
+  text-align:center;font-size:clamp(16px,4.4vw,21px);line-height:1.25;box-shadow:0 4px 0 rgba(0,0,0,.12)}
+#msg b{color:var(--red)}
+.chip{display:inline-block;background:#ffe9b8;border-radius:10px;padding:0 6px;white-space:nowrap}
+
+/* ---------- stage ---------- */
+#stage{flex:1;position:relative;display:flex;flex-direction:column;min-height:0;padding:0 8px 8px;gap:8px}
+#blanket{flex:1;min-height:0;border-radius:22px;background-color:#fff;
+  background-image:linear-gradient(90deg,var(--gingham) 50%,transparent 50%),linear-gradient(var(--gingham) 50%,transparent 50%);
+  background-size:40px 40px;box-shadow:0 6px 0 rgba(0,0,0,.15),inset 0 0 0 6px rgba(255,255,255,.6);
+  display:grid;gap:6px;padding:8px;align-content:center;justify-items:center}
+.seat{display:flex;flex-direction:column;align-items:center;width:100%;min-width:0;position:relative}
+.seat.arrive{animation:arrive .8s cubic-bezier(.3,1.5,.5,1)}
+.friend{font-size:clamp(34px,10vw,52px);line-height:1;position:relative;transition:transform .2s}
+.friend.happy{animation:hop .6s ease-in-out infinite}
+.mood{position:absolute;right:-14px;top:-8px;font-size:24px;animation:pop .3s backwards}
+.plate{width:min(100%,128px);aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,#fff 55%,#e9eef3 56%,#fff 64%,#dfe6ec);
+  box-shadow:0 5px 0 rgba(0,0,0,.18);display:flex;flex-wrap:wrap;align-content:center;justify-content:center;padding:14%;cursor:pointer;margin-top:-4px;position:relative}
+.plate:active{transform:scale(.96)}
+.plate.wob{animation:wob .5s}
+.treat{line-height:1;padding:3px;cursor:pointer;display:inline-block}
+.treat.new{animation:pop .35s .18s backwards}
+.crow{display:flex;align-items:center;gap:6px;margin-top:4px}
+.back{width:44px;height:44px;border-radius:50%;background:#ffe1ec;font-size:22px;box-shadow:0 3px 0 rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;padding:0}
+.back:active{transform:translateY(2px)}
+.back.gone{visibility:hidden}
+.anthill .back{position:absolute;top:4px;right:4px;width:44px;height:44px}
+.treat{pointer-events:none}
+.count{font-weight:bold;font-size:clamp(18px,5vw,24px);background:var(--white);border-radius:999px;min-width:40px;text-align:center;padding:0 8px;box-shadow:0 3px 0 rgba(0,0,0,.12)}
+.pulse{animation:pulse 1s ease-in-out infinite!important}
+.hand{position:absolute;font-size:42px;pointer-events:none;animation:point 1s ease-in-out infinite;z-index:5}
+
+#bottom{flex:none;display:flex;gap:8px;align-items:stretch;height:clamp(116px,19vh,150px)}
+.basket{flex:1;border-radius:22px;background:linear-gradient(#e7b36a,#c98a3c);box-shadow:0 6px 0 #8d5a22,inset 0 0 0 4px rgba(255,255,255,.25);
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px;min-width:0}
+.basket::before{content:"";position:absolute;inset:8px;border-radius:14px;
+  background:repeating-linear-gradient(45deg,rgba(0,0,0,.08) 0 6px,transparent 6px 12px)}
+.pile{position:relative;display:flex;flex-wrap:wrap;justify-content:center;align-content:center;max-height:100%;overflow:hidden}
+.pile span{font-size:clamp(20px,5.5vw,28px);margin:-1px}
+.blabel{position:relative;font-weight:bold;background:var(--white);border-radius:999px;padding:0 10px;font-size:16px;margin-top:2px}
+.anthill{width:clamp(110px,32vw,150px);flex:none;border-radius:22px;background:linear-gradient(#a7e07f,#7cc451);box-shadow:0 6px 0 #4b8d2b;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:6px;cursor:pointer;position:relative;overflow:hidden}
+.anthill.hide{display:none}
+.mound{width:86%;height:44%;border-radius:50% 50% 8px 8px/90% 90% 8px 8px;background:radial-gradient(circle at 50% 30%,#a8703e,#7a4b22);
+  display:flex;align-items:flex-start;justify-content:center;font-size:18px;padding-top:4px}
+.antsWalk{position:absolute;top:6px;font-size:18px;animation:march 3s linear infinite}
+.antPile{display:flex;flex-wrap:wrap;justify-content:center;font-size:20px;min-height:24px}
+.anthill .blabel{margin-top:2px}
+
+/* ---------- pies ---------- */
+#pies{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;border-radius:22px;padding:10px;background-color:#fff;
+  background-image:linear-gradient(90deg,var(--gingham) 50%,transparent 50%),linear-gradient(var(--gingham) 50%,transparent 50%);background-size:40px 40px;
+  box-shadow:0 6px 0 rgba(0,0,0,.15)}
+#pies.on{display:flex}
+.prow{display:flex;gap:6px;justify-content:center;font-size:clamp(36px,10vw,52px)}
+.prow span{position:relative;display:inline-block}
+.prow span.happy{animation:hop .6s ease-in-out infinite}
+.prow span b{position:absolute;bottom:-10px;right:-8px;font-size:24px;animation:pop .35s backwards}
+.choices{display:flex;gap:8px;justify-content:center;width:100%}
+.pie{flex:1;max-width:150px;aspect-ratio:1;border-radius:50%;background:transparent;padding:0;position:relative;transition:opacity .3s,transform .3s}
+.pie svg{width:100%;height:100%;display:block;filter:drop-shadow(0 5px 0 rgba(0,0,0,.18))}
+.pie.nope{opacity:.4;animation:wob .5s}
+.pie.yes{transform:scale(1.12)}
+.pie .why{position:absolute;left:50%;top:100%;transform:translateX(-50%);background:var(--white);border-radius:12px;padding:2px 8px;font-size:15px;white-space:nowrap;box-shadow:0 2px 0 rgba(0,0,0,.12)}
+
+/* ---------- free share controls ---------- */
+#freeCtl{display:none;flex-direction:column;gap:6px;width:clamp(150px,46vw,240px);flex:none}
+#freeCtl.on{display:flex}
+.step{display:flex;align-items:center;justify-content:space-between;background:var(--white);border-radius:16px;padding:3px;box-shadow:0 4px 0 rgba(0,0,0,.12)}
+.step button{width:44px;height:44px;border-radius:12px;background:var(--btn2);color:#fff;font-size:26px;font-weight:bold}
+.step span{font-size:20px;font-weight:bold;text-align:center;flex:1;white-space:nowrap}
+#freeGo{min-height:44px;border-radius:16px;background:var(--ok);color:#fff;font-size:22px;font-weight:bold;box-shadow:0 4px 0 #2b8c45}
+
+/* ---------- success card ---------- */
+#win{position:absolute;left:8px;right:8px;bottom:8px;height:clamp(116px,19vh,150px);border-radius:22px;background:var(--panel);
+  box-shadow:0 6px 0 rgba(0,0,0,.18),inset 0 0 0 4px var(--gold);display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;z-index:6;padding:6px}
+#win.on{display:flex;animation:pop .4s}
+#eq{font-size:clamp(17px,4.8vw,24px);font-weight:bold;text-align:center}
+#nextBtn{min-height:52px;min-width:170px;font-size:24px}
+
+/* ---------- end ---------- */
+#end{align-items:center;justify-content:center;gap:16px;text-align:center;padding:20px}
+#end h1{font-size:clamp(34px,10vw,64px)}
+.endStars{font-size:clamp(22px,6vw,32px);background:var(--white);padding:8px 18px;border-radius:999px;box-shadow:0 4px 0 rgba(0,0,0,.12)}
+
+#fx{position:fixed;inset:0;pointer-events:none;z-index:20}
+.ghost{position:fixed;z-index:15;pointer-events:none;font-size:28px;transition:transform .32s cubic-bezier(.4,.1,.5,1.2),opacity .32s}
+
+@keyframes hop{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes pop{0%{transform:scale(0)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
+@keyframes wob{0%,100%{transform:rotate(0)}20%{transform:rotate(-8deg)}40%{transform:rotate(7deg)}60%{transform:rotate(-5deg)}80%{transform:rotate(3deg)}}
+@keyframes pulse{0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 var(--gold))}50%{transform:scale(1.08);filter:drop-shadow(0 0 10px var(--gold))}}
+@keyframes point{0%,100%{transform:translate(0,0)}50%{transform:translate(0,-12px)}}
+@keyframes arrive{0%{transform:translateX(120vw)}100%{transform:translateX(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes drift{0%{transform:translateX(-30vw)}100%{transform:translateX(130vw)}}
+@keyframes march{0%{left:-20px}100%{left:110%}}
+</style>
+</head>
+<body>
+
+<!-- TITLE -->
+<section id="title" class="screen on">
+  <div class="sun">🌞</div>
+  <div class="cloud" style="top:12%;left:0">☁️</div>
+  <div class="cloud" style="top:24%;left:0;animation-delay:-13s">☁️</div>
+  <div class="parade"><span>🐻</span><span style="animation-delay:.15s">🐰</span><span style="animation-delay:.3s">🦊</span><span style="animation-delay:.45s">🐸</span></div>
+  <h1>Fair Share<br>Picnic</h1>
+  <div class="tag">Everyone gets the <b>same</b>!</div>
+  <div class="blanketMini">🍓 🍪 🧁 🍩</div>
+  <button class="big" id="playBtn">▶ Play</button>
+  <button class="big blue" id="freeBtn">🧺 Free Share</button>
+  <div class="small" id="titleNote"></div>
+</section>
+
+<!-- GAME -->
+<section id="game" class="screen">
+  <header>
+    <button class="ib" id="homeBtn" aria-label="Home">🏠</button>
+    <div id="dots"></div>
+    <button class="ib" id="sayBtn" aria-label="Say it">🔊</button>
+    <button class="ib" id="hintBtn" aria-label="Hint">💡</button>
+    <button class="ib" id="sndBtn" aria-label="Sound">🎵</button>
+  </header>
+  <div id="msg"><span></span></div>
+  <div id="stage">
+    <div id="blanket"></div>
+    <div id="pies">
+      <div class="prow" id="pieFriends"></div>
+      <div class="choices" id="pieChoices"></div>
+    </div>
+    <div id="bottom">
+      <div class="basket" id="basket"><div class="pile" id="pile"></div><div class="blabel" id="bcount">0</div></div>
+      <div id="freeCtl">
+        <div class="step"><button id="fnMinus">−</button><span id="fnLbl">🐻 3</span><button id="fnPlus">+</button></div>
+        <div class="step"><button id="fkMinus">−</button><span id="fkLbl">🍪 12</span><button id="fkPlus">+</button></div>
+        <button id="freeGo">Share! ✨</button>
+      </div>
+      <div class="anthill hide" id="anthill">
+        <div class="antsWalk">🐜</div>
+        <button class="back gone" id="antBack" aria-label="take one back">↩️</button>
+        <div class="antPile" id="antPile"></div>
+        <div class="mound">🐜</div>
+        <div class="blabel" id="acount">Ants 0</div>
+      </div>
+    </div>
+    <div id="win"><div id="eq"></div><button class="big green" id="nextBtn">Next ▶</button></div>
+  </div>
+</section>
+
+<!-- END -->
+<section id="end" class="screen">
+  <div class="sun">🌞</div>
+  <div class="parade" id="endParade"></div>
+  <h1>Best Picnic<br>Ever!</h1>
+  <div class="endStars" id="endStars"></div>
+  <div class="tag">You shared fair with everyone 💛</div>
+  <button class="big" id="againBtn">🔁 Play Again</button>
+  <button class="big blue" id="endFreeBtn">🧺 Free Share</button>
+</section>
+
+<canvas id="fx"></canvas>
+
+<script>
+/* ================= data ================= */
+const FOODS = [
+  ['🍓','strawberries'],['🍪','cookies'],['🧁','cupcakes'],['🍎','apples'],['🍩','donuts'],
+  ['🥕','carrots'],['🍇','grapes'],['🍌','bananas'],['🥨','pretzels'],['🍉','melon slices'],['🫐','blueberries'],['🍒','cherries']
+];
+const FRIENDS = ['🐻','🐰','🦊','🐸','🐼','🐨','🐷','🐯','🐵','🐶'];
+const ROUNDS = [
+  {t:'share', n:2, k:4,  f:0},
+  {t:'share', n:2, k:6,  f:1},
+  {t:'share', n:3, k:6,  f:2},
+  {t:'pie',   n:2},
+  {t:'share', n:3, k:9,  f:3},
+  {t:'share', n:4, k:8,  f:4},
+  {t:'share', n:2, k:5,  f:1, ants:true},
+  {t:'pie',   n:4},
+  {t:'share', n:3, k:7,  f:0, ants:true},
+  {t:'guest', n:2, k:6,  f:5},
+  {t:'pie',   n:3},
+  {t:'share', n:4, k:14, f:6, ants:true},
+];
+const PIE_WORD = {2:'halves',3:'thirds',4:'quarters'};
+const KEY = 'cowork-fairsharepicnic-';
+const $ = id => document.getElementById(id);
+
+/* ================= state ================= */
+const S = {
+  mode:'play', ri:0, round:null, friends:[], plates:[], basket:0, ants:0, food:FOODS[0],
+  locked:false, moods:[], guestIn:false, firstTap:true, stars:0,
+  freeN:3, freeK:12, freeF:1, dealing:null, token:0
+};
+let sfxOn = localStorage.getItem(KEY+'sfx') !== '0';
+
+/* ================= audio ================= */
+let actx = null;
+function ac(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(actx && actx.state==='suspended') actx.resume(); return actx; }
+function tone(f, dur=.15, type='sine', vol=.18, when=0, f2=null){
+  if(!sfxOn) return; const a = ac(); if(!a) return;
+  const t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if(f2) o.frequency.exponentialRampToValueAtTime(f2, t+dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t+.015); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t+dur+.05);
+}
+const sPop = i => tone(520 + Math.min(i,14)*55, .13, 'triangle', .2);
+const sBoing = () => tone(600, .25, 'sine', .18, 0, 180);
+const sHmm = () => { tone(330,.18,'triangle',.14); tone(262,.25,'triangle',.14,.18); };
+const sAnt = () => { tone(1400,.05,'square',.05); tone(1700,.05,'square',.05,.07); };
+const sDing = () => { tone(880,.45,'sine',.22); tone(698,.6,'sine',.22,.4); };
+const sYay = () => [523,659,784,1047].forEach((f,i)=>tone(f,.28,'triangle',.2,i*.11));
+const sBig = () => [523,659,784,1047,784,1047,1319].forEach((f,i)=>tone(f,.3,'triangle',.2,i*.13));
+
+let voiceText = '';
+function speak(t){
+  if(!('speechSynthesis' in window)) return;
+  try{ speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.rate=.95; u.pitch=1.25; speechSynthesis.speak(u); }catch(e){}
+}
+
+/* ================= helpers ================= */
+const shuffle = a => { a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} return a; };
+function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===id)); }
+function setMsg(html, voice){ $('msg').innerHTML = '<span>'+html+'</span>'; voiceText = voice || $('msg').textContent; }
+function fly(emoji, fromEl, toEl){
+  if(!fromEl || !toEl) return;
+  const a = fromEl.getBoundingClientRect(), b = toEl.getBoundingClientRect();
+  const g = document.createElement('div'); g.className='ghost'; g.textContent = emoji;
+  g.style.left = (a.left + a.width/2 - 14)+'px'; g.style.top = (a.top + a.height/2 - 16)+'px';
+  document.body.appendChild(g);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    g.style.transform = `translate(${b.left+b.width/2-a.left-a.width/2}px,${b.top+b.height/2-a.top-a.height/2}px) scale(.8)`;
+    g.style.opacity = '.2';
+  }));
+  setTimeout(()=>g.remove(), 360);
+}
+function treatSize(c){ return c<=4 ? 'clamp(22px,6.5vw,32px)' : c<=9 ? 'clamp(17px,4.8vw,24px)' : 'clamp(13px,3.6vw,18px)'; }
+
+/* ================= rendering ================= */
+function renderDots(){
+  const d = $('dots');
+  if(S.mode==='free'){ d.innerHTML = '<span class="ftxt">Free Share</span>'; return; }
+  d.innerHTML = ROUNDS.map((r,i)=>`<i class="${i<S.ri?'done':i===S.ri?'now':''}"></i>`).join('');
+}
+function renderPlates(newIdx=-1, arriveIdx=-1){
+  const n = S.plates.length, bl = $('blanket');
+  const cols = n<=2 ? 2 : n===4 ? 2 : 3;
+  bl.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+  bl.innerHTML = S.plates.map((c,i)=>{
+    const fs = treatSize(c);
+    const treats = Array.from({length:c},(_,j)=>`<span class="treat${i===newIdx&&j===c-1?' new':''}" data-p="${i}" style="font-size:${fs}">${S.food[0]}</span>`).join('');
+    const mood = S.moods[i] ? `<span class="mood">${S.moods[i]}</span>` : '';
+    return `<div class="seat${i===arriveIdx?' arrive':''}" data-seat="${i}">
+      <div class="friend${S.moods[i]==='😋'?' happy':''}" style="animation-delay:${i*.1}s">${S.friends[i]}${mood}</div>
+      <div class="plate" data-plate="${i}">${treats}</div>
+      <div class="crow"><div class="count">${c}</div><button class="back${c?'':' gone'}" data-back="${i}" aria-label="take one back">↩️</button></div></div>`;
+  }).join('');
+}
+function renderBasket(){
+  $('pile').innerHTML = Array.from({length:S.basket},()=>`<span>${S.food[0]}</span>`).join('');
+  $('bcount').textContent = S.basket ? `🧺 ${S.basket}` : '🧺 empty!';
+  $('antPile').innerHTML = Array.from({length:S.ants},(_,i)=>`<span class="treat" data-ant="${i}">${S.food[0]}</span>`).join('');
+  $('acount').textContent = `🐜 ${S.ants}`;
+  $('antBack').classList.toggle('gone', !S.ants);
+}
+function renderAll(newIdx, arriveIdx){ renderPlates(newIdx, arriveIdx); renderBasket(); }
+function clearPulse(){ document.querySelectorAll('.pulse').forEach(e=>e.classList.remove('pulse')); document.querySelectorAll('.hand').forEach(e=>e.remove()); }
+function showHand(el){
+  if(!el) return; const st = $('stage').getBoundingClientRect(), r = el.getBoundingClientRect();
+  const h = document.createElement('div'); h.className='hand'; h.textContent='👆';
+  h.style.left = (r.left - st.left + r.width/2 - 16)+'px'; h.style.top = (r.top - st.top + r.height*.55)+'px';
+  $('stage').appendChild(h);
+}
+
+/* ================= round setup ================= */
+function startRound(){
+  clearInterval(S.dealing); S.dealing = null;
+  const R = ROUNDS[S.ri]; S.round = R; S.locked = false; S.moods = []; S.ants = 0; S.guestIn = false;
+  $('win').classList.remove('on'); clearPulse(); renderDots();
+  const pick = shuffle(FRIENDS);
+  if(R.t==='pie'){ startPie(R, pick); return; }
+  $('pies').classList.remove('on'); $('blanket').style.display=''; $('bottom').style.display='';
+  $('freeCtl').classList.remove('on'); $('basket').style.display='';
+  S.food = FOODS[R.f];
+  $('anthill').classList.toggle('hide', !R.ants);
+  if(R.t==='guest'){
+    S.friends = pick.slice(0,2); S.plates = [3,3]; S.basket = 0; S.locked = true;
+    S.guest = pick[2];
+    renderAll();
+    setMsg(`Everyone has <b>3</b> ${S.food[0]}. Yum!`, `Everyone has three ${S.food[1]}. Yum!`);
+    const tok = ++S.token;
+    setTimeout(()=>{
+      if(tok!==S.token || !$('game').classList.contains('on')) return;
+      sDing(); S.friends.push(S.guest); S.plates.push(0); S.guestIn = true; S.locked = false;
+      renderAll(-1, 2);
+      setMsg(`Ding-dong! A new friend! <b>Share again</b> so everyone has the same.`,
+             `Ding dong! A new friend came to the picnic. Share again so everyone has the same. Tap the back arrow under a plate to take a treat back.`);
+      setTimeout(()=>{ const t=document.querySelector('.back[data-back="0"]'); if(t){ t.classList.add('pulse'); } }, 900);
+    }, 1900);
+    return;
+  }
+  S.friends = pick.slice(0,R.n); S.plates = Array(R.n).fill(0); S.basket = R.k;
+  renderAll();
+  const firstAnts = R.ants && !ROUNDS.slice(0,S.ri).some(r=>r.ants);
+  setMsg(`Give everyone the <b>same</b>! <span class="chip">${S.food[0]} × ${R.k}</span>` + (firstAnts ? ' 🐜 are hungry too…' : ''),
+    `Share the ${R.k} ${S.food[1]} so every friend gets the same. Tap a plate to give a treat.` + (firstAnts ? ' The ants are hungry too!' : ''));
+  if(S.ri===0 && S.firstTap) setTimeout(()=>showHand(document.querySelector('.plate')), 300);
+}
+
+/* ================= share actions ================= */
+function givePlate(i){
+  if(S.locked) return;
+  clearPulse(); S.firstTap = false;
+  if(S.basket<=0){
+    if(S.mode==='free'){ setMsg('The basket is empty! Press <b>Share!</b> or change the numbers.', 'The basket is empty.'); sHmm(); return; }
+    sBoing(); const p=document.querySelector(`.plate[data-plate="${i}"]`); p && p.classList.add('wob');
+    setMsg('The basket is empty! Tap ↩️ under a plate to take a treat back.', 'The basket is empty! Tap the back arrow under a plate to take a treat back.'); return;
+  }
+  S.basket--; S.plates[i]++; S.moods = [];
+  fly(S.food[0], $('basket'), document.querySelector(`.plate[data-plate="${i}"]`));
+  sPop(S.plates[i]);
+  renderAll(i);
+  afterAction();
+}
+function takeBack(i){
+  if(S.locked) return;
+  clearPulse(); S.plates[i]--; S.basket++; S.moods = [];
+  fly(S.food[0], document.querySelector(`.plate[data-plate="${i}"]`), $('basket'));
+  sBoing(); renderAll(); afterAction(true);
+}
+function giveAnts(){
+  if(S.locked) return;
+  clearPulse();
+  if(S.basket<=0){ sHmm(); return; }
+  S.basket--; S.ants++; S.moods = [];
+  fly(S.food[0], $('basket'), $('anthill'));
+  sAnt(); renderAll(); afterAction();
+}
+function takeFromAnts(){
+  if(S.locked || S.ants<=0) return;
+  clearPulse(); S.ants--; S.basket++; S.moods = [];
+  fly(S.food[0], $('anthill'), $('basket'));
+  sBoing(); renderAll(); afterAction(true);
+}
+const allEqual = () => S.plates.every(c=>c===S.plates[0]);
+
+function afterAction(tookBack){
+  if(S.mode==='free'){ freeStatus(); return; }
+  const n = S.plates.length;
+  if(S.basket===0){ evaluate(); return; }
+  if(S.round.ants && allEqual() && S.basket < n && S.plates[0] > 0){
+    $('anthill').classList.add('pulse');
+    setMsg(`Only <b>${S.basket}</b> left — not enough for everyone! Give the leftovers to the 🐜`,
+      `Only ${S.basket} left. That's not enough for everyone. Give the leftovers to the ants!`);
+    return;
+  }
+  if(tookBack) setMsg(`Back in the basket! <span class="chip">🧺 ${S.basket}</span> Tap a plate to give it out.`, 'Back in the basket! Tap a plate to give it out.');
+  else if(S.plates.reduce((a,b)=>a+b,0)===1 && S.round.t!=='guest') setMsg(`Yum! Keep going — tap the plates. <span class="chip">🧺 ${S.basket}</span>`, 'Yum! Keep going. Tap the plates.');
+  else setMsg(`<span class="chip">🧺 ${S.basket}</span> left to share`, `${S.basket} left to share.`);
+}
+
+function evaluate(){
+  const c = S.plates, n = c.length, mn = Math.min(...c), mx = Math.max(...c);
+  if(mn===mx && mn>0){
+    if(S.ants >= n){
+      S.moods = c.map(()=>'🤔'); renderPlates(); $('antBack').classList.add('pulse');
+      sHmm();
+      setMsg(`The ants got <b>${S.ants}</b> — enough for every friend to get one more! Tap ↩️ on the ant hill.`,
+        `The ants got ${S.ants}. That's enough for every friend to have one more! Tap the back arrow on the ant hill.`);
+      return;
+    }
+    return success();
+  }
+  if(mx===0){
+    S.moods = c.map(()=>'🥺'); renderPlates(); sHmm(); $('antBack').classList.add('pulse');
+    setMsg('The 🐜 got <b>everything</b>! Tap ↩️ on the ant hill to take some back.',
+      'The ants got everything! Tap the back arrow on the ant hill to take some back for your friends.');
+    return;
+  }
+  const maxI = c.indexOf(mx), minI = c.indexOf(mn);
+  S.moods = c.map(v => v===mn ? '🥺' : v===mx ? '😮' : '🙂');
+  renderPlates(); sHmm();
+  document.querySelectorAll('.plate').forEach((p,i)=>{ if(c[i]===mn) p.classList.add('wob'); });
+  setMsg(`${S.friends[maxI]} has <b>${mx}</b> but ${S.friends[minI]} has <b>${mn}</b>. Tap ↩️ under ${S.friends[maxI]} to take one back.`,
+    `Uh oh, that's not fair yet. One friend has ${mx} but another has only ${mn}. Tap the back arrow under the full plate to take one back.`);
+  const t = document.querySelector(`.back[data-back="${maxI}"]`); t && t.classList.add('pulse');
+}
+
+function success(){
+  S.locked = true; clearPulse();
+  S.moods = S.plates.map(()=>'😋'); renderPlates();
+  const n = S.plates.length, each = S.plates[0], total = each*n + S.ants;
+  let eq = `<span class="chip">${S.food[0]} ${total}</span> ÷ ${n} friends = <b>${each} each</b>`;
+  let v = `Hooray! ${total} ${S.food[1]} shared by ${n} friends is ${each} each.`;
+  if(S.ants){ eq += `<br>…and <b>${S.ants}</b> for the 🐜!`; v += ` And ${S.ants} for the ants!`; }
+  setMsg('Hooray! Everyone has the <b>same</b>! 🎉', 'Hooray! Everyone has the same!');
+  winCard(eq, v);
+}
+function winCard(eq, v){
+  sYay(); confetti(90);
+  S.stars++;
+  $('eq').innerHTML = eq;
+  $('nextBtn').textContent = S.ri >= ROUNDS.length-1 ? 'Party! 🎉' : 'Next ▶';
+  setTimeout(()=>{ $('win').classList.add('on'); speak(v); }, 500);
+  localStorage.setItem(KEY+'round', String(S.ri+1));
+}
+
+/* ================= pie rounds ================= */
+function pieSVG(angles){
+  let a = -90, lines = '';
+  const cuts = [];
+  angles.forEach(d=>{ cuts.push(a); a += d; });
+  if(angles.length>1) cuts.forEach(c=>{
+    const r = c*Math.PI/180;
+    lines += `<line x1="50" y1="50" x2="${50+46*Math.cos(r)}" y2="${50+46*Math.sin(r)}" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/>`;
+  });
+  let dots = '';
+  for(let i=0;i<9;i++){ const r=(i*40+13)*Math.PI/180, d=i%2?26:16; dots += `<circle cx="${50+d*Math.cos(r)}" cy="${50+d*Math.sin(r)}" r="3.2" fill="#a3122a"/>`; }
+  return `<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#e9a54b"/><circle cx="50" cy="50" r="48" fill="none" stroke="#c47a25" stroke-width="3" stroke-dasharray="4 4"/>
+    <circle cx="50" cy="50" r="40" fill="#e0405a"/>${dots}${lines}</svg>`;
+}
+function startPie(R, pick){
+  $('pies').classList.add('on'); $('blanket').style.display='none'; $('bottom').style.display='none';
+  S.friends = pick.slice(0,R.n);
+  $('pieFriends').innerHTML = S.friends.map(f=>`<span>${f}</span>`).join('');
+  const n = R.n;
+  const uneq = {2:[220,140],3:[170,110,80],4:[140,100,70,50]}[n];
+  const opts = shuffle([
+    {k:'ok',  a:Array(n).fill(360/n)},
+    {k:'big', a:uneq},
+    {k:'cnt', a:Array(n+1).fill(360/(n+1))}
+  ]);
+  $('pieChoices').innerHTML = opts.map(o=>`<button class="pie" data-k="${o.k}" data-c="${o.a.length}" aria-label="pie">${pieSVG(o.a)}</button>`).join('');
+  setMsg(`Which pie is cut <b>fair</b> for ${n} friends?`, `Which pie is cut fair for ${n} friends? Everyone needs a slice, and all the slices must be the same size.`);
+}
+function pickPie(btn){
+  if(S.locked || btn.classList.contains('nope')) return;
+  const k = btn.dataset.k, n = S.friends.length, c = +btn.dataset.c;
+  btn.querySelector('.why')?.remove();
+  if(k==='ok'){
+    S.locked = true; btn.classList.add('yes');
+    document.querySelectorAll('.pie').forEach(p=>{ if(p!==btn) p.classList.add('nope'); });
+    document.querySelectorAll('#pieFriends span').forEach((s,i)=>{ s.classList.add('happy'); s.style.animationDelay=(i*.1)+'s'; s.insertAdjacentHTML('beforeend','<b>🍰</b>'); });
+    setMsg(`Yes! ${n} friends, ${n} <b>same-size</b> slices! 🎉`, 'Yes! Same size slices for everyone!');
+    winCard(`${n} same slices = <b>${PIE_WORD[n]}</b>!<br><span class="small">each friend gets 1 of ${n}</span>`,
+      `${n} friends, ${n} same size slices. Those are called ${PIE_WORD[n]}!`);
+    return;
+  }
+  sHmm(); btn.classList.add('nope');
+  if(k==='big'){
+    btn.insertAdjacentHTML('beforeend','<span class="why">some are bigger!</span>');
+    setMsg('Some slices are <b>bigger</b> — that\'s not fair! Try another pie.', 'Some slices are bigger than others. That\'s not fair! Try another pie.');
+  } else {
+    btn.insertAdjacentHTML('beforeend',`<span class="why">${c} slices</span>`);
+    setMsg(`That pie has <b>${c}</b> slices but there are <b>${n}</b> friends! Try another.`, `That pie has ${c} slices, but there are ${n} friends. Try another pie.`);
+  }
+}
+
+/* ================= free share ================= */
+function startFree(){
+  clearInterval(S.dealing); S.dealing = null;
+  S.mode = 'free'; S.locked = false; S.moods = []; S.round = {t:'free'};
+  show('game'); renderDots(); clearPulse();
+  $('win').classList.remove('on'); $('pies').classList.remove('on');
+  $('blanket').style.display=''; $('bottom').style.display='';
+  $('freeCtl').classList.add('on'); $('basket').style.display='';
+  $('anthill').classList.remove('hide');
+  freeReset();
+  setMsg('Pick friends 🐻 and treats 🍪, then press <b>Share!</b>', 'Pick how many friends and how many treats, then press Share!');
+}
+function freeReset(){
+  clearInterval(S.dealing); S.dealing = null; S.locked = false;
+  S.food = FOODS[S.freeF];
+  if(!S.freeFriends || S.freeFriends.length < 6) S.freeFriends = shuffle(FRIENDS);
+  S.friends = S.freeFriends.slice(0,S.freeN); S.plates = Array(S.freeN).fill(0); S.basket = S.freeK; S.ants = 0; S.moods = [];
+  $('fnLbl').textContent = `${S.friends[0]} ${S.freeN}`; $('fkLbl').textContent = `${S.food[0]} ${S.freeK}`;
+  renderAll();
+}
+function freeDeal(){
+  freeReset(); S.locked = true; clearPulse();
+  let i = 0; const n = S.freeN;
+  setMsg('Sharing… one for you, one for you…', 'One for you, one for you');
+  S.dealing = setInterval(()=>{
+    if(S.basket<=0){ clearInterval(S.dealing); S.dealing=null; S.locked=false; freeStatus(true); return; }
+    if(S.basket >= n || i % n !== 0){
+      const p = i % n; S.basket--; S.plates[p]++; sPop(S.plates[p]);
+      fly(S.food[0], $('basket'), document.querySelector(`.plate[data-plate="${p}"]`));
+      renderAll(p); i++;
+    } else {
+      S.basket--; S.ants++; sAnt(); fly(S.food[0], $('basket'), $('anthill')); renderAll();
+    }
+  }, n*S.freeK > 60 ? 170 : 260);
+}
+function freeStatus(done){
+  const n = S.plates.length;
+  if(S.basket>0){ setMsg(`<span class="chip">🧺 ${S.basket}</span> left — tap plates, or press <b>Share!</b>`, `${S.basket} left.`); return; }
+  if(allEqual()){
+    const each = S.plates[0], total = each*n + S.ants;
+    S.moods = S.plates.map(()=> each>0 ? '😋' : '🙂'); renderPlates();
+    let h = `<b>${total} ÷ ${n} = ${each} each</b>` + (S.ants ? ` · ${S.ants} for the 🐜` : '');
+    let v = `${total} shared by ${n} friends is ${each} each` + (S.ants ? `, and ${S.ants} for the ants.` : '.');
+    if(total===0) { h = 'Press <b>+</b> to put some treats in the basket!'; v = 'Press plus to put some treats in the basket!'; }
+    else if(each===0) { h = `Not enough for everyone — the 🐜 get them all!`; v = 'Not enough to go round. The ants get them all!'; }
+    setMsg(h, v); if(done){ sYay(); if(each>0) confetti(50); speak(v); }
+  } else {
+    setMsg('Hmm, the plates are not the same yet!', 'The plates are not the same yet.');
+  }
+}
+
+/* ================= confetti ================= */
+const cv = $('fx'), cx = cv.getContext('2d'); let parts = [], fxRun = false;
+function sizeFx(){ cv.width = innerWidth*devicePixelRatio; cv.height = innerHeight*devicePixelRatio; cx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+addEventListener('resize', sizeFx); sizeFx();
+function confetti(n){
+  const cols = ['#ff5fa2','#ffc83d','#4fb3ff','#43c463','#8a5cff','#ff8a3d'];
+  for(let i=0;i<n;i++) parts.push({x:innerWidth/2+(Math.random()-.5)*innerWidth*.6, y:innerHeight*.35, vx:(Math.random()-.5)*9, vy:-Math.random()*11-4,
+    c:cols[i%cols.length], s:5+Math.random()*6, r:Math.random()*6, vr:(Math.random()-.5)*.4, life:0});
+  if(!fxRun){ fxRun = true; requestAnimationFrame(fxLoop); }
+}
+function fxLoop(){
+  cx.clearRect(0,0,innerWidth,innerHeight);
+  parts.forEach(p=>{ p.vy += .32; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life++;
+    cx.save(); cx.translate(p.x,p.y); cx.rotate(p.r); cx.fillStyle = p.c; cx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2); cx.restore(); });
+  parts = parts.filter(p=>p.y < innerHeight+30 && p.life < 300);
+  if(parts.length) requestAnimationFrame(fxLoop); else { fxRun = false; cx.clearRect(0,0,innerWidth,innerHeight); }
+}
+
+/* ================= flow ================= */
+function startPlay(fromStart){
+  S.mode = 'play';
+  const saved = +localStorage.getItem(KEY+'round') || 0;
+  S.ri = (fromStart || saved >= ROUNDS.length) ? 0 : saved;
+  if(S.ri===0) S.stars = 0;
+  show('game'); startRound();
+}
+function next(){
+  $('win').classList.remove('on');
+  if(S.ri >= ROUNDS.length-1){ endParty(); return; }
+  S.ri++; startRound();
+}
+function endParty(){
+  localStorage.setItem(KEY+'round', String(ROUNDS.length));
+  show('end'); sBig(); confetti(160); setTimeout(()=>confetti(120), 900);
+  $('endParade').innerHTML = shuffle(FRIENDS).slice(0,6).map((f,i)=>`<span style="animation-delay:${i*.12}s">${f}</span>`).join('');
+  $('endStars').textContent = `⭐ × ${ROUNDS.length}  picnics shared!`;
+  speak('Best picnic ever! You shared fair with everyone!');
+}
+function titleNote(){
+  const saved = +localStorage.getItem(KEY+'round') || 0;
+  $('playBtn').textContent = (saved>0 && saved<ROUNDS.length) ? `▶ Continue (${saved+1}/${ROUNDS.length})` : '▶ Play';
+  $('titleNote').textContent = (saved>0 && saved<ROUNDS.length) ? 'tap 🏠 any time to come back here' : '';
+}
+function goHome(){
+  clearInterval(S.dealing); S.dealing=null; S.locked=true;
+  try{ speechSynthesis.cancel(); }catch(e){}
+  clearPulse(); show('title'); titleNote();
+}
+function hint(){
+  if(S.mode==='free'){ $('freeGo').classList.add('pulse'); speak(voiceText); return; }
+  clearPulse();
+  const R = S.round;
+  if(S.locked){ if($('win').classList.contains('on')) $('nextBtn').classList.add('pulse'); return; }
+  if(R.t==='pie'){
+    const n = S.friends.length;
+    setMsg(`Count the slices — you need <b>${n}</b>, all the <b>same size</b>.`, `Count the slices. You need ${n}, and they must all be the same size.`);
+    speak(voiceText); return;
+  }
+  const c = S.plates, mn = Math.min(...c), mx = Math.max(...c);
+  if(S.basket>0){
+    if(R.ants && allEqual() && S.basket < c.length && c[0]>0){ $('anthill').classList.add('pulse'); showHand($('anthill')); }
+    else { const i = c.indexOf(mn); const p = document.querySelector(`.plate[data-plate="${i}"]`); p.classList.add('pulse'); showHand(p);
+      setMsg(`${S.friends[i]} has the fewest — give one to ${S.friends[i]}!`, 'Give one to the friend with the fewest!'); }
+  } else if(mn!==mx){
+    const t = document.querySelector(`.back[data-back="${c.indexOf(mx)}"]`); if(t){ t.classList.add('pulse'); showHand(t); }
+  } else if(S.ants >= c.length || c[0]===0){ $('antBack').classList.add('pulse'); showHand($('antBack')); }
+  speak(voiceText);
+}
+
+/* ================= events ================= */
+$('playBtn').onclick = () => { ac(); startPlay(false); };
+$('freeBtn').onclick = () => { ac(); startFree(); };
+$('againBtn').onclick = () => { localStorage.setItem(KEY+'round','0'); startPlay(true); };
+$('endFreeBtn').onclick = () => startFree();
+$('homeBtn').onclick = goHome;
+$('nextBtn').onclick = next;
+$('sayBtn').onclick = () => speak(voiceText);
+$('hintBtn').onclick = hint;
+$('sndBtn').onclick = () => { sfxOn = !sfxOn; localStorage.setItem(KEY+'sfx', sfxOn?'1':'0'); $('sndBtn').classList.toggle('off', !sfxOn); if(sfxOn) sPop(3); };
+$('sndBtn').classList.toggle('off', !sfxOn);
+
+$('blanket').addEventListener('click', e=>{
+  const bk = e.target.closest('.back');
+  if(bk){ takeBack(+bk.dataset.back); return; }
+  const p = e.target.closest('.plate') || e.target.closest('.seat')?.querySelector('.plate');
+  if(p) givePlate(+p.dataset.plate);
+});
+$('anthill').addEventListener('click', e=>{
+  if(e.target.closest('.back')) takeFromAnts(); else giveAnts();
+});
+$('basket').addEventListener('click', ()=>{
+  if(S.locked) return;
+  if(S.basket>0){ $('basket').classList.add('wob'); setTimeout(()=>$('basket').classList.remove('wob'),500);
+    if(S.mode!=='free') setMsg('Tap a <b>plate</b> to give a friend a treat!', 'Tap a plate to give a friend a treat!'); }
+});
+$('pieChoices').addEventListener('click', e=>{ const b = e.target.closest('.pie'); if(b) pickPie(b); });
+
+const clampN = (v,a,b) => Math.max(a, Math.min(b, v));
+$('fnMinus').onclick = () => { S.freeN = clampN(S.freeN-1,1,6); freeReset(); freeStatus(); };
+$('fnPlus').onclick  = () => { S.freeN = clampN(S.freeN+1,1,6); freeReset(); freeStatus(); };
+$('fkMinus').onclick = () => { S.freeK = clampN(S.freeK-1,0,24); freeReset(); freeStatus(); };
+$('fkPlus').onclick  = () => { S.freeK = clampN(S.freeK+1,0,24); freeReset(); freeStatus(); };
+$('fkLbl').onclick = () => { S.freeF = (S.freeF+1)%FOODS.length; freeReset(); };
+$('freeGo').onclick = () => { $('freeGo').classList.remove('pulse'); freeDeal(); };
+
+titleNote();
+</script>
+</body>
+</html>

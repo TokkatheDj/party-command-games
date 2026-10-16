@@ -1,0 +1,806 @@
+<!-- CONCEPT: Pancake Pile-Up — a one-tap timing/stacking game; a fluffy pancake swings back and forth on a spatula, tap anywhere to drop it onto your tower. Land it dead-center for a PERFECT (combo chimes + syrup sparkles), land it sloppy and the edge slices off. Stack high enough and the sky changes from sunrise to starry night, with toppings, confetti milestones and hungry animals cheering. Impossible to lose — a too-small pancake just gets a "Fresh Batch!" from the chef. Reaction/timing game for ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pancake Pile-Up</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  width: 100%; height: 100%;
+}
+
+:root {
+  --syrup:   #8a4b1e;
+  --syrup-d: #5e2f10;
+  --butter:  #ffd24a;
+  --cream:   #fff4de;
+  --berry:   #e0457b;
+  --leaf:    #4bbf7a;
+  --shadow:  rgba(94, 47, 16, .30);
+  --font: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  background: #ffeccf;
+  color: var(--syrup-d);
+}
+
+#app {
+  position: relative;
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column;
+}
+
+/* ---------- top bar ---------- */
+#topbar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px calc(8px + env(safe-area-inset-top, 0px));
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
+  background: linear-gradient(180deg, rgba(255,244,222,.96), rgba(255,244,222,.72));
+  border-bottom: 3px solid rgba(138,75,30,.18);
+  z-index: 5;
+}
+
+#title {
+  font-size: clamp(15px, 4.4vw, 24px);
+  font-weight: bold;
+  letter-spacing: .5px;
+  background: linear-gradient(90deg, var(--syrup), var(--berry));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  white-space: nowrap;
+}
+
+.stat {
+  display: flex; align-items: center; gap: 4px;
+  font-size: clamp(15px, 4.2vw, 22px);
+  font-weight: bold;
+  background: #fff;
+  border: 3px solid var(--syrup);
+  border-radius: 999px;
+  padding: 3px 11px;
+  box-shadow: 0 3px 0 var(--shadow);
+  line-height: 1.25;
+}
+.stat.best { border-color: var(--butter); color: #a06a00; }
+
+#spacer { flex: 1; }
+
+#resetBtn {
+  flex: 0 0 auto;
+  width: 46px; height: 46px;
+  min-width: 46px;
+  border: 3px solid var(--syrup);
+  border-radius: 50%;
+  background: #fff;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--shadow);
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+#resetBtn:active { transform: translateY(3px); box-shadow: none; }
+
+/* ---------- canvas ---------- */
+#stage { position: relative; flex: 1 1 auto; min-height: 0; }
+canvas { display: block; width: 100%; height: 100%; }
+
+/* ---------- drop button ---------- */
+#footer {
+  flex: 0 0 auto;
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(0deg, rgba(255,244,222,.98), rgba(255,244,222,.55));
+  z-index: 5;
+}
+
+#dropBtn {
+  width: 100%;
+  min-height: 68px;
+  border: none;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #ffcf5c, #f5a623);
+  color: #6b3410;
+  font-family: var(--font);
+  font-size: clamp(20px, 6vw, 30px);
+  font-weight: bold;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #c97b12, 0 10px 18px rgba(138,75,30,.28);
+  text-shadow: 0 2px 0 rgba(255,255,255,.45);
+}
+#dropBtn:active { transform: translateY(5px); box-shadow: 0 1px 0 #c97b12; }
+
+/* ---------- start / celebration overlay ---------- */
+#overlay {
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 38%, rgba(255,244,222,.97), rgba(255,214,150,.97));
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px; padding: 20px;
+  text-align: center;
+  z-index: 10;
+}
+#overlay.hidden { display: none; }
+
+#ovStack { font-size: clamp(52px, 17vw, 96px); line-height: 1; }
+#ovTitle {
+  font-size: clamp(30px, 9vw, 52px);
+  font-weight: bold;
+  background: linear-gradient(90deg, var(--syrup), var(--berry), #f5a623);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  line-height: 1.1;
+}
+#ovHow {
+  font-size: clamp(16px, 4.6vw, 22px);
+  color: #7a4a22;
+  max-width: 22ch;
+  line-height: 1.5;
+}
+#playBtn {
+  margin-top: 6px;
+  min-height: 74px;
+  min-width: 74%;
+  border: none;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #6ce09a, var(--leaf));
+  color: #0d3f24;
+  font-family: var(--font);
+  font-size: clamp(24px, 7vw, 34px);
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #2f8f57, 0 12px 20px rgba(30,90,55,.3);
+  animation: bob 1.4s ease-in-out infinite;
+}
+#playBtn:active { transform: translateY(5px); box-shadow: 0 1px 0 #2f8f57; }
+
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div id="title">🥞 Pancake Pile-Up</div>
+    <div id="spacer"></div>
+    <div class="stat" id="scoreStat">🥞 <span id="score">0</span></div>
+    <div class="stat best" id="bestStat">🏆 <span id="best">0</span></div>
+    <button id="resetBtn" aria-label="Start over">🔄</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+
+    <div id="overlay">
+      <div id="ovStack">🥞</div>
+      <div id="ovTitle">Pancake Pile-Up</div>
+      <div id="ovHow">Tap to drop the pancake.<br>Stack it as high as the stars! ⭐</div>
+      <button id="playBtn">▶ PLAY</button>
+    </div>
+  </div>
+
+  <div id="footer">
+    <button id="dropBtn">DROP! 🥞</button>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ============================================================ setup
+  const cv       = document.getElementById('cv');
+  const ctx      = cv.getContext('2d');
+  const stage    = document.getElementById('stage');
+  const overlay  = document.getElementById('overlay');
+  const playBtn  = document.getElementById('playBtn');
+  const dropBtn  = document.getElementById('dropBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const scoreEl  = document.getElementById('score');
+  const bestEl   = document.getElementById('best');
+  const ovTitle  = document.getElementById('ovTitle');
+  const ovHow    = document.getElementById('ovHow');
+  const ovStack  = document.getElementById('ovStack');
+
+  const TAU = Math.PI * 2;
+  const BEST_KEY = 'cowork-pancakepileup-best';
+
+  let W = 0, H = 0;
+  function resize() {
+    W = stage.clientWidth;
+    H = stage.clientHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width  = Math.max(1, Math.round(W * dpr));
+    cv.height = Math.max(1, Math.round(H * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+
+  // ============================================================ audio
+  let AC = null;
+  function audio() {
+    if (!AC) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) AC = new Ctx();
+    }
+    if (AC && AC.state === 'suspended') AC.resume();
+    return AC;
+  }
+
+  function tone(freq, dur, opts) {
+    const ac = audio(); if (!ac) return;
+    const o = opts || {};
+    const t = ac.currentTime + (o.delay || 0);
+    const osc = ac.createOscillator();
+    const g   = ac.createGain();
+    osc.type = o.type || 'sine';
+    osc.frequency.setValueAtTime(freq, t);
+    if (o.to) osc.frequency.exponentialRampToValueAtTime(Math.max(30, o.to), t + dur);
+    const vol = o.vol == null ? 0.22 : o.vol;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(g); g.connect(ac.destination);
+    osc.start(t); osc.stop(t + dur + 0.04);
+  }
+
+  function noise(dur, vol, filterHz) {
+    const ac = audio(); if (!ac) return;
+    const n = Math.floor(ac.sampleRate * dur);
+    const buf = ac.createBuffer(1, n, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const src = ac.createBufferSource(); src.buffer = buf;
+    const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filterHz || 900;
+    const g = ac.createGain(); g.gain.value = vol == null ? 0.18 : vol;
+    src.connect(f); f.connect(g); g.connect(ac.destination);
+    src.start();
+  }
+
+  const sfx = {
+    land()  { noise(0.16, 0.24, 700); tone(150, 0.16, { type: 'sine', to: 90, vol: 0.24 }); },
+    perfect(combo) {
+      const base = 660 * Math.pow(1.06, Math.min(combo, 10));
+      tone(base,       0.16, { type: 'triangle', vol: 0.24 });
+      tone(base * 1.26, 0.18, { type: 'triangle', vol: 0.20, delay: 0.07 });
+      tone(base * 1.5,  0.24, { type: 'sine',     vol: 0.18, delay: 0.14 });
+    },
+    slice() { noise(0.12, 0.14, 2200); tone(420, 0.12, { type: 'sawtooth', to: 180, vol: 0.10 }); },
+    miss()  { tone(340, 0.34, { type: 'sine', to: 120, vol: 0.18 }); },
+    fresh() { [523, 659, 784].forEach((f, i) => tone(f, 0.2, { type: 'triangle', vol: 0.20, delay: i * 0.09 })); },
+    party() {
+      [523, 659, 784, 1046, 1318].forEach((f, i) =>
+        tone(f, 0.32, { type: 'triangle', vol: 0.22, delay: i * 0.085 }));
+      noise(0.4, 0.12, 3000);
+    }
+  };
+
+  // ============================================================ world constants
+  const PH        = 26;    // pancake body height (world px)
+  const PERFECT   = 11;    // px tolerance for a PERFECT
+  const MINW      = 46;    // below this the chef hands over a fresh one
+  const PLATE_H   = 16;
+
+  let baseW = 200, freshW = 130;
+  function sizes() {
+    baseW  = Math.max(120, Math.min(W * 0.56, 240));
+    freshW = baseW * 0.62;
+  }
+
+  // ============================================================ state
+  let stack, mover, debris, confetti, flyers, floaters;
+  let camY, camTarget, count, combo, best, wobble, wobblePhase;
+  let mode = 'ready';           // ready | swing | dropping
+  let lastT = 0, shake = 0;
+
+  best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0;
+  bestEl.textContent = best;
+
+  function hueFor(i) { return 34 + ((i * 7) % 12) - 6; }
+
+  function newGame() {
+    sizes();
+    stack    = [{ x: 0, w: baseW, hue: hueFor(0), topping: null }];
+    debris   = [];
+    confetti = [];
+    flyers   = [];
+    floaters = [];
+    count    = 0;
+    combo    = 0;
+    wobble   = 0;
+    wobblePhase = 0;
+    shake    = 0;
+    camY = camTarget = camFor();
+    scoreEl.textContent = '0';
+    spawnMover();
+    mode = 'swing';
+  }
+
+  function stackTopY() { return -stack.length * PH; }          // world y of the top surface
+  function anchorY()   { return H * 0.62; }                     // where that surface renders
+  function camFor()    { return stackTopY() - anchorY(); }
+
+  function spawnMover() {
+    const top = stack[stack.length - 1];
+    const w   = top.w;
+    const speed = Math.min(2.0 + count * 0.13, 7.6);
+    mover = {
+      x: -(W / 2 - 18 - w / 2),
+      y: stackTopY() - 118,
+      w, hue: hueFor(stack.length),
+      dir: 1, speed,
+      vy: 0,
+      topping: (stack.length % 5 === 4) ? pickTopping() : null
+    };
+  }
+
+  const TOPPINGS = ['🧈', '🍓', '🫐', '🍯', '🍌'];
+  function pickTopping() { return TOPPINGS[Math.floor(Math.random() * TOPPINGS.length)]; }
+
+  // ============================================================ effects
+  function addFloater(text, color, big) {
+    floaters.push({ text, color, life: 1, size: big ? 40 : 27, y: anchorY() - 70, x: W / 2 });
+  }
+  function burstConfetti(n, sy) {
+    const cols = ['#ffd24a', '#e0457b', '#4bbf7a', '#5aa9ff', '#ff8a3d', '#ffffff'];
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * TAU, sp = 2 + Math.random() * 7;
+      confetti.push({
+        x: W / 2 + (Math.random() - .5) * W * .5, y: sy,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 5,
+        w: 5 + Math.random() * 7, h: 4 + Math.random() * 6,
+        rot: Math.random() * TAU, vrot: (Math.random() - .5) * .35,
+        col: cols[(Math.random() * cols.length) | 0], life: 1
+      });
+    }
+  }
+  const ANIMALS = ['🐻', '🐰', '🦊', '🐨', '🐼', '🐷', '🐸', '🐵'];
+  function sendFlyer() {
+    const fromLeft = Math.random() < .5;
+    flyers.push({
+      emoji: ANIMALS[(Math.random() * ANIMALS.length) | 0],
+      x: fromLeft ? -60 : W + 60,
+      y: anchorY() - 40 - Math.random() * 90,
+      vx: fromLeft ? 2.6 : -2.6,
+      bob: Math.random() * TAU,
+      life: 1
+    });
+  }
+
+  // ============================================================ drop / landing
+  function doDrop() {
+    if (mode !== 'swing') return;
+    audio();
+    mode = 'dropping';
+    mover.vy = 0;
+  }
+
+  function land() {
+    const top = stack[stack.length - 1];
+    const p   = mover;
+
+    const nL = p.x - p.w / 2, nR = p.x + p.w / 2;
+    const tL = top.x - top.w / 2, tR = top.x + top.w / 2;
+    const oL = Math.max(nL, tL), oR = Math.min(nR, tR);
+    const overlap = oR - oL;
+
+    // --- total miss: the pancake flops off, nothing lost ---
+    if (overlap <= 2) {
+      debris.push({
+        x: p.x, y: stackTopY(), w: p.w, hue: p.hue,
+        vx: (p.x > top.x ? 1 : -1) * 3.4, vy: -3, rot: 0,
+        vrot: (p.x > top.x ? 1 : -1) * 0.18
+      });
+      combo = 0;
+      sfx.miss();
+      addFloater('Oops! Try again 🥞', '#c9612a', false);
+      spawnMover();
+      mode = 'swing';
+      return;
+    }
+
+    const dx = Math.abs(p.x - top.x);
+    const isPerfect = dx <= PERFECT;
+
+    if (isPerfect) {
+      p.x = top.x;
+      combo++;
+      sfx.perfect(combo);
+      addFloater(combo > 1 ? `PERFECT x${combo}! ⭐` : 'PERFECT! ⭐', '#e0457b', true);
+      burstConfetti(combo > 2 ? 26 : 14, anchorY());
+      shake = Math.min(3 + combo, 9);
+    } else {
+      combo = 0;
+      // the sliced-off edge tumbles away
+      const onRight = p.x > top.x;
+      const sliceW  = onRight ? (nR - oR) : (oL - nL);
+      if (sliceW > 3) {
+        debris.push({
+          x: onRight ? oR + sliceW / 2 : oL - sliceW / 2,
+          y: stackTopY(), w: sliceW, hue: p.hue,
+          vx: (onRight ? 1 : -1) * 2.4, vy: -1.6, rot: 0,
+          vrot: (onRight ? 1 : -1) * 0.2
+        });
+        sfx.slice();
+      }
+      p.x = (oL + oR) / 2;
+      p.w = overlap;
+      sfx.land();
+      const msgs = ['Nice! 👍', 'Yum! 😋', 'Good one!', 'Stacked it!', 'Keep going!'];
+      addFloater(msgs[(Math.random() * msgs.length) | 0], '#8a4b1e', false);
+      shake = 3;
+    }
+
+    // --- chef's mercy: no losing, ever ---
+    let fresh = false;
+    if (p.w < MINW) {
+      p.w = freshW;
+      p.x = top.x;
+      fresh = true;
+    }
+
+    stack.push({ x: p.x, w: p.w, hue: p.hue, topping: p.topping });
+    count++;
+    scoreEl.textContent = count;
+
+    if (count > best) {
+      best = count;
+      bestEl.textContent = best;
+      try { localStorage.setItem(BEST_KEY, String(best)); } catch (e) {}
+    }
+
+    wobble = Math.min(wobble + (isPerfect ? 3 : 7), 16);
+    camTarget = camFor();
+
+    if (fresh) {
+      sfx.fresh();
+      addFloater('Fresh batch! 🧑‍🍳🥞', '#4bbf7a', true);
+    }
+
+    // milestone party every 5 pancakes
+    if (count % 5 === 0) {
+      sfx.party();
+      burstConfetti(44, anchorY());
+      sendFlyer();
+      addFloater(`${count} HIGH! 🎉`, '#e0457b', true);
+    }
+
+    spawnMover();
+    mode = 'swing';
+  }
+
+  // ============================================================ sky
+  const SKIES = [
+    { a: '#ffb765', b: '#ffe9c4' },   // sunrise
+    { a: '#79c9ff', b: '#dff3ff' },   // day
+    { a: '#ff9a5c', b: '#ffd9a8' },   // sunset
+    { a: '#5b3f8f', b: '#c07ab0' },   // dusk
+    { a: '#141033', b: '#372a63' }    // night
+  ];
+  function lerpHex(h1, h2, t) {
+    const p = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    const A = p(h1), B = p(h2);
+    return `rgb(${Math.round(A[0] + (B[0] - A[0]) * t)},${Math.round(A[1] + (B[1] - A[1]) * t)},${Math.round(A[2] + (B[2] - A[2]) * t)})`;
+  }
+  function skyPair() {
+    const t = Math.min(count / 36, 1) * (SKIES.length - 1);
+    const i = Math.min(Math.floor(t), SKIES.length - 2);
+    const f = t - i;
+    return { a: lerpHex(SKIES[i].a, SKIES[i + 1].a, f), b: lerpHex(SKIES[i].b, SKIES[i + 1].b, f), night: t / (SKIES.length - 1) };
+  }
+
+  const CLOUDS = [];
+  for (let i = 0; i < 14; i++) {
+    CLOUDS.push({ x: Math.random(), y: -i * 190 - 60, s: 0.6 + Math.random() * 0.8, sp: 0.08 + Math.random() * 0.18 });
+  }
+  const STARS = [];
+  for (let i = 0; i < 60; i++) {
+    STARS.push({ x: Math.random(), y: Math.random(), r: 0.6 + Math.random() * 1.7, ph: Math.random() * TAU });
+  }
+
+  // ============================================================ drawing
+  function drawPancake(sx, sy, w, hue, topping) {
+    const rx = w / 2;
+    const ry = Math.max(5, Math.min(11, w * 0.13));
+    const dark  = `hsl(${hue}, 58%, 40%)`;
+    const mid   = `hsl(${hue}, 64%, 52%)`;
+    const light = `hsl(${hue}, 78%, 68%)`;
+
+    // bottom rim
+    ctx.fillStyle = dark;
+    ctx.beginPath(); ctx.ellipse(sx, sy + PH, rx, ry, 0, 0, TAU); ctx.fill();
+    // body
+    ctx.fillStyle = mid;
+    ctx.fillRect(sx - rx, sy, w, PH);
+    // top face
+    ctx.fillStyle = light;
+    ctx.beginPath(); ctx.ellipse(sx, sy, rx, ry, 0, 0, TAU); ctx.fill();
+    // buttery sheen
+    ctx.fillStyle = 'rgba(255,255,255,.34)';
+    ctx.beginPath();
+    ctx.ellipse(sx - rx * 0.26, sy - ry * 0.22, rx * 0.4, ry * 0.42, -0.3, 0, TAU);
+    ctx.fill();
+
+    if (topping) {
+      ctx.font = `${Math.max(16, Math.min(26, w * 0.24))}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(topping, sx, sy - ry * 0.4);
+    }
+  }
+
+  function drawSpatula(sx, sy, w) {
+    ctx.fillStyle = '#9aa4b0';
+    ctx.fillRect(sx - w / 2 - 4, sy + PH + 6, w + 8, 7);
+    ctx.fillStyle = '#5b636d';
+    ctx.fillRect(sx + w / 2 + 4, sy + PH + 3, 34, 12);
+    ctx.fillStyle = '#3b3f46';
+    ctx.fillRect(sx + w / 2 + 30, sy + PH + 1, 10, 16);
+  }
+
+  function draw(t) {
+    const sky = skyPair();
+
+    // sky
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, sky.a); g.addColorStop(1, sky.b);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    // stars fade in as you climb
+    if (sky.night > 0.45) {
+      const al = Math.min((sky.night - 0.45) / 0.4, 1);
+      for (const s of STARS) {
+        const tw = 0.55 + 0.45 * Math.sin(t * 0.003 + s.ph);
+        ctx.fillStyle = `rgba(255,255,255,${al * tw * 0.9})`;
+        ctx.beginPath(); ctx.arc(s.x * W, s.y * H * 0.72, s.r, 0, TAU); ctx.fill();
+      }
+    }
+
+    ctx.save();
+    if (shake > 0.2) {
+      ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+    }
+
+    // parallax clouds
+    ctx.fillStyle = `rgba(255,255,255,${0.42 + 0.35 * (1 - sky.night)})`;
+    for (const c of CLOUDS) {
+      c.x += c.sp * 0.0012;
+      if (c.x > 1.3) c.x = -0.3;
+      const cy = c.y - camY * 0.42;
+      const wrapped = ((cy % (H * 3)) + H * 3) % (H * 3) - H;
+      const cx = c.x * (W + 160) - 80;
+      const r = 24 * c.s;
+      ctx.beginPath();
+      ctx.arc(cx, wrapped, r, 0, TAU);
+      ctx.arc(cx + r * 0.9, wrapped + r * 0.16, r * 0.78, 0, TAU);
+      ctx.arc(cx - r * 0.9, wrapped + r * 0.2, r * 0.68, 0, TAU);
+      ctx.fill();
+    }
+
+    const toScreen = wy => wy - camY;
+
+    // ---- plate + table ----
+    const plateY = toScreen(0);
+    if (plateY < H + 80) {
+      ctx.fillStyle = 'rgba(94,47,16,.18)';
+      ctx.beginPath(); ctx.ellipse(W / 2, plateY + PLATE_H + 8, baseW * 0.86, 14, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#e8eef5';
+      ctx.beginPath(); ctx.ellipse(W / 2, plateY + PLATE_H, baseW * 0.8, 17, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.ellipse(W / 2, plateY + 1, baseW * 0.78, 15, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = 'rgba(120,160,200,.25)';
+      ctx.beginPath(); ctx.ellipse(W / 2, plateY + 1, baseW * 0.6, 10, 0, 0, TAU); ctx.fill();
+    }
+
+    // ---- the tower (only what's on screen) ----
+    for (let i = 0; i < stack.length; i++) {
+      const p  = stack[i];
+      const wy = -(i + 1) * PH;
+      const sy = toScreen(wy);
+      if (sy < -60 || sy > H + 60) continue;
+      const sway = Math.sin(wobblePhase + i * 0.42) * wobble * (i / Math.max(stack.length, 1));
+      drawPancake(W / 2 + p.x + sway, sy, p.w, p.hue, p.topping);
+    }
+
+    // ---- swinging / falling pancake ----
+    if (mover) {
+      const sy = toScreen(mover.y);
+      drawSpatula(W / 2 + mover.x, sy, mover.w);
+      drawPancake(W / 2 + mover.x, sy, mover.w, mover.hue, mover.topping);
+
+      // aim guide while swinging
+      if (mode === 'swing') {
+        const topSy = toScreen(stackTopY());
+        ctx.strokeStyle = 'rgba(255,255,255,.55)';
+        ctx.setLineDash([6, 8]);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(W / 2 + mover.x, sy + PH + 20);
+        ctx.lineTo(W / 2 + mover.x, topSy - 6);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // ---- debris ----
+    for (const d of debris) {
+      ctx.save();
+      ctx.translate(W / 2 + d.x, toScreen(d.y));
+      ctx.rotate(d.rot);
+      drawPancake(0, 0, d.w, d.hue, null);
+      ctx.restore();
+    }
+
+    // ---- cheering animals ----
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const f of flyers) {
+      ctx.globalAlpha = Math.min(1, f.life * 1.6);
+      ctx.font = '44px system-ui, sans-serif';
+      ctx.fillText(f.emoji, f.x, f.y + Math.sin(f.bob) * 12);
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.restore();
+
+    // ---- confetti ----
+    for (const c of confetti) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, c.life));
+      ctx.translate(c.x, c.y);
+      ctx.rotate(c.rot);
+      ctx.fillStyle = c.col;
+      ctx.fillRect(-c.w / 2, -c.h / 2, c.w, c.h);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+
+    // ---- floating praise text ----
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const f of floaters) {
+      const a = Math.min(1, f.life * 1.5);
+      ctx.globalAlpha = a;
+      ctx.font = `bold ${f.size}px "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif`;
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = 'rgba(255,255,255,.92)';
+      ctx.strokeText(f.text, f.x, f.y);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+
+    // ---- height ribbon ----
+    if (count > 0) {
+      ctx.font = `bold ${Math.max(13, Math.min(18, W * 0.042))}px "Comic Sans MS", system-ui, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      ctx.strokeStyle = 'rgba(138,75,30,.35)';
+      ctx.lineWidth = 3;
+      const label = count >= 30 ? '⭐ Sky high!' : count >= 20 ? '☁️ Above the clouds' :
+                    count >= 10 ? '🌤️ Way up there' : '🥞 Keep stacking';
+      ctx.strokeText(label, 12, H - 16);
+      ctx.fillText(label, 12, H - 16);
+    }
+  }
+
+  // ============================================================ update
+  function update(dt) {
+    const k = dt / 16.67;
+
+    if (mode === 'swing' && mover) {
+      const half = mover.w / 2;
+      const lim = Math.max(20, W / 2 - 14 - half);
+      mover.x += mover.dir * mover.speed * k;
+      if (mover.x > lim)  { mover.x = lim;  mover.dir = -1; }
+      if (mover.x < -lim) { mover.x = -lim; mover.dir = 1; }
+      mover.y = stackTopY() - 118;
+    } else if (mode === 'dropping' && mover) {
+      mover.vy = Math.min(mover.vy + 1.05 * k, 26);
+      mover.y += mover.vy * k;
+      if (mover.y >= stackTopY()) {
+        mover.y = stackTopY();
+        land();
+      }
+    }
+
+    // camera glide
+    camTarget = camFor();
+    camY += (camTarget - camY) * Math.min(1, 0.12 * k);
+
+    // tower wobble
+    wobblePhase += 0.22 * k;
+    wobble *= Math.pow(0.94, k);
+    if (wobble < 0.05) wobble = 0;
+    shake *= Math.pow(0.82, k);
+
+    for (let i = debris.length - 1; i >= 0; i--) {
+      const d = debris[i];
+      d.vy += 0.75 * k;
+      d.x += d.vx * k; d.y += d.vy * k; d.rot += d.vrot * k;
+      if (d.y - camY > H + 160) debris.splice(i, 1);
+    }
+    for (let i = confetti.length - 1; i >= 0; i--) {
+      const c = confetti[i];
+      c.vy += 0.28 * k; c.vx *= Math.pow(0.99, k);
+      c.x += c.vx * k; c.y += c.vy * k; c.rot += c.vrot * k;
+      c.life -= 0.012 * k;
+      if (c.life <= 0 || c.y > H + 60) confetti.splice(i, 1);
+    }
+    for (let i = flyers.length - 1; i >= 0; i--) {
+      const f = flyers[i];
+      f.x += f.vx * k; f.bob += 0.14 * k; f.life -= 0.006 * k;
+      if (f.x < -100 || f.x > W + 100 || f.life <= 0) flyers.splice(i, 1);
+    }
+    for (let i = floaters.length - 1; i >= 0; i--) {
+      const f = floaters[i];
+      f.y -= 0.75 * k; f.life -= 0.017 * k;
+      if (f.life <= 0) floaters.splice(i, 1);
+    }
+  }
+
+  // ============================================================ loop
+  function frame(t) {
+    if (!lastT) lastT = t;
+    const dt = Math.min(t - lastT, 50);
+    lastT = t;
+    if (W !== stage.clientWidth || H !== stage.clientHeight) resize();
+    if (mode !== 'ready') update(dt);
+    draw(t);
+    requestAnimationFrame(frame);
+  }
+
+  // ============================================================ input
+  function start() {
+    overlay.classList.add('hidden');
+    audio();
+    newGame();
+  }
+
+  playBtn.addEventListener('click', start);
+  dropBtn.addEventListener('click', e => {
+    e.preventDefault();
+    if (mode === 'ready') start(); else doDrop();
+  });
+
+  cv.addEventListener('pointerdown', e => { e.preventDefault(); doDrop(); });
+
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Space' || e.code === 'Enter') {
+      e.preventDefault();
+      if (mode === 'ready') start(); else doDrop();
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    ovStack.textContent = '🥞';
+    ovTitle.textContent = 'Pancake Pile-Up';
+    ovHow.innerHTML = 'Tap to drop the pancake.<br>Stack it as high as the stars! ⭐';
+    playBtn.textContent = '▶ PLAY AGAIN';
+    overlay.classList.remove('hidden');
+    mode = 'ready';
+  });
+
+  // ============================================================ go
+  resize();
+  sizes();
+  // idle backdrop behind the start overlay
+  stack = [{ x: 0, w: baseW, hue: hueFor(0), topping: null }];
+  debris = []; confetti = []; flyers = []; floaters = [];
+  count = 0; combo = 0; wobble = 0; wobblePhase = 0;
+  camY = camTarget = camFor();
+  mover = null;
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
