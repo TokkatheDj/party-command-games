@@ -1,0 +1,831 @@
+<!-- CONCEPT: ranking-consensus - One player secretly ranks five things; the rest of the room argues its way to a single matching order, then individuals stake a slot for bonus points. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ORDER, PLEASE! — a ranking &amp; consensus party game</title>
+<style>
+  :root{
+    --bg:#12062b; --bg2:#2a0d4d; --ink:#fff5e6;
+    --hot:#ff2e88; --gold:#ffd23f; --mint:#28e0b0; --sky:#4dc9ff; --plum:#7b2ff7;
+    --dim:#b39ad0; --panel:rgba(255,255,255,.07); --line:rgba(255,255,255,.18);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%}
+  body{
+    background:
+      radial-gradient(1100px 700px at 12% -10%, #4a1180 0%, transparent 60%),
+      radial-gradient(900px 600px at 105% 5%, #b3106b 0%, transparent 55%),
+      radial-gradient(900px 700px at 50% 120%, #0b7f7a 0%, transparent 60%),
+      linear-gradient(170deg,var(--bg),var(--bg2));
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:"Trebuchet MS","Segoe UI",Verdana,system-ui,sans-serif;
+    min-height:100%;
+    overflow-x:hidden;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:14px 14px 40px;min-height:100vh;display:flex;flex-direction:column}
+  .screen{display:none;animation:pop .28s ease-out}
+  .screen.on{display:block}
+  @keyframes pop{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  h1{font-size:clamp(38px,9vw,86px);line-height:.92;margin:8px 0 4px;letter-spacing:-2px;
+     background:linear-gradient(94deg,var(--gold),var(--hot) 45%,var(--sky));
+     -webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 40px rgba(255,46,136,.25)}
+  .tag{font-size:clamp(14px,2.6vw,20px);color:var(--ink);opacity:.92;margin:0 0 6px;font-weight:bold}
+  .meta{font-size:clamp(12px,2.2vw,16px);color:var(--dim);margin:0 0 18px;letter-spacing:.5px;text-transform:uppercase}
+
+  .card{background:var(--panel);border:2px solid var(--line);border-radius:20px;padding:16px;margin:0 0 14px;
+        backdrop-filter:blur(6px)}
+  .card h2{margin:0 0 10px;font-size:clamp(17px,3.4vw,24px);letter-spacing:.5px;text-transform:uppercase;color:var(--gold)}
+
+  button{font-family:inherit;font-weight:bold;cursor:pointer;border:none;color:#1a0533}
+  .btn{display:block;width:100%;padding:18px 16px;border-radius:16px;font-size:clamp(18px,3.8vw,26px);
+       background:linear-gradient(180deg,var(--gold),#ffab1a);box-shadow:0 6px 0 #b8770a;letter-spacing:1px;
+       text-transform:uppercase;transition:transform .06s,box-shadow .06s}
+  .btn:active{transform:translateY(5px);box-shadow:0 1px 0 #b8770a}
+  .btn.pink{background:linear-gradient(180deg,#ff5fa8,var(--hot));box-shadow:0 6px 0 #96114f;color:#fff}
+  .btn.pink:active{box-shadow:0 1px 0 #96114f}
+  .btn.mint{background:linear-gradient(180deg,#5cf3cd,var(--mint));box-shadow:0 6px 0 #10806a}
+  .btn.mint:active{box-shadow:0 1px 0 #10806a}
+  .btn.ghost{background:transparent;border:2px solid var(--line);color:var(--ink);box-shadow:none;font-size:clamp(14px,2.8vw,18px);padding:13px}
+  .btn.ghost:active{transform:translateY(2px)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>*{flex:1 1 160px}
+
+  input[type=text]{font-family:inherit;font-size:clamp(16px,3.2vw,20px);padding:13px;border-radius:12px;
+    border:2px solid var(--line);background:rgba(0,0,0,.28);color:var(--ink);width:100%}
+  input[type=text]:focus{outline:none;border-color:var(--gold)}
+
+  .plist{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+  .prow{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.22);border-radius:12px;padding:8px 12px;border:1px solid var(--line)}
+  .prow .nm{flex:1;font-size:clamp(16px,3.2vw,21px);font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .xbtn{background:rgba(255,46,136,.25);color:#ffd9e9;border:1px solid rgba(255,46,136,.6);border-radius:10px;
+        padding:7px 13px;font-size:16px;flex:none}
+  .dot{width:16px;height:16px;border-radius:50%;flex:none;box-shadow:0 0 10px currentColor}
+
+  .opts{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .opt{padding:11px 16px;border-radius:12px;border:2px solid var(--line);background:rgba(0,0,0,.22);
+       color:var(--ink);font-size:clamp(14px,2.8vw,18px);font-weight:bold;flex:1 1 70px;text-align:center}
+  .opt.sel{background:linear-gradient(180deg,var(--sky),#1a92d6);color:#04223a;border-color:#fff}
+
+  .prompt{font-size:clamp(20px,4.6vw,34px);font-weight:bold;line-height:1.2;margin:0 0 4px;color:#fff}
+  .promptsub{font-size:clamp(13px,2.6vw,17px);color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin:0 0 12px}
+
+  .items{display:flex;flex-direction:column;gap:10px}
+  .item{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:15px 14px;border-radius:16px;
+        background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.05));
+        border:2px solid var(--line);color:var(--ink);font-size:clamp(16px,3.4vw,24px);font-weight:bold;
+        transition:transform .08s}
+  .item:active{transform:scale(.985)}
+  .item.taken{background:linear-gradient(180deg,rgba(255,210,63,.28),rgba(255,210,63,.12));border-color:var(--gold)}
+  .rank{width:44px;height:44px;flex:none;border-radius:12px;display:flex;align-items:center;justify-content:center;
+        font-size:22px;background:rgba(0,0,0,.35);color:var(--dim);border:2px solid var(--line)}
+  .item.taken .rank{background:var(--gold);color:#3a2400;border-color:#fff}
+
+  .banner{border-radius:16px;padding:14px;text-align:center;font-weight:bold;margin:0 0 12px;
+          font-size:clamp(15px,3.2vw,22px);letter-spacing:.5px;line-height:1.35}
+  .banner.warn{background:repeating-linear-gradient(45deg,#ff2e88,#ff2e88 14px,#c11062 14px,#c11062 28px);color:#fff}
+  .banner.calm{background:rgba(40,224,176,.18);border:2px solid var(--mint);color:var(--mint)}
+  .who{font-size:clamp(26px,6vw,48px);font-weight:bold;letter-spacing:-1px;line-height:1}
+
+  .timerbar{height:16px;border-radius:10px;background:rgba(0,0,0,.35);overflow:hidden;margin:10px 0;border:1px solid var(--line)}
+  .timerfill{height:100%;width:100%;background:linear-gradient(90deg,var(--mint),var(--gold));transition:width .95s linear}
+  .timerfill.low{background:linear-gradient(90deg,#ff8a3d,var(--hot))}
+  .tnum{text-align:center;font-size:clamp(15px,3vw,20px);color:var(--dim);margin:0 0 6px;letter-spacing:1px}
+
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cmp h3{margin:0 0 8px;font-size:clamp(12px,2.4vw,16px);text-transform:uppercase;letter-spacing:1.2px;color:var(--dim);text-align:center}
+  .slot{display:flex;align-items:center;gap:8px;padding:11px 10px;border-radius:12px;margin-bottom:8px;
+        background:rgba(0,0,0,.25);border:2px solid var(--line);font-size:clamp(13px,2.7vw,19px);font-weight:bold;min-height:56px}
+  .slot .n{width:28px;flex:none;color:var(--dim);font-size:16px}
+  .slot.exact{border-color:var(--mint);background:rgba(40,224,176,.2)}
+  .slot.close{border-color:var(--gold);background:rgba(255,210,63,.16)}
+  .slot.miss{opacity:.62}
+  .mark{margin-left:auto;font-size:clamp(11px,2.2vw,14px);padding:4px 8px;border-radius:8px;flex:none;white-space:nowrap}
+  .mark.exact{background:var(--mint);color:#04302a}
+  .mark.close{background:var(--gold);color:#3a2400}
+  .mark.miss{background:rgba(255,255,255,.14);color:var(--dim)}
+
+  .bigscore{text-align:center;font-size:clamp(46px,13vw,110px);font-weight:bold;line-height:.9;margin:6px 0;
+            background:linear-gradient(180deg,#fff,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .bigscore small{display:block;font-size:clamp(12px,2.6vw,17px);color:var(--dim);letter-spacing:2px;text-transform:uppercase;
+                  -webkit-text-fill-color:var(--dim)}
+
+  .board{display:flex;flex-direction:column;gap:8px}
+  .brow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:rgba(0,0,0,.24);border:2px solid var(--line)}
+  .brow.lead{border-color:var(--gold);background:linear-gradient(90deg,rgba(255,210,63,.24),rgba(0,0,0,.2))}
+  .brow .pos{width:38px;flex:none;font-size:clamp(17px,3.4vw,24px);color:var(--dim)}
+  .brow .nm{flex:1;font-size:clamp(16px,3.4vw,24px);font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .brow .pts{font-size:clamp(19px,4vw,30px);font-weight:bold;color:var(--gold)}
+  .brow .delta{font-size:clamp(12px,2.4vw,16px);color:var(--mint);flex:none}
+
+  .stakerow{display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+  .stakerow .nm{flex:1 1 100px;font-weight:bold;font-size:clamp(14px,3vw,20px);min-width:90px}
+  .sbtns{display:flex;gap:5px;flex:2 1 220px}
+  .sb{flex:1;padding:12px 0;border-radius:10px;border:2px solid var(--line);background:rgba(0,0,0,.28);
+      color:var(--ink);font-size:clamp(14px,3vw,19px);font-weight:bold}
+  .sb.on{background:linear-gradient(180deg,#ff5fa8,var(--hot));color:#fff;border-color:#fff}
+
+  .hint{font-size:clamp(12px,2.4vw,16px);color:var(--dim);line-height:1.5}
+  .hint b{color:var(--gold)}
+  ol.rules{margin:0;padding-left:22px;font-size:clamp(13px,2.8vw,18px);line-height:1.65}
+  ol.rules li{margin-bottom:8px}
+  .pill{display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(255,255,255,.12);
+        font-size:clamp(11px,2.2vw,14px);color:var(--dim);margin-right:6px;letter-spacing:1px}
+  .foot{margin-top:auto;padding-top:16px;text-align:center;color:var(--dim);font-size:12px;letter-spacing:1px}
+  .confetti{position:fixed;inset:0;pointer-events:none;z-index:99}
+  .cf{position:absolute;width:11px;height:16px;opacity:.95;animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(106vh) rotate(760deg);opacity:0}}
+  @media(max-width:520px){ .cmp{grid-template-columns:1fr} .cmp .col2{margin-top:6px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ============ SETUP ============ -->
+<section id="s-setup" class="screen on">
+  <h1>ORDER,<br>PLEASE!</h1>
+  <p class="tag">One player secretly ranks five things. Everybody else argues until they agree on the order they think matches.</p>
+  <p class="meta">3–10 players &nbsp;•&nbsp; 20–30 minutes &nbsp;•&nbsp; one shared screen</p>
+
+  <div class="card">
+    <h2>Who's playing?</h2>
+    <div class="row" style="margin-bottom:10px">
+      <input type="text" id="nameIn" maxlength="14" placeholder="Type a name, hit Add" autocomplete="off">
+      <button class="btn mint" id="addBtn" style="flex:0 1 140px">Add</button>
+    </div>
+    <div class="plist" id="plist"></div>
+    <p class="hint" id="pcount">Add at least 3 players.</p>
+  </div>
+
+  <div class="card">
+    <h2>Rounds</h2>
+    <div class="opts" id="roundOpts"></div>
+    <h2 style="margin-top:16px">Debate timer</h2>
+    <div class="opts" id="timeOpts"></div>
+    <h2 style="margin-top:16px">Slot Stakes <span class="pill">bonus points</span></h2>
+    <div class="opts" id="stakeOpts"></div>
+    <p class="hint" style="margin-top:8px">Stakes let each guesser privately call one slot they think the group nailed. <b>+2</b> if they're right.</p>
+  </div>
+
+  <button class="btn" id="startBtn" disabled>Start the game</button>
+  <button class="btn ghost" id="howBtn" style="margin-top:10px">How to play</button>
+  <div class="foot">No internet, no ads, no accounts. Just the room.</div>
+</section>
+
+<!-- ============ HOW TO PLAY ============ -->
+<section id="s-how" class="screen">
+  <h1 style="font-size:clamp(30px,7vw,60px)">HOW TO PLAY</h1>
+  <div class="card">
+    <ol class="rules">
+      <li>Each round, one player is the <b style="color:var(--gold)">ORACLE</b>. Everyone sees the same card: a question and five things.</li>
+      <li>The Oracle takes the screen alone and secretly ranks the five in <em>their own</em> personal order. Then it hides.</li>
+      <li>The Oracle goes silent. <b style="color:var(--mint)">Everyone else</b> argues out loud and locks in ONE ranking they think matches the Oracle's.</li>
+      <li>Before the reveal, each guesser calls a <b style="color:var(--hot)">Slot Stake</b> — the one position they'd bet money on.</li>
+      <li>Reveal! Every slot in exactly the right place is <b>+3</b>. Off by one is <b>+1</b>. A perfect five is <b>+5</b> more.</li>
+      <li>That round score goes to <em>everyone</em>. Correct Slot Stakes add <b>+2</b> each. The Oracle can't stake, but earns <b>+2 Poker Face</b> if the group read them well (3+ exact).</li>
+      <li>Oracle rotates. Highest total after the last round wins.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <p class="hint"><b>Oracle rules of honour:</b> no hints, no faces, no "ooh". You may smile. You may not help. Being <em>readable</em> is worth points, so ranking honestly beats ranking weirdly.</p>
+  </div>
+  <button class="btn" id="howBack">Back</button>
+</section>
+
+<!-- ============ ROUND INTRO ============ -->
+<section id="s-intro" class="screen">
+  <p class="promptsub" id="introRound">Round 1 of 6</p>
+  <div class="card" style="text-align:center;border-color:var(--gold)">
+    <p class="hint" style="margin:0 0 6px">This round's Oracle is</p>
+    <p class="who" id="introOracle" style="color:var(--gold)">—</p>
+  </div>
+  <div class="card">
+    <p class="promptsub" id="introSub">Rank these</p>
+    <p class="prompt" id="introPrompt">—</p>
+    <div class="items" id="introItems"></div>
+  </div>
+  <button class="btn" id="introGo">Hand the screen to <span id="introGoName">—</span></button>
+  <button class="btn ghost" id="introQuit" style="margin-top:10px">Quit to menu</button>
+</section>
+
+<!-- ============ ORACLE SECRET RANK ============ -->
+<section id="s-oracle" class="screen">
+  <div class="banner warn">🙈 <span id="oracleName">—</span> ONLY — everyone else, eyes away!</div>
+  <p class="promptsub" id="oracleSub">Rank these</p>
+  <p class="prompt" id="oraclePrompt">—</p>
+  <p class="hint" style="margin:0 0 10px">Tap them in <b>your</b> order — your honest opinion, best answer first.</p>
+  <div class="items" id="oracleItems"></div>
+  <div class="row" style="margin-top:12px">
+    <button class="btn ghost" id="oracleUndo" style="flex:0 1 150px">Undo</button>
+    <button class="btn pink" id="oracleLock" disabled>Lock it in &amp; hide</button>
+  </div>
+</section>
+
+<!-- ============ GROUP RANK ============ -->
+<section id="s-group" class="screen">
+  <div class="banner calm">🗣️ EVERYONE EXCEPT <span id="groupOracleName">—</span> — argue it out, agree on one order</div>
+  <p class="tnum" id="tnum">Debate timer</p>
+  <div class="timerbar"><div class="timerfill" id="tfill"></div></div>
+  <p class="promptsub" id="groupSub">Rank these</p>
+  <p class="prompt" id="groupPrompt">—</p>
+  <div class="items" id="groupItems"></div>
+  <div class="row" style="margin-top:12px">
+    <button class="btn ghost" id="groupUndo" style="flex:0 1 150px">Undo</button>
+    <button class="btn mint" id="groupLock" disabled>Lock in the group's answer</button>
+  </div>
+</section>
+
+<!-- ============ STAKES ============ -->
+<section id="s-stake" class="screen">
+  <div class="banner calm">🎯 SLOT STAKES — each guesser calls one position they'd bet on</div>
+  <p class="hint" style="margin:0 0 12px">Which slot of your group's answer is <b>definitely</b> exactly right? +2 each if you're correct. Tap a number, or skip anyone unsure.</p>
+  <div class="card" id="stakeList"></div>
+  <button class="btn pink" id="stakeGo">Reveal the Oracle</button>
+</section>
+
+<!-- ============ REVEAL ============ -->
+<section id="s-reveal" class="screen">
+  <p class="promptsub" id="revealSub">The reveal</p>
+  <p class="prompt" id="revealPrompt" style="font-size:clamp(16px,3.4vw,24px)">—</p>
+  <div class="cmp" style="margin:12px 0">
+    <div><h3 id="revealGroupHead">The group said</h3><div id="revealGroup"></div></div>
+    <div class="col2"><h3 id="revealOracleHead">Oracle said</h3><div id="revealOracle"></div></div>
+  </div>
+  <div class="card" style="text-align:center;border-color:var(--gold)">
+    <p class="bigscore" id="revealPts">0<small>points to everyone</small></p>
+    <p class="hint" id="revealBreak">—</p>
+  </div>
+  <div class="card" id="revealStakes" style="display:none"><h2>Slot stakes</h2><div id="revealStakeList"></div></div>
+  <div class="card"><h2>Scoreboard</h2><div class="board" id="revealBoard"></div></div>
+  <button class="btn" id="revealNext">Next round</button>
+</section>
+
+<!-- ============ FINAL ============ -->
+<section id="s-final" class="screen">
+  <h1 style="font-size:clamp(30px,7.5vw,64px)">FINAL SCORES</h1>
+  <div class="card" style="text-align:center;border-color:var(--gold)">
+    <p class="hint" style="margin:0 0 4px" id="winLabel">Winner</p>
+    <p class="who" id="winName" style="color:var(--gold)">—</p>
+    <p class="hint" id="winLine" style="margin-top:8px">—</p>
+  </div>
+  <div class="card"><div class="board" id="finalBoard"></div></div>
+  <button class="btn mint" id="againBtn">Play again — same players</button>
+  <button class="btn ghost" id="newBtn" style="margin-top:10px">New game (new players)</button>
+</section>
+
+</div>
+<div class="confetti" id="confetti"></div>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------ *
+ *  ORDER, PLEASE!  — ranking & consensus party game
+ * ------------------------------------------------------------------ */
+
+/* ---------------- CARD DECK (66 cards) ---------------- */
+var DECK = [
+ ["Best pizza topping","Pepperoni","Mushrooms","Pineapple","Extra cheese","Black olives"],
+ ["Best breakfast","Pancakes","Cereal","Bacon and eggs","Avocado toast","Yoghurt and granola"],
+ ["Best ice cream flavour","Chocolate","Vanilla","Mint choc chip","Strawberry","Cookie dough"],
+ ["Most useful superpower","Flight","Invisibility","Super speed","Reading minds","Freezing time"],
+ ["Best season","Summer","Autumn","Winter","Spring","The lazy week between holidays"],
+ ["Best pet","Dog","Cat","Parrot","Goldfish","Hamster"],
+ ["Worst chore","Washing dishes","Folding laundry","Vacuuming","Taking out the bins","Cleaning the bathroom"],
+ ["Best way to spend a Saturday","Long hike","Sleeping in","Board games","Wandering the shops","Movie marathon"],
+ ["Most overrated food","Sushi","Kale","Truffle fries","Lobster","Oysters"],
+ ["Best sandwich","Grilled cheese","BLT","Club sandwich","Peanut butter and jam","Meatball sub"],
+ ["Best kind of game night","Big strategy epic","Loud party game","Team-vs-team trivia","Co-op vs the board","Fast reflex game"],
+ ["Best road trip snack","Beef jerky","Crisps","Gummy sweets","Trail mix","A bag of apples"],
+ ["Scariest thing on this list","Public speaking","Spiders","Great heights","Deep dark water","Being properly lost"],
+ ["Best holiday of the year","New Year's Eve","Halloween","Thanksgiving","Midsummer","Your own birthday"],
+ ["Best dessert","Cheesecake","Warm brownies","Apple pie","Donuts","Tiramisu"],
+ ["Coolest animal","Octopus","Wolf","Eagle","Dolphin","Honey badger"],
+ ["Best way to travel","Plane","Train","Road trip","Cruise ship","Bicycle"],
+ ["Most annoying sound","Alarm clock","Nails on a chalkboard","Leaf blower at 7am","A slow dripping tap","Loud chewing"],
+ ["Most valuable thing to be","Strong","Brilliant","Fast","Rich","Charming"],
+ ["Best cinema snack","Popcorn","Nachos","Pick-and-mix sweets","Fizzy drink","Ice cream"],
+ ["Best weather","Blazing sunshine","Light rain","Thunderstorm","Fresh snow","Thick fog"],
+ ["Best morning drink","Coffee","Orange juice","Tea","Smoothie","Hot chocolate"],
+ ["Most believable excuse for being late","Traffic","Alarm never went off","Couldn't find my keys","Helped a neighbour","Pet emergency"],
+ ["Hardest thing to actually learn","Juggling","A new language","Piano","Skateboarding","Drawing faces"],
+ ["Best fairground ride","Roller coaster","Ferris wheel","Bumper cars","Log flume","Carousel"],
+ ["Most useless object","A single sock","A broken umbrella","Expired coupons","A rusty key","A pen that doesn't work"],
+ ["Best sleepover activity","Truth or dare","Pillow fight","Scary movie","Midnight snack raid","Talking until 3am"],
+ ["Best condiment","Ketchup","Mustard","Mayonnaise","Hot sauce","Ranch"],
+ ["Best place to live","A treehouse","A castle","A space station","A tiny island","A lighthouse"],
+ ["Nicest way to be woken up","Sunlight through the curtains","The smell of coffee","Your favourite song","Someone singing badly","A dog landing on you"],
+ ["Best pasta shape","Spaghetti","Penne","Ravioli","Macaroni elbows","Lasagne sheets"],
+ ["Most impressive party trick","Card magic","Perfect impressions","Juggling","Beatboxing","Solving a Rubik's cube"],
+ ["Best thing about winter","Snow days","Hot drinks","Cosy blankets","Fairy lights","Big jumpers"],
+ ["Best biscuit","Chocolate chip","Oatmeal raisin","Shortbread","Peanut butter","Cinnamon snickerdoodle"],
+ ["Worst thing to lose","Your phone","Your keys","Your wallet","One shoe","Your place in a great book"],
+ ["Best music for a party","Pop bangers","Hip-hop","80s hits","Latin","Classic rock"],
+ ["Coolest job when you were eight","Astronaut","Vet","Firefighter","Chef","Video game tester"],
+ ["Best beach activity","Swimming","Building sandcastles","Napping","Frisbee","Collecting shells"],
+ ["Most satisfying thing","Popping bubble wrap","Peeling off screen film","A perfect parallel park","Fresh snow footprints","Untangling headphones"],
+ ["Best side order","Fries","Onion rings","Mozzarella sticks","Coleslaw","Side salad"],
+ ["Most useful emoji","Crying-laughing face","Fire","Thumbs up","Heart","Party popper"],
+ ["Best day of the week","Friday","Saturday","Sunday","Thursday","Monday"],
+ ["Best cheese","Cheddar","Mozzarella","Brie","Blue cheese","Swiss"],
+ ["Most overrated activity","Camping","Golf","Yoga","Karaoke","Escape rooms"],
+ ["Best pie","Apple","Pumpkin","Pecan","Key lime","Cherry"],
+ ["Best thing at a summer fair","The big wheel","Funnel cake","Ring toss stalls","Petting zoo","Live band"],
+ ["Best hat","Baseball cap","Beanie","Cowboy hat","Wide sun hat","Top hat"],
+ ["Most stressful moment","Job interview","First date","Group presentation","Waiting for results","Merging onto a motorway"],
+ ["Best place to sit","Recliner","Beanbag","Hammock","Proper office chair","Porch swing"],
+ ["Best cereal","Corn flakes","Chocolate puffs","Honey oat clusters","Bran and raisins","Marshmallow cereal"],
+ ["Best superpower for housework","Telekinesis","Cloning yourself","Stopping time","Super speed","Talking to appliances"],
+ ["Best sound in the world","Rain on a roof","Ocean waves","A crackling fire","Birdsong at dawn","A cat purring"],
+ ["Best thing to do on a long flight","Sleep","Watch films","Read a novel","Eat every snack","Chat to your neighbour"],
+ ["Best crisp flavour","Plain salted","Barbecue","Salt and vinegar","Sour cream and onion","Cheese"],
+ ["Best footwear","Trainers","Boots","Sandals","Smart shoes","Slippers"],
+ ["Best pizza base","Thin and crispy","Deep dish","Stuffed crust","Sourdough","Cauliflower"],
+ ["Best gift to receive","Cash","Something handmade","A gift card","A surprise trip","A stack of books"],
+ ["Best thing about summer","Long light evenings","Swimming outdoors","Time off","Barbecues","Going somewhere new"],
+ ["Most breathtaking sight","Northern lights","A huge canyon","An active volcano","A coral reef","A redwood forest"],
+ ["Best smell from a kitchen","Fresh bread","Frying bacon","Cookies in the oven","Coffee brewing","Garlic in butter"],
+ ["Most essential phone app","Maps","Camera","Music","Messages","Weather"],
+ ["Best way to eat a potato","Mashed","Roasted","Chips","Baked","Hash browns"],
+ ["Best carnival food","Candy floss","Corn dog","Toffee apple","Popcorn","Snow cone"],
+ ["Least awful small talk topic","The weather","Pets","Weekend plans","Food","Traffic"],
+ ["Best board game piece to be","The little dog","The top hat","The racing car","The thimble","The boot"],
+ ["Best thing to find in a pocket","Money you forgot about","An old photo","A concert ticket stub","A sweet","A note from someone"]
+];
+
+/* ---------------- STATE ---------------- */
+var G = {
+  players: [],          // [{name,score,colour}]
+  rounds: 6,
+  timeLimit: 90,        // seconds, 0 = off
+  stakesOn: true,
+  round: 0,             // 1-based once running
+  oracleIdx: 0,
+  deckOrder: [],
+  deckPos: 0,
+  card: null,
+  oracleRank: [],       // item strings, index 0 = their #1
+  groupRank: [],
+  stakes: {},           // playerIndex -> slot number (1..5)
+  lastScores: []
+};
+
+var COLOURS = ["#ff2e88","#ffd23f","#28e0b0","#4dc9ff","#c084fc","#fb923c","#f472b6","#a3e635","#22d3ee","#facc15"];
+
+/* ---------------- AUDIO ---------------- */
+var AC = null;
+function ac(){
+  if(AC===null){
+    try{
+      var C = window.AudioContext || window.webkitAudioContext;
+      AC = C ? new C() : false;
+    }catch(e){ AC = false; }
+  }
+  if(AC && AC.state === "suspended" && AC.resume) { try{ AC.resume(); }catch(e){} }
+  return AC || null;
+}
+function tone(freq, dur, type, vol, delay){
+  var c = ac(); if(!c) return;
+  try{
+    var t0 = c.currentTime + (delay||0);
+    var o = c.createOscillator(), g = c.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol||0.18, t0+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t0); o.stop(t0+dur+0.02);
+  }catch(e){}
+}
+function sTap(){ tone(560,0.07,"square",0.09); }
+function sPick(n){ tone(420+n*90,0.11,"triangle",0.14); }
+function sUndo(){ tone(240,0.1,"sawtooth",0.09); }
+function sLock(){ tone(392,0.16,"triangle",0.16,0); tone(523,0.18,"triangle",0.16,0.08); tone(784,0.26,"triangle",0.14,0.16); }
+function sTick(){ tone(880,0.05,"square",0.07); }
+function sBuzz(){ tone(150,0.42,"sawtooth",0.2); tone(112,0.5,"square",0.14,0.03); }
+function sExact(i){ tone(523*Math.pow(1.1892,i),0.2,"triangle",0.17); }
+function sMiss(){ tone(196,0.16,"sine",0.1); }
+function sWin(){
+  var n=[523,659,784,1046,1318];
+  for(var i=0;i<n.length;i++) tone(n[i],0.42,"triangle",0.16,i*0.12);
+  tone(261,0.9,"sine",0.12,0.1);
+}
+
+/* ---------------- HELPERS ---------------- */
+function $(id){ return document.getElementById(id); }
+function show(id){
+  var all = document.querySelectorAll(".screen");
+  for(var i=0;i<all.length;i++) all[i].classList.remove("on");
+  $(id).classList.add("on");
+  window.scrollTo(0,0);
+}
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+function shuffle(a){
+  var r = a.slice();
+  for(var i=r.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=r[i]; r[i]=r[j]; r[j]=t; }
+  return r;
+}
+
+/* ---------------- SETUP SCREEN ---------------- */
+function renderPlayers(){
+  var host = $("plist"); host.innerHTML = "";
+  for(var i=0;i<G.players.length;i++){
+    (function(idx){
+      var p = G.players[idx];
+      var row = document.createElement("div"); row.className = "prow";
+      var d = document.createElement("span"); d.className="dot"; d.style.background = p.colour; d.style.color = p.colour;
+      var n = document.createElement("span"); n.className="nm"; n.textContent = p.name;
+      var x = document.createElement("button"); x.className="xbtn"; x.textContent="Remove";
+      x.setAttribute("data-remove", String(idx));
+      x.onclick = function(){ sUndo(); G.players.splice(idx,1); recolour(); renderPlayers(); };
+      row.appendChild(d); row.appendChild(n); row.appendChild(x);
+      host.appendChild(row);
+    })(i);
+  }
+  var n = G.players.length;
+  $("pcount").innerHTML = n < 3
+    ? "Add at least <b>3</b> players — you have " + n + "."
+    : "<b>" + n + "</b> players ready" + (n >= 10 ? " (that's the max)" : "") + ".";
+  $("startBtn").disabled = n < 3;
+  $("addBtn").disabled = n >= 10;
+}
+function recolour(){
+  for(var i=0;i<G.players.length;i++) G.players[i].colour = COLOURS[i % COLOURS.length];
+}
+function addPlayer(){
+  var el = $("nameIn");
+  var v = (el.value || "").trim();
+  if(!v){ el.focus(); return; }
+  if(G.players.length >= 10) return;
+  var exists = false;
+  for(var i=0;i<G.players.length;i++) if(G.players[i].name.toLowerCase() === v.toLowerCase()) exists = true;
+  if(exists){ v = v + " 2"; }
+  G.players.push({ name: v, score: 0, colour: COLOURS[G.players.length % COLOURS.length] });
+  el.value = ""; el.focus();
+  sPick(G.players.length);
+  renderPlayers();
+}
+function buildOptions(hostId, values, labels, current, setter){
+  var host = $(hostId); host.innerHTML = "";
+  for(var i=0;i<values.length;i++){
+    (function(v, label){
+      var b = document.createElement("button");
+      b.className = "opt" + (v === current ? " sel" : "");
+      b.textContent = label;
+      b.setAttribute("data-val", String(v));
+      b.onclick = function(){ sTap(); setter(v); };
+      host.appendChild(b);
+    })(values[i], labels[i]);
+  }
+}
+function renderOptions(){
+  buildOptions("roundOpts",[3,6,9,12],["3 rounds","6 rounds","9 rounds","12 rounds"],G.rounds,
+    function(v){ G.rounds = v; renderOptions(); });
+  buildOptions("timeOpts",[60,90,120,0],["60 sec","90 sec","2 min","No timer"],G.timeLimit,
+    function(v){ G.timeLimit = v; renderOptions(); });
+  buildOptions("stakeOpts",[true,false],["Stakes on","Stakes off"],G.stakesOn,
+    function(v){ G.stakesOn = v; renderOptions(); });
+}
+
+/* ---------------- GAME FLOW ---------------- */
+function startGame(){
+  for(var i=0;i<G.players.length;i++) G.players[i].score = 0;
+  G.round = 0;
+  G.oracleIdx = Math.floor(Math.random()*G.players.length);
+  G.deckOrder = shuffle(DECK);
+  G.deckPos = 0;
+  sLock();
+  nextRound();
+}
+function nextRound(){
+  G.round++;
+  if(G.round > G.rounds){ finish(); return; }
+  if(G.round > 1) G.oracleIdx = (G.oracleIdx + 1) % G.players.length;
+  if(G.deckPos >= G.deckOrder.length){ G.deckOrder = shuffle(DECK); G.deckPos = 0; }
+  var raw = G.deckOrder[G.deckPos++];
+  G.card = { prompt: raw[0], items: shuffle(raw.slice(1)) };
+  G.oracleRank = [];
+  G.groupRank = [];
+  G.stakes = {};
+  renderIntro();
+  show("s-intro");
+}
+function oracle(){ return G.players[G.oracleIdx]; }
+
+function renderIntro(){
+  $("introRound").textContent = "Round " + G.round + " of " + G.rounds;
+  $("introOracle").textContent = oracle().name;
+  $("introOracle").style.color = oracle().colour;
+  $("introPrompt").textContent = G.card.prompt;
+  $("introSub").textContent = "Rank all five, best first";
+  $("introGoName").textContent = oracle().name;
+  var host = $("introItems"); host.innerHTML = "";
+  for(var i=0;i<G.card.items.length;i++){
+    var d = document.createElement("div"); d.className = "item";
+    var r = document.createElement("span"); r.className="rank"; r.textContent = "?";
+    var t = document.createElement("span"); t.textContent = G.card.items[i];
+    d.appendChild(r); d.appendChild(t); host.appendChild(d);
+  }
+}
+
+/* ---- shared picker builder ---- */
+function renderPicker(hostId, chosen, onPick){
+  var host = $(hostId); host.innerHTML = "";
+  for(var i=0;i<G.card.items.length;i++){
+    (function(item){
+      var pos = chosen.indexOf(item);
+      var b = document.createElement("button");
+      b.className = "item" + (pos >= 0 ? " taken" : "");
+      b.setAttribute("data-item", item);
+      var r = document.createElement("span"); r.className = "rank";
+      r.textContent = pos >= 0 ? String(pos+1) : "–";
+      var t = document.createElement("span"); t.textContent = item;
+      b.appendChild(r); b.appendChild(t);
+      b.onclick = function(){
+        if(chosen.indexOf(item) >= 0) return;
+        onPick(item);
+      };
+      host.appendChild(b);
+    })(G.card.items[i]);
+  }
+}
+
+/* ---- oracle secret ranking ---- */
+function renderOracle(){
+  $("oracleName").textContent = oracle().name;
+  $("oraclePrompt").textContent = G.card.prompt;
+  $("oracleSub").textContent = "Your private ranking";
+  renderPicker("oracleItems", G.oracleRank, function(item){
+    G.oracleRank.push(item); sPick(G.oracleRank.length); renderOracle();
+  });
+  $("oracleLock").disabled = G.oracleRank.length !== 5;
+  $("oracleUndo").disabled = G.oracleRank.length === 0;
+}
+
+/* ---- group ranking + timer ---- */
+var timerId = null, timeLeft = 0;
+function stopTimer(){ if(timerId){ clearInterval(timerId); timerId = null; } }
+function startTimer(){
+  stopTimer();
+  if(!G.timeLimit){
+    $("tnum").textContent = "No timer — take your time";
+    $("tfill").style.width = "100%";
+    $("tfill").classList.remove("low");
+    return;
+  }
+  timeLeft = G.timeLimit;
+  paintTimer();
+  timerId = setInterval(function(){
+    timeLeft--;
+    paintTimer();
+    if(timeLeft <= 5 && timeLeft > 0) sTick();
+    if(timeLeft <= 0){ stopTimer(); sBuzz(); $("tnum").textContent = "TIME! Lock in your best guess."; }
+  }, 1000);
+}
+function paintTimer(){
+  var pct = Math.max(0, (timeLeft / G.timeLimit) * 100);
+  var f = $("tfill");
+  f.style.width = pct + "%";
+  if(timeLeft <= 15) f.classList.add("low"); else f.classList.remove("low");
+  $("tnum").textContent = "Debate time: " + timeLeft + "s";
+}
+function renderGroup(){
+  $("groupOracleName").textContent = oracle().name;
+  $("groupPrompt").textContent = G.card.prompt;
+  $("groupSub").textContent = "Match the Oracle's order";
+  renderPicker("groupItems", G.groupRank, function(item){
+    G.groupRank.push(item); sPick(G.groupRank.length); renderGroup();
+  });
+  $("groupLock").disabled = G.groupRank.length !== 5;
+  $("groupUndo").disabled = G.groupRank.length === 0;
+}
+
+/* ---- stakes ---- */
+function renderStakes(){
+  var host = $("stakeList"); host.innerHTML = "";
+  var any = false;
+  for(var i=0;i<G.players.length;i++){
+    if(i === G.oracleIdx) continue;
+    any = true;
+    (function(idx){
+      var p = G.players[idx];
+      var row = document.createElement("div"); row.className = "stakerow";
+      var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = p.name; nm.style.color = p.colour;
+      var box = document.createElement("div"); box.className = "sbtns";
+      for(var s=1;s<=5;s++){
+        (function(slot){
+          var b = document.createElement("button");
+          b.className = "sb" + (G.stakes[idx] === slot ? " on" : "");
+          b.textContent = "#" + slot;
+          b.setAttribute("data-stake", idx + ":" + slot);
+          b.onclick = function(){
+            if(G.stakes[idx] === slot) delete G.stakes[idx];
+            else G.stakes[idx] = slot;
+            sTap(); renderStakes();
+          };
+          box.appendChild(b);
+        })(s);
+      }
+      row.appendChild(nm); row.appendChild(box);
+      host.appendChild(row);
+    })(i);
+  }
+  if(!any) host.innerHTML = '<p class="hint">No guessers to stake.</p>';
+}
+
+/* ---- scoring ---- */
+function scoreRound(){
+  var detail = [], pts = 0, exact = 0, close = 0;
+  for(var i=0;i<5;i++){
+    var oi = G.oracleRank.indexOf(G.groupRank[i]);
+    var d = Math.abs(oi - i);
+    if(d === 0){ pts += 3; exact++; detail.push("exact"); }
+    else if(d === 1){ pts += 1; close++; detail.push("close"); }
+    else detail.push("miss");
+  }
+  var bonus = (exact === 5) ? 5 : 0;
+  return { pts: pts + bonus, base: pts, bonus: bonus, exact: exact, close: close, detail: detail };
+}
+
+function renderReveal(){
+  var R = scoreRound();
+  var i;
+
+  // award
+  var deltas = [];
+  for(i=0;i<G.players.length;i++) deltas.push(R.pts);
+  var pokerFace = (R.exact >= 3);
+  if(pokerFace) deltas[G.oracleIdx] += 2;
+  var stakeResults = [];
+  for(i=0;i<G.players.length;i++){
+    if(i === G.oracleIdx) continue;
+    var slot = G.stakes[i];
+    if(!slot) continue;
+    var ok = (R.detail[slot-1] === "exact");
+    if(ok) deltas[i] += 2;
+    stakeResults.push({ idx: i, slot: slot, ok: ok });
+  }
+  for(i=0;i<G.players.length;i++) G.players[i].score += deltas[i];
+  G.lastScores = deltas;
+
+  // heading
+  $("revealSub").textContent = "Round " + G.round + " of " + G.rounds + " — reveal";
+  $("revealPrompt").textContent = G.card.prompt;
+  $("revealGroupHead").textContent = "The group said";
+  $("revealOracleHead").textContent = oracle().name + " said";
+
+  // columns
+  var gh = $("revealGroup"), oh = $("revealOracle");
+  gh.innerHTML = ""; oh.innerHTML = "";
+  var labels = { exact:"EXACT +3", close:"CLOSE +1", miss:"MISS" };
+  for(i=0;i<5;i++){
+    var st = R.detail[i];
+    var g = document.createElement("div"); g.className = "slot " + st;
+    g.setAttribute("data-slot", String(i+1));
+    g.innerHTML = '<span class="n">'+(i+1)+'</span><span>'+esc(G.groupRank[i])+
+                  '</span><span class="mark '+st+'">'+labels[st]+'</span>';
+    gh.appendChild(g);
+
+    var o = document.createElement("div"); o.className = "slot";
+    o.innerHTML = '<span class="n">'+(i+1)+'</span><span>'+esc(G.oracleRank[i])+'</span>';
+    oh.appendChild(o);
+  }
+
+  // score
+  $("revealPts").innerHTML = R.pts + "<small>points to everyone</small>";
+  var bits = [R.exact + " exact (+" + (R.exact*3) + ")", R.close + " off-by-one (+" + R.close + ")"];
+  if(R.bonus) bits.push("<b>PERFECT FIVE +5</b>");
+  if(pokerFace) bits.push("<b>" + esc(oracle().name) + " earns +2 Poker Face</b>");
+  $("revealBreak").innerHTML = bits.join(" &nbsp;•&nbsp; ");
+
+  // stakes list
+  if(stakeResults.length){
+    $("revealStakes").style.display = "";
+    var sl = $("revealStakeList"); sl.innerHTML = "";
+    for(i=0;i<stakeResults.length;i++){
+      var s = stakeResults[i];
+      var p = G.players[s.idx];
+      var line = document.createElement("p");
+      line.className = "hint";
+      line.style.margin = "0 0 6px";
+      line.innerHTML = '<b style="color:'+p.colour+'">'+esc(p.name)+'</b> staked slot #'+s.slot+' — ' +
+        (s.ok ? '<b style="color:var(--mint)">correct, +2</b>' : '<span style="opacity:.7">no dice</span>');
+      sl.appendChild(line);
+    }
+  } else {
+    $("revealStakes").style.display = "none";
+  }
+
+  drawBoard("revealBoard", true);
+  $("revealNext").textContent = (G.round >= G.rounds) ? "See final scores" : "Next round";
+
+  // sound
+  var played = 0;
+  for(i=0;i<5;i++){
+    if(R.detail[i] === "exact"){ sExact(played); played++; }
+  }
+  if(!played) sMiss();
+  if(R.bonus) sWin();
+}
+
+function drawBoard(hostId, withDelta){
+  var order = [];
+  for(var i=0;i<G.players.length;i++) order.push(i);
+  order.sort(function(a,b){ return G.players[b].score - G.players[a].score; });
+  var host = $(hostId); host.innerHTML = "";
+  var top = G.players[order[0]].score;
+  var allSame = (G.players[order[order.length-1]].score === top);
+  for(var k=0;k<order.length;k++){
+    var idx = order[k], p = G.players[idx];
+    var row = document.createElement("div");
+    row.className = "brow" + (p.score === top && top > 0 && !allSame ? " lead" : "");
+    row.setAttribute("data-player", p.name);
+    var d = (withDelta && G.lastScores[idx]) ? '<span class="delta">+'+G.lastScores[idx]+'</span>' : "";
+    row.innerHTML = '<span class="pos">'+(k+1)+'</span>' +
+                    '<span class="nm" style="color:'+p.colour+'">'+esc(p.name)+'</span>' + d +
+                    '<span class="pts">'+p.score+'</span>';
+    host.appendChild(row);
+  }
+}
+
+function finish(){
+  var order = [];
+  for(var i=0;i<G.players.length;i++) order.push(i);
+  order.sort(function(a,b){ return G.players[b].score - G.players[a].score; });
+  var top = G.players[order[0]].score;
+  var winners = [];
+  for(var k=0;k<order.length;k++) if(G.players[order[k]].score === top) winners.push(G.players[order[k]].name);
+  $("winLabel").textContent = winners.length > 1 ? "It's a tie!" : "Winner";
+  $("winName").textContent = winners.join(" & ");
+  $("winLine").innerHTML = "<b>" + top + "</b> points across " + G.rounds + " rounds of arguing.";
+  G.lastScores = [];
+  drawBoard("finalBoard", false);
+  show("s-final");
+  sWin();
+  confetti();
+}
+
+function confetti(){
+  var host = $("confetti");
+  host.innerHTML = "";
+  for(var i=0;i<70;i++){
+    var d = document.createElement("div");
+    d.className = "cf";
+    d.style.left = (Math.random()*100) + "vw";
+    d.style.top = (-10 - Math.random()*30) + "vh";
+    d.style.background = COLOURS[i % COLOURS.length];
+    d.style.animationDuration = (2.2 + Math.random()*2.2) + "s";
+    d.style.animationDelay = (Math.random()*0.9) + "s";
+    host.appendChild(d);
+  }
+  setTimeout(function(){ host.innerHTML = ""; }, 6500);
+}
+
+/* ---------------- WIRING ---------------- */
+$("addBtn").onclick = addPlayer;
+$("nameIn").addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); addPlayer(); } });
+
+$("howBtn").onclick = function(){ sTap(); show("s-how"); };
+$("howBack").onclick = function(){ sTap(); show("s-setup"); };
+
+$("startBtn").onclick = function(){ startGame(); };
+
+$("introGo").onclick = function(){ sTap(); renderOracle(); show("s-oracle"); };
+$("introQuit").onclick = function(){ stopTimer(); sUndo(); show("s-setup"); };
+
+$("oracleUndo").onclick = function(){ if(G.oracleRank.length){ G.oracleRank.pop(); sUndo(); renderOracle(); } };
+$("oracleLock").onclick = function(){
+  if(G.oracleRank.length !== 5) return;
+  sLock();
+  renderGroup(); show("s-group"); startTimer();
+};
+
+$("groupUndo").onclick = function(){ if(G.groupRank.length){ G.groupRank.pop(); sUndo(); renderGroup(); } };
+$("groupLock").onclick = function(){
+  if(G.groupRank.length !== 5) return;
+  stopTimer(); sLock();
+  if(G.stakesOn && G.players.length > 1){ renderStakes(); show("s-stake"); }
+  else { renderReveal(); show("s-reveal"); }
+};
+
+$("stakeGo").onclick = function(){ sLock(); renderReveal(); show("s-reveal"); };
+$("revealNext").onclick = function(){ sTap(); nextRound(); };
+
+$("againBtn").onclick = function(){ sTap(); startGame(); };
+$("newBtn").onclick = function(){ sTap(); G.players = []; renderPlayers(); show("s-setup"); };
+
+/* ---------------- BOOT ---------------- */
+renderOptions();
+renderPlayers();
+
+/* test hook — harmless in normal play */
+window.OP = { G: G, DECK: DECK, scoreRound: scoreRound, show: show };
+</script>
+</body>
+</html>
