@@ -1,0 +1,714 @@
+<!-- CONCEPT: FRAME BY FRAME - Flipbook Magic: kids draw a few pages that copy forward, then press PLAY and their drawing comes alive as an animation they can print as a real flipbook | Audience: Kids Ages 4-8 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Flipbook Magic — Make Your Drawing Move!</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    font-family: "Comic Sans MS", "Chalkboard SE", "Trebuchet MS", Verdana, sans-serif;
+    background: #fff6d8;
+    color: #33265c;
+    overflow-x: hidden;
+    touch-action: manipulation;
+  }
+  body {
+    background:
+      radial-gradient(circle at 12% 12%, #ffe6a8 0 18%, transparent 18.5%),
+      radial-gradient(circle at 88% 22%, #cdf3ff 0 14%, transparent 14.5%),
+      radial-gradient(circle at 20% 88%, #ffd9ec 0 16%, transparent 16.5%),
+      radial-gradient(circle at 84% 84%, #d9f8d2 0 15%, transparent 15.5%),
+      #fff6d8;
+  }
+  .screen { display: none; min-height: 100%; padding: 14px; }
+  .screen.on { display: block; }
+
+  h1 { font-size: clamp(30px, 8vw, 58px); margin: 6px 0 2px; text-align: center; color: #ff5aa8; text-shadow: 3px 3px 0 #fff, 6px 6px 0 rgba(0,0,0,.08); }
+  .sub { text-align: center; font-size: clamp(15px, 4vw, 22px); margin: 0 0 6px; color: #4b3b86; }
+  .age { display: block; width: fit-content; margin: 6px auto 14px; background: #7ad0ff; color: #143a52; font-size: 17px; padding: 6px 16px; border-radius: 999px; border: 3px solid #fff; }
+
+  .btn {
+    border: none; border-radius: 22px; cursor: pointer;
+    font-family: inherit; font-weight: bold;
+    min-height: 64px; min-width: 64px; padding: 10px 20px;
+    font-size: 22px; color: #fff; background: #ff8ac1;
+    box-shadow: 0 6px 0 rgba(0,0,0,.18); transition: transform .08s ease, box-shadow .08s ease;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn:active { transform: translateY(5px); box-shadow: 0 1px 0 rgba(0,0,0,.18); }
+  .btn.big { font-size: clamp(24px, 6vw, 34px); min-height: 84px; padding: 14px 34px; border-radius: 30px; }
+  .btn.green { background: #46c96a; }
+  .btn.blue  { background: #4aa8f0; }
+  .btn.purple{ background: #a274f0; }
+  .btn.orange{ background: #ff9b3d; }
+  .btn.grey  { background: #9aa4c2; }
+
+  .center { text-align: center; }
+  .howrow { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 18px auto 22px; max-width: 640px; }
+  .howcard { background: #fff; border: 4px solid #ffd166; border-radius: 22px; padding: 12px 10px; width: 150px; }
+  .howcard .em { font-size: 42px; display: block; }
+  .howcard .tx { font-size: 15px; margin-top: 4px; }
+
+  /* ---------- studio ---------- */
+  .topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; max-width: 900px; margin: 0 auto 8px; }
+  .brand { font-size: clamp(20px, 5vw, 30px); color: #ff5aa8; font-weight: bold; text-shadow: 2px 2px 0 #fff; }
+  .pagepill { background: #fff; border: 4px solid #a274f0; border-radius: 999px; padding: 6px 16px; font-size: 18px; white-space: nowrap; }
+
+  .stagewrap { max-width: 560px; margin: 0 auto; position: relative; }
+  .paper {
+    position: relative; width: 100%; aspect-ratio: 1 / 1;
+    background: #fff; border: 8px solid #fff; border-radius: 26px;
+    box-shadow: 0 10px 0 rgba(0,0,0,.12), 0 0 0 6px #ffd166;
+    overflow: hidden;
+  }
+  .paper canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #playBadge {
+    position: absolute; top: 10px; left: 10px; background: #46c96a; color: #fff;
+    padding: 6px 14px; border-radius: 999px; font-size: 18px; display: none;
+  }
+  .paper.playing #playBadge { display: block; }
+
+  .tools { max-width: 620px; margin: 12px auto 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
+  .swatch {
+    width: 62px; height: 62px; border-radius: 50%; border: 5px solid #fff; cursor: pointer;
+    box-shadow: 0 4px 0 rgba(0,0,0,.18);
+  }
+  .swatch.sel { border-color: #33265c; transform: scale(1.12); }
+  .tool {
+    width: 66px; height: 66px; border-radius: 20px; border: 5px solid #fff; background: #eef1ff;
+    font-size: 30px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+    box-shadow: 0 4px 0 rgba(0,0,0,.15);
+  }
+  .tool.sel { border-color: #33265c; background: #fff0c2; transform: scale(1.08); }
+  .label { width: 100%; text-align: center; font-size: 16px; color: #6a5ea8; margin: 12px 0 2px; }
+
+  .strip { display: flex; gap: 8px; overflow-x: auto; padding: 8px 4px 12px; max-width: 900px; margin: 0 auto; }
+  .thumb {
+    flex: 0 0 auto; width: 78px; height: 78px; border-radius: 16px; border: 5px solid #fff;
+    background: #fff; box-shadow: 0 4px 0 rgba(0,0,0,.14); position: relative; cursor: pointer; overflow: hidden;
+  }
+  .thumb.sel { border-color: #ff5aa8; }
+  .thumb canvas { width: 100%; height: 100%; display: block; }
+  .thumb .n { position: absolute; bottom: 2px; right: 5px; font-size: 13px; color: #7a6fb0; background: rgba(255,255,255,.8); border-radius: 6px; padding: 0 4px; }
+  .addframe {
+    flex: 0 0 auto; width: 78px; height: 78px; border-radius: 16px; border: 5px dashed #46c96a;
+    background: #eafbee; color: #2c8a48; font-size: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; display: none; }
+  #confetti.on { display: block; }
+
+  .movie {
+    max-width: 480px; margin: 0 auto; background: #2b2350; border-radius: 28px; padding: 16px;
+    border: 8px solid #ffd166; box-shadow: 0 12px 0 rgba(0,0,0,.18);
+  }
+  .movie .paper { border-radius: 16px; box-shadow: none; border: 6px solid #fff; }
+  .bigemoji { font-size: 54px; text-align: center; }
+  .foot { text-align: center; font-size: 14px; color: #8b82bd; margin: 26px 0 8px; }
+  @media print {
+    body * { display: none !important; }
+    #printArea, #printArea * { display: block !important; }
+    #printArea { position: absolute; inset: 0; padding: 0; }
+    #printArea img { width: 100%; }
+  }
+  #printArea { display: none; }
+</style>
+</head>
+<body>
+
+<!-- ================= WELCOME ================= -->
+<section id="welcome" class="screen on">
+  <h1>✏️ Flipbook Magic ✨</h1>
+  <p class="sub">Draw a few pages — then watch your drawing come alive and move!</p>
+  <span class="age">For kids ages 4–8 🧒</span>
+
+  <div class="howrow">
+    <div class="howcard"><span class="em">🖍️</span><span class="tx">1. Draw on page 1</span></div>
+    <div class="howcard"><span class="em">➕</span><span class="tx">2. Add a page and move it a little</span></div>
+    <div class="howcard"><span class="em">▶️</span><span class="tx">3. Press PLAY and it moves!</span></div>
+  </div>
+
+  <div class="center">
+    <button class="btn big green" id="startBtn">Let's Draw! 🎉</button>
+  </div>
+  <p class="foot">Everything stays on this device. No internet needed. 💛</p>
+</section>
+
+<!-- ================= STUDIO ================= -->
+<section id="studio" class="screen">
+  <div class="topbar">
+    <span class="brand">✏️ Flipbook Magic</span>
+    <span class="pagepill" id="pagePill">Page 1 of 1</span>
+  </div>
+
+  <div class="stagewrap">
+    <div class="paper" id="paper">
+      <canvas id="view"></canvas>
+      <span id="playBadge">▶️ Playing!</span>
+    </div>
+  </div>
+
+  <div class="tools">
+    <div class="label">Pick a color 🎨</div>
+    <div class="row" id="palette"></div>
+
+    <div class="label">Or tap a sticker, then tap your picture ⭐</div>
+    <div class="row" id="stamps"></div>
+
+    <div class="row" style="margin-top:14px">
+      <div class="tool sel" id="toolFat" title="Fat crayon">🖍️</div>
+      <div class="tool" id="toolThin" title="Thin crayon">🖊️</div>
+      <div class="tool" id="toolEraser" title="Eraser">🧼</div>
+      <button class="btn grey" id="undoBtn">↩️ Oops</button>
+    </div>
+
+    <div class="label">Your pages 📖</div>
+    <div class="strip" id="strip"></div>
+
+    <div class="row" style="margin-top:6px">
+      <button class="btn big blue" id="playBtn">▶️ Play</button>
+      <button class="btn big purple" id="doneBtn">I'm Finished! ✨</button>
+    </div>
+
+    <div class="label">How fast?</div>
+    <div class="row">
+      <div class="tool" data-fps="2" title="Slow">🐢</div>
+      <div class="tool sel" data-fps="5" title="Medium">🐰</div>
+      <div class="tool" data-fps="10" title="Fast">🐆</div>
+    </div>
+  </div>
+  <p class="foot">Tip: press ➕ to add a page — your drawing is copied so you only nudge it a little!</p>
+</section>
+
+<!-- ================= FINISHED ================= -->
+<section id="finished" class="screen">
+  <h1>🎬 You made a movie!</h1>
+  <p class="sub" id="doneLine">Look at it go!</p>
+
+  <div class="movie">
+    <div class="paper"><canvas id="showCanvas"></canvas></div>
+  </div>
+
+  <div class="row" style="margin-top:20px">
+    <button class="btn blue" id="saveBtn">💾 Save Picture</button>
+    <button class="btn orange" id="printBtn">🖨️ Print Flipbook</button>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="btn green" id="backBtn">✏️ Keep Drawing</button>
+    <button class="btn purple" id="againBtn">🔁 Make Another!</button>
+  </div>
+  <p class="foot">Print it, cut the squares, stack them and flip! 📚</p>
+</section>
+
+<canvas id="confetti"></canvas>
+<div id="printArea"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SIZE = 520;              // internal drawing resolution
+  var MAX_FRAMES = 12;
+  var COLORS = ["#ff3b6b", "#ff9b18", "#ffd400", "#33c25b", "#2a9df4", "#8b4bf0", "#ff7ec4", "#5a3a1e", "#111827"];
+  var STAMPS = ["⭐", "🌞", "❤️", "🐟", "🐦", "🌈", "🍎", "⚽", "🌸", "🚀", "🦋", "🐱"];
+
+  var frames = [];             // array of canvases
+  var current = 0;
+  var color = COLORS[0];
+  var brush = 26;
+  var mode = "draw";           // draw | erase | stamp
+  var stampChar = null;
+  var undoStacks = [];         // per frame: array of canvases
+  var fps = 5;
+  var playing = false;
+  var playTimer = null;
+  var playIndex = 0;
+
+  // ---------- tiny helpers ----------
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
+  function newCanvas(w, h) {
+    var c = document.createElement("canvas");
+    c.width = w || SIZE; c.height = h || SIZE;
+    return c;
+  }
+  function fillWhite(c) {
+    var x = c.getContext("2d");
+    x.fillStyle = "#ffffff";
+    x.fillRect(0, 0, c.width, c.height);
+  }
+  function show(id) {
+    var list = document.querySelectorAll(".screen");
+    for (var i = 0; i < list.length; i++) list[i].classList.remove("on");
+    $(id).classList.add("on");
+    window.scrollTo(0, 0);
+  }
+
+  // ---------- happy sounds ----------
+  var actx = null;
+  function audio() {
+    if (!actx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      try { actx = new AC(); } catch (e) { return null; }
+    }
+    if (actx.state === "suspended" && actx.resume) { try { actx.resume(); } catch (e) {} }
+    return actx;
+  }
+  function tone(freq, start, dur, vol, type) {
+    var a = audio(); if (!a) return;
+    var o = a.createOscillator(), g = a.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(freq, a.currentTime + start);
+    g.gain.setValueAtTime(0.0001, a.currentTime + start);
+    g.gain.exponentialRampToValueAtTime(vol || 0.18, a.currentTime + start + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + start + dur);
+    o.connect(g); g.connect(a.destination);
+    o.start(a.currentTime + start);
+    o.stop(a.currentTime + start + dur + 0.03);
+  }
+  function sTap()     { tone(660, 0, 0.10, 0.14, "triangle"); }
+  function sSparkle() { tone(880, 0, 0.09, 0.12); tone(1320, 0.06, 0.10, 0.10); tone(1760, 0.12, 0.12, 0.08); }
+  function sPage()    { tone(420, 0, 0.09, 0.12, "square"); tone(700, 0.07, 0.12, 0.10, "triangle"); }
+  function sPlay()    { tone(523, 0, 0.10, 0.14); tone(784, 0.09, 0.14, 0.12); }
+  function sFanfare() {
+    var n = [523, 659, 784, 1047, 1319];
+    for (var i = 0; i < n.length; i++) tone(n[i], i * 0.11, 0.30, 0.16, "triangle");
+    tone(1568, 0.62, 0.55, 0.14, "sine");
+  }
+
+  // ---------- frames ----------
+  function addFrame(copyFrom) {
+    if (frames.length >= MAX_FRAMES) { sSparkle(); return false; }
+    var c = newCanvas();
+    fillWhite(c);
+    if (copyFrom) c.getContext("2d").drawImage(copyFrom, 0, 0);
+    frames.push(c);
+    undoStacks.push([]);
+    current = frames.length - 1;
+    return true;
+  }
+  function pushUndo() {
+    var snap = newCanvas();
+    snap.getContext("2d").drawImage(frames[current], 0, 0);
+    var st = undoStacks[current];
+    st.push(snap);
+    if (st.length > 10) st.shift();
+  }
+  function undo() {
+    var st = undoStacks[current];
+    if (!st || !st.length) { sTap(); return; }
+    var snap = st.pop();
+    var x = frames[current].getContext("2d");
+    x.clearRect(0, 0, SIZE, SIZE);
+    x.drawImage(snap, 0, 0);
+    sTap();
+    render();
+    renderStrip();
+  }
+
+  // ---------- rendering ----------
+  var view = $("view"), vctx = null;
+  function setupView() {
+    view.width = SIZE; view.height = SIZE;
+    vctx = view.getContext("2d");
+  }
+  function render() {
+    if (!vctx) return;
+    vctx.fillStyle = "#ffffff";
+    vctx.fillRect(0, 0, SIZE, SIZE);
+    if (playing) {
+      vctx.drawImage(frames[playIndex % frames.length], 0, 0);
+      return;
+    }
+    if (current > 0) {                       // onion skin of the page before
+      vctx.globalAlpha = 0.22;
+      vctx.drawImage(frames[current - 1], 0, 0);
+      vctx.globalAlpha = 1;
+    }
+    vctx.drawImage(frames[current], 0, 0);
+    $("pagePill").textContent = "Page " + (current + 1) + " of " + frames.length;
+  }
+
+  function renderStrip() {
+    var strip = $("strip");
+    strip.innerHTML = "";
+    for (var i = 0; i < frames.length; i++) {
+      (function (i) {
+        var t = el("div", "thumb" + (i === current ? " sel" : ""));
+        var tc = newCanvas(78, 78);
+        var tx = tc.getContext("2d");
+        tx.fillStyle = "#fff"; tx.fillRect(0, 0, 78, 78);
+        tx.drawImage(frames[i], 0, 0, 78, 78);
+        t.appendChild(tc);
+        var n = el("span", "n"); n.textContent = String(i + 1); t.appendChild(n);
+        t.addEventListener("click", function () {
+          if (playing) stopPlay();
+          current = i; sTap(); render(); renderStrip();
+        });
+        strip.appendChild(t);
+      })(i);
+    }
+    if (frames.length < MAX_FRAMES) {
+      var add = el("div", "addframe");
+      add.textContent = "＋";
+      add.addEventListener("click", function () {
+        if (playing) stopPlay();
+        if (addFrame(frames[frames.length - 1])) { sPage(); burst(14); }
+        render(); renderStrip();
+      });
+      $("strip").appendChild(add);
+    }
+  }
+
+  // ---------- drawing input ----------
+  var drawing = false, lastX = 0, lastY = 0;
+  function pos(ev) {
+    var r = view.getBoundingClientRect();
+    var p = (ev.touches && ev.touches[0]) ? ev.touches[0] : ev;
+    return {
+      x: (p.clientX - r.left) * (SIZE / r.width),
+      y: (p.clientY - r.top) * (SIZE / r.height)
+    };
+  }
+  function stroke(x1, y1, x2, y2) {
+    var c = frames[current].getContext("2d");
+    c.lineCap = "round"; c.lineJoin = "round";
+    if (mode === "erase") {
+      c.strokeStyle = "#ffffff"; c.lineWidth = 46;
+    } else {
+      c.strokeStyle = color; c.lineWidth = brush;
+    }
+    c.beginPath();
+    c.moveTo(x1, y1); c.lineTo(x2, y2);
+    c.stroke();
+  }
+  function placeStamp(x, y) {
+    var c = frames[current].getContext("2d");
+    c.save();
+    c.font = "96px serif";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillText(stampChar, x, y);
+    c.restore();
+    sSparkle();
+    sparkleAt(x, y);
+  }
+  function onDown(ev) {
+    if (playing) return;
+    ev.preventDefault();
+    audio();
+    var p = pos(ev);
+    pushUndo();
+    if (mode === "stamp" && stampChar) {
+      placeStamp(p.x, p.y);
+      render(); renderStrip();
+      return;
+    }
+    drawing = true; lastX = p.x; lastY = p.y;
+    stroke(p.x, p.y, p.x + 0.01, p.y + 0.01);
+    render();
+  }
+  function onMove(ev) {
+    if (!drawing || playing) return;
+    ev.preventDefault();
+    var p = pos(ev);
+    stroke(lastX, lastY, p.x, p.y);
+    lastX = p.x; lastY = p.y;
+    render();
+  }
+  function onUp() {
+    if (!drawing) return;
+    drawing = false;
+    renderStrip();
+  }
+
+  // ---------- play ----------
+  function startPlay() {
+    if (frames.length < 2) {
+      sSparkle();
+      $("pagePill").textContent = "Add a page first! ➕";
+      setTimeout(render, 1400);
+      return;
+    }
+    playing = true; playIndex = 0;
+    $("paper").classList.add("playing");
+    $("playBtn").innerHTML = "⏸️ Stop";
+    sPlay();
+    tick();
+  }
+  function tick() {
+    render();
+    playIndex++;
+    playTimer = setTimeout(tick, 1000 / fps);
+  }
+  function stopPlay() {
+    playing = false;
+    if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+    $("paper").classList.remove("playing");
+    $("playBtn").innerHTML = "▶️ Play";
+    render();
+  }
+
+  // ---------- finished screen ----------
+  var showCanvas = $("showCanvas"), sctx = null, showTimer = null, showIndex = 0;
+  function startShow() {
+    showCanvas.width = SIZE; showCanvas.height = SIZE;
+    sctx = showCanvas.getContext("2d");
+    showIndex = 0;
+    if (showTimer) clearTimeout(showTimer);
+    showTick();
+  }
+  function showTick() {
+    sctx.fillStyle = "#fff";
+    sctx.fillRect(0, 0, SIZE, SIZE);
+    sctx.drawImage(frames[showIndex % frames.length], 0, 0);
+    showIndex++;
+    showTimer = setTimeout(showTick, 1000 / (frames.length > 1 ? fps : 1));
+  }
+  function stopShow() { if (showTimer) { clearTimeout(showTimer); showTimer = null; } }
+
+  // ---------- printable sheet ----------
+  function buildSheet() {
+    var cols = 3;
+    var cell = 300, pad = 18, labelH = 34;
+    var rows = Math.ceil(frames.length / cols);
+    var w = cols * (cell + pad) + pad;
+    var h = rows * (cell + pad + labelH) + pad + 70;
+    var c = newCanvas(w, h);
+    var x = c.getContext("2d");
+    x.fillStyle = "#ffffff"; x.fillRect(0, 0, w, h);
+    x.fillStyle = "#ff5aa8";
+    x.font = "bold 40px Verdana, sans-serif";
+    x.textAlign = "center";
+    x.fillText("My Flipbook!  ✂️ cut, stack and flip", w / 2, 48);
+    for (var i = 0; i < frames.length; i++) {
+      var cx = pad + (i % cols) * (cell + pad);
+      var cy = 70 + Math.floor(i / cols) * (cell + pad + labelH);
+      x.fillStyle = "#ffffff";
+      x.fillRect(cx, cy, cell, cell);
+      x.drawImage(frames[i], cx, cy, cell, cell);
+      x.strokeStyle = "#9aa4c2";
+      x.setLineDash([8, 8]);
+      x.lineWidth = 2;
+      x.strokeRect(cx, cy, cell, cell);
+      x.setLineDash([]);
+      x.fillStyle = "#33265c";
+      x.font = "bold 24px Verdana, sans-serif";
+      x.textAlign = "center";
+      x.fillText("Page " + (i + 1), cx + cell / 2, cy + cell + 26);
+    }
+    return c;
+  }
+
+  // ---------- confetti + sparkles ----------
+  var conf = $("confetti"), cctx = null, parts = [], confRAF = null;
+  function sizeConf() {
+    conf.width = window.innerWidth;
+    conf.height = window.innerHeight;
+    cctx = conf.getContext("2d");
+  }
+  function burst(n, cx, cy) {
+    sizeConf();
+    conf.classList.add("on");
+    var colors = ["#ff3b6b", "#ffd400", "#33c25b", "#2a9df4", "#8b4bf0", "#ff9b18"];
+    for (var i = 0; i < n; i++) {
+      parts.push({
+        x: cx === undefined ? Math.random() * conf.width : cx,
+        y: cy === undefined ? -20 - Math.random() * 120 : cy,
+        vx: (Math.random() - 0.5) * 6,
+        vy: 2 + Math.random() * 4,
+        s: 6 + Math.random() * 10,
+        r: Math.random() * 6,
+        vr: (Math.random() - 0.5) * 0.4,
+        c: colors[(Math.random() * colors.length) | 0],
+        life: 90 + Math.random() * 60
+      });
+    }
+    if (!confRAF) confRAF = requestAnimationFrame(confStep);
+  }
+  function sparkleAt(x, y) {
+    var r = view.getBoundingClientRect();
+    burst(10, r.left + x * (r.width / SIZE), r.top + y * (r.height / SIZE));
+  }
+  function confStep() {
+    if (!cctx) { confRAF = null; return; }
+    cctx.clearRect(0, 0, conf.width, conf.height);
+    for (var i = parts.length - 1; i >= 0; i--) {
+      var p = parts[i];
+      p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.r += p.vr; p.life--;
+      cctx.save();
+      cctx.translate(p.x, p.y);
+      cctx.rotate(p.r);
+      cctx.fillStyle = p.c;
+      cctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6);
+      cctx.restore();
+      if (p.life <= 0 || p.y > conf.height + 40) parts.splice(i, 1);
+    }
+    if (parts.length) { confRAF = requestAnimationFrame(confStep); }
+    else { confRAF = null; conf.classList.remove("on"); }
+  }
+
+  // ---------- build the tool UI ----------
+  function buildPalette() {
+    var pal = $("palette");
+    pal.innerHTML = "";
+    for (var i = 0; i < COLORS.length; i++) {
+      (function (i) {
+        var s = el("div", "swatch" + (i === 0 ? " sel" : ""));
+        s.style.background = COLORS[i];
+        s.addEventListener("click", function () {
+          color = COLORS[i];
+          mode = "draw"; stampChar = null;
+          var sw = pal.querySelectorAll(".swatch");
+          for (var k = 0; k < sw.length; k++) sw[k].classList.remove("sel");
+          s.classList.add("sel");
+          clearStampSel();
+          setToolSel(brush > 16 ? "toolFat" : "toolThin");
+          sTap();
+        });
+        pal.appendChild(s);
+      })(i);
+    }
+  }
+  function clearStampSel() {
+    var st = $("stamps").querySelectorAll(".tool");
+    for (var i = 0; i < st.length; i++) st[i].classList.remove("sel");
+  }
+  function buildStamps() {
+    var box = $("stamps");
+    box.innerHTML = "";
+    for (var i = 0; i < STAMPS.length; i++) {
+      (function (ch) {
+        var t = el("div", "tool");
+        t.textContent = ch;
+        t.addEventListener("click", function () {
+          clearStampSel();
+          t.classList.add("sel");
+          mode = "stamp"; stampChar = ch;
+          setToolSel(null, false);
+          sTap();
+        });
+        box.appendChild(t);
+      })(STAMPS[i]);
+    }
+  }
+  function setToolSel(which) {
+    ["toolFat", "toolThin", "toolEraser"].forEach(function (id) {
+      $(id).classList.toggle("sel", id === which);
+    });
+  }
+
+  // ---------- wire everything ----------
+  function reset() {
+    frames = []; undoStacks = []; current = 0;
+    addFrame(null);
+    color = COLORS[0]; brush = 26; mode = "draw"; stampChar = null;
+    buildPalette(); clearStampSel(); setToolSel("toolFat");
+    render(); renderStrip();
+  }
+
+  var started = false;
+  function init() {
+    if (started) return;       // never wire the buttons twice
+    started = true;
+    setupView();
+    buildPalette();
+    buildStamps();
+    reset();
+
+    view.addEventListener("mousedown", onDown);
+    view.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    view.addEventListener("touchstart", onDown, { passive: false });
+    view.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onUp);
+
+    $("toolFat").addEventListener("click", function () { mode = "draw"; brush = 26; stampChar = null; clearStampSel(); setToolSel("toolFat"); sTap(); });
+    $("toolThin").addEventListener("click", function () { mode = "draw"; brush = 10; stampChar = null; clearStampSel(); setToolSel("toolThin"); sTap(); });
+    $("toolEraser").addEventListener("click", function () { mode = "erase"; stampChar = null; clearStampSel(); setToolSel("toolEraser"); sTap(); });
+    $("undoBtn").addEventListener("click", undo);
+
+    var speeds = document.querySelectorAll("[data-fps]");
+    for (var i = 0; i < speeds.length; i++) {
+      (function (node) {
+        node.addEventListener("click", function () {
+          fps = parseInt(node.getAttribute("data-fps"), 10);
+          for (var k = 0; k < speeds.length; k++) speeds[k].classList.remove("sel");
+          node.classList.add("sel");
+          sTap();
+        });
+      })(speeds[i]);
+    }
+
+    $("startBtn").addEventListener("click", function () { audio(); sSparkle(); show("studio"); setupView(); render(); renderStrip(); });
+    $("playBtn").addEventListener("click", function () { playing ? stopPlay() : startPlay(); });
+
+    $("doneBtn").addEventListener("click", function () {
+      stopPlay();
+      show("finished");
+      $("doneLine").textContent = frames.length > 1
+        ? "Your movie has " + frames.length + " pages. Look at it go! 🎉"
+        : "Here is your beautiful drawing! 🎉";
+      startShow();
+      sFanfare();
+      burst(90);
+      setTimeout(function () { burst(60); }, 700);
+    });
+
+    $("backBtn").addEventListener("click", function () { stopShow(); show("studio"); render(); renderStrip(); sTap(); });
+    $("againBtn").addEventListener("click", function () { stopShow(); reset(); show("studio"); sSparkle(); burst(30); });
+
+    $("saveBtn").addEventListener("click", function () {
+      var sheet = buildSheet();
+      var a = document.createElement("a");
+      a.download = "my-flipbook.png";
+      a.href = sheet.toDataURL("image/png");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      sSparkle(); burst(30);
+    });
+
+    $("printBtn").addEventListener("click", function () {
+      var sheet = buildSheet();
+      var area = $("printArea");
+      area.innerHTML = "";
+      var img = document.createElement("img");
+      img.src = sheet.toDataURL("image/png");
+      area.appendChild(img);
+      sSparkle();
+      setTimeout(function () { window.print(); }, 250);
+    });
+
+    window.addEventListener("resize", function () { if (conf.classList.contains("on")) sizeConf(); });
+  }
+
+  // expose a few bits for headless testing
+  window.__flip = {
+    init: init,
+    addFrame: function () { return addFrame(frames[frames.length - 1]); },
+    frameCount: function () { return frames.length; },
+    setCurrent: function (i) { current = i; },
+    stroke: stroke,
+    pushUndo: pushUndo,
+    undo: undo,
+    undoDepth: function () { return undoStacks[current].length; },
+    buildSheet: buildSheet,
+    reset: reset,
+    render: render
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
