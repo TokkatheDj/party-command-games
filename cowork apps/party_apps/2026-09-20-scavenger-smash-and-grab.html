@@ -1,0 +1,1193 @@
+<!-- CONCEPT: SCAVENGER/PHYSICAL - "Smash & Grab": a get-off-the-sofa heist party game where the Fence posts an order ("something older than everyone here"), the room scatters to grab a real object and slams their tile to check back in - but WHICH of the six rules on the Fence's wishlist actually scores is kept secret until every crook is home, so you have to hedge between fastest, smallest, shiniest, unique and genuinely-matching instead of just sprinting. 126 orders, live check-in order, host-tapped judging, double-points final job | Players: 3-10 | ~15-25 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Smash &amp; Grab</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+}
+
+:root {
+  --bg: #0b0d14;
+  --panel: #151a27;
+  --panel2: #1d2434;
+  --line: #2b3448;
+  --gold: #ffc94d;
+  --gold2: #ff9d2e;
+  --teal: #38e0c8;
+  --red: #ff5470;
+  --violet: #9b7cff;
+  --green: #4ade80;
+  --ink: #eef2ff;
+  --dim: #8b97b5;
+  --r: 18px;
+  --pad: clamp(12px, 3.5vw, 20px);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: clamp(15px, 4vw, 18px);
+  line-height: 1.4;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255,201,77,.10), transparent 45%),
+    radial-gradient(circle at 84% 92%, rgba(56,224,200,.09), transparent 46%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app { position: relative; z-index: 1; height: 100%; }
+
+.screen {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--pad);
+  gap: 12px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.screen.active { display: flex; }
+
+/* ---------- shared bits ---------- */
+h1 {
+  margin: 0;
+  font-size: clamp(30px, 10.5vw, 54px);
+  font-weight: 900;
+  letter-spacing: -1px;
+  line-height: .95;
+  text-align: center;
+  background: linear-gradient(90deg, var(--gold), var(--red));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tagline {
+  margin: 0; text-align: center; color: var(--dim);
+  font-size: clamp(12px, 3.4vw, 15px); letter-spacing: .5px;
+}
+.eyebrow {
+  text-align: center; color: var(--gold);
+  font-size: clamp(11px, 3vw, 13px);
+  font-weight: 800; letter-spacing: 2.5px; text-transform: uppercase;
+}
+
+button {
+  font-family: inherit; font-size: inherit; color: inherit;
+  border: none; background: none; cursor: pointer;
+}
+
+.btn {
+  min-height: 58px;
+  border-radius: var(--r);
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  color: #1a1204;
+  font-weight: 900;
+  font-size: clamp(17px, 4.8vw, 21px);
+  letter-spacing: 1px;
+  padding: 14px 20px;
+  width: 100%;
+  box-shadow: 0 6px 0 rgba(0,0,0,.35);
+  transition: transform .08s, box-shadow .08s;
+}
+.btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.35); }
+.btn.ghost {
+  background: var(--panel2);
+  color: var(--ink);
+  border: 2px solid var(--line);
+  box-shadow: none;
+  font-size: clamp(14px, 4vw, 17px);
+  min-height: 50px;
+}
+.btn.ghost:active { transform: translateY(2px); }
+.btn.teal { background: linear-gradient(135deg, var(--teal), #1fa891); color: #06201c; }
+.btn:disabled { opacity: .35; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: var(--pad);
+}
+
+.spacer { flex: 1 1 auto; min-height: 4px; }
+.row { display: flex; gap: 10px; }
+.row > * { flex: 1; }
+
+/* ---------- setup ---------- */
+#crewList { display: flex; flex-direction: column; gap: 8px; }
+.crew-row { display: flex; gap: 8px; align-items: center; }
+.crew-row input {
+  flex: 1; min-height: 50px;
+  background: var(--panel2);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: clamp(15px, 4.2vw, 18px);
+  padding: 0 14px;
+  user-select: text; -webkit-user-select: text;
+}
+.crew-row input:focus { outline: none; border-color: var(--gold); }
+.crew-del {
+  width: 48px; min-height: 50px;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 2px solid var(--line);
+  color: var(--red);
+  font-size: 22px; font-weight: 900;
+}
+.opt-group { display: flex; flex-direction: column; gap: 8px; }
+.opt-label {
+  font-size: clamp(11px, 3vw, 13px);
+  letter-spacing: 1.6px; text-transform: uppercase;
+  color: var(--dim); font-weight: 800;
+}
+.seg { display: flex; gap: 8px; }
+.seg button {
+  flex: 1; min-height: 52px;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 2px solid var(--line);
+  color: var(--dim);
+  font-weight: 800;
+  font-size: clamp(14px, 3.8vw, 17px);
+}
+.seg button.on {
+  background: rgba(255,201,77,.14);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+/* ---------- wishlist ---------- */
+.wishlist {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.wish {
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 2px solid var(--line);
+  padding: 8px 2px 6px;
+  text-align: center;
+  transition: all .3s;
+}
+.wish .ic { font-size: clamp(18px, 5.2vw, 24px); line-height: 1.1; }
+.wish .nm {
+  font-size: clamp(7px, 2.1vw, 9px);
+  color: var(--dim);
+  font-weight: 800;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  margin-top: 3px;
+  line-height: 1.15;
+}
+.wish.lit {
+  background: rgba(255,201,77,.18);
+  border-color: var(--gold);
+  transform: scale(1.08);
+  box-shadow: 0 0 22px rgba(255,201,77,.4);
+}
+.wish.lit .nm { color: var(--gold); }
+.wish.dud { opacity: .28; }
+
+/* ---------- order card ---------- */
+.order {
+  background: linear-gradient(160deg, var(--panel2), #121726);
+  border: 2px dashed rgba(255,201,77,.4);
+  border-radius: var(--r);
+  padding: clamp(18px, 5vw, 28px) var(--pad);
+  text-align: center;
+}
+.order .from {
+  font-size: clamp(10px, 2.9vw, 12px);
+  letter-spacing: 2.5px; text-transform: uppercase;
+  color: var(--gold); font-weight: 800; margin-bottom: 10px;
+}
+.order .txt {
+  font-size: clamp(22px, 7vw, 34px);
+  font-weight: 900; line-height: 1.15;
+}
+
+/* ---------- hunt ---------- */
+#huntOrder {
+  flex: 1;
+  text-align: center;
+  color: var(--ink);
+  font-size: clamp(16px, 4.6vw, 21px);
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.2;
+}
+
+#clock {
+  font-size: clamp(64px, 26vw, 150px);
+  font-weight: 900;
+  text-align: center;
+  line-height: .9;
+  font-variant-numeric: tabular-nums;
+  color: var(--teal);
+  transition: color .2s;
+}
+#clock.warn { color: var(--gold); }
+#clock.panic { color: var(--red); animation: pulse .45s infinite; }
+@keyframes pulse { 50% { transform: scale(1.07); } }
+
+#tiles {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+@media (min-width: 620px) { #tiles { grid-template-columns: repeat(3, 1fr); } }
+
+#resolveTiles { display: grid; grid-template-columns: 1fr; gap: 8px; }
+@media (min-width: 620px) { #resolveTiles { grid-template-columns: repeat(2, 1fr); } }
+
+.tile {
+  min-height: 64px;
+  border-radius: 14px;
+  background: var(--panel2);
+  border: 2px solid var(--line);
+  padding: 8px 10px;
+  display: flex; align-items: center; gap: 8px;
+  text-align: left;
+  font-weight: 800;
+  font-size: clamp(13px, 3.6vw, 16px);
+  transition: all .15s;
+  overflow: hidden;
+}
+.tile .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile .rank {
+  width: 30px; height: 30px; flex: none;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 900;
+  background: var(--line); color: var(--dim);
+}
+.tile.in {
+  background: rgba(56,224,200,.14);
+  border-color: var(--teal);
+}
+.tile.in .rank { background: var(--teal); color: #06201c; }
+.tile.out { opacity: .45; }
+.tile:active { transform: scale(.97); }
+
+/* resolve variants */
+.tile.pick { border-color: var(--violet); }
+.tile.chosen {
+  background: rgba(255,201,77,.18);
+  border-color: var(--gold);
+  box-shadow: 0 0 18px rgba(255,201,77,.3);
+}
+.tile.marked {
+  background: rgba(255,84,112,.15);
+  border-color: var(--red);
+  opacity: 1;
+}
+.tile.marked .rank { background: var(--red); color: #2a060d; }
+.tile.absent { opacity: .3; }
+
+/* ---------- reveal ---------- */
+#revealWrap { text-align: center; }
+#revealIcon {
+  font-size: clamp(56px, 20vw, 110px);
+  line-height: 1;
+  animation: pop .45s cubic-bezier(.2,1.5,.4,1);
+}
+@keyframes pop { 0% { transform: scale(0) rotate(-25deg); } 100% { transform: scale(1) rotate(0); } }
+#revealName {
+  font-size: clamp(26px, 8.5vw, 42px);
+  font-weight: 900;
+  background: linear-gradient(90deg, var(--gold), var(--teal));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  margin: 6px 0;
+  line-height: 1.05;
+}
+#revealRule {
+  color: var(--ink);
+  font-size: clamp(15px, 4.4vw, 19px);
+  opacity: .9;
+}
+
+/* ---------- scores ---------- */
+.score-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px;
+  border-radius: 14px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-weight: 800;
+  font-size: clamp(14px, 3.9vw, 17px);
+}
+.score-row .pos { width: 26px; color: var(--dim); font-size: 13px; flex: none; }
+.score-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.score-row .delta {
+  color: var(--green); font-size: clamp(12px, 3.3vw, 14px);
+  min-width: 34px; text-align: right;
+}
+.score-row .delta.zero { color: var(--dim); opacity: .6; }
+.score-row .tot {
+  color: var(--gold); min-width: 42px; text-align: right;
+  font-size: clamp(16px, 4.6vw, 20px); font-weight: 900;
+}
+.score-row.lead { border-color: var(--gold); background: rgba(255,201,77,.1); }
+
+#scoreList, #finalList { display: flex; flex-direction: column; gap: 7px; }
+
+#winner {
+  text-align: center;
+  font-size: clamp(30px, 9.5vw, 46px);
+  font-weight: 900;
+  background: linear-gradient(90deg, var(--gold), var(--red));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  line-height: 1.05;
+}
+
+/* ---------- misc ---------- */
+.hint {
+  text-align: center; color: var(--dim);
+  font-size: clamp(12px, 3.3vw, 14px);
+  line-height: 1.45;
+}
+.hint b { color: var(--teal); }
+
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px;
+  font-size: clamp(11px, 3vw, 13px);
+  font-weight: 800; letter-spacing: 1.5px;
+  color: var(--dim); text-transform: uppercase;
+}
+.icon-btn {
+  width: 44px; height: 44px; flex: none;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-size: 18px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.modal {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(6,8,14,.93);
+  padding: var(--pad);
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+.modal.active { display: flex; }
+.modal h2 {
+  margin: 0; font-size: clamp(22px, 6.5vw, 30px); font-weight: 900;
+  color: var(--gold);
+}
+.modal p { margin: 0 0 10px; color: var(--ink); font-size: clamp(14px, 3.9vw, 16px); }
+.modal .rule-line {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 9px 0; border-bottom: 1px solid var(--line);
+  font-size: clamp(13px, 3.6vw, 15px);
+}
+.modal .rule-line .ic { font-size: 22px; flex: none; width: 30px; text-align: center; }
+.modal .rule-line b { color: var(--teal); }
+.warn-box {
+  background: rgba(255,84,112,.1);
+  border: 1px solid rgba(255,84,112,.4);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #ffc9d3;
+  font-size: clamp(12px, 3.4vw, 14px);
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ SETUP ============ -->
+  <section id="scr-setup" class="screen active">
+    <div class="spacer" style="max-height:10px"></div>
+    <h1>SMASH<br>&amp; GRAB</h1>
+    <p class="tagline">THE ROOM IS THE VAULT &middot; 3&ndash;10 CROOKS</p>
+    <div class="card">
+      <div class="opt-label" style="margin-bottom:8px">The Crew</div>
+      <div id="crewList"></div>
+      <button class="btn ghost" id="addCrew" style="margin-top:10px">+ ADD CROOK</button>
+    </div>
+    <div class="card opt-group">
+      <div>
+        <div class="opt-label">Time on the job</div>
+        <div class="seg" id="segTime" style="margin-top:8px">
+          <button data-sec="30">30s</button>
+          <button data-sec="45" class="on">45s</button>
+          <button data-sec="60">60s</button>
+        </div>
+      </div>
+      <div style="margin-top:6px">
+        <div class="opt-label">How many jobs</div>
+        <div class="seg" id="segRounds" style="margin-top:8px">
+          <button data-rounds="4">4</button>
+          <button data-rounds="6" class="on">6</button>
+          <button data-rounds="8">8</button>
+        </div>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="startBtn">PULL THE JOB</button>
+    <button class="btn ghost" id="howBtn">HOW TO PLAY</button>
+  </section>
+
+  <!-- ============ BRIEF ============ -->
+  <section id="scr-brief" class="screen">
+    <div class="topbar">
+      <span id="briefJob">JOB 1 OF 6</span>
+      <button class="icon-btn" id="muteBrief">🔊</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="order">
+      <div class="from" id="briefFrom">THE FENCE WANTS</div>
+      <div class="txt" id="briefOrder">&hellip;</div>
+    </div>
+    <div>
+      <div class="opt-label" style="text-align:center;margin-bottom:8px">
+        One of these six decides the winner &mdash; you won&rsquo;t know which
+      </div>
+      <div class="wishlist" id="briefWishlist"></div>
+    </div>
+    <p class="hint">Grab <b>ONE real object</b> from this room, get back, and slam your name.</p>
+    <div class="spacer"></div>
+    <button class="btn" id="goBtn">GO GO GO</button>
+  </section>
+
+  <!-- ============ HUNT ============ -->
+  <section id="scr-hunt" class="screen">
+    <div class="topbar">
+      <span id="huntOrder">&hellip;</span>
+    </div>
+    <div id="clock">45</div>
+    <div class="wishlist" id="huntWishlist"></div>
+    <div id="tiles"></div>
+    <div class="spacer"></div>
+    <div class="row">
+      <button class="btn ghost" id="undoBtn">UNDO</button>
+      <button class="btn ghost" id="allInBtn">ALL IN &rarr;</button>
+    </div>
+  </section>
+
+  <!-- ============ REVEAL ============ -->
+  <section id="scr-reveal" class="screen">
+    <div class="spacer"></div>
+    <div id="revealWrap">
+      <div class="eyebrow">THE FENCE ONLY WANTED&hellip;</div>
+      <div id="revealIcon">🚪</div>
+      <div id="revealName">FIRST THROUGH THE DOOR</div>
+      <div id="revealRule">Fastest crook back wins it.</div>
+      <div class="wishlist" id="revealWishlist" style="margin-top:20px"></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="revealNext">SETTLE UP</button>
+  </section>
+
+  <!-- ============ RESOLVE ============ -->
+  <section id="scr-resolve" class="screen">
+    <div class="topbar"><span id="resolveJob">JOB 1</span></div>
+    <div class="eyebrow" id="resolveTitle">ONE OF A KIND</div>
+    <p class="hint" id="resolveHint">Tap anyone holding the same thing as someone else.</p>
+    <div id="resolveTiles"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="resolveDone">LOCK IT IN</button>
+  </section>
+
+  <!-- ============ SCORE ============ -->
+  <section id="scr-score" class="screen">
+    <div class="topbar"><span id="scoreJob">AFTER JOB 1</span></div>
+    <div class="eyebrow" id="scoreTwist">FIRST THROUGH THE DOOR</div>
+    <div id="scoreList"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="nextJobBtn">NEXT JOB</button>
+  </section>
+
+  <!-- ============ FINAL ============ -->
+  <section id="scr-final" class="screen">
+    <div class="spacer"></div>
+    <div class="eyebrow">THE JOB IS DONE</div>
+    <div style="text-align:center;font-size:clamp(48px,16vw,84px);line-height:1">👑</div>
+    <div id="winner">&hellip;</div>
+    <div id="finalList"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="againBtn">SAME CREW, NEW JOBS</button>
+    <button class="btn ghost" id="newCrewBtn">CHANGE THE CREW</button>
+  </section>
+
+</div>
+
+<!-- ============ HOW TO PLAY ============ -->
+<div class="modal" id="howModal">
+  <h2>HOW TO PLAY</h2>
+  <p>One phone, propped where everyone can see it. Everybody plays at once.</p>
+  <p><b style="color:var(--gold)">1.</b> The Fence posts an order &mdash; <i>&ldquo;something older than everyone here&rdquo;</i>.</p>
+  <p><b style="color:var(--gold)">2.</b> Everyone scatters and grabs <b>one real object</b> from the room before the clock hits zero, comes back and taps their own name to check in. Your check-in position is recorded.</p>
+  <p><b style="color:var(--gold)">3.</b> <b>Only then</b> does the Fence say which of the six rules actually paid. That is the whole game: you are betting on a rule you cannot see.</p>
+  <div id="rulesList"></div>
+  <div class="warn-box">
+    House rules: nothing sharp, hot, breakable, or belonging to someone who isn&rsquo;t playing. Stay inside. Put it all back afterwards.
+  </div>
+  <button class="btn" id="howClose">GOT IT</button>
+</div>
+
+<script>
+/* ============ THE FENCE'S ORDER BOOK ============ */
+const ORDERS = [
+  "something older than everyone here",
+  "something that fits inside a shoe",
+  "something with writing on it",
+  "something you'd grab first in a fire",
+  "something with a battery in it",
+  "something soft enough to sleep on",
+  "something perfectly round",
+  "something that makes a noise",
+  "something blue",
+  "something with a hole in it",
+  "something that folds",
+  "something made of wood",
+  "something you've owned for years",
+  "something that could hold water",
+  "something with a button on it",
+  "something shiny",
+  "something that smells of anything at all",
+  "something with a logo on it",
+  "something you use every single day",
+  "something that has never been washed",
+  "something with a lid",
+  "something that came free with something else",
+  "something with a number printed on it",
+  "something you could wear",
+  "something heavier than it looks",
+  "something lighter than it looks",
+  "something that belongs in a different room",
+  "something with a string or a cord",
+  "something useless on a desert island",
+  "something you'd hide before a guest arrived",
+  "something that was a gift",
+  "something with more than one colour on it",
+  "something completely black",
+  "something you can see through",
+  "something that came from another country",
+  "something you could use as a hat",
+  "something with a face on it",
+  "something small enough to hide in your fist",
+  "something you could sell for a fiver",
+  "something with instructions written on it",
+  "something that is one half of a pair",
+  "something bent out of shape",
+  "something you've been meaning to throw away",
+  "something with a screen",
+  "something that rattles",
+  "something you could write with",
+  "something that is exactly one colour",
+  "something older than the youngest player",
+  "something you'd want in a pillow fight",
+  "something rectangular",
+  "something with a zip or a clasp",
+  "something you'd never lend anyone",
+  "something you own two of",
+  "something that badly needs cleaning",
+  "something with a date on it",
+  "something you could use as a bookmark",
+  "something with a spring in it",
+  "something that fits in your pocket",
+  "something that would look expensive to a stranger",
+  "something with a brand name you can read aloud",
+  "something that makes you look organised",
+  "something that has been in a car",
+  "something you could safely stand on",
+  "something you can see your reflection in",
+  "something warm to the touch",
+  "something cold to the touch",
+  "something you could hide a secret note inside",
+  "something cheap that you love anyway",
+  "something that would baffle a time traveller",
+  "something you could use as a doorstop",
+  "something with a picture of a person on it",
+  "something you have never once used",
+  "something with a switch",
+  "something you could roll across the floor",
+  "something with fabric on it",
+  "something that is mostly air",
+  "something you could balance on your head",
+  "something nobody else will think of",
+  "something that would fit in a matchbox",
+  "something with a scratch or a dent",
+  "something you could use as a coaster",
+  "something with a hinge",
+  "something plastic",
+  "something metal",
+  "something for a time capsule",
+  "something that helps you reach a high shelf",
+  "something with an animal on it",
+  "something you'd be genuinely sad to lose",
+  "something with a smell nobody likes",
+  "something you could fan yourself with",
+  "something that arrived in the post",
+  "something with a handle",
+  "something that would make a terrible gift",
+  "something that props a book open",
+  "something that has changed colour with age",
+  "something safe to throw across the room",
+  "something with dust on it",
+  "something you could make music with",
+  "something with a hidden pocket or compartment",
+  "something you could measure with",
+  "something that says what it is on the front",
+  "something containing more than ten of the same thing",
+  "something you'd take camping",
+  "something you'd never take camping",
+  "something that could be a tiny table",
+  "something with a curved edge",
+  "something that runs out eventually",
+  "something that came as part of a set",
+  "something you can squeeze",
+  "something that fits inside something else you're carrying",
+  "something you could hide behind",
+  "something with a stain on it",
+  "something you could tie in a knot",
+  "something you could scratch your back with",
+  "something the same size as your hand",
+  "something you'd rescue before your phone",
+  "something that has been to another city",
+  "something that makes you laugh",
+  "something with a corner missing",
+  "something two people could share",
+  "something that was expensive and was worth it",
+  "something you'd put on a shelf to show off",
+  "something that has a smell you actually like",
+  "something you could stack three of",
+  "something that would survive being dropped",
+  "something nobody in this room owns but you"
+];
+
+/* ============ THE WISHLIST — one of these six pays out ============ */
+const TWISTS = [
+  { id: 'first', ic: '🚪', nm: 'FIRST THROUGH THE DOOR', short: 'FIRST', kind: 'order',
+    rule: "Speed was all that mattered. Earliest crook back takes the lot.",
+    hint: "Scored automatically from who checked in first." },
+  { id: 'last', ic: '🐌', nm: 'LAST ONE OUT', short: 'LAST', kind: 'order',
+    rule: "The Fence hates a show-off. The LAST crook back scores biggest.",
+    hint: "Scored automatically from who dawdled the longest." },
+  { id: 'small', ic: '🤏', nm: 'POCKET SIZED', short: 'SMALLEST', kind: 'pick',
+    rule: "It has to fit in a coat pocket. Smallest haul in the room wins.",
+    hint: "Hold them up together — tap the crook with the SMALLEST object." },
+  { id: 'shiny', ic: '✨', nm: 'THE SHINIEST THING', short: 'SHINIEST', kind: 'pick',
+    rule: "The Fence only buys what glitters. The best-looking haul wins.",
+    hint: "Let the room shout — tap the crook with the best-looking loot." },
+  { id: 'unique', ic: '❄️', nm: 'ONE OF A KIND', short: 'UNIQUE', kind: 'mark',
+    rule: "Doubles are worthless. Grab the same kind of thing as someone else and you both walk away empty.",
+    hint: "Tap anyone holding the SAME KIND of thing as another crook. Everyone left standing scores." },
+  { id: 'picky', ic: '🧐', nm: 'THE FENCE IS PICKY', short: 'STRICT', kind: 'mark',
+    rule: "Every haul gets inspected. Anything that doesn't truly match the order is thrown straight out.",
+    hint: "Tap anyone whose object doesn't really match the order. Everyone left standing scores." }
+];
+
+const PTS = { first: 5, second: 3, third: 2, backOk: 1, survivor: 3 };
+
+/* ============ CORE ============ */
+const $ = id => document.getElementById(id);
+const LS = 'cowork-smashandgrab-';
+
+const S = {
+  players: [],      // { name, score, delta }
+  round: 0,
+  totalRounds: 6,
+  huntSeconds: 45,
+  deck: [],
+  order: '',
+  twist: null,
+  checkIn: [],      // player indices, in arrival order
+  marked: new Set(),
+  picked: null,
+  muted: false,
+  forcedTwist: null
+};
+
+const shuffle = a => {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+const isFinalJob = () => S.round === S.totalRounds;
+const mult = () => (isFinalJob() ? 2 : 1);
+
+function show(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $('scr-' + name).classList.add('active');
+  $('scr-' + name).scrollTop = 0;
+}
+
+/* ---- audio ---- */
+let AC = null;
+function ac() {
+  if (!AC) {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (C) AC = new C();
+  }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function beep(freq, dur, type = 'square', vol = 0.14) {
+  if (S.muted) return;
+  const c = ac(); if (!c) return;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, c.currentTime);
+  g.gain.linearRampToValueAtTime(vol, c.currentTime + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(); o.stop(c.currentTime + dur + 0.02);
+}
+function noise(dur = 0.4, vol = 0.1) {
+  if (S.muted) return;
+  const c = ac(); if (!c) return;
+  const n = Math.floor(c.sampleRate * dur);
+  const buf = c.createBuffer(1, n, c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = c.createBufferSource(), g = c.createGain();
+  src.buffer = buf; g.gain.value = vol;
+  src.connect(g); g.connect(c.destination);
+  src.start();
+}
+const sfx = {
+  tick:    () => beep(680, 0.07, 'square', 0.1),
+  panic:   () => beep(940, 0.09, 'square', 0.16),
+  checkin: () => { beep(520, 0.07, 'triangle', 0.16); setTimeout(() => beep(780, 0.1, 'triangle', 0.14), 60); },
+  buzz:    () => { beep(150, 0.5, 'sawtooth', 0.18); noise(0.5, 0.08); },
+  drum:    () => noise(0.55, 0.13),
+  reveal:  () => { [440, 587, 784].forEach((f, i) => setTimeout(() => beep(f, 0.22, 'triangle', 0.15), i * 110)); },
+  score:   () => beep(880, 0.12, 'sine', 0.13),
+  win:     () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.3, 'triangle', 0.16), i * 140)); }
+};
+function setMute(m) {
+  S.muted = m;
+  document.querySelectorAll('#muteBrief').forEach(b => b.textContent = m ? '🔇' : '🔊');
+  try { localStorage.setItem(LS + 'muted', m ? '1' : '0'); } catch (e) {}
+}
+
+/* ---- wishlist rendering ---- */
+function renderWishlist(el, litId) {
+  el.innerHTML = '';
+  TWISTS.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'wish' + (litId ? (t.id === litId ? ' lit' : ' dud') : '');
+    d.innerHTML = '<div class="ic">' + t.ic + '</div><div class="nm">' + t.short + '</div>';
+    el.appendChild(d);
+  });
+}
+
+/* ============ SETUP ============ */
+function loadCrew() {
+  let names = null;
+  try { names = JSON.parse(localStorage.getItem(LS + 'crew') || 'null'); } catch (e) {}
+  if (!Array.isArray(names) || names.length < 3) names = ['', '', ''];
+  return names.slice(0, 10);
+}
+function saveCrew() {
+  const names = [...document.querySelectorAll('#crewList input')].map(i => i.value);
+  try { localStorage.setItem(LS + 'crew', JSON.stringify(names)); } catch (e) {}
+}
+function renderCrew(names) {
+  const box = $('crewList');
+  box.innerHTML = '';
+  names.forEach((n, i) => {
+    const row = document.createElement('div');
+    row.className = 'crew-row';
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.maxLength = 14;
+    inp.value = n;
+    inp.placeholder = 'Crook ' + (i + 1);
+    inp.addEventListener('input', saveCrew);
+    const del = document.createElement('button');
+    del.className = 'crew-del';
+    del.textContent = '×';
+    del.setAttribute('aria-label', 'Remove crook');
+    del.addEventListener('click', () => {
+      const cur = [...document.querySelectorAll('#crewList input')].map(x => x.value);
+      if (cur.length <= 3) return;
+      cur.splice(i, 1);
+      renderCrew(cur);
+      saveCrew();
+    });
+    row.appendChild(inp);
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+  $('addCrew').disabled = names.length >= 10;
+}
+
+$('addCrew').addEventListener('click', () => {
+  const cur = [...document.querySelectorAll('#crewList input')].map(x => x.value);
+  if (cur.length >= 10) return;
+  cur.push('');
+  renderCrew(cur);
+  saveCrew();
+});
+
+function segWire(id, attr, apply) {
+  $(id).addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    [...$(id).children].forEach(c => c.classList.remove('on'));
+    b.classList.add('on');
+    apply(parseInt(b.dataset[attr], 10));
+  });
+}
+segWire('segTime', 'sec', v => { S.huntSeconds = v; try { localStorage.setItem(LS + 'sec', v); } catch (e) {} });
+segWire('segRounds', 'rounds', v => { S.totalRounds = v; try { localStorage.setItem(LS + 'rounds', v); } catch (e) {} });
+
+function restoreSeg(id, attr, val) {
+  const b = [...$(id).children].find(c => parseInt(c.dataset[attr], 10) === val);
+  if (b) { [...$(id).children].forEach(c => c.classList.remove('on')); b.classList.add('on'); }
+}
+
+$('startBtn').addEventListener('click', () => {
+  ac();
+  const names = [...document.querySelectorAll('#crewList input')]
+    .map((inp, i) => (inp.value.trim() || 'Crook ' + (i + 1)));
+  S.players = names.map(n => ({ name: n, score: 0, delta: 0 }));
+  S.round = 0;
+  S.deck = shuffle(ORDERS.slice());
+  saveCrew();
+  nextJob();
+});
+
+/* ---- how to play ---- */
+(function buildRules() {
+  const box = $('rulesList');
+  TWISTS.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'rule-line';
+    d.innerHTML = '<div class="ic">' + t.ic + '</div><div><b>' + t.nm + '</b><br>' + t.rule + '</div>';
+    box.appendChild(d);
+  });
+})();
+$('howBtn').addEventListener('click', () => $('howModal').classList.add('active'));
+$('howClose').addEventListener('click', () => $('howModal').classList.remove('active'));
+$('muteBrief').addEventListener('click', () => setMute(!S.muted));
+
+/* ============ BRIEF ============ */
+function nextJob() {
+  S.round++;
+  if (!S.deck.length) S.deck = shuffle(ORDERS.slice());
+  S.order = S.deck.pop();
+  S.twist = S.forcedTwist
+    ? (TWISTS.find(t => t.id === S.forcedTwist) || TWISTS[0])
+    : TWISTS[Math.floor(Math.random() * TWISTS.length)];
+  S.checkIn = [];
+  S.marked = new Set();
+  S.picked = null;
+  S.players.forEach(p => p.delta = 0);
+
+  $('briefJob').textContent = isFinalJob()
+    ? 'FINAL JOB · DOUBLE PAY'
+    : 'JOB ' + S.round + ' OF ' + S.totalRounds;
+  $('briefFrom').textContent = isFinalJob() ? 'THE BIG ONE — THE FENCE WANTS' : 'THE FENCE WANTS';
+  $('briefOrder').textContent = S.order;
+  renderWishlist($('briefWishlist'), null);
+  show('brief');
+}
+
+$('goBtn').addEventListener('click', startHunt);
+
+/* ============ HUNT ============ */
+let timerId = null, endAt = 0, lastWhole = -1, huntOver = true;
+
+function renderTiles() {
+  const box = $('tiles');
+  box.innerHTML = '';
+  S.players.forEach((p, i) => {
+    const pos = S.checkIn.indexOf(i);
+    const b = document.createElement('button');
+    b.className = 'tile' + (pos >= 0 ? ' in' : '');
+    b.dataset.idx = i;
+    b.innerHTML = '<div class="rank">' + (pos >= 0 ? (pos + 1) : '·') + '</div>' +
+                  '<div class="nm"></div>';
+    b.querySelector('.nm').textContent = p.name;
+    b.addEventListener('click', () => checkIn(i));
+    box.appendChild(b);
+  });
+  $('undoBtn').disabled = S.checkIn.length === 0;
+}
+
+function checkIn(i) {
+  if (S.checkIn.includes(i)) return;
+  S.checkIn.push(i);
+  sfx.checkin();
+  renderTiles();
+  if (S.checkIn.length === S.players.length) { stopTimer(); setTimeout(endHunt, 450); }
+}
+
+$('undoBtn').addEventListener('click', () => {
+  if (!S.checkIn.length) return;
+  S.checkIn.pop();
+  beep(300, 0.08, 'sine', 0.12);
+  renderTiles();
+});
+$('allInBtn').addEventListener('click', endHunt);
+
+function startHunt() {
+  ac();
+  $('huntOrder').textContent = S.order;
+  renderWishlist($('huntWishlist'), null);
+  renderTiles();
+  show('hunt');
+
+  endAt = Date.now() + S.huntSeconds * 1000;
+  lastWhole = -1;
+  huntOver = false;
+  const clock = $('clock');
+  clock.className = '';
+
+  const tick = () => {
+    const left = Math.max(0, endAt - Date.now());
+    const secs = Math.ceil(left / 1000);
+    if (secs !== lastWhole) {
+      lastWhole = secs;
+      clock.textContent = secs;
+      clock.className = secs <= 5 ? 'panic' : (secs <= 10 ? 'warn' : '');
+      if (secs <= 5 && secs > 0) sfx.panic();
+      else if (secs <= 10 && secs > 0) sfx.tick();
+    }
+    if (left <= 0) { endHunt(); return; }
+    timerId = requestAnimationFrame(tick);
+  };
+  timerId = requestAnimationFrame(tick);
+}
+
+function stopTimer() {
+  if (timerId) { cancelAnimationFrame(timerId); timerId = null; }
+}
+
+function endHunt() {
+  if (huntOver) return;
+  huntOver = true;
+  stopTimer();
+  sfx.buzz();
+  goReveal();
+}
+
+/* ============ REVEAL ============ */
+function goReveal() {
+  const t = S.twist;
+  $('revealIcon').textContent = t.ic;
+  $('revealName').textContent = t.nm;
+  $('revealRule').textContent = t.rule;
+  renderWishlist($('revealWishlist'), t.id);
+  show('reveal');
+  sfx.drum();
+  setTimeout(sfx.reveal, 350);
+
+  // nobody made it back at all
+  if (S.checkIn.length === 0) {
+    $('revealName').textContent = 'THE FENCE GOT NOTHING';
+    $('revealIcon').textContent = '🚫';
+    $('revealRule').textContent = 'Not one crook made it back in time. No points, no questions.';
+    $('revealNext').textContent = 'HANG YOUR HEADS';
+  } else {
+    $('revealNext').textContent = 'SETTLE UP';
+  }
+}
+
+$('revealNext').addEventListener('click', () => {
+  if (S.checkIn.length === 0) { applyScores(); return; }
+  if (S.twist.kind === 'order') { applyScores(); return; }
+  startResolve();
+});
+
+/* ============ RESOLVE (host taps the judgement) ============ */
+function startResolve() {
+  const t = S.twist;
+  $('resolveJob').textContent = isFinalJob() ? 'FINAL JOB' : 'JOB ' + S.round;
+  $('resolveTitle').textContent = t.ic + '  ' + t.nm;
+  $('resolveHint').textContent = t.hint;
+  renderResolveTiles();
+  show('resolve');
+}
+
+function renderResolveTiles() {
+  const box = $('resolveTiles');
+  const t = S.twist;
+  box.innerHTML = '';
+  S.players.forEach((p, i) => {
+    const back = S.checkIn.includes(i);
+    const b = document.createElement('button');
+    let cls = 'tile';
+    if (!back) cls += ' absent';
+    else if (t.kind === 'pick') cls += (S.picked === i ? ' chosen' : ' pick');
+    else if (t.kind === 'mark') cls += (S.marked.has(i) ? ' marked' : ' in');
+    b.className = cls;
+    b.dataset.idx = i;
+    const badge = !back ? '✗' : (t.kind === 'mark' ? (S.marked.has(i) ? '✗' : '✓')
+                                                   : (S.picked === i ? '★' : '·'));
+    b.innerHTML = '<div class="rank">' + badge + '</div><div class="nm"></div>';
+    b.querySelector('.nm').textContent = p.name + (back ? '' : ' — empty handed');
+    if (back) {
+      b.addEventListener('click', () => {
+        if (t.kind === 'pick') {
+          S.picked = (S.picked === i ? null : i);
+          sfx.score();
+        } else {
+          if (S.marked.has(i)) S.marked.delete(i); else S.marked.add(i);
+          beep(S.marked.has(i) ? 240 : 560, 0.08, 'sine', 0.13);
+        }
+        renderResolveTiles();
+      });
+    }
+    box.appendChild(b);
+  });
+  $('resolveDone').disabled = (t.kind === 'pick' && S.picked === null);
+  $('resolveDone').textContent = (t.kind === 'pick' && S.picked === null)
+    ? 'PICK A WINNER' : 'LOCK IT IN';
+}
+
+$('resolveDone').addEventListener('click', applyScores);
+
+/* ============ SCORING ============ */
+function applyScores() {
+  const t = S.twist, m = mult();
+  S.players.forEach(p => p.delta = 0);
+
+  if (S.checkIn.length > 0) {
+    if (t.kind === 'order') {
+      const order = (t.id === 'last') ? S.checkIn.slice().reverse() : S.checkIn.slice();
+      order.forEach((pi, rank) => {
+        const v = rank === 0 ? PTS.first : rank === 1 ? PTS.second
+                : rank === 2 ? PTS.third : PTS.backOk;
+        S.players[pi].delta = v * m;
+      });
+    } else if (t.kind === 'pick') {
+      S.checkIn.forEach(pi => { S.players[pi].delta = PTS.backOk * m; });
+      if (S.picked !== null) S.players[S.picked].delta = PTS.first * m;
+    } else { // mark
+      S.checkIn.forEach(pi => {
+        S.players[pi].delta = S.marked.has(pi) ? 0 : PTS.survivor * m;
+      });
+    }
+  }
+
+  S.players.forEach(p => p.score += p.delta);
+  renderScores();
+}
+
+/* ============ SCOREBOARD ============ */
+function standings() {
+  return S.players
+    .map((p, i) => ({ ...p, i }))
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+}
+
+function renderScores() {
+  $('scoreJob').textContent = isFinalJob()
+    ? 'AFTER THE FINAL JOB' : 'AFTER JOB ' + S.round + ' OF ' + S.totalRounds;
+  $('scoreTwist').textContent = S.twist.ic + '  ' + S.twist.nm + (mult() > 1 ? '  ×2' : '');
+
+  const box = $('scoreList');
+  box.innerHTML = '';
+  const list = standings();
+  const top = list.length ? list[0].score : 0;
+  list.forEach((p, idx) => {
+    const row = document.createElement('div');
+    row.className = 'score-row' + (p.score === top && top > 0 ? ' lead' : '');
+    row.innerHTML = '<div class="pos">' + (idx + 1) + '</div>' +
+      '<div class="nm"></div>' +
+      '<div class="delta' + (p.delta ? '' : ' zero') + '">' + (p.delta ? '+' + p.delta : '—') + '</div>' +
+      '<div class="tot">' + p.score + '</div>';
+    row.querySelector('.nm').textContent = p.name;
+    box.appendChild(row);
+  });
+
+  $('nextJobBtn').textContent = isFinalJob() ? 'SPLIT THE HAUL' : 'NEXT JOB';
+  show('score');
+  sfx.score();
+}
+
+$('nextJobBtn').addEventListener('click', () => {
+  if (isFinalJob()) renderFinal(); else nextJob();
+});
+
+/* ============ FINAL ============ */
+function renderFinal() {
+  const list = standings();
+  const top = list[0].score;
+  const champs = list.filter(p => p.score === top);
+  $('winner').textContent = champs.length > 1
+    ? champs.map(p => p.name).join(' & ') + ' SPLIT IT'
+    : champs[0].name + ' TAKES THE HAUL';
+
+  const box = $('finalList');
+  box.innerHTML = '';
+  list.forEach((p, idx) => {
+    const row = document.createElement('div');
+    row.className = 'score-row' + (p.score === top ? ' lead' : '');
+    row.innerHTML = '<div class="pos">' + (idx + 1) + '</div>' +
+      '<div class="nm"></div><div class="tot">' + p.score + '</div>';
+    row.querySelector('.nm').textContent = p.name;
+    box.appendChild(row);
+  });
+  show('final');
+  sfx.win();
+}
+
+$('againBtn').addEventListener('click', () => {
+  S.players.forEach(p => { p.score = 0; p.delta = 0; });
+  S.round = 0;
+  S.deck = shuffle(ORDERS.slice());
+  nextJob();
+});
+$('newCrewBtn').addEventListener('click', () => {
+  stopTimer();
+  show('setup');
+});
+
+/* ============ BOOT ============ */
+(function boot() {
+  renderCrew(loadCrew());
+  let sec = parseInt(localStorage.getItem(LS + 'sec') || '45', 10);
+  let rnd = parseInt(localStorage.getItem(LS + 'rounds') || '6', 10);
+  if (![30, 45, 60].includes(sec)) sec = 45;
+  if (![4, 6, 8].includes(rnd)) rnd = 6;
+  S.huntSeconds = sec; S.totalRounds = rnd;
+  restoreSeg('segTime', 'sec', sec);
+  restoreSeg('segRounds', 'rounds', rnd);
+  setMute(localStorage.getItem(LS + 'muted') === '1');
+})();
+
+/* ---- deterministic hooks for headless verification ---- */
+window.__forceTwist = id => { S.forcedTwist = id; };
+window.__state = () => ({
+  screen: (document.querySelector('.screen.active') || {}).id,
+  round: S.round, total: S.totalRounds,
+  order: S.order, twist: S.twist && S.twist.id,
+  checkIn: S.checkIn.slice(),
+  scores: S.players.map(p => ({ n: p.name, s: p.score, d: p.delta }))
+});
+window.__skipClock = () => { endAt = Date.now(); };
+
+</script>
+</body>
+</html>

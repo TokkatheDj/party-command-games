@@ -1,0 +1,788 @@
+<!-- CONCEPT: ICEBREAKERS - "Someone Who?": pass the phone so every player secretly answers 20 yes/no "someone who..." facts about themselves, then the app builds a shared 4x4 bingo board from the room's rarest facts; on your turn pick a square and name who it's true for (or call NOBODY ELSE) - the app checks the secret answers, a hit claims the square and puts that person in the spotlight to tell the story, a miss marks the square with a public clue, and optional Mingle Minutes let the room fish for facts (fibbing allowed). Rare squares, full lines and same-colour BINGO lines score bonus points. 122 facts | Players: 3-10 | ~15-25 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Someone Who? — Icebreaker Bingo</title>
+<style>
+:root {
+  --bg1: #1a1033; --bg2: #0e1a33;
+  --panel: rgba(255,255,255,0.07); --panel2: rgba(255,255,255,0.12);
+  --line: rgba(255,255,255,0.16);
+  --text: #f6f2ff; --muted: #b9b0d6;
+  --pink: #ff5d8f; --gold: #ffd23f; --teal: #3ee6c1; --blue: #5aa9ff;
+  --good: #3ee6a0; --bad: #ff5d6c;
+  --radius: 16px; --gap: clamp(6px, 1.6vw, 10px);
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background: radial-gradient(120% 80% at 20% 0%, #3a1a5c 0%, transparent 60%),
+              radial-gradient(100% 70% at 100% 100%, #0f3a4a 0%, transparent 60%),
+              linear-gradient(160deg, var(--bg1), var(--bg2));
+}
+button { font: inherit; color: inherit; cursor: pointer; border: none; }
+.screen { position: absolute; inset: 0; display: none; flex-direction: column; overflow-y: auto; overflow-x: hidden; padding: max(12px, env(safe-area-inset-top)) 14px 16px; }
+.screen.on { display: flex; }
+.wrap { width: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+h1 {
+  margin: 6px 0 0; text-align: center; font-weight: 900; letter-spacing: 0.5px;
+  font-size: clamp(34px, 10vw, 60px); line-height: 1.02;
+  background: linear-gradient(90deg, var(--pink), var(--gold), var(--teal));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.emoji-row { text-align: center; font-size: clamp(28px, 8vw, 44px); margin-top: 4px; }
+.tag { text-align: center; color: var(--muted); font-size: clamp(14px, 3.8vw, 18px); line-height: 1.35; margin: 0; }
+.meta { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.pill { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; font-size: clamp(12px, 3.3vw, 15px); font-weight: 700; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.card h2 { margin: 0 0 8px; font-size: clamp(16px, 4.4vw, 20px); }
+.how { margin: 0; padding-left: 20px; color: var(--muted); font-size: clamp(13px, 3.6vw, 16px); line-height: 1.45; }
+.how b { color: var(--text); }
+.row { display: flex; gap: 8px; }
+input[type=text] {
+  flex: 1; min-width: 0; min-height: 48px; border-radius: 12px; border: 1px solid var(--line);
+  background: rgba(0,0,0,0.3); color: var(--text); padding: 0 14px; font-size: 17px; outline: none;
+  user-select: text; -webkit-user-select: text;
+}
+input[type=text]:focus { border-color: var(--teal); }
+.btn {
+  min-height: 48px; padding: 0 18px; border-radius: 14px; font-weight: 800;
+  font-size: clamp(15px, 4vw, 18px); background: var(--panel2); border: 1px solid var(--line);
+  transition: transform .08s, filter .15s;
+}
+.btn:active { transform: scale(0.96); }
+.btn:disabled { opacity: 0.35; cursor: default; transform: none; }
+.btn.go { background: linear-gradient(90deg, var(--pink), #ff8c5a); border: none; color: #fff; box-shadow: 0 6px 20px rgba(255,93,143,0.35); }
+.btn.teal { background: linear-gradient(90deg, #22c8a6, var(--blue)); border: none; color: #04161a; }
+.btn.big { min-height: 60px; font-size: clamp(18px, 5vw, 24px); width: 100%; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.pchip { display: flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 4px 4px 12px; font-weight: 800; font-size: 15px; background: rgba(0,0,0,0.25); border: 2px solid; }
+.pchip .x { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.1); font-size: 16px; }
+.hint { color: var(--muted); font-size: 13px; margin-top: 8px; }
+.opt { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 6px 0; font-size: clamp(14px, 3.8vw, 16px); }
+.seg { display: flex; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); flex-shrink: 0; }
+.seg button { min-width: 48px; min-height: 44px; background: transparent; font-weight: 800; padding: 0 10px; }
+.seg button.sel { background: var(--teal); color: #04161a; }
+
+/* pass + ask screens */
+.center { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 16px; }
+.bigname { font-size: clamp(38px, 12vw, 72px); font-weight: 900; line-height: 1.05; word-break: break-word; }
+.sub { color: var(--muted); font-size: clamp(15px, 4vw, 19px); max-width: 520px; line-height: 1.4; margin: 0; }
+.progress { width: 100%; max-width: 520px; height: 10px; background: var(--panel2); border-radius: 99px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--pink), var(--gold)); transition: width .2s; }
+.askwho { font-size: clamp(15px, 4vw, 18px); font-weight: 800; }
+.factcard {
+  width: 100%; max-width: 520px; border-radius: 22px; padding: clamp(22px, 6vw, 36px) 18px;
+  background: linear-gradient(160deg, rgba(255,93,143,0.18), rgba(90,169,255,0.14)); border: 2px solid var(--line);
+}
+.factcard .lead { color: var(--muted); font-size: clamp(14px, 3.8vw, 17px); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.factcard .fact { font-size: clamp(26px, 7.5vw, 40px); font-weight: 900; line-height: 1.15; margin-top: 8px; }
+.factcard .q { margin-top: 12px; font-size: clamp(16px, 4.4vw, 20px); color: var(--gold); font-weight: 800; }
+.yn { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 520px; }
+.yn .btn { min-height: 84px; font-size: clamp(24px, 7vw, 32px); border-radius: 20px; }
+.yes { background: linear-gradient(160deg, #26d49a, #1aa37a); color: #03170f; border: none; }
+.no { background: linear-gradient(160deg, #ff6b7d, #d9405a); color: #fff; border: none; }
+.linkbtn { background: none; color: var(--muted); text-decoration: underline; min-height: 44px; padding: 0 12px; font-size: 15px; }
+
+/* board */
+#board { padding-bottom: 10px; }
+.bhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.turn { font-size: clamp(18px, 5.2vw, 26px); font-weight: 900; line-height: 1.1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.turn small { display: block; font-size: clamp(12px, 3.2vw, 14px); color: var(--muted); font-weight: 700; }
+.iconbtn { width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; background: var(--panel2); border: 1px solid var(--line); font-size: 20px; }
+.scores { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 6px; scrollbar-width: none; flex-shrink: 0; }
+.scores::-webkit-scrollbar { display: none; }
+.sc { flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: rgba(0,0,0,0.3); border: 2px solid transparent; font-weight: 800; font-size: 14px; }
+.sc .dot { width: 12px; height: 12px; border-radius: 50%; }
+.sc.cur { border-color: currentColor; box-shadow: 0 0 12px -2px currentColor; }
+.sc b { color: var(--text); }
+.gridwrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: var(--gap); width: 100%; }
+.sq {
+  position: relative; border-radius: 12px; padding: 6px 4px 16px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; background: var(--panel); border: 2px solid var(--line); overflow: hidden;
+  font-size: clamp(11px, 2.9vw, 16px); font-weight: 700; line-height: 1.15; min-height: 0;
+}
+.sq .em { font-size: clamp(18px, 5vw, 28px); line-height: 1; margin-bottom: 3px; }
+.sq .tx { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+.sq:not(.own):active { transform: scale(0.95); }
+.sq .wr { position: absolute; left: 3px; right: 3px; bottom: 2px; font-size: clamp(9px, 2.3vw, 12px); color: var(--bad); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sq.own { cursor: default; color: #10091f; border-color: transparent; }
+.sq.own .who { position: absolute; left: 0; right: 0; bottom: 2px; font-size: clamp(9px, 2.4vw, 12px); font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; }
+.sq.flash { animation: pop .5s; }
+.sq.lineglow { box-shadow: 0 0 0 3px #fff, 0 0 18px var(--gold); }
+@keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.bfoot { color: var(--muted); font-size: clamp(12px, 3.3vw, 14px); text-align: center; padding-top: 8px; flex-shrink: 0; }
+
+/* modals */
+.modal { position: fixed; inset: 0; background: rgba(5,3,15,0.72); display: none; align-items: center; justify-content: center; padding: 14px; z-index: 20; }
+.modal.on { display: flex; }
+.mbox { width: 100%; max-width: 520px; max-height: 100%; overflow-y: auto; background: linear-gradient(170deg, #2a1a4d, #15213d); border: 1px solid var(--line); border-radius: 22px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.mbox .lead { color: var(--muted); font-size: 14px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; text-align: center; }
+.mbox .fact { font-size: clamp(22px, 6.4vw, 30px); font-weight: 900; text-align: center; line-height: 1.15; }
+.names { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.nbtn { min-height: 54px; border-radius: 14px; font-weight: 900; font-size: clamp(15px, 4.2vw, 19px); color: #10091f; padding: 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nbtn:disabled { opacity: 0.3; text-decoration: line-through; cursor: default; }
+.nobody { grid-column: 1 / -1; background: var(--panel2); color: var(--text); border: 2px dashed var(--line); }
+.verdict { text-align: center; font-size: clamp(34px, 10vw, 52px); font-weight: 900; line-height: 1; }
+.verdict.good { color: var(--good); } .verdict.badv { color: var(--bad); }
+.pts { text-align: center; font-weight: 900; font-size: clamp(18px, 5vw, 24px); color: var(--gold); }
+.spot { border-radius: 16px; padding: 14px; background: rgba(255,210,63,0.12); border: 2px solid rgba(255,210,63,0.5); text-align: center; }
+.spot .t { font-size: 13px; font-weight: 900; letter-spacing: 1px; color: var(--gold); }
+.spot .p { font-size: clamp(18px, 5vw, 24px); font-weight: 800; margin-top: 4px; line-height: 1.25; }
+.prove { display: inline-block; margin-top: 8px; background: var(--pink); color: #fff; font-weight: 900; border-radius: 999px; padding: 4px 12px; font-size: 14px; }
+.small { color: var(--muted); text-align: center; font-size: 14px; line-height: 1.4; margin: 0; }
+
+/* mingle */
+.timer { font-size: clamp(80px, 26vw, 150px); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums;
+  background: linear-gradient(90deg, var(--teal), var(--blue)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.timer.low { background: linear-gradient(90deg, var(--pink), var(--gold)); -webkit-background-clip: text; background-clip: text; }
+
+/* end */
+.podium { display: flex; flex-direction: column; gap: 8px; }
+.prow { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 14px; background: var(--panel); border: 2px solid transparent; font-weight: 800; font-size: clamp(16px, 4.4vw, 20px); }
+.prow .rk { width: 34px; text-align: center; font-size: 22px; }
+.prow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow .pt { font-variant-numeric: tabular-nums; }
+.prow.win { background: rgba(255,210,63,0.15); border-color: var(--gold); }
+.reveal { display: flex; flex-direction: column; gap: 6px; }
+.rv { display: flex; justify-content: space-between; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,0.22); font-size: clamp(13px, 3.6vw, 15px); }
+.rv span:last-child { color: var(--gold); font-weight: 800; text-align: right; }
+.btnrow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#confetti { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<section class="screen on" id="setup">
+  <div class="wrap">
+    <div class="emoji-row">🙋‍♀️🎯🙋‍♂️</div>
+    <h1>Someone Who?</h1>
+    <p class="tag">Secretly answer a few quick facts about yourself, then race to match the room's surprising facts to the right people on a shared bingo board. Every correct guess comes with a story.</p>
+    <div class="meta"><span class="pill">👥 3–10 players</span><span class="pill">⏱ 15–25 min</span><span class="pill">📱 one shared phone</span></div>
+
+    <div class="card">
+      <h2>Who's playing?</h2>
+      <div class="row">
+        <input type="text" id="nameIn" maxlength="14" placeholder="Type a name" autocomplete="off">
+        <button class="btn teal" id="addBtn">Add</button>
+      </div>
+      <div class="chips" id="roster"></div>
+      <div class="hint" id="rosterHint"></div>
+    </div>
+
+    <div class="card">
+      <h2>Options</h2>
+      <div class="opt"><span>Facts each player answers</span><div class="seg" id="segQ"><button data-v="16">16</button><button data-v="20">20</button><button data-v="24">24</button></div></div>
+      <div class="opt"><span>Mingle Minute after every lap</span><div class="seg" id="segM"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+    </div>
+
+    <div class="card">
+      <h2>How to play</h2>
+      <ol class="how">
+        <li><b>Secret round:</b> pass the phone — everyone taps YES or NO to quick "someone who…" facts about themselves.</li>
+        <li><b>The board:</b> the app turns the room's rarest facts into a 4×4 bingo board.</li>
+        <li><b>Your turn:</b> pick a square and name someone it's true for — or call <b>NOBODY ELSE</b>. Right = you claim it and they tell the story. Wrong = the square shows who it <i>isn't</i>.</li>
+        <li><b>Mingle Minute:</b> chat and fish for clues — but fibbing is allowed!</li>
+        <li><b>Points:</b> 3 if only one person fits, 2 if two, 1 if more. <b>+2</b> for finishing any line, <b>+5 BINGO</b> if the whole line is your colour.</li>
+      </ol>
+    </div>
+
+    <button class="btn go big" id="startBtn">Start the Secret Round ▶</button>
+  </div>
+</section>
+
+<!-- PASS -->
+<section class="screen" id="pass">
+  <div class="center">
+    <div class="sub" id="passTop">Pass the phone to</div>
+    <div class="bigname" id="passName">Name</div>
+    <p class="sub">Only you should see the next screen. Answer honestly — the whole game depends on it!</p>
+    <button class="btn go big" id="passGo" style="max-width:520px">I'm ready — show me</button>
+    <button class="linkbtn" id="passQuit">Back to setup</button>
+  </div>
+</section>
+
+<!-- ASK -->
+<section class="screen" id="ask">
+  <div class="center">
+    <div class="askwho" id="askWho">Name · 1 / 20</div>
+    <div class="progress"><i id="askBar"></i></div>
+    <div class="factcard">
+      <div class="lead">Someone who…</div>
+      <div class="fact" id="askFact">has been on a boat</div>
+      <div class="q">Is that you?</div>
+    </div>
+    <div class="yn">
+      <button class="btn yes" id="yesBtn">YES</button>
+      <button class="btn no" id="noBtn">NO</button>
+    </div>
+    <button class="linkbtn" id="askBack">↩ Undo last answer</button>
+  </div>
+</section>
+
+<!-- BOARD READY -->
+<section class="screen" id="ready">
+  <div class="center">
+    <div class="emoji-row">🎉</div>
+    <div class="bigname" style="font-size:clamp(30px,9vw,52px)">The board is ready!</div>
+    <p class="sub">Everyone gather round the phone. <b id="firstName">Name</b> goes first.<br>Pick a square, name who it's true for — or call <b>NOBODY ELSE</b>.</p>
+    <button class="btn go big" id="readyGo" style="max-width:520px">Show the board</button>
+    <button class="btn big" id="readyMingle" style="max-width:520px">🗣 Start with a Mingle Minute</button>
+  </div>
+</section>
+
+<!-- BOARD -->
+<section class="screen" id="board">
+  <div class="wrap" style="flex:1;min-height:0">
+    <div class="bhead">
+      <div class="turn" id="turnName">Name's turn<small>Tap a square</small></div>
+      <button class="iconbtn" id="menuBtn" aria-label="Menu">⏸</button>
+    </div>
+    <div class="scores" id="scores"></div>
+    <div class="gridwrap" id="gridwrap"><div class="grid" id="grid"></div></div>
+    <div class="bfoot" id="bfoot">3 pts rare · 2 pts pair · 1 pt common · +2 line · +5 BINGO</div>
+  </div>
+</section>
+
+<!-- MINGLE -->
+<section class="screen" id="mingle">
+  <div class="center">
+    <div class="emoji-row">🗣️🍹🗣️</div>
+    <div class="bigname" style="font-size:clamp(30px,9vw,52px)">Mingle Minute!</div>
+    <div class="timer" id="mTimer">60</div>
+    <p class="sub">Chat with anyone about anything on the board. Fish for clues, ask sneaky questions… <b>but anyone may fib!</b> The app knows the truth.</p>
+    <button class="btn big" id="mSkip" style="max-width:520px">Done mingling ▶</button>
+  </div>
+</section>
+
+<!-- END -->
+<section class="screen" id="end">
+  <div class="wrap">
+    <div class="emoji-row">🏆</div>
+    <h1 id="endTitle">Winner!</h1>
+    <div class="podium" id="podium"></div>
+    <div class="card">
+      <h2>🔎 The Room Reveal</h2>
+      <div class="reveal" id="reveal"></div>
+    </div>
+    <div class="btnrow">
+      <button class="btn go" id="againBtn">Play Again</button>
+      <button class="btn" id="newBtn">New Players</button>
+    </div>
+  </div>
+</section>
+
+<!-- PICK MODAL -->
+<div class="modal" id="pickM">
+  <div class="mbox">
+    <div class="lead">Who is someone who…</div>
+    <div class="fact" id="pickFact">fact</div>
+    <div class="names" id="pickNames"></div>
+    <button class="btn" id="pickCancel">Cancel</button>
+  </div>
+</div>
+
+<!-- RESULT MODAL -->
+<div class="modal" id="resM">
+  <div class="mbox">
+    <div class="verdict" id="resV">Correct!</div>
+    <div class="fact" id="resFact" style="font-size:clamp(17px,4.8vw,22px)">fact</div>
+    <div class="pts" id="resPts"></div>
+    <div id="resSpot"></div>
+    <p class="small" id="resNote"></p>
+    <button class="btn go big" id="resNext">Next turn ▶</button>
+  </div>
+</div>
+
+<!-- MENU MODAL -->
+<div class="modal" id="menuM">
+  <div class="mbox">
+    <div class="fact">Paused</div>
+    <p class="small">Right guess: 3 pts if only one person fits, 2 if two, 1 if more. NOBODY ELSE = 3. Finishing any line +2, a line all your colour = +5 BINGO. Wrong guesses mark the square for everyone.</p>
+    <button class="btn go big" id="menuResume">Resume</button>
+    <button class="btn big" id="menuSkip">Skip this player's turn</button>
+    <button class="btn big" id="menuEnd">End game &amp; see results</button>
+    <button class="btn big" id="menuQuit">Quit to setup</button>
+  </div>
+</div>
+
+<canvas id="confetti"></canvas>
+
+<script>
+// [emoji, "someone who ___", follow-up story prompt, prove-it?]
+const FACTS = [
+  ['⛵','has been on a boat','Where were you headed — and did anyone get seasick?'],
+  ['🦴','has broken a bone','Which bone, and how did it happen?'],
+  ['😗','can whistle a tune','Whistle us something right now!',1],
+  ['🐶','has a pet at home','Tell us your pet\'s name and its weirdest habit.'],
+  ['📺','has been on TV or radio','What was it for?'],
+  ['🌟','has met someone famous','Who was it, and what did you say?'],
+  ['👅','can touch nose with tongue','Prove it!',1],
+  ['✈️','has been to another country','Best thing you saw there?'],
+  ['🐴','has ridden a horse','Did the horse behave?'],
+  ['🤹','can juggle three things','Grab three socks and show us!',1],
+  ['🎸','plays a musical instrument','Which one? Air-play us a few seconds.'],
+  ['🏆','has won a trophy or medal','What did you win it for?'],
+  ['⛺','has slept in a tent','Best or worst moment of that night?'],
+  ['👑','is the oldest sibling','Were you the bossy one?'],
+  ['🍼','is the youngest sibling','What did you get away with?'],
+  ['🧍','is an only child','Best part of having no siblings?'],
+  ['🌶️','loves really spicy food','Hottest thing you have ever eaten?'],
+  ['🍍','likes pineapple on pizza','Defend yourself!'],
+  ['🌅','is a morning person','What time do you wake up on a day off?'],
+  ['🦉','is a night owl','Latest you have ever stayed up?'],
+  ['🎤','has sung karaoke','What song — and how did it go?'],
+  ['🧊','has seen real snow falling','Where was it?'],
+  ['🌋','has seen a volcano','Was it smoking?'],
+  ['🐍','has held a snake','Were you scared?'],
+  ['🎢','loves roller coasters','Best ride you have ever been on?'],
+  ['😱','is scared of spiders','What do you do when you see one?'],
+  ['🦈','has swum in the ocean','Where was it — was the water freezing?'],
+  ['🎂','has a birthday in winter','Best birthday you ever had?'],
+  ['☀️','has a birthday in summer','Best birthday you ever had?'],
+  ['🐱','prefers cats to dogs','What makes cats better?'],
+  ['🍫','could eat chocolate every day','Favourite kind?'],
+  ['🥦','actually likes Brussels sprouts','How do you like them cooked?'],
+  ['📚','has read a book more than twice','Which book, and why?'],
+  ['🎬','has watched a movie 10+ times','Which movie? Quote a line!'],
+  ['🧩','has finished a 1000-piece puzzle','How long did it take?'],
+  ['🏊','can swim a full length underwater','Where did you learn?'],
+  ['🚲','can ride a bike no-handed','Any crashes?'],
+  ['🛹','has tried skateboarding','Best trick or worst fall?'],
+  ['⛷️','has been skiing or snowboarding','Did you fall off the lift?'],
+  ['🎣','has caught a fish','How big? (Be honest!)'],
+  ['🌱','has grown their own food','What did you grow?'],
+  ['🍪','has baked something from scratch','What was your best bake?'],
+  ['🔥','has burnt toast this month','How burnt are we talking?'],
+  ['🥢','can use chopsticks','Show us your technique with two pens!',1],
+  ['🗣️','speaks more than one language','Say something in it!',1],
+  ['✍️','is left-handed','Hardest thing about it?'],
+  ['🙃','can do a handstand','Want to prove it? (Carefully!)',1],
+  ['🤸','can do a cartwheel','Show us if there is room!',1],
+  ['🧘','can touch their toes easily','Prove it!',1],
+  ['😜','can wiggle their ears','Prove it!',1],
+  ['👀','can cross their eyes','Prove it!',1],
+  ['🌀','can roll their tongue','Prove it!',1],
+  ['🫢','can do an impression','Do it now!',1],
+  ['🐓','can make an animal noise really well','Let\'s hear it!',1],
+  ['🧠','can name all the planets in order','Go — fast!',1],
+  ['🔤','can say the alphabet backwards','Try it now!',1],
+  ['🎮','has beaten a video game 100%','Which game?'],
+  ['♟️','knows how to play chess','Ever beaten a grown-up / a kid?'],
+  ['🃏','knows a card trick','Tell us about it (or do it!)'],
+  ['🎨','has painted a picture they kept','What was it of?'],
+  ['🧶','can knit or sew','What have you made?'],
+  ['🏕️','has been to summer camp','Best camp memory?'],
+  ['🏰','has visited a castle','Which one — was it haunted?'],
+  ['🦒','has seen a giraffe in real life','Where?'],
+  ['🐧','has seen a penguin in real life','Where?'],
+  ['🐬','has seen dolphins in the wild','Where were you?'],
+  ['🌈','has seen a double rainbow','Where were you?'],
+  ['🌠','has seen a shooting star','Did you make a wish?'],
+  ['🚂','has slept on a train or bus','Did you sleep at all?'],
+  ['🚁','has been in a helicopter','Where did you fly?'],
+  ['🛶','has paddled a canoe or kayak','Did you tip over?'],
+  ['🏔️','has climbed a mountain','Which one? How long did it take?'],
+  ['🎭','has been in a play or show','What part did you play?'],
+  ['🥇','has won a race','What kind of race?'],
+  ['⚽','plays on a sports team','Which team, which position?'],
+  ['🥋','has done a martial art','Show us a (gentle) move!',1],
+  ['🩰','has taken dance lessons','What style? Show us a step!'],
+  ['🎹','can play a song on the piano','Which song?'],
+  ['🥁','has played the drums','Drum us a beat on the table!',1],
+  ['🐣','has hatched or raised baby animals','What kind?'],
+  ['🐠','has had a fish as a pet','What was its name?'],
+  ['🐹','has had a hamster or guinea pig','Name and funniest moment?'],
+  ['🌙','has stayed up to watch the sunrise','Why were you up?'],
+  ['🍳','can cook a full meal','What\'s your signature dish?'],
+  ['🥞','can flip a pancake in the pan','Ever dropped one?'],
+  ['🍦','has eaten ice cream in winter','Favourite flavour?'],
+  ['🍣','has eaten sushi','Favourite kind?'],
+  ['🐌','has eaten something really unusual','What was it?'],
+  ['🧃','has never had a cup of coffee','What\'s your go-to drink?'],
+  ['📱','has dropped a phone in water','Did it survive?'],
+  ['🔑','has locked themselves out','How did you get back in?'],
+  ['🧳','has lost their luggage','Did you ever get it back?'],
+  ['😴','has fallen asleep somewhere funny','Where?'],
+  ['🤧','has sneezed 5+ times in a row','What set you off?'],
+  ['🎁','has made a present by hand','What did you make?'],
+  ['✉️','has written a real letter this year','Who to?'],
+  ['🌍','has a pen pal or friend abroad','Where do they live?'],
+  ['🏠','has moved house 3+ times','Favourite place you lived?'],
+  ['🏙️','has lived in a big city','Which one?'],
+  ['🌾','has lived in the countryside','Best thing about it?'],
+  ['🌊','has surfed or bodyboarded','Did you stand up?'],
+  ['🎪','has been to a circus','Best act you saw?'],
+  ['🎆','has watched fireworks from a roof','Where was it?'],
+  ['🏟️','has been to a big live game','Who won?'],
+  ['🎵','has been to a concert','Who did you see?'],
+  ['💇','has had a haircut they regretted','Describe it!'],
+  ['🦷','has lost a tooth in food','What were you eating?'],
+  ['🩹','has had stitches','How did it happen?'],
+  ['🏥','was born in a different city from here','Where?'],
+  ['👯','has a cousin born the same year','Do people mix you up?'],
+  ['🎉','has thrown a surprise party','Was it actually a surprise?'],
+  ['😂','laughed till they cried this month','What was so funny?'],
+  ['🕵️','has solved a real-life mystery','What was the mystery?'],
+  ['🧗','has gone rock climbing','Did you reach the top?'],
+  ['🪁','has flown a kite','Did it get stuck in a tree?'],
+  ['🧁','has won a contest or raffle','What did you win?'],
+  ['🎲','has a board game they always win','Which one? Challenge anyone!'],
+  ['📸','is in a photo on someone\'s wall','What\'s in the photo?'],
+  ['🐞','likes bugs and creepy-crawlies','Favourite bug?'],
+  ['👻','has been in a "haunted" house','Did you see anything?'],
+  ['👓','wears glasses or contacts','When did you first get them?'],
+  ['🍕','could eat pizza for every meal','Best topping?']
+];
+const COLORS = ['#ff5d8f','#ffd23f','#3ee6c1','#5aa9ff','#b98cff','#ff8c42','#9be15d','#ff6b6b','#4dd0e1','#f7a8d0'];
+const LS = 'cowork-someonewho-';
+const LINES = [];
+for (let i = 0; i < 4; i++) {
+  LINES.push([0,1,2,3].map(j => i*4 + j));   // rows
+  LINES.push([0,1,2,3].map(j => j*4 + i));   // columns
+}
+LINES.push([0,5,10,15], [3,6,9,12]);         // diagonals
+
+const $ = id => document.getElementById(id);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function load(k, d) { try { const v = JSON.parse(localStorage.getItem(LS + k)); return v == null ? d : v; } catch { return d; } }
+function save(k, v) { try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch {} }
+
+let roster = load('roster', []);
+let opts = Object.assign({ q: 20, mingle: 1 }, load('opts', {}));
+let used = load('used', []);   // fact indices seen recently, so replays feel fresh
+let G = null;
+
+// ---------- sound ----------
+let AC = null;
+function tone(freq, dur = 0.12, type = 'sine', vol = 0.18, when = 0) {
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const t = AC.currentTime + when, o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch {}
+}
+const sfx = {
+  tap: () => tone(660, 0.06, 'triangle', 0.1),
+  yes: () => tone(880, 0.08, 'triangle', 0.12),
+  no: () => tone(330, 0.08, 'triangle', 0.12),
+  good: () => [523, 659, 784].forEach((f, i) => tone(f, 0.18, 'triangle', 0.18, i * 0.09)),
+  bad: () => { tone(200, 0.25, 'sawtooth', 0.12); tone(150, 0.3, 'sawtooth', 0.1, 0.12); },
+  bingo: () => [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, 0.2, 'square', 0.12, i * 0.1)),
+  tick: () => tone(1000, 0.05, 'square', 0.08),
+  horn: () => { tone(440, 0.5, 'sawtooth', 0.12); tone(554, 0.5, 'sawtooth', 0.1); }
+};
+
+// ---------- screens ----------
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  if (id === 'board') requestAnimationFrame(fitGrid);
+}
+function modal(id, on) { $(id).classList.toggle('on', on); }
+
+// ---------- setup ----------
+function renderRoster() {
+  $('roster').innerHTML = roster.map((n, i) =>
+    `<span class="pchip" style="border-color:${COLORS[i % COLORS.length]};color:${COLORS[i % COLORS.length]}">${esc(n)}<button class="x" data-i="${i}" aria-label="Remove ${esc(n)}">✕</button></span>`).join('');
+  const n = roster.length;
+  $('rosterHint').textContent = n < 3 ? `Add at least ${3 - n} more player${3 - n > 1 ? 's' : ''} (3–10).` : n >= 10 ? 'Full house — 10 players max.' : `${n} players. Add up to ${10 - n} more.`;
+  $('startBtn').disabled = n < 3;
+  $('addBtn').disabled = n >= 10;
+}
+function addName() {
+  const v = $('nameIn').value.trim().replace(/\s+/g, ' ');
+  if (!v || roster.length >= 10) return;
+  if (roster.some(r => r.toLowerCase() === v.toLowerCase())) { $('rosterHint').textContent = `"${v}" is already playing — try a nickname.`; return; }
+  roster.push(v); $('nameIn').value = ''; save('roster', roster); renderRoster(); sfx.tap();
+}
+function renderSegs() {
+  document.querySelectorAll('#segQ button').forEach(b => b.classList.toggle('sel', +b.dataset.v === opts.q));
+  document.querySelectorAll('#segM button').forEach(b => b.classList.toggle('sel', +b.dataset.v === opts.mingle));
+}
+$('addBtn').onclick = addName;
+$('nameIn').addEventListener('keydown', e => { if (e.key === 'Enter') addName(); });
+$('roster').onclick = e => {
+  const b = e.target.closest('.x'); if (!b) return;
+  roster.splice(+b.dataset.i, 1); save('roster', roster); renderRoster();
+};
+$('segQ').onclick = e => { const b = e.target.closest('button'); if (!b) return; opts.q = +b.dataset.v; save('opts', opts); renderSegs(); };
+$('segM').onclick = e => { const b = e.target.closest('button'); if (!b) return; opts.mingle = +b.dataset.v; save('opts', opts); renderSegs(); };
+$('startBtn').onclick = () => { if (roster.length >= 3) startGame(); };
+
+// ---------- secret round ----------
+function pickFacts(k) {
+  let pool = FACTS.map((_, i) => i).filter(i => !used.includes(i));
+  if (pool.length < k) { used = []; pool = FACTS.map((_, i) => i); }
+  const chosen = shuffle(pool).slice(0, k);
+  used = used.concat(chosen).slice(-FACTS.length + k);
+  save('used', used);
+  return chosen;
+}
+function startGame() {
+  G = {
+    players: roster.map((name, i) => ({ name, color: COLORS[i % COLORS.length], score: 0 })),
+    facts: pickFacts(opts.q),
+    ans: roster.map(() => ({})),
+    order: [], who: 0, qi: 0,
+    board: [], turn: 0, lapCount: 0, lines: new Set(), over: false
+  };
+  showPass(0);
+}
+function showPass(i) {
+  G.who = i; G.qi = 0; G.order = shuffle(G.facts.slice());
+  $('passTop').textContent = i === 0 ? 'Secret round! Pass the phone to' : 'Thanks! Now pass the phone to';
+  $('passName').textContent = G.players[i].name;
+  $('passName').style.color = G.players[i].color;
+  show('pass');
+}
+$('passGo').onclick = () => { sfx.tap(); renderAsk(); show('ask'); };
+$('passQuit').onclick = () => { G = null; show('setup'); };
+function renderAsk() {
+  const p = G.players[G.who], f = FACTS[G.order[G.qi]];
+  $('askWho').innerHTML = `<span style="color:${p.color}">${esc(p.name)}</span> · ${G.qi + 1} / ${G.order.length}`;
+  $('askBar').style.width = (G.qi / G.order.length * 100) + '%';
+  $('askFact').textContent = f[0] + ' ' + f[1];
+  $('askBack').style.visibility = G.qi > 0 ? 'visible' : 'hidden';
+}
+function answer(yes) {
+  G.ans[G.who][G.order[G.qi]] = yes;
+  yes ? sfx.yes() : sfx.no();
+  G.qi++;
+  if (G.qi < G.order.length) return renderAsk();
+  if (G.who + 1 < G.players.length) return showPass(G.who + 1);
+  buildBoard();
+}
+$('yesBtn').onclick = () => answer(true);
+$('noBtn').onclick = () => answer(false);
+$('askBack').onclick = () => { if (G.qi > 0) { G.qi--; renderAsk(); } };
+
+// ---------- board ----------
+// Pick the 16 most interesting facts: rare ones first, a couple of "nobody" squares allowed.
+function buildBoard() {
+  const n = G.players.length;
+  const cand = G.facts.map(fi => {
+    const fits = G.players.map((_, p) => p).filter(p => G.ans[p][fi]);
+    const k = fits.length;
+    let rank = k === 1 ? 0 : k === 2 ? 1 : k === 0 ? 2.5 : k === 3 ? 2 : 2 + k;
+    if (k === n) rank = 50;                       // everyone: least interesting
+    return { f: fi, fits, rank: rank + Math.random() * 0.9 };
+  }).sort((a, b) => a.rank - b.rank);
+  const chosen = []; let nobodies = 0;
+  for (const c of cand) {
+    if (chosen.length >= 16) break;
+    if (c.fits.length === 0) { if (nobodies >= 2) continue; nobodies++; }
+    chosen.push(c);
+  }
+  for (const c of cand) { if (chosen.length >= 16) break; if (!chosen.includes(c)) chosen.push(c); }
+  G.board = shuffle(chosen).map(c => ({ f: c.f, fits: c.fits, owner: null, wrong: [], nobodyWrong: false, lastLine: false }));
+  G.turn = Math.floor(Math.random() * n);
+  G.lapCount = 0;
+  $('firstName').textContent = G.players[G.turn].name;
+  $('firstName').style.color = G.players[G.turn].color;
+  $('readyMingle').style.display = opts.mingle ? '' : 'none';
+  sfx.horn();
+  show('ready');
+}
+$('readyGo').onclick = () => { renderBoard(); show('board'); };
+$('readyMingle').onclick = () => startMingle();
+
+function renderBoard(flashIdx = -1, glow = []) {
+  const p = G.players[G.turn];
+  $('turnName').innerHTML = `<span style="color:${p.color}">${esc(p.name)}</span>'s turn<small>Tap a square · name who it's true for</small>`;
+  $('scores').innerHTML = G.players.map((q, i) =>
+    `<span class="sc${i === G.turn ? ' cur' : ''}" style="color:${q.color}"><span class="dot" style="background:${q.color}"></span><b>${esc(q.name)}</b> ${q.score}</span>`).join('');
+  $('grid').innerHTML = G.board.map((s, i) => {
+    const f = FACTS[s.f];
+    if (s.owner != null) {
+      const o = G.players[s.owner];
+      return `<button class="sq own${i === flashIdx ? ' flash' : ''}${glow.includes(i) ? ' lineglow' : ''}" style="background:${o.color}" data-i="${i}"><span class="em">${f[0]}</span><span class="tx">${esc(f[1])}</span><span class="who">${esc(o.name)}</span></button>`;
+    }
+    const marks = s.wrong.map(w => G.players[w].name).concat(s.nobodyWrong ? ['nobody'] : []);
+    const wr = marks.length ? `<span class="wr">✗ ${esc(marks.join(', '))}</span>` : '';
+    return `<button class="sq${i === flashIdx ? ' flash' : ''}" data-i="${i}"><span class="em">${f[0]}</span><span class="tx">${esc(f[1])}</span>${wr}</button>`;
+  }).join('');
+  const left = G.board.filter(s => s.owner == null).length;
+  $('bfoot').textContent = `${left} square${left === 1 ? '' : 's'} left · 3 rare · 2 pair · 1 common · +2 line · +5 BINGO`;
+  fitGrid();
+}
+// Keep the 4x4 board square-ish and fully on screen.
+function fitGrid() {
+  const w = $('gridwrap'), g = $('grid');
+  if (!w.clientWidth) return;
+  const side = Math.min(w.clientWidth, w.clientHeight / 1.3);
+  g.style.width = Math.floor(side) + 'px';
+  g.style.height = Math.floor(Math.min(w.clientHeight, side * 1.3)) + 'px';
+}
+window.addEventListener('resize', fitGrid);
+
+let pickIdx = -1;
+$('grid').onclick = e => {
+  const b = e.target.closest('.sq'); if (!b || G.over) return;
+  const i = +b.dataset.i, s = G.board[i];
+  if (s.owner != null) return;
+  pickIdx = i; sfx.tap();
+  const f = FACTS[s.f];
+  $('pickFact').textContent = f[0] + ' ' + f[1] + '?';
+  $('pickNames').innerHTML = G.players.map((q, pi) => pi === G.turn ? '' :
+    `<button class="nbtn" data-p="${pi}" style="background:${q.color}"${s.wrong.includes(pi) ? ' disabled' : ''}>${esc(q.name)}</button>`).join('') +
+    // never disabled: after a wrong "nobody", it is still right for the one player the fact is true for
+    `<button class="nbtn nobody" data-p="-1">🙅 NOBODY ELSE</button>`;
+  modal('pickM', true);
+};
+$('pickCancel').onclick = () => modal('pickM', false);
+$('pickNames').onclick = e => {
+  const b = e.target.closest('.nbtn'); if (!b || b.disabled) return;
+  modal('pickM', false);
+  resolve(pickIdx, +b.dataset.p);
+};
+
+function resolve(i, guess) {
+  const s = G.board[i], me = G.turn, P = G.players, f = FACTS[s.f];
+  const others = s.fits.filter(p => p !== me);
+  const correct = guess === -1 ? others.length === 0 : s.fits.includes(guess);
+  let spot = '', note = '', pts = 0, glow = [], label = '';
+  $('resFact').textContent = 'Someone who ' + f[1];
+  if (correct) {
+    s.owner = me;
+    pts = guess === -1 ? 3 : others.length === 1 ? 3 : others.length === 2 ? 2 : 1;
+    const parts = [`+${pts} ${guess === -1 ? 'nobody else!' : others.length === 1 ? 'rare fact!' : others.length === 2 ? 'a pair!' : 'common fact'}`];
+    for (const L of LINES) {
+      const key = L.join(',');
+      if (!L.includes(i) || G.lines.has(key) || !L.every(x => G.board[x].owner != null)) continue;
+      G.lines.add(key); glow = glow.concat(L);
+      if (L.every(x => G.board[x].owner === me)) { pts += 5; parts.push('+5 BINGO!'); label = 'BINGO!'; }
+      else { pts += 2; parts.push('+2 line'); }
+    }
+    P[me].score += pts;
+    $('resPts').textContent = parts.join('  ·  ');
+    const storyteller = guess >= 0 ? guess : (s.fits.includes(me) ? me : -1);
+    if (storyteller >= 0) {
+      const st = P[storyteller];
+      spot = `<div class="spot"><div class="t">🎤 SPOTLIGHT</div><div class="p"><span style="color:${st.color}">${esc(st.name)}</span>${storyteller === me && guess === -1 ? ' (it\'s only you!)' : ''}: ${esc(f[2])}</div>${f[3] && !/prove/i.test(f[2]) ? '<span class="prove">PROVE IT!</span>' : ''}</div>`;
+    } else {
+      spot = `<div class="spot"><div class="t">🙅 NOBODY IN THE ROOM</div><div class="p">Not a single person! Who's going to try it first?</div></div>`;
+    }
+    const alsoTrue = s.fits.filter(p => p !== guess);
+    note = alsoTrue.length ? 'Also true for: ' + alsoTrue.map(p => P[p].name).join(', ') : (guess >= 0 ? `Only ${P[guess].name} — nice read!` : '');
+    $('resV').textContent = label || (guess === -1 ? 'Nobody else! ✅' : 'Correct! ✅');
+    $('resV').className = 'verdict good';
+    label ? sfx.bingo() : sfx.good();
+    if (label || pts >= 5) confetti();
+  } else {
+    if (guess >= 0) s.wrong.push(guess); else s.nobodyWrong = true;
+    $('resV').textContent = guess >= 0 ? `Not ${P[guess].name}! ❌` : 'Somebody does! ❌';
+    $('resV').className = 'verdict badv';
+    $('resPts').textContent = 'No points — the square stays open';
+    note = guess >= 0 ? `The board now shows ✗ ${P[guess].name} on this square. Anyone may still claim it.` : 'Someone in the room fits this one… so who is it?';
+    sfx.bad();
+  }
+  $('resSpot').innerHTML = spot;
+  $('resNote').textContent = note;
+  G.pending = { flash: i, glow };
+  const done = G.board.every(q => q.owner != null);
+  $('resNext').textContent = done ? 'See the results 🏆' : 'Next turn ▶';
+  modal('resM', true);
+}
+$('resNext').onclick = () => { modal('resM', false); nextTurn(); };
+
+function nextTurn() {
+  if (G.board.every(q => q.owner != null)) return endGame();
+  G.turn = (G.turn + 1) % G.players.length;
+  G.lapCount++;
+  const pend = G.pending || { flash: -1, glow: [] }; G.pending = null;
+  if (opts.mingle && G.lapCount >= G.players.length) { G.lapCount = 0; G.afterMingle = pend; return startMingle(); }
+  renderBoard(pend.flash, pend.glow);
+  show('board');
+}
+
+// ---------- mingle ----------
+let mInt = null;
+function startMingle() {
+  let t = 60;
+  $('mTimer').textContent = t; $('mTimer').classList.remove('low');
+  show('mingle'); sfx.horn();
+  clearInterval(mInt);
+  mInt = setInterval(() => {
+    t--; $('mTimer').textContent = t;
+    if (t <= 10) { $('mTimer').classList.add('low'); sfx.tick(); }
+    if (t <= 0) endMingle();
+  }, 1000);
+}
+function endMingle() {
+  clearInterval(mInt); mInt = null; sfx.horn();
+  const pend = G.afterMingle || { flash: -1, glow: [] }; G.afterMingle = null;
+  renderBoard(pend.flash, pend.glow); show('board');
+}
+$('mSkip').onclick = endMingle;
+
+// ---------- menu ----------
+$('menuBtn').onclick = () => modal('menuM', true);
+$('menuResume').onclick = () => modal('menuM', false);
+$('menuSkip').onclick = () => { modal('menuM', false); G.pending = null; nextTurn(); };
+$('menuEnd').onclick = () => { modal('menuM', false); endGame(); };
+$('menuQuit').onclick = () => { modal('menuM', false); G = null; clearInterval(mInt); renderRoster(); show('setup'); };
+
+// ---------- end ----------
+function endGame() {
+  G.over = true; clearInterval(mInt);
+  const P = G.players;
+  const ranked = P.map((p, i) => ({ ...p, i, claims: G.board.filter(s => s.owner === i).length })).sort((a, b) => b.score - a.score || b.claims - a.claims);
+  const top = ranked[0].score;
+  const winners = ranked.filter(r => r.score === top);
+  $('endTitle').textContent = winners.length > 1 ? 'It\'s a tie!' : `${winners[0].name} wins!`;
+  const medals = ['🥇', '🥈', '🥉'];
+  let rank = 0, prev = null;
+  $('podium').innerHTML = ranked.map((r, k) => {
+    if (r.score !== prev) { rank = k; prev = r.score; }
+    return `<div class="prow${r.score === top ? ' win' : ''}"><span class="rk">${medals[rank] || rank + 1}</span><span class="nm" style="color:${r.color}">${esc(r.name)}</span><span class="small">${r.claims} sq</span><span class="pt">${r.score}</span></div>`;
+  }).join('');
+  const rv = G.board.slice().sort((a, b) => (a.fits.length || 99) - (b.fits.length || 99));
+  $('reveal').innerHTML = rv.map(s => {
+    const f = FACTS[s.f];
+    const who = s.fits.length === 0 ? 'nobody!' : s.fits.length === P.length ? 'everyone!' : s.fits.map(p => P[p].name).join(', ');
+    return `<div class="rv"><span>${f[0]} ${esc(f[1])}</span><span>${esc(who)}</span></div>`;
+  }).join('');
+  show('end'); sfx.bingo(); confetti();
+}
+$('againBtn').onclick = () => startGame();
+$('newBtn').onclick = () => { G = null; renderRoster(); show('setup'); };
+
+// ---------- confetti ----------
+function confetti() {
+  const c = $('confetti'), x = c.getContext('2d');
+  c.width = innerWidth; c.height = innerHeight;
+  const bits = Array.from({ length: 120 }, () => ({
+    x: Math.random() * c.width, y: -20 - Math.random() * c.height * 0.5,
+    vx: (Math.random() - 0.5) * 3, vy: 2 + Math.random() * 4, r: Math.random() * 6.3, s: 5 + Math.random() * 7,
+    col: COLORS[Math.floor(Math.random() * COLORS.length)]
+  }));
+  let f = 0;
+  (function step() {
+    x.clearRect(0, 0, c.width, c.height);
+    for (const b of bits) {
+      b.x += b.vx; b.y += b.vy; b.r += 0.1;
+      x.save(); x.translate(b.x, b.y); x.rotate(b.r); x.fillStyle = b.col; x.fillRect(-b.s / 2, -b.s / 4, b.s, b.s / 2); x.restore();
+    }
+    if (++f < 150) requestAnimationFrame(step); else x.clearRect(0, 0, c.width, c.height);
+  })();
+}
+
+renderRoster(); renderSegs();
+</script>
+</body>
+</html>

@@ -1,0 +1,955 @@
+<!-- CONCEPT: SPEAKING/CHALLENGE - "Hold the Floor": a panel-show party game where any listener can shout CHALLENGE to freeze a shared 60-second clock the moment the speaker hesitates, repeats a word or wanders off topic; the room rules on it, an upheld challenger scores and TAKES OVER the same topic as the clock runs on, and whoever is still talking when the whistle blows banks the big points. Twist cards (Banned Word, Swerve, Whisper, Short Fuse, Hot Mic, Accent Relay), undoable rulings, 160 topics in 4 decks, end-of-game awards | Players: 3-10 | ~15-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Hold the Floor</title>
+<style>
+:root {
+  --bg: #0d0f1c;
+  --bg2: #151a2e;
+  --panel: #1b2140;
+  --panel2: #232a50;
+  --line: #2f3866;
+  --text: #eef1ff;
+  --muted: #9aa3cc;
+  --gold: #ffc94a;
+  --red: #ff4d5e;
+  --teal: #36d6c3;
+  --blue: #5b8cff;
+  --violet: #b07cff;
+  --radius: 16px;
+  --gap: clamp(8px, 2.2vw, 14px);
+  --font: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+  background: radial-gradient(ellipse at 50% -10%, #26306a 0%, var(--bg) 60%) fixed, var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+}
+button { font-family: inherit; cursor: pointer; border: none; color: inherit; }
+input { font-family: inherit; user-select: text; -webkit-user-select: text; }
+
+#app { position: fixed; inset: 0; max-width: 720px; margin: 0 auto; }
+.scr {
+  position: absolute; inset: 0;
+  display: none; flex-direction: column;
+  padding: max(10px, env(safe-area-inset-top)) clamp(12px, 4vw, 22px) max(12px, env(safe-area-inset-bottom));
+  gap: var(--gap);
+}
+.scr.active { display: flex; }
+.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+h1.title {
+  margin: 6px 0 0; text-align: center;
+  font-size: clamp(34px, 11vw, 56px); font-weight: 900; letter-spacing: -1px; line-height: 1.05;
+  background: linear-gradient(90deg, var(--gold), var(--red));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.sub { text-align: center; color: var(--muted); font-size: clamp(13px, 3.6vw, 16px); margin: 0; }
+.mic { text-align: center; font-size: clamp(30px, 9vw, 44px); line-height: 1; margin-top: 4px; }
+
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: clamp(10px, 3vw, 16px);
+}
+.card h3 { margin: 0 0 8px; font-size: clamp(13px, 3.5vw, 15px); text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); }
+
+details.how summary { cursor: pointer; font-weight: 700; color: var(--gold); min-height: 30px; display: flex; align-items: center; }
+details.how ol { margin: 8px 0 0; padding-left: 20px; color: var(--muted); font-size: clamp(13px, 3.5vw, 15px); line-height: 1.45; }
+details.how b { color: var(--text); }
+
+.plist { display: flex; flex-direction: column; gap: 6px; }
+.prow { display: flex; align-items: center; gap: 8px; background: var(--panel2); border-radius: 12px; padding: 4px 4px 4px 12px; min-height: 46px; }
+.prow .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.prow span { flex: 1; font-weight: 600; font-size: clamp(15px, 4vw, 17px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow button { width: 44px; height: 38px; border-radius: 10px; background: transparent; color: var(--muted); font-size: 20px; }
+.addrow { display: flex; gap: 8px; margin-top: 8px; }
+.addrow input {
+  flex: 1; min-width: 0; height: 46px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--bg2); color: var(--text); padding: 0 12px; font-size: 16px;
+}
+.addrow button { height: 46px; padding: 0 16px; border-radius: 12px; background: var(--teal); color: #06231f; font-weight: 800; }
+.hint { color: var(--muted); font-size: 13px; margin: 6px 0 0; }
+
+.opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 6px 0; }
+.opt > label { font-weight: 600; font-size: clamp(14px, 3.8vw, 16px); }
+.seg { display: flex; background: var(--bg2); border-radius: 12px; padding: 3px; gap: 3px; }
+.seg button { min-width: 44px; height: 40px; padding: 0 10px; border-radius: 9px; background: transparent; color: var(--muted); font-weight: 700; font-size: 15px; }
+.seg button.on { background: var(--gold); color: #2a1d00; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  min-height: 44px; padding: 0 14px; border-radius: 22px; background: var(--panel2);
+  border: 2px solid transparent; color: var(--muted); font-weight: 700; font-size: clamp(14px, 3.8vw, 16px);
+}
+.chip.on { border-color: var(--gold); color: var(--text); background: #3a3360; }
+
+.btn {
+  min-height: 56px; border-radius: 16px; font-weight: 900; font-size: clamp(17px, 5vw, 22px);
+  letter-spacing: 1px; text-transform: uppercase; padding: 0 18px;
+}
+.btn.gold { background: linear-gradient(180deg, #ffd873, #f0a923); color: #2a1d00; box-shadow: 0 6px 0 #a76a00; }
+.btn.teal { background: linear-gradient(180deg, #5ef0dd, #22b3a1); color: #04241f; box-shadow: 0 6px 0 #127467; }
+.btn.ghost { background: var(--panel2); color: var(--text); box-shadow: 0 4px 0 #12162e; min-height: 48px; font-size: clamp(14px, 4vw, 17px); }
+.btn:active { transform: translateY(3px); box-shadow: none; }
+.btn:disabled { opacity: .35; pointer-events: none; }
+.row2 { display: flex; gap: 10px; }
+.row2 > * { flex: 1; }
+
+/* top bar */
+.topbar { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.topbar .count { font-weight: 800; color: var(--muted); font-size: clamp(13px, 3.6vw, 15px); letter-spacing: 1px; text-transform: uppercase; }
+.topbar .sp { flex: 1; }
+.iconbtn { width: 44px; height: 44px; border-radius: 12px; background: var(--panel); font-size: 20px; display: grid; place-items: center; }
+.textbtn { height: 44px; padding: 0 12px; border-radius: 12px; background: var(--panel); color: var(--muted); font-weight: 700; font-size: 14px; }
+.textbtn.arm { background: var(--red); color: #fff; }
+
+.twist {
+  border-radius: var(--radius); padding: 10px 14px;
+  background: linear-gradient(135deg, #3a1f5c, #24204a); border: 1px solid #6b47b8;
+}
+.twist .tn { font-weight: 900; color: var(--violet); text-transform: uppercase; letter-spacing: 1.5px; font-size: clamp(13px, 3.6vw, 15px); }
+.twist .td { color: #d9ccff; font-size: clamp(13px, 3.6vw, 15px); margin-top: 3px; line-height: 1.35; }
+.twist.final { background: linear-gradient(135deg, #5c3d0a, #3a2a10); border-color: #b8862a; }
+.twist.final .tn { color: var(--gold); }
+.twist.final .td { color: #ffe7b0; }
+
+.topic {
+  text-align: center; border-radius: 22px; padding: clamp(16px, 5vw, 28px) 14px;
+  background: linear-gradient(160deg, #2c3570, #1b2140); border: 2px solid #46509a;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+.topic .lbl { color: var(--muted); font-size: 12px; letter-spacing: 3px; text-transform: uppercase; font-weight: 700; }
+.topic .tt { font-size: clamp(24px, 8vw, 40px); font-weight: 900; line-height: 1.12; margin-top: 6px; }
+.rules3 { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; }
+.rules3 span { background: var(--panel); border-radius: 20px; padding: 6px 12px; font-size: clamp(12px, 3.3vw, 14px); color: var(--muted); font-weight: 700; }
+.rules3 span b { color: var(--red); }
+
+.starter .chip.on { border-color: var(--teal); }
+
+/* live */
+#scrLive .topicmini { text-align: center; font-weight: 800; font-size: clamp(18px, 5.4vw, 26px); line-height: 1.15; padding: 0 6px; }
+#scrLive .topicmini small { display: block; color: var(--muted); font-size: 11px; letter-spacing: 3px; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+#scrLive .topicmini.swerved { animation: swerve .7s ease; color: var(--violet); }
+@keyframes swerve { 0% { transform: rotate(-4deg) scale(1.15); } 50% { transform: rotate(3deg) scale(1.05); } 100% { transform: none; } }
+.clockwrap { position: relative; width: min(60vw, 30vh, 250px); aspect-ratio: 1; margin: 0 auto; flex: none; }
+.clockwrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.clockwrap .ctr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.clockwrap .secs { font-size: clamp(40px, 13vw, 66px); font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; }
+.clockwrap .state { font-size: 12px; letter-spacing: 2px; font-weight: 800; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+.clockwrap.low .secs { color: var(--red); }
+.clockwrap.paused .secs { color: var(--gold); }
+.speaker { text-align: center; }
+.speaker .lbl { color: var(--muted); font-size: 12px; letter-spacing: 3px; text-transform: uppercase; font-weight: 700; }
+.speaker .nm { font-size: clamp(26px, 8vw, 38px); font-weight: 900; line-height: 1.1; }
+.speaker .nm.flash { animation: pop .5s ease; }
+@keyframes pop { 0% { transform: scale(1.35); color: var(--teal); } 100% { transform: scale(1); } }
+.statusline { text-align: center; color: var(--muted); font-size: clamp(13px, 3.6vw, 15px); min-height: 20px; }
+.statusline span b { color: var(--text); }
+.grow { flex: 1; min-height: 4px; }
+.bigchal {
+  width: 100%; min-height: clamp(76px, 13vh, 110px); border-radius: 24px;
+  background: radial-gradient(circle at 50% 30%, #ff7a86, var(--red) 60%, #c4263a); color: #fff;
+  font-size: clamp(26px, 8vw, 40px); font-weight: 900; letter-spacing: 3px;
+  box-shadow: 0 8px 0 #8a1424, 0 0 30px rgba(255,77,94,.35);
+  flex: none;
+}
+.bigchal:active { transform: translateY(4px); box-shadow: 0 2px 0 #8a1424; }
+.bigchal small { display: block; font-size: 12px; letter-spacing: 2px; opacity: .85; font-weight: 700; }
+.bigchal.resume { background: radial-gradient(circle at 50% 30%, #7ff5e6, var(--teal) 60%, #1a9e8e); color: #03231e; box-shadow: 0 8px 0 #0e6b60; }
+.liverow { display: flex; gap: 8px; flex: none; }
+.liverow .textbtn { flex: 1; }
+.minisb { display: flex; gap: 6px; overflow-x: auto; flex: none; padding-bottom: 2px; scrollbar-width: none; }
+.minisb::-webkit-scrollbar { display: none; }
+.minisb div { flex: none; background: var(--panel); border-radius: 12px; padding: 5px 10px; font-size: 13px; font-weight: 700; color: var(--muted); border: 2px solid transparent; white-space: nowrap; }
+.minisb div b { color: var(--text); margin-left: 4px; }
+.minisb div.on { border-color: var(--teal); color: var(--text); }
+
+/* challenge sheet */
+.shade { position: fixed; inset: 0; background: rgba(5,6,14,.72); z-index: 20; display: none; }
+.shade.show { display: block; }
+.sheet {
+  position: fixed; left: 50%; bottom: 0; transform: translate(-50%, 105%);
+  width: min(720px, 100%); max-height: 94%; z-index: 21;
+  background: var(--bg2); border-top: 3px solid var(--red); border-radius: 24px 24px 0 0;
+  padding: 14px clamp(12px, 4vw, 22px) max(14px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 10px; overflow-y: auto;
+  transition: transform .22s ease;
+}
+.sheet.show { transform: translate(-50%, 0); }
+.sheet .hd { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.sheet .hd .t { font-size: clamp(24px, 7.5vw, 34px); font-weight: 900; color: var(--red); letter-spacing: 2px; }
+.sheet .hd .frz { color: var(--gold); font-weight: 800; font-variant-numeric: tabular-nums; font-size: clamp(14px, 4vw, 17px); }
+.sheet .q { font-weight: 800; font-size: clamp(14px, 4vw, 17px); }
+.sheet .q small { color: var(--muted); font-weight: 600; }
+.reasons { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; }
+.reason { min-height: 52px; border-radius: 14px; background: var(--panel); border: 2px solid transparent; text-align: left; padding: 6px 12px; }
+.reason b { display: block; font-size: 15px; }
+.reason span { display: block; font-size: 12px; color: var(--muted); line-height: 1.25; }
+.reason.on { border-color: var(--gold); background: #3a3360; }
+.reason.tw b { color: var(--violet); }
+.verdicts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.verdict { min-height: 64px; border-radius: 16px; font-weight: 900; font-size: clamp(15px, 4.4vw, 19px); letter-spacing: 1px; padding: 4px 8px; }
+.verdict small { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0; opacity: .85; }
+.verdict.up { background: var(--teal); color: #03231e; }
+.verdict.rej { background: var(--red); color: #fff; }
+.verdict.split { grid-column: 1 / -1; background: var(--panel2); color: var(--text); min-height: 50px; }
+.verdict:disabled { opacity: .3; pointer-events: none; }
+.cancel { background: transparent; color: var(--muted); text-decoration: underline; min-height: 44px; font-size: 14px; }
+.verdicthint { color: var(--muted); font-size: 13px; text-align: center; min-height: 18px; }
+
+/* summary */
+.whistle { text-align: center; }
+.whistle .big { font-size: clamp(30px, 10vw, 48px); font-weight: 900; color: var(--gold); letter-spacing: 2px; }
+.whistle .who { font-size: clamp(16px, 4.6vw, 20px); margin-top: 4px; }
+.whistle .who b { color: var(--teal); }
+.log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: clamp(13px, 3.6vw, 15px); }
+.log li { display: flex; gap: 8px; align-items: baseline; padding: 6px 8px; border-radius: 10px; background: var(--panel2); }
+.log li .tm { color: var(--gold); font-variant-numeric: tabular-nums; font-weight: 800; flex: none; width: 38px; }
+.log li .ev { flex: 1; color: var(--muted); }
+.log li .ev b { color: var(--text); }
+.log li .pts { flex: none; font-weight: 900; color: var(--teal); }
+.board { display: flex; flex-direction: column; gap: 6px; }
+.brow { display: flex; align-items: center; gap: 10px; background: var(--panel2); border-radius: 12px; padding: 8px 12px; min-height: 46px; }
+.brow .rk { width: 24px; font-weight: 900; color: var(--muted); }
+.brow .nm { flex: 1; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brow .sc { font-weight: 900; font-size: 20px; font-variant-numeric: tabular-nums; }
+.brow .dl { color: var(--teal); font-weight: 800; font-size: 13px; width: 34px; text-align: right; }
+.brow.lead { background: linear-gradient(90deg, #4a3a10, var(--panel2)); }
+.brow.lead .sc { color: var(--gold); }
+
+/* end */
+.champ { text-align: center; padding: 6px 0; }
+.champ .crown { font-size: clamp(40px, 12vw, 60px); line-height: 1; }
+.champ .nm { font-size: clamp(28px, 9vw, 44px); font-weight: 900; color: var(--gold); line-height: 1.1; }
+.champ .pt { color: var(--muted); font-weight: 700; }
+.awards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.award { background: var(--panel2); border-radius: 14px; padding: 10px 12px; }
+.award .ic { font-size: 24px; }
+.award .an { font-weight: 900; color: var(--violet); text-transform: uppercase; letter-spacing: 1px; font-size: 13px; }
+.award .aw { font-weight: 800; font-size: 16px; margin-top: 2px; }
+.award .as { color: var(--muted); font-size: 12px; }
+
+.toast {
+  position: fixed; left: 50%; top: 18%; transform: translate(-50%, -20px) scale(.9); opacity: 0;
+  background: var(--gold); color: #2a1d00; font-weight: 900; padding: 12px 22px; border-radius: 16px;
+  font-size: clamp(18px, 5.5vw, 26px); z-index: 40; pointer-events: none; transition: all .25s ease;
+  text-align: center; max-width: 90vw;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
+.toast.violet { background: var(--violet); color: #1a0838; }
+.toast.teal { background: var(--teal); color: #03231e; }
+
+@media (min-width: 768px) {
+  .clockwrap { width: min(40vw, 34vh, 300px); }
+}
+@media (max-height: 620px) {
+  .clockwrap { width: min(60vw, 25vh, 250px); }
+  .clockwrap .secs { font-size: clamp(32px, 9vh, 56px); }
+  .speaker .nm { font-size: clamp(22px, 6vh, 32px); }
+  .bigchal { min-height: 68px; }
+  .sheet { gap: 7px; }
+  .reason { min-height: 44px; }
+  .reason span { display: none; }
+  .verdict { min-height: 52px; }
+  .verdict.split { min-height: 44px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SETUP -->
+  <section id="scrSetup" class="scr active scroll">
+    <div class="mic">🎙️</div>
+    <h1 class="title">Hold the Floor</h1>
+    <p class="sub">Talk for a minute. No hesitation, no repetition, no deviation.<br>Get caught and someone steals your topic.</p>
+
+    <div class="card">
+      <details class="how">
+        <summary>How to play ▸</summary>
+        <ol>
+          <li>Put the phone in the middle. A <b>topic</b> appears and one player starts talking about it. Tap <b>Start the clock</b> the moment they begin.</li>
+          <li>Anyone listening can shout <b>"CHALLENGE!"</b> and slam the red button if the speaker <b>hesitates</b> (um, er, long pause), <b>repeats</b> a word (words in the topic are free) or <b>deviates</b> from the topic. The clock freezes.</li>
+          <li>The room rules. <b>Upheld:</b> the challenger scores 1 and <b>takes over the same topic</b>, and the clock runs on. <b>Rejected:</b> the speaker scores 1 and keeps going.</li>
+          <li>Whoever is talking when the <b>whistle</b> blows scores <b>2</b>. Talk the whole clock with no upheld challenge and get <b>+1 bonus</b>.</li>
+          <li>Twist cards bend some topics. The final topic is worth double. Highest score wins.</li>
+        </ol>
+      </details>
+    </div>
+
+    <div class="card">
+      <h3>Players <span id="pcount"></span></h3>
+      <div class="plist" id="plist"></div>
+      <div class="addrow">
+        <input id="pname" maxlength="14" placeholder="Add a player" autocomplete="off">
+        <button id="padd">ADD</button>
+      </div>
+      <p class="hint" id="phint">3 to 10 players.</p>
+    </div>
+
+    <div class="card">
+      <h3>Game</h3>
+      <div class="opt"><label>Clock</label><div class="seg" id="segClock"></div></div>
+      <div class="opt"><label>Topics</label><div class="seg" id="segTopics"></div></div>
+      <div class="opt"><label>Twist cards</label><div class="seg" id="segTwist"></div></div>
+      <div class="opt" style="flex-direction:column;align-items:stretch"><label>Topic decks</label><div class="chips" id="deckChips"></div></div>
+    </div>
+
+    <button class="btn gold" id="btnStart">Start game</button>
+    <div style="min-height:6px;flex:none"></div>
+  </section>
+
+  <!-- READY -->
+  <section id="scrReady" class="scr">
+    <div class="topbar">
+      <span class="count" id="rdCount">Topic 1 / 8</span><span class="sp"></span>
+      <button class="iconbtn" id="rdMute" aria-label="Sound">🔊</button>
+      <button class="textbtn" id="rdEnd">End game</button>
+    </div>
+    <div class="scroll" style="flex:1;display:flex;flex-direction:column;gap:var(--gap)">
+      <div class="twist" id="rdTwist"><div class="tn"></div><div class="td"></div></div>
+      <div class="topic"><div class="lbl">Your topic</div><div class="tt" id="rdTopic">Socks</div></div>
+      <div class="rules3"><span><b>✕</b> Hesitation</span><span><b>✕</b> Repetition</span><span><b>✕</b> Deviation</span></div>
+      <div class="card starter">
+        <h3>Who starts talking?</h3>
+        <div class="chips" id="rdStarters"></div>
+      </div>
+    </div>
+    <div class="row2">
+      <button class="btn ghost" id="rdReroll" style="flex:.6">New topic</button>
+      <button class="btn teal" id="rdGo">Start the clock</button>
+    </div>
+  </section>
+
+  <!-- LIVE -->
+  <section id="scrLive" class="scr">
+    <div class="topbar">
+      <span class="count" id="lvCount">Topic 1 / 8</span><span class="sp"></span>
+      <span class="count" id="lvTwist" style="color:var(--violet)"></span>
+      <button class="iconbtn" id="lvMute" aria-label="Sound">🔊</button>
+    </div>
+    <div class="topicmini" id="lvTopic"><small>Topic</small><span>Socks</span></div>
+    <div class="clockwrap" id="clock">
+      <svg viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="88" fill="none" stroke="#232a50" stroke-width="14"/>
+        <circle id="ring" cx="100" cy="100" r="88" fill="none" stroke="#36d6c3" stroke-width="14" stroke-linecap="round" stroke-dasharray="552.92" stroke-dashoffset="0"/>
+      </svg>
+      <div class="ctr"><div class="secs" id="secs">60</div><div class="state" id="cstate">Talking</div></div>
+    </div>
+    <div class="speaker"><div class="lbl">On the floor</div><div class="nm" id="lvSpeaker">—</div></div>
+    <div class="statusline" id="lvStatus"></div>
+    <div class="grow"></div>
+    <div class="minisb" id="lvBoard"></div>
+    <div class="liverow" id="lvUndoRow" style="display:none">
+      <button class="textbtn" id="lvUndo">↶ Undo last ruling</button>
+    </div>
+    <button class="bigchal" id="btnChal">CHALLENGE!<small>tap or press space</small></button>
+  </section>
+
+  <!-- SUMMARY -->
+  <section id="scrSummary" class="scr">
+    <div class="topbar">
+      <span class="count" id="smCount">Topic 1 / 8</span><span class="sp"></span>
+      <button class="textbtn" id="smEnd">End game</button>
+    </div>
+    <div class="scroll" style="flex:1;display:flex;flex-direction:column;gap:var(--gap)">
+      <div class="whistle"><div class="big">WHISTLE!</div><div class="who" id="smWho"></div></div>
+      <div class="card"><h3>How it went</h3><ul class="log" id="smLog"></ul></div>
+      <div class="card"><h3>Scores</h3><div class="board" id="smBoard"></div></div>
+    </div>
+    <button class="btn gold" id="smNext">Next topic</button>
+  </section>
+
+  <!-- END -->
+  <section id="scrEnd" class="scr">
+    <div class="scroll" style="flex:1;display:flex;flex-direction:column;gap:var(--gap)">
+      <div class="champ"><div class="crown">🏆</div><div class="nm" id="enName"></div><div class="pt" id="enPts"></div></div>
+      <div class="card"><h3>Final scores</h3><div class="board" id="enBoard"></div></div>
+      <div class="card"><h3>Awards</h3><div class="awards" id="enAwards"></div></div>
+    </div>
+    <div class="row2">
+      <button class="btn ghost" id="enSetup">New setup</button>
+      <button class="btn gold" id="enAgain">Play again</button>
+    </div>
+  </section>
+</div>
+
+<!-- CHALLENGE SHEET -->
+<div class="shade" id="shade"></div>
+<div class="sheet" id="sheet">
+  <div class="hd"><div class="t">CHALLENGE!</div><div class="frz" id="shFrozen">frozen at 0:42</div></div>
+  <div class="q">Who challenged <span id="shSpeaker">Sam</span>?</div>
+  <div class="chips" id="shWho"></div>
+  <div class="q">What for? <small>(optional)</small></div>
+  <div class="reasons" id="shWhy"></div>
+  <div class="q">The room's verdict</div>
+  <div class="verdicts">
+    <button class="verdict up" id="vUp" disabled>UPHELD<small id="vUpS">challenger +1 &amp; takes the floor</small></button>
+    <button class="verdict rej" id="vRej" disabled>REJECTED<small id="vRejS">speaker +1 &amp; keeps going</small></button>
+    <button class="verdict split" id="vSplit" disabled>BENEFIT OF THE DOUBT<small>both +1 · speaker keeps going</small></button>
+  </div>
+  <div class="verdicthint" id="shHint">Pick who challenged first.</div>
+  <button class="cancel" id="shCancel">False alarm, no challenge</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DECKS = {
+  everyday: { name: 'Everyday', topics: [
+    'Socks', 'Umbrellas', 'Breakfast', 'The bus', 'Shoelaces', 'Doorbells', 'Pillows', 'Toothpaste',
+    'Supermarkets', 'Bicycles', 'Rain', 'Keys', 'Sandwiches', 'Mirrors', 'Homework', 'The fridge',
+    'Pockets', 'Alarm clocks', 'Hats', 'Spoons', 'Birthdays', 'Ladders', 'Clouds', 'Libraries',
+    'Elevators', 'Puddles', 'Remote controls', 'Lunchboxes', 'Stairs', 'Haircuts', 'Paperclips', 'Sunglasses',
+    'Backpacks', 'Washing machines', 'Pencils', 'Weekends', 'Neighbours', 'Traffic lights', 'Bubbles', 'Snow'
+  ]},
+  absurd: { name: 'Absurd', topics: [
+    'Why owls should run banks', 'A day in the life of a sock', 'The secret life of traffic cones',
+    'My pet cloud', 'If cats had jobs', 'The moon\'s day off', 'A dinosaur at the dentist',
+    'Why spoons are jealous of forks', 'The world\'s worst superhero', 'A penguin\'s holiday plans',
+    'If trees could talk', 'Aliens visiting a supermarket', 'The pigeon who wanted to fly first class',
+    'A robot learning to dance', 'Inside a snow globe', 'The lost sock\'s great escape',
+    'Why the chicken really crossed the road', 'A ghost who is afraid of people', 'The squirrel stock market',
+    'Running a hotel for bees', 'A wizard who only does chores', 'The giant who loved tiny hats',
+    'If shoes had opinions', 'Life as a garden gnome', 'The world\'s slowest race car',
+    'A dragon trying to make toast', 'Talking to vegetables', 'The day gravity took a break',
+    'A pirate who gets seasick', 'If clouds were made of candy floss', 'The jellyfish job interview',
+    'A cow on the moon', 'The haunted toaster', 'Why bananas wear jackets', 'A snail with a jetpack',
+    'The goldfish\'s memoir', 'A knight afraid of the dark', 'If your shadow went on strike',
+    'The pancake Olympics', 'An octopus learning the piano'
+  ]},
+  howto: { name: 'How To', topics: [
+    'How to apologise to a cat', 'How to build the perfect fort', 'How to win a staring contest',
+    'How to make a terrible sandwich', 'How to train a goldfish', 'How to survive a family road trip',
+    'How to look busy', 'How to tie your shoes', 'How to throw a surprise party', 'How to catch a rainbow',
+    'How to make friends with a pigeon', 'How to pack for the moon', 'How to whistle',
+    'How to win at hide and seek', 'How to walk a dog that refuses to walk', 'How to make your bed in 10 seconds',
+    'How to talk your way out of chores', 'How to brush a lion\'s teeth', 'How to plan a picnic',
+    'How to get out of a sleeping bag', 'How to make a paper aeroplane', 'How to stop hiccups',
+    'How to be a spy', 'How to name a pet', 'How to bake a cake without a kitchen',
+    'How to tidy a messy room', 'How to escape quicksand', 'How to tell a good joke',
+    'How to wake up a sleepy teenager', 'How to start a band', 'How to grow a giant pumpkin',
+    'How to explain the internet to a knight', 'How to cross a river with no bridge', 'How to be a good guest',
+    'How to wrap a present badly', 'How to choose a pizza topping', 'How to calm a dragon',
+    'How to sneak a snack', 'How to make a sandcastle', 'How to win an argument with a toddler'
+  ]},
+  opinions: { name: 'Hot Takes', topics: [
+    'The best sandwich ever made', 'Why Mondays get a bad reputation', 'The greatest invention of all time',
+    'Pineapple on pizza', 'Cats versus dogs', 'The perfect holiday', 'Why breakfast for dinner wins',
+    'The most overrated vegetable', 'The best season of the year', 'Why naps are underrated',
+    'The ideal superpower', 'The worst chore in the house', 'Socks with sandals', 'The best board game',
+    'Why cereal is a soup', 'The best ice cream flavour', 'Early birds versus night owls',
+    'The best animal to have as a sidekick', 'Why everyone should learn to juggle', 'The perfect birthday cake',
+    'The most annoying sound in the world', 'Beach versus mountains', 'The best way to eat a biscuit',
+    'Why the middle seat is the worst', 'Crunchy versus smooth peanut butter', 'The best smell in the world',
+    'Why the stairs beat the lift', 'The greatest snack of all time', 'The best place to sit at a party',
+    'Why everyone loves bubble wrap', 'The best name for a goldfish', 'Summer holidays versus winter holidays',
+    'The ideal weekend', 'Why hats deserve a comeback', 'The most useful room in the house',
+    'Tea versus hot chocolate', 'The best sound effect', 'Why socks always go missing',
+    'The best colour', 'Why rainy days are secretly great'
+  ]}
+};
+
+const BANNED_WORDS = ['and', 'so', 'like', 'I', 'the', 'really', 'you', 'just', 'it', 'very'];
+
+const TWISTS = [
+  { id: 'double', name: 'Double Points', desc: () => 'Every point on this topic counts twice.' },
+  { id: 'banned', name: 'Banned Word', desc: w => `Nobody may say “${w}”. Saying it is a valid challenge.`, reason: w => ({ k: 'banned', b: `Said “${w}”`, s: 'the banned word' }) },
+  { id: 'swerve', name: 'Swerve', desc: () => 'Partway through, the topic changes without warning. Keep talking, about the NEW one.' },
+  { id: 'whisper', name: 'Whisper Round', desc: () => 'Speakers must whisper. Raising your voice is a valid challenge.', reason: () => ({ k: 'loud', b: 'Too loud', s: 'broke the whisper' }) },
+  { id: 'fuse', name: 'Short Fuse', desc: () => 'Half the clock. The whistle is worth 3.' },
+  { id: 'hotmic', name: 'Hot Mic', desc: () => 'A rejected challenge costs the challenger a point. Be sure.' },
+  { id: 'accent', name: 'Accent Relay', desc: () => 'The starter picks an accent. Whoever takes the floor must keep it. Dropping it is a valid challenge.', reason: () => ({ k: 'accent', b: 'Dropped accent', s: 'lost the voice' }) }
+];
+
+const REASONS = [
+  { k: 'hes', b: 'Hesitation', s: 'um, er, a long pause' },
+  { k: 'rep', b: 'Repetition', s: 'said a word twice' },
+  { k: 'dev', b: 'Deviation', s: 'wandered off topic' }
+];
+
+const PCOLORS = ['#36d6c3', '#ffc94a', '#ff4d5e', '#5b8cff', '#b07cff', '#ff8a3d', '#7be36b', '#ff6fc8', '#4fd1ff', '#e0e0e0'];
+const LS_KEY = 'cowork-holdthefloor-settings';
+
+const $ = s => document.querySelector(s);
+const now = () => performance.now();
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = s => { s = Math.max(0, Math.ceil(s - 1e-6)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const RING = 552.92;
+
+/* ---------- settings ---------- */
+const cfg = { names: ['Player 1', 'Player 2', 'Player 3'], clock: 60, topics: 8, twists: true,
+  decks: { everyday: true, absurd: true, howto: true, opinions: true }, muted: false };
+try {
+  const s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+  if (Array.isArray(s.names) && s.names.length) cfg.names = s.names.filter(n => typeof n === 'string' && n.trim()).slice(0, 10);
+  if ([30, 45, 60, 90].includes(s.clock)) cfg.clock = s.clock;
+  if ([4, 6, 8, 10, 12].includes(s.topics)) cfg.topics = s.topics;
+  if (typeof s.twists === 'boolean') cfg.twists = s.twists;
+  if (typeof s.muted === 'boolean') cfg.muted = s.muted;
+  if (s.decks && typeof s.decks === 'object') for (const k in DECKS) if (typeof s.decks[k] === 'boolean') cfg.decks[k] = s.decks[k];
+  if (!Object.values(cfg.decks).some(Boolean)) cfg.decks.everyday = true;
+} catch (e) {}
+const save = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); } catch (e) {} };
+
+/* ---------- sound ---------- */
+let AC = null;
+function ac() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, d, type = 'sine', vol = 0.15, when = 0, slideTo = null) {
+  if (cfg.muted) return;
+  const a = ac(); if (!a) return;
+  const t = a.currentTime + when;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + d);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g).connect(a.destination);
+  o.start(t); o.stop(t + d + 0.03);
+}
+const SFX = {
+  tick: () => tone(1000, 0.05, 'square', 0.05),
+  go: () => { tone(660, 0.1, 'triangle', 0.15); tone(990, 0.18, 'triangle', 0.15, 0.1); },
+  buzz: () => { tone(130, 0.5, 'sawtooth', 0.18); tone(138, 0.5, 'square', 0.08); },
+  up: () => { tone(660, 0.1, 'triangle', 0.15); tone(880, 0.1, 'triangle', 0.15, 0.1); tone(1320, 0.2, 'triangle', 0.13, 0.2); },
+  rej: () => { tone(330, 0.18, 'triangle', 0.15); tone(250, 0.3, 'triangle', 0.15, 0.16); },
+  split: () => { tone(520, 0.15, 'sine', 0.14); tone(520, 0.15, 'sine', 0.14, 0.18); },
+  swerve: () => tone(380, 0.35, 'triangle', 0.16, 0, 1100),
+  whistle: () => { tone(2050, 0.35, 'sine', 0.14, 0, 2350); tone(2350, 0.55, 'sine', 0.13, 0.4, 2050); }
+};
+const sfx = k => { try { SFX[k](); } catch (e) {} };
+
+function syncMute() { for (const b of [$('#rdMute'), $('#lvMute')]) b.textContent = cfg.muted ? '🔇' : '🔊'; }
+function toggleMute() { cfg.muted = !cfg.muted; save(); syncMute(); if (!cfg.muted) sfx('tick'); }
+
+/* ---------- ui helpers ---------- */
+function show(id) { document.querySelectorAll('.scr').forEach(s => s.classList.toggle('active', s.id === id)); }
+let toastT = 0;
+function toast(msg, cls = '') {
+  const t = $('#toast'); t.textContent = msg; t.className = 'toast show ' + cls;
+  clearTimeout(toastT); toastT = setTimeout(() => { t.className = 'toast ' + cls; }, 1400);
+}
+function armButton(btn, label, fn) {
+  let armed = 0;
+  btn.addEventListener('click', () => {
+    if (armed) { clearTimeout(armed); armed = 0; btn.classList.remove('arm'); btn.textContent = label; fn(); return; }
+    btn.classList.add('arm'); btn.textContent = 'Tap again';
+    armed = setTimeout(() => { armed = 0; btn.classList.remove('arm'); btn.textContent = label; }, 2500);
+  });
+}
+
+/* ---------- setup screen ---------- */
+function renderPlayers() {
+  const pl = $('#plist');
+  pl.innerHTML = cfg.names.map((n, i) =>
+    `<div class="prow"><i class="dot" style="background:${PCOLORS[i % PCOLORS.length]}"></i><span>${esc(n)}</span>` +
+    `<button data-rm="${i}" aria-label="Remove ${esc(n)}">✕</button></div>`).join('');
+  $('#pcount').textContent = `(${cfg.names.length})`;
+  const ok = cfg.names.length >= 3;
+  $('#btnStart').disabled = !ok;
+  $('#phint').textContent = ok ? (cfg.names.length >= 10 ? 'Full table: 10 players.' : '3 to 10 players.') : `Add ${3 - cfg.names.length} more: you need a speaker, a challenger and a room.`;
+  $('#padd').disabled = cfg.names.length >= 10;
+}
+function addPlayer() {
+  const inp = $('#pname');
+  let n = inp.value.replace(/\s+/g, ' ').trim().slice(0, 14);
+  if (!n || cfg.names.length >= 10) { inp.focus(); return; }
+  if (cfg.names.some(x => x.toLowerCase() === n.toLowerCase())) { toast('Name already taken'); return; }
+  cfg.names.push(n); inp.value = ''; save(); renderPlayers(); inp.focus();
+}
+$('#plist').addEventListener('click', e => {
+  const b = e.target.closest('[data-rm]'); if (!b) return;
+  cfg.names.splice(+b.dataset.rm, 1); save(); renderPlayers();
+});
+$('#padd').addEventListener('click', addPlayer);
+$('#pname').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addPlayer(); } });
+
+function makeSeg(el, opts, get, set) {
+  const draw = () => { el.innerHTML = opts.map(([v, l]) => `<button class="${get() === v ? 'on' : ''}" data-v="${v}">${l}</button>`).join(''); };
+  el.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const v = opts.find(o => String(o[0]) === b.dataset.v)[0];
+    set(v); save(); draw();
+  });
+  draw();
+}
+makeSeg($('#segClock'), [[30, '30s'], [45, '45s'], [60, '60s'], [90, '90s']], () => cfg.clock, v => cfg.clock = v);
+makeSeg($('#segTopics'), [[4, '4'], [6, '6'], [8, '8'], [10, '10'], [12, '12']], () => cfg.topics, v => cfg.topics = v);
+makeSeg($('#segTwist'), [[true, 'On'], [false, 'Off']], () => cfg.twists, v => cfg.twists = v);
+function renderDecks() {
+  $('#deckChips').innerHTML = Object.entries(DECKS).map(([k, d]) =>
+    `<button class="chip ${cfg.decks[k] ? 'on' : ''}" data-deck="${k}">${d.name} <small style="opacity:.6">${d.topics.length}</small></button>`).join('');
+}
+$('#deckChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-deck]'); if (!b) return;
+  const k = b.dataset.deck;
+  if (cfg.decks[k] && Object.values(cfg.decks).filter(Boolean).length === 1) { toast('Keep at least one deck'); return; }
+  cfg.decks[k] = !cfg.decks[k]; save(); renderDecks();
+});
+$('#btnStart').addEventListener('click', () => { if (cfg.names.length >= 3) { ac(); newGame(); } });
+
+/* ---------- game state ---------- */
+let G = null;   // whole game
+let C = null;   // current topic
+
+function newGame() {
+  G = {
+    players: cfg.names.map((n, i) => ({ name: n, color: PCOLORS[i % PCOLORS.length], score: 0, held: 0, bestRun: 0, upheld: 0, rejected: 0, whistles: 0, challenges: 0 })),
+    ti: 0, n: cfg.topics, used: new Set(), pool: [], lastTwist: null,
+    offset: Math.floor(Math.random() * cfg.names.length)
+  };
+  setupTopic();
+}
+function drawTopic() {
+  if (!G.pool.length) {
+    const all = [];
+    for (const k in DECKS) if (cfg.decks[k]) all.push(...DECKS[k].topics);
+    let fresh = all.filter(t => !G.used.has(t));
+    if (!fresh.length) { G.used.clear(); fresh = all; }
+    G.pool = shuffle(fresh);
+  }
+  const t = G.pool.pop(); G.used.add(t); return t;
+}
+function setupTopic() {
+  const isFinal = G.ti === G.n - 1;
+  let twist = null, word = null;
+  if (isFinal) twist = { id: 'final', name: 'Final Topic', desc: () => 'Every point counts double. Make it count.' };
+  else if (cfg.twists && G.ti > 0 && Math.random() < 0.55) {
+    const opts = TWISTS.filter(t => t.id !== G.lastTwist);
+    twist = opts[Math.floor(Math.random() * opts.length)];
+    if (twist.id === 'banned') word = BANNED_WORDS[Math.floor(Math.random() * BANNED_WORDS.length)];
+  }
+  G.lastTwist = twist ? twist.id : null;
+  const len = twist && twist.id === 'fuse' ? Math.max(15, Math.round(cfg.clock / 2)) : cfg.clock;
+  C = {
+    topic: drawTopic(), twist, word, len,
+    mult: twist && (twist.id === 'double' || twist.id === 'final') ? 2 : 1,
+    whistlePts: twist && twist.id === 'fuse' ? 3 : 2,
+    starter: (G.offset + G.ti) % G.players.length, speaker: null,
+    remAtResume: len, running: false, resumeAt: 0, segStart: len, runStart: len,
+    unbroken: true, log: [], phase: 'ready', undo: null, chal: { who: null, why: null },
+    swerveAt: twist && twist.id === 'swerve' ? len * (0.35 + Math.random() * 0.3) : -1, swerved: false,
+    lastTick: null, startScores: G.players.map(p => p.score)
+  };
+  renderReady(); show('scrReady');
+}
+
+/* ---------- ready ---------- */
+function twistText() {
+  if (!C.twist) return null;
+  return { name: C.twist.name, desc: C.twist.desc(C.word), final: C.twist.id === 'final' };
+}
+function renderReady() {
+  $('#rdCount').textContent = `Topic ${G.ti + 1} / ${G.n}`;
+  const tw = twistText(), box = $('#rdTwist');
+  box.style.display = tw ? '' : 'none';
+  if (tw) { box.classList.toggle('final', tw.final); box.querySelector('.tn').textContent = (tw.final ? '★ ' : '⚡ ') + tw.name; box.querySelector('.td').textContent = tw.desc; }
+  $('#rdTopic').textContent = C.topic;
+  $('#rdStarters').innerHTML = G.players.map((p, i) =>
+    `<button class="chip ${i === C.starter ? 'on' : ''}" data-st="${i}">${esc(p.name)}</button>`).join('');
+}
+$('#rdStarters').addEventListener('click', e => {
+  const b = e.target.closest('[data-st]'); if (!b || !C || C.phase !== 'ready') return;
+  C.starter = +b.dataset.st; renderReady();
+});
+$('#rdReroll').addEventListener('click', () => { if (!C || C.phase !== 'ready') return; C.topic = drawTopic(); renderReady(); });
+$('#rdGo').addEventListener('click', startClock);
+$('#rdMute').addEventListener('click', toggleMute);
+$('#lvMute').addEventListener('click', toggleMute);
+
+/* ---------- clock ---------- */
+function remaining() { return C.running ? Math.max(0, C.remAtResume - (now() - C.resumeAt) / 1000) : C.remAtResume; }
+function credit(r) {
+  const p = G.players[C.speaker];
+  p.held += Math.max(0, C.segStart - r);
+  C.segStart = r;
+  p.bestRun = Math.max(p.bestRun, C.runStart - r);
+}
+function pauseClock() { const r = remaining(); credit(r); C.remAtResume = r; C.running = false; }
+function startClock() {
+  if (!C || C.phase !== 'ready') return;
+  C.speaker = C.starter;
+  C.remAtResume = C.segStart = C.runStart = C.len;
+  C.log.push({ t: 0, html: `<b>${esc(G.players[C.speaker].name)}</b> starts talking`, pts: '' });
+  ac(); sfx('go');
+  show('scrLive');
+  setSpeakerName(false);
+  resume();
+}
+function resume() {
+  if (!C || (C.phase !== 'paused' && C.phase !== 'ready')) return;
+  C.running = true; C.resumeAt = now(); C.segStart = C.remAtResume;
+  C.phase = 'live'; C.undo = null;
+  renderLive();
+}
+setInterval(tick, 50);
+function tick() {
+  if (!C || !C.running || C.phase !== 'live') return;
+  const r = remaining();
+  if (C.swerveAt > 0 && !C.swerved && r <= C.swerveAt) {
+    C.swerved = true;
+    const old = C.topic; C.topic = drawTopic();
+    C.log.push({ t: C.len - r, html: `Swerve! <b>${esc(old)}</b> became <b>${esc(C.topic)}</b>`, pts: '' });
+    sfx('swerve'); toast('SWERVE! New topic', 'violet');
+    renderTopicMini(true);
+  }
+  const s = Math.ceil(r);
+  if (s <= 5 && s > 0 && s !== C.lastTick) { C.lastTick = s; sfx('tick'); }
+  drawClock(r);
+  if (r <= 0) whistle();
+}
+function drawClock(r) {
+  const low = r <= 10 && C.phase !== 'done';
+  const paused = C.phase === 'paused' || C.phase === 'challenge';
+  $('#ring').setAttribute('stroke-dashoffset', (RING * (1 - r / C.len)).toFixed(2));
+  $('#ring').setAttribute('stroke', paused ? '#ffc94a' : low ? '#ff4d5e' : '#36d6c3');
+  const secs = $('#secs');
+  const txt = String(Math.max(0, Math.ceil(r - 1e-6)));
+  if (secs.textContent !== txt) secs.textContent = txt;
+  const cw = $('#clock'); cw.classList.toggle('low', low && !paused); cw.classList.toggle('paused', paused);
+  $('#cstate').textContent = C.phase === 'done' ? 'Whistle!' : C.phase === 'challenge' ? 'Frozen' : paused ? 'Paused' : 'Talking';
+}
+
+/* ---------- live screen ---------- */
+function renderTopicMini(swerved) {
+  const el = $('#lvTopic');
+  el.querySelector('span').textContent = C.topic;
+  el.querySelector('small').textContent = C.swerved ? 'New topic!' : 'Topic';
+  if (swerved) { el.classList.remove('swerved'); void el.offsetWidth; el.classList.add('swerved'); }
+}
+function setSpeakerName(flash) {
+  const el = $('#lvSpeaker');
+  el.textContent = G.players[C.speaker].name;
+  el.style.color = G.players[C.speaker].color;
+  if (flash) { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+}
+function renderLive() {
+  $('#lvCount').textContent = `Topic ${G.ti + 1} / ${G.n}`;
+  const tw = C.twist;
+  $('#lvTwist').textContent = !tw ? '' : tw.id === 'final' ? '★ Final ×2' : tw.id === 'banned' ? `⚡ No “${C.word}”` : '⚡ ' + tw.name;
+  renderTopicMini(false);
+  setSpeakerName(false);
+  const sp = esc(G.players[C.speaker].name);
+  $('#lvStatus').innerHTML = C.phase === 'paused'
+    ? `<span>Clock frozen. Tap RESUME when <b>${sp}</b> starts talking.</span>`
+    : C.phase === 'done' ? '<span>Time!</span>'
+    : '<span>Hear an um, a repeat or a ramble? <b>Challenge!</b></span>';
+  $('#lvBoard').innerHTML = G.players.map((p, i) =>
+    `<div class="${i === C.speaker ? 'on' : ''}"><span style="color:${p.color}">●</span> ${esc(p.name)}<b>${p.score}</b></div>`).join('');
+  $('#lvUndoRow').style.display = C.phase === 'paused' && C.undo ? '' : 'none';
+  const btn = $('#btnChal');
+  btn.disabled = C.phase === 'done' || C.phase === 'challenge';
+  btn.classList.toggle('resume', C.phase === 'paused');
+  btn.innerHTML = C.phase === 'paused' ? `RESUME<small>${sp} talks · ${fmt(C.remAtResume)} left</small>` : 'CHALLENGE!<small>tap or press space</small>';
+  drawClock(remaining());
+}
+$('#btnChal').addEventListener('click', () => {
+  if (!C) return;
+  if (C.phase === 'live') challenge();
+  else if (C.phase === 'paused') { sfx('go'); resume(); }
+});
+
+/* ---------- challenge sheet ---------- */
+function reasonList() {
+  const list = REASONS.slice();
+  if (C.twist && C.twist.reason) list.push({ ...C.twist.reason(C.word), tw: true });
+  return list;
+}
+function challenge() {
+  if (!C || C.phase !== 'live' || !C.running || C.speaker == null) return;
+  if (remaining() <= 0.05) return;
+  pauseClock();
+  C.phase = 'challenge';
+  C.chal = { who: null, why: null };
+  sfx('buzz');
+  renderLive();
+  openSheet();
+}
+function openSheet() {
+  const sp = G.players[C.speaker], m = C.mult, hot = C.twist && C.twist.id === 'hotmic';
+  $('#shFrozen').textContent = `frozen · ${fmt(C.remAtResume)} left`;
+  $('#shSpeaker').textContent = sp.name;
+  $('#vUpS').textContent = `challenger +${m} & takes the floor`;
+  $('#vRejS').textContent = hot ? `speaker +${m} · challenger −1 (Hot Mic)` : `speaker +${m} & keeps going`;
+  renderSheet();
+  $('#shade').classList.add('show'); $('#sheet').classList.add('show');
+}
+function renderSheet() {
+  $('#shWho').innerHTML = G.players.map((p, i) => i === C.speaker ? '' :
+    `<button class="chip ${C.chal.who === i ? 'on' : ''}" data-who="${i}"><span style="color:${p.color}">●</span> ${esc(p.name)}</button>`).join('');
+  $('#shWhy').innerHTML = reasonList().map(r =>
+    `<button class="reason ${r.tw ? 'tw' : ''} ${C.chal.why === r.k ? 'on' : ''}" data-why="${r.k}"><b>${esc(r.b)}</b><span>${esc(r.s)}</span></button>`).join('');
+  const ok = C.chal.who != null;
+  for (const id of ['#vUp', '#vRej', '#vSplit']) $(id).disabled = !ok;
+  $('#shHint').innerHTML = ok
+    ? `<b>${esc(G.players[C.chal.who].name)}</b> vs <b>${esc(G.players[C.speaker].name)}</b>: argue it out, then tap the verdict.`
+    : 'Pick who challenged first.';
+}
+function closeSheet() { $('#shade').classList.remove('show'); $('#sheet').classList.remove('show'); }
+$('#shWho').addEventListener('click', e => {
+  const b = e.target.closest('[data-who]'); if (!b || C.phase !== 'challenge') return;
+  const i = +b.dataset.who; if (i === C.speaker) return;
+  C.chal.who = i; renderSheet();
+});
+$('#shWhy').addEventListener('click', e => {
+  const b = e.target.closest('[data-why]'); if (!b || C.phase !== 'challenge') return;
+  C.chal.why = C.chal.why === b.dataset.why ? null : b.dataset.why; renderSheet();
+});
+$('#vUp').addEventListener('click', () => rule('up'));
+$('#vRej').addEventListener('click', () => rule('rej'));
+$('#vSplit').addEventListener('click', () => rule('split'));
+$('#shCancel').addEventListener('click', () => {
+  if (!C || C.phase !== 'challenge') return;
+  C.phase = 'paused'; C.undo = null; closeSheet(); renderLive();
+});
+
+function rule(kind) {
+  if (!C || C.phase !== 'challenge' || C.chal.who == null || C.chal.who === C.speaker) return;
+  C.undo = JSON.stringify({ players: G.players, speaker: C.speaker, runStart: C.runStart, segStart: C.segStart, unbroken: C.unbroken, logLen: C.log.length, chal: C.chal });
+  const ch = G.players[C.chal.who], sp = G.players[C.speaker], m = C.mult;
+  const r = reasonList().find(x => x.k === C.chal.why);
+  const why = r ? ` for <i>${esc(r.b.toLowerCase())}</i>` : '';
+  const t = C.len - C.remAtResume;
+  const who = `<b>${esc(ch.name)}</b> challenged <b>${esc(sp.name)}</b>${why}`;
+  ch.challenges++;
+  if (kind === 'up') {
+    ch.score += m; ch.upheld++;
+    C.log.push({ t, html: `${who}: upheld, takes the floor`, pts: `+${m}` });
+    C.speaker = C.chal.who; C.runStart = C.segStart = C.remAtResume; C.unbroken = false;
+    sfx('up'); toast(`${ch.name} takes the floor!`, 'teal');
+    setSpeakerName(true);
+  } else if (kind === 'rej') {
+    sp.score += m; ch.rejected++;
+    const hot = C.twist && C.twist.id === 'hotmic';
+    if (hot) ch.score -= 1;
+    C.log.push({ t, html: `${who}: rejected${hot ? ` (Hot Mic, ${esc(ch.name)} −1)` : ''}`, pts: `+${m}` });
+    sfx('rej'); toast('Rejected! Keep talking');
+  } else {
+    ch.score += m; sp.score += m;
+    C.log.push({ t, html: `${who}: benefit of the doubt, both score`, pts: `+${m}/+${m}` });
+    sfx('split'); toast('Both score!');
+  }
+  C.phase = 'paused';
+  closeSheet(); renderLive();
+}
+$('#lvUndo').addEventListener('click', () => {
+  if (!C || C.phase !== 'paused' || !C.undo) return;
+  const s = JSON.parse(C.undo);
+  G.players = s.players; C.speaker = s.speaker; C.runStart = s.runStart; C.segStart = s.segStart;
+  C.unbroken = s.unbroken; C.log.length = s.logLen; C.chal = s.chal; C.undo = null;
+  C.phase = 'challenge';
+  renderLive(); openSheet();
+  toast('Ruling undone');
+});
+
+/* ---------- whistle & summary ---------- */
+function whistle() {
+  if (C.phase !== 'live') return;
+  credit(0); C.remAtResume = 0; C.running = false; C.phase = 'done';
+  const p = G.players[C.speaker], pts = C.whistlePts * C.mult;
+  p.score += pts; p.whistles++;
+  C.whistler = C.speaker; C.whistlePtsWon = pts;
+  C.log.push({ t: C.len, html: `Whistle! <b>${esc(p.name)}</b> held the floor`, pts: `+${pts}` });
+  if (C.unbroken) {
+    p.score += C.mult; C.fullBonus = C.mult;
+    C.log.push({ t: C.len, html: `<b>${esc(p.name)}</b> talked the whole clock unbroken`, pts: `+${C.mult}` });
+  }
+  sfx('whistle');
+  renderLive();
+  const me = C;
+  setTimeout(() => { if (C === me && me.phase === 'done') showSummary(); }, 1200);
+}
+function boardHTML(deltas) {
+  const order = G.players.map((p, i) => ({ p, i })).sort((a, b) => b.p.score - a.p.score);
+  const top = order[0].p.score;
+  let rank = 0, prev = null;
+  return order.map(({ p, i }, k) => {
+    if (p.score !== prev) { rank = k + 1; prev = p.score; }
+    const d = deltas ? p.score - deltas[i] : null;
+    return `<div class="brow ${p.score === top && top > 0 ? 'lead' : ''}"><span class="rk">${rank}</span>` +
+      `<span class="nm"><span style="color:${p.color}">●</span> ${esc(p.name)}</span>` +
+      (deltas ? `<span class="dl">${d ? (d > 0 ? '+' : '') + d : ''}</span>` : '') +
+      `<span class="sc">${p.score}</span></div>`;
+  }).join('');
+}
+function showSummary() {
+  $('#smCount').textContent = `Topic ${G.ti + 1} / ${G.n}`;
+  const p = G.players[C.whistler];
+  $('#smWho').innerHTML = `<b>${esc(p.name)}</b> was talking at the whistle: +${C.whistlePtsWon}` +
+    (C.fullBonus ? `<br>Unbroken from start to finish: +${C.fullBonus} bonus!` : '');
+  $('#smLog').innerHTML = C.log.map(e =>
+    `<li><span class="tm">${fmt(e.t)}</span><span class="ev">${e.html}</span><span class="pts">${e.pts}</span></li>`).join('');
+  $('#smBoard').innerHTML = boardHTML(C.startScores);
+  $('#smNext').textContent = G.ti + 1 >= G.n ? 'Final results' : G.ti + 2 === G.n ? 'Final topic' : 'Next topic';
+  show('scrSummary');
+}
+$('#smNext').addEventListener('click', () => {
+  if (!G) return;
+  G.ti++;
+  if (G.ti >= G.n) showEnd(); else setupTopic();
+});
+
+/* ---------- end ---------- */
+function showEnd() {
+  if (C) { C.running = false; C.phase = 'over'; }
+  closeSheet();
+  const top = Math.max(...G.players.map(p => p.score));
+  const champs = G.players.filter(p => p.score === top);
+  $('#enName').textContent = champs.length > 1 ? 'A tie!' : champs[0].name;
+  $('#enPts').textContent = champs.length > 1 ? `${champs.map(p => p.name).join(' & ')} · ${top} pts each` : `${top} points`;
+  $('#enBoard').innerHTML = boardHTML(null);
+  const AW = [
+    ['🗣️', 'Silver Tongue', p => Math.round(p.held), v => `${v}s on the floor`],
+    ['🫁', 'Iron Lung', p => Math.round(p.bestRun), v => `${v}s in one unbroken run`],
+    ['👂', 'Sharp Ears', p => p.upheld, v => `${v} challenge${v > 1 ? 's' : ''} upheld`],
+    ['📣', 'Buzzer Beater', p => p.whistles, v => `talking at ${v} whistle${v > 1 ? 's' : ''}`],
+    ['🎯', 'Trigger Happy', p => p.rejected, v => `${v} challenge${v > 1 ? 's' : ''} thrown out`]
+  ];
+  const html = AW.map(([ic, name, get, desc]) => {
+    const best = Math.max(...G.players.map(get));
+    if (best <= 0) return '';
+    const ws = G.players.filter(p => get(p) === best).map(p => esc(p.name)).join(' & ');
+    return `<div class="award"><div class="ic">${ic}</div><div class="an">${name}</div><div class="aw">${ws}</div><div class="as">${desc(best)}</div></div>`;
+  }).join('');
+  $('#enAwards').innerHTML = html || '<div class="hint">No awards this time. Play a topic or two first!</div>';
+  show('scrEnd');
+  if (G.players.some(p => p.score > 0)) sfx('up');
+}
+armButton($('#rdEnd'), 'End game', () => showEnd());
+armButton($('#smEnd'), 'End game', () => showEnd());
+$('#enAgain').addEventListener('click', () => newGame());
+$('#enSetup').addEventListener('click', () => { G = null; C = null; renderPlayers(); show('scrSetup'); });
+
+/* ---------- keyboard ---------- */
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (!C) return;
+  const live = $('#scrLive').classList.contains('active');
+  if (e.code === 'Space' && live) {
+    e.preventDefault();
+    if (C.phase === 'live') challenge();
+    else if (C.phase === 'paused') { sfx('go'); resume(); }
+  } else if (e.key === 'Enter' && $('#scrReady').classList.contains('active')) {
+    e.preventDefault(); startClock();
+  }
+});
+
+/* ---------- boot ---------- */
+renderPlayers(); renderDecks(); syncMute();
+</script>
+</body>
+</html>

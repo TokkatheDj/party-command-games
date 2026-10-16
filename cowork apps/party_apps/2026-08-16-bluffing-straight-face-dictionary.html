@@ -1,0 +1,886 @@
+<!-- CONCEPT: BLUFFING/WRITING - "Straight Face": a written-bluff game in the Fictionary/Balderdash tradition. A real but obscure word, film or dish appears with its true meaning hidden; each player secretly types a fake definition, then all the fakes are shuffled in with the real one and the room votes on which is genuine. Score by fooling people (+2 a vote), by spotting the truth (+3), and by accidentally writing the real answer (+3). 96 cards across 3 decks | Players: 3-6 | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Straight Face</title>
+<style>
+:root{
+  --bg:#0d0b16;
+  --panel:#191434;
+  --panel2:#221a45;
+  --line:#33296b;
+  --ink:#efeaff;
+  --dim:#9b91c9;
+  --gold:#ffcf5c;
+  --rose:#ff5f9e;
+  --violet:#9b7bff;
+  --mint:#5fe3c0;
+  --bad:#ff6b6b;
+  --pad:clamp(12px,4vw,20px);
+  --r:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{
+  margin:0;padding:0;
+  touch-action:manipulation;
+  user-select:none;-webkit-user-select:none;
+  height:100%;
+  overflow:hidden;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+}
+textarea,input{user-select:text;-webkit-user-select:text;}
+body{
+  background:
+    radial-gradient(120% 60% at 50% -10%, #2a1b56 0%, transparent 60%),
+    radial-gradient(90% 50% at 100% 100%, #3a1240 0%, transparent 65%),
+    var(--bg);
+}
+#app{
+  height:100vh;
+  height:100dvh;
+  display:flex;flex-direction:column;
+  max-width:640px;margin:0 auto;
+  padding:var(--pad);
+  gap:10px;
+}
+.head{flex:0 0 auto;display:flex;align-items:center;gap:10px;min-height:34px;}
+.head h1{
+  margin:0;font-size:clamp(20px,6vw,30px);letter-spacing:.5px;font-weight:800;
+  background:linear-gradient(90deg,var(--gold),var(--rose));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.tag{
+  margin-left:auto;font-size:clamp(11px,3vw,13px);color:var(--dim);
+  text-align:right;line-height:1.3;
+}
+.body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:12px;padding-bottom:4px;}
+.foot{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;}
+.screen{display:none;flex-direction:column;gap:12px;height:100%;}
+.screen.on{display:flex;}
+
+.card{
+  background:linear-gradient(160deg,var(--panel2),var(--panel));
+  border:1px solid var(--line);border-radius:var(--r);
+  padding:var(--pad);
+}
+.deckchip{
+  display:inline-block;font-size:11px;letter-spacing:2px;font-weight:800;
+  color:var(--bg);background:var(--gold);padding:3px 10px;border-radius:99px;
+}
+.prompt{
+  font-size:clamp(26px,8vw,42px);font-weight:800;line-height:1.1;margin:10px 0 6px;
+  word-break:break-word;
+}
+.prompt.small{font-size:clamp(20px,6vw,30px);}
+.sub{color:var(--dim);font-size:clamp(13px,3.6vw,15px);line-height:1.4;}
+
+button{
+  font-family:inherit;font-size:clamp(15px,4.2vw,17px);font-weight:700;
+  min-height:52px;padding:12px 16px;border-radius:14px;cursor:pointer;
+  border:1px solid var(--line);background:var(--panel2);color:var(--ink);
+  width:100%;transition:transform .08s ease,filter .15s ease;
+}
+button:active{transform:scale(.98);}
+button:disabled{opacity:.4;cursor:default;}
+.primary{
+  background:linear-gradient(90deg,var(--rose),var(--violet));
+  border:none;color:#fff;box-shadow:0 6px 20px rgba(155,123,255,.3);
+}
+.gold{background:linear-gradient(90deg,#ffb340,var(--gold));border:none;color:#2a1c00;}
+.ghost{background:transparent;color:var(--dim);min-height:44px;font-weight:600;}
+.row{display:flex;gap:8px;}
+.row button{width:auto;flex:1;}
+
+label.fld{display:block;font-size:12px;letter-spacing:1.5px;color:var(--dim);font-weight:700;margin-bottom:6px;}
+input[type=text],textarea{
+  width:100%;background:#100d24;border:1px solid var(--line);border-radius:12px;
+  color:var(--ink);font-family:inherit;font-size:clamp(15px,4.2vw,17px);
+  padding:12px;min-height:48px;outline:none;
+}
+input[type=text]:focus,textarea:focus{border-color:var(--violet);}
+textarea{min-height:96px;resize:none;line-height:1.4;}
+.count{text-align:right;font-size:12px;color:var(--dim);margin-top:4px;}
+.count.warn{color:var(--gold);}
+
+.plist{display:flex;flex-direction:column;gap:8px;}
+.prow{display:flex;gap:8px;align-items:center;}
+.prow .num{width:26px;text-align:center;color:var(--dim);font-weight:800;flex:0 0 auto;}
+.prow button{width:44px;min-width:44px;flex:0 0 auto;min-height:48px;padding:0;color:var(--bad);background:transparent;border-color:transparent;font-size:22px;}
+
+.decks{display:flex;flex-direction:column;gap:8px;}
+.deck{
+  display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;
+  border:1px solid var(--line);background:#100d24;cursor:pointer;min-height:56px;
+}
+.deck.sel{border-color:var(--gold);background:rgba(255,207,92,.09);}
+.deck .box{width:24px;height:24px;border-radius:7px;border:2px solid var(--line);flex:0 0 auto;display:grid;place-items:center;font-size:15px;color:var(--bg);}
+.deck.sel .box{background:var(--gold);border-color:var(--gold);}
+.deck .dn{font-weight:800;}
+.deck .dd{font-size:12px;color:var(--dim);}
+
+.pills{display:flex;gap:8px;}
+.pill{
+  flex:1;min-height:50px;border-radius:12px;border:1px solid var(--line);
+  background:#100d24;color:var(--dim);font-weight:800;cursor:pointer;
+}
+.pill.sel{background:var(--violet);border-color:var(--violet);color:#fff;}
+
+.handoff{flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center;gap:6px;}
+.handoff .eyes{font-size:clamp(48px,16vw,80px);}
+.handoff .who{font-size:clamp(28px,9vw,44px);font-weight:800;color:var(--gold);word-break:break-word;}
+.handoff .hint{color:var(--dim);font-size:clamp(13px,3.8vw,15px);line-height:1.5;padding:0 6px;}
+
+.ans{
+  width:100%;text-align:left;background:#100d24;border:1px solid var(--line);
+  border-radius:14px;padding:14px;font-size:clamp(14px,4vw,16px);font-weight:600;
+  line-height:1.4;display:flex;gap:10px;align-items:flex-start;min-height:56px;
+}
+.ans .lt{
+  flex:0 0 auto;width:26px;height:26px;border-radius:8px;background:var(--panel2);
+  color:var(--gold);display:grid;place-items:center;font-weight:800;font-size:14px;
+}
+.ans.sel{border-color:var(--violet);background:rgba(155,123,255,.16);}
+.ans.mine{opacity:.45;}
+.ans.truth{border-color:var(--mint);background:rgba(95,227,192,.14);}
+.ans .meta{display:block;font-size:12px;font-weight:700;color:var(--dim);margin-top:6px;}
+.ans .meta b{color:var(--rose);}
+.ans.truth .meta b{color:var(--mint);}
+
+.scores{display:flex;flex-direction:column;gap:6px;}
+.srow{
+  display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:12px;
+  background:#100d24;border:1px solid var(--line);font-weight:700;
+}
+.srow .rk{width:24px;color:var(--dim);font-weight:800;}
+.srow .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.srow .pt{color:var(--gold);font-weight:800;}
+.srow .dl{font-size:12px;color:var(--mint);font-weight:700;}
+.srow.lead{border-color:var(--gold);background:rgba(255,207,92,.09);}
+
+.banner{text-align:center;padding:14px;border-radius:14px;background:rgba(95,227,192,.12);border:1px solid var(--mint);}
+.banner .k{font-size:11px;letter-spacing:2px;color:var(--mint);font-weight:800;}
+.banner .v{font-size:clamp(16px,5vw,22px);font-weight:800;margin-top:6px;line-height:1.3;}
+.crown{text-align:center;padding:6px 0;}
+.crown .c{font-size:clamp(46px,15vw,72px);}
+.crown .n{font-size:clamp(24px,8vw,38px);font-weight:800;
+  background:linear-gradient(90deg,var(--gold),var(--rose));
+  -webkit-background-clip:text;background-clip:text;color:transparent;word-break:break-word;}
+.note{font-size:12px;color:var(--dim);line-height:1.5;}
+.rules{font-size:clamp(13px,3.6vw,15px);color:var(--dim);line-height:1.6;}
+.rules b{color:var(--ink);}
+.err{color:var(--bad);font-size:13px;font-weight:700;text-align:center;min-height:16px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="head">
+    <h1>Straight Face</h1>
+    <div class="tag" id="tag">The Bluff Dictionary</div>
+  </div>
+
+  <!-- ============ HOME ============ -->
+  <div class="screen on" id="s-home">
+    <div class="body">
+      <div class="card">
+        <div class="rules">
+          A real but obscure <b>word</b>, <b>film</b> or <b>dish</b> appears. Everyone
+          secretly types a <b>fake</b> meaning for it. All the fakes get shuffled in with
+          the real one &mdash; then the room votes.<br><br>
+          <b>+2</b> for every player your fake fools &middot; <b>+3</b> for finding the truth
+          &middot; <b>+3</b> if you accidentally write the real answer.
+        </div>
+      </div>
+
+      <div class="card">
+        <label class="fld">PLAYERS (3&ndash;6)</label>
+        <div class="plist" id="plist"></div>
+        <button class="ghost" id="addP" style="margin-top:8px">+ Add player</button>
+      </div>
+
+      <div class="card">
+        <label class="fld">DECKS</label>
+        <div class="decks" id="decks"></div>
+      </div>
+
+      <div class="card">
+        <label class="fld">ROUNDS</label>
+        <div class="pills" id="rounds"></div>
+      </div>
+      <div class="err" id="homeErr"></div>
+    </div>
+    <div class="foot">
+      <button class="primary" id="start">START GAME</button>
+    </div>
+  </div>
+
+  <!-- ============ HANDOFF ============ -->
+  <div class="screen" id="s-hand">
+    <div class="body">
+      <div class="handoff">
+        <div class="eyes" id="handIcon">🙈</div>
+        <div class="note" id="handTop">PASS THE PHONE TO</div>
+        <div class="who" id="handWho">Player</div>
+        <div class="hint" id="handHint">Everyone else: no peeking.</div>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="gold" id="handGo">I'M READY</button>
+    </div>
+  </div>
+
+  <!-- ============ WRITE ============ -->
+  <div class="screen" id="s-write">
+    <div class="body">
+      <div class="card">
+        <span class="deckchip" id="wDeck">WORDS</span>
+        <div class="prompt" id="wPrompt">WORD</div>
+        <div class="sub" id="wSub">Write a definition convincing enough to fool the room.</div>
+      </div>
+      <div class="card">
+        <label class="fld" id="wLabel">YOUR FAKE ANSWER</label>
+        <textarea id="wText" maxlength="110" placeholder="Make it sound real&hellip;" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+        <div class="count" id="wCount">0 / 110</div>
+      </div>
+      <div class="err" id="wErr"></div>
+    </div>
+    <div class="foot">
+      <button class="primary" id="wGo">LOCK IT IN</button>
+    </div>
+  </div>
+
+  <!-- ============ VOTE ============ -->
+  <div class="screen" id="s-vote">
+    <div class="body">
+      <div class="card">
+        <span class="deckchip" id="vDeck">WORDS</span>
+        <div class="prompt small" id="vPrompt">WORD</div>
+        <div class="sub" id="vSub">Which one is the real answer?</div>
+      </div>
+      <div class="plist" id="vList"></div>
+      <div class="err" id="vErr"></div>
+    </div>
+    <div class="foot">
+      <button class="primary" id="vGo">CONFIRM VOTE</button>
+    </div>
+  </div>
+
+  <!-- ============ REVEAL ============ -->
+  <div class="screen" id="s-reveal">
+    <div class="body">
+      <div class="card">
+        <span class="deckchip" id="rDeck">WORDS</span>
+        <div class="prompt small" id="rPrompt">WORD</div>
+      </div>
+      <div class="plist" id="rList"></div>
+      <div id="rTruth"></div>
+    </div>
+    <div class="foot">
+      <button class="gold" id="rGo">REVEAL</button>
+    </div>
+  </div>
+
+  <!-- ============ SCORES ============ -->
+  <div class="screen" id="s-scores">
+    <div class="body">
+      <div class="crown" id="sCrown"></div>
+      <div class="scores" id="sList"></div>
+      <div class="note" id="sNote"></div>
+    </div>
+    <div class="foot">
+      <button class="primary" id="sGo">NEXT ROUND</button>
+      <button class="ghost" id="sReset">End game &amp; start over</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+/* ============================ CARD DECKS ============================ */
+/* Every "truth" below is the genuine meaning. Bluffs are supplied by players. */
+
+const DECKS = {
+  WORDS: {
+    name: 'WORDS',
+    blurb: 'Obscure but real English words',
+    lead: 'What does it mean?',
+    hint: 'Write a definition convincing enough to fool the room.',
+    cards: [
+      ['PETRICHOR','the earthy smell that rises when rain falls on dry ground'],
+      ['BORBORYGMUS','the rumbling sound of gas moving through the intestines'],
+      ['COLLYWOBBLES','a nervous, queasy feeling in the stomach'],
+      ['SNOLLYGOSTER','a shrewd, unprincipled person, especially a politician'],
+      ['WIDDERSHINS','in a counterclockwise direction, against the sun’s course'],
+      ['ULLAGE','the empty space in a bottle or barrel above the liquid'],
+      ['AGLET','the small tube on the end of a shoelace'],
+      ['BRUMOUS','foggy, wintry and gloomy'],
+      ['GARDYLOO','the warning once shouted in Edinburgh before slops were thrown from a window'],
+      ['NUDIUSTERTIAN','relating to the day before yesterday'],
+      ['ZARF','a holder for a cup that has no handle'],
+      ['LUNULE','the pale crescent at the base of a fingernail'],
+      ['TITTLE','the dot above a lowercase i or j'],
+      ['PANDICULATION','the stretch and yawn you do on waking'],
+      ['GRAWLIX','the row of symbols standing in for swearing in a comic strip'],
+      ['SCROOP','the rustling sound made by silk'],
+      ['PHILTRUM','the vertical groove between the nose and the upper lip'],
+      ['CRAPULENCE','sickness brought on by too much food or drink'],
+      ['DEIPNOSOPHIST','a person skilled at dinner-table conversation'],
+      ['MONDEGREEN','a misheard song lyric'],
+      ['HALLUX','the big toe'],
+      ['FUNAMBULIST','a tightrope walker'],
+      ['SIALOQUENT','spraying saliva while speaking'],
+      ['OSCITANCY','drowsiness marked by yawning'],
+      ['GRIFFONAGE','careless, unreadable handwriting'],
+      ['LETHOLOGICA','the failure to recall a word you know perfectly well'],
+      ['OBELUS','the division sign'],
+      ['INTERROBANG','a punctuation mark combining a question mark and an exclamation mark'],
+      ['FERRULE','the metal band that holds an eraser onto a pencil'],
+      ['TRAGUS','the small flap of cartilage in front of the ear canal'],
+      ['WAMBLE','to roll or wobble unsteadily'],
+      ['SNICKERSNEE','a large knife'],
+      ['BUMFUZZLE','to confuse or fluster someone'],
+      ['CABOTAGE','carrying goods between two ports of the same country'],
+      ['ERINACEOUS','resembling a hedgehog'],
+      ['JENTACULAR','relating to breakfast'],
+      ['ULTRACREPIDARIAN','a person who gives opinions beyond their knowledge'],
+      ['QUIRE','twenty-four sheets of paper'],
+      ['GLABELLA','the smooth patch of skin between the eyebrows'],
+      ['VAGITUS','the cry of a newborn baby'],
+      ['CRUCIVERBALIST','a crossword enthusiast'],
+      ['SUSURRUS','a soft whispering or rustling sound'],
+      ['KENSPECKLE','easily recognisable, conspicuous'],
+      ['MAFFICK','to celebrate wildly in public'],
+      ['APRICITY','the warmth of the sun in winter'],
+      ['FLOCCINAUCINIHILIPILIFICATION','the habit of judging things to be worthless']
+    ]
+  },
+  FILMS: {
+    name: 'FILMS',
+    blurb: 'Real films almost nobody has seen',
+    lead: 'What is it about?',
+    hint: 'Write a one-line plot the room might believe.',
+    cards: [
+      ['THE GATE (1987)','two boys accidentally open a hole to a demon world in their backyard'],
+      ['THE PEANUT BUTTER SOLUTION (1985)','a boy loses his hair from fright and a homemade paste regrows it uncontrollably'],
+      ['ZARDOZ (1974)','a far-future warrior discovers the flying stone god he serves is a fraud'],
+      ['THE WICKER MAN (1973)','a policeman hunts for a missing girl on a remote pagan island'],
+      ['SOCIETY (1989)','a wealthy teenager suspects his family belongs to a sinister secret class'],
+      ['THE STUFF (1985)','an addictive dessert goo turns out to be alive'],
+      ['NIGHT OF THE LEPUS (1972)','oversized mutant rabbits terrorise an Arizona ranch'],
+      ['MIAMI CONNECTION (1987)','a rock band of martial-artist orphans battles a drug gang'],
+      ['BUBBA HO-TEP (2002)','two nursing-home residents claiming to be Elvis and JFK fight a mummy'],
+      ['HOUSE / HAUSU (1977)','schoolgirls visit an aunt’s country house that begins eating them'],
+      ['TURBO KID (2015)','a comic-obsessed teen becomes a hero in a post-apocalyptic wasteland'],
+      ['THE APPLE (1980)','a folk duo resists a glam record label that rules the world'],
+      ['SHAKMA (1990)','students playing an overnight game in a research lab are hunted by a baboon'],
+      ['FITZCARRALDO (1982)','a dreamer hauls a steamship over a mountain to build an opera house in the jungle'],
+      ['DARK STAR (1974)','a bored deep-space crew argues with a bomb that refuses to stop counting down'],
+      ['PHASE IV (1974)','desert scientists face ants that have begun acting with a single mind'],
+      ['SORCERER (1977)','four desperate men drive trucks of unstable explosives through the jungle'],
+      ['THE BROTHER FROM ANOTHER PLANET (1984)','a mute alien runaway lands in Harlem and is pursued by bounty hunters'],
+      ['THE LAST WAVE (1977)','an Australian lawyer defending Aboriginal men is troubled by apocalyptic visions'],
+      ['THE NINTH CONFIGURATION (1980)','a psychiatrist takes charge of an asylum full of military officers']
+    ]
+  },
+  FOODS: {
+    name: 'FOODS',
+    blurb: 'Genuine dishes with peculiar names',
+    lead: 'What is it, exactly?',
+    hint: 'Write a description that sounds like a real recipe.',
+    cards: [
+      ['SPOTTED DICK','a steamed British suet pudding studded with dried fruit'],
+      ['BUBBLE AND SQUEAK','fried leftover potato and cabbage'],
+      ['TOAD IN THE HOLE','sausages baked into Yorkshire pudding batter'],
+      ['CULLEN SKINK','a Scottish soup of smoked haddock, potato and onion'],
+      ['HOPPIN’ JOHN','a Southern US dish of black-eyed peas cooked with rice'],
+      ['SINGING HINNIES','a northern English griddle scone that sizzles as it cooks'],
+      ['FAIRY BREAD','Australian buttered white bread covered in sprinkles'],
+      ['LAVERBREAD','a Welsh purée of boiled seaweed'],
+      ['CLOOTIE DUMPLING','a Scottish spiced fruit pudding boiled in a cloth'],
+      ['SHOOFLY PIE','a Pennsylvania Dutch pie of molasses under a crumb topping'],
+      ['JELLIED EELS','chopped eels set in a savoury jelly, an East London staple'],
+      ['BANOFFEE PIE','a British pie of banana, toffee and cream'],
+      ['SYLLABUB','a whipped dessert of cream curdled with sweetened wine'],
+      ['KOUIGN-AMANN','a Breton cake of laminated dough, butter and sugar'],
+      ['FOOL','a dessert of puréed fruit folded through whipped cream'],
+      ['KOLDSKÅL','a chilled Danish soup of sweetened buttermilk'],
+      ['PICKLEBACK','a shot of whiskey chased with pickle brine'],
+      ['CHICKEN FRIED STEAK','a beef cutlet breaded and fried like fried chicken'],
+      ['HALO-HALO','a Filipino dessert of shaved ice with beans, jellies and purple yam'],
+      ['BLACK PUDDING','a sausage made with pig’s blood and oatmeal'],
+      ['COCK-A-LEEKIE','a Scottish soup of chicken and leeks'],
+      ['PANACKELTY','a north-east English bake of potato, onion and corned beef'],
+      ['BROWN BETTY','a baked American pudding of fruit layered with buttered crumbs'],
+      ['SPOONBREAD','a soft baked cornmeal dish eaten with a spoon'],
+      ['SCOTCH WOODCOCK','scrambled egg on toast spread with anchovy'],
+      ['WELSH RAREBIT','a savoury melted cheese sauce poured over toast'],
+      ['HUMMINGBIRD CAKE','a banana and pineapple cake under cream cheese frosting'],
+      ['STARGAZY PIE','a Cornish fish pie with the heads poking through the crust'],
+      ['SALMIAKKI','Finnish liquorice made salty with ammonium chloride'],
+      ['JOE FROGGERS','large soft molasses cookies from coastal Massachusetts']
+    ]
+  }
+};
+
+const LETTERS = 'ABCDEFGHIJ';
+const LS_PLAYERS = 'cowork-straightface-players';
+const LS_SETUP   = 'cowork-straightface-setup';
+
+/* ============================ STATE ============================ */
+
+const G = {
+  names: [],
+  decks: ['WORDS'],
+  totalRounds: 5,
+  round: 0,
+  players: [],      // {name, score, roundPts, dead}
+  used: {},         // deck -> Set of used indices
+  card: null,       // {deck, prompt, truth}
+  bluffs: [],       // {text, owner}
+  shuffled: [],     // {text, owner, owners:[], isTruth}
+  votes: [],        // votes[playerIdx] = index into shuffled, or -1
+  writeIdx: 0,
+  voteIdx: 0,
+  revealStep: 0,
+  next: null        // what the handoff screen leads to
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+
+/* Every answer on the ballot — bluffs AND the truth — is displayed through this.
+   The deck truths are written dictionary-style ("the big toe", no full stop) while
+   players naturally type "A kind of bird."; without normalising, the odd one out is
+   spottable from punctuation alone. Normalise UP (capitalise + add a period) so a
+   bluff that opens with a proper noun is never mangled. */
+const disp = s => {
+  const t = String(s).trim().replace(/[.!?\s]+$/,'');
+  return t.charAt(0).toUpperCase() + t.slice(1) + '.';
+};
+
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $(id).classList.add('on');
+  $(id).querySelector('.body').scrollTop = 0;
+}
+
+/* ============================ HOME / SETUP ============================ */
+
+function loadSetup(){
+  try{
+    const n = JSON.parse(localStorage.getItem(LS_PLAYERS));
+    if(Array.isArray(n) && n.length>=3) G.names = n.slice(0,6).map(String);
+  }catch(e){}
+  if(!G.names.length) G.names = ['Player 1','Player 2','Player 3'];
+  try{
+    const s = JSON.parse(localStorage.getItem(LS_SETUP));
+    if(s && Array.isArray(s.decks) && s.decks.length) G.decks = s.decks.filter(d=>DECKS[d]);
+    if(s && [3,5,8].includes(s.totalRounds)) G.totalRounds = s.totalRounds;
+  }catch(e){}
+  if(!G.decks.length) G.decks = ['WORDS'];
+}
+
+function saveSetup(){
+  try{
+    localStorage.setItem(LS_PLAYERS, JSON.stringify(G.names));
+    localStorage.setItem(LS_SETUP, JSON.stringify({decks:G.decks, totalRounds:G.totalRounds}));
+  }catch(e){}
+}
+
+function renderPlayers(){
+  const wrap = $('plist');
+  wrap.innerHTML = '';
+  G.names.forEach((nm,i)=>{
+    const row = document.createElement('div');
+    row.className='prow';
+    row.innerHTML = '<div class="num">'+(i+1)+'</div>';
+    const inp = document.createElement('input');
+    inp.type='text'; inp.value=nm; inp.maxLength=14; inp.autocomplete='off';
+    inp.setAttribute('aria-label','Player '+(i+1)+' name');
+    inp.addEventListener('input',()=>{ G.names[i]=inp.value; });
+    row.appendChild(inp);
+    const del = document.createElement('button');
+    del.textContent='×'; del.title='Remove';
+    del.disabled = G.names.length<=3;
+    del.addEventListener('click',()=>{ G.names.splice(i,1); renderPlayers(); });
+    row.appendChild(del);
+    wrap.appendChild(row);
+  });
+  $('addP').disabled = G.names.length>=6;
+  $('addP').textContent = G.names.length>=6 ? 'Maximum 6 players' : '+ Add player';
+}
+
+function renderDecks(){
+  const wrap = $('decks');
+  wrap.innerHTML='';
+  Object.keys(DECKS).forEach(k=>{
+    const d = DECKS[k];
+    const el = document.createElement('div');
+    el.className = 'deck'+(G.decks.includes(k)?' sel':'');
+    el.innerHTML = '<div class="box">'+(G.decks.includes(k)?'✓':'')+'</div>'+
+      '<div><div class="dn">'+d.name+'</div><div class="dd">'+esc(d.blurb)+' &middot; '+d.cards.length+' cards</div></div>';
+    el.addEventListener('click',()=>{
+      const i = G.decks.indexOf(k);
+      if(i>=0){ if(G.decks.length>1) G.decks.splice(i,1); }
+      else G.decks.push(k);
+      renderDecks();
+    });
+    wrap.appendChild(el);
+  });
+}
+
+function renderRounds(){
+  const wrap = $('rounds');
+  wrap.innerHTML='';
+  [3,5,8].forEach(n=>{
+    const b = document.createElement('button');
+    b.className = 'pill'+(G.totalRounds===n?' sel':'');
+    b.textContent = n+' rounds';
+    b.addEventListener('click',()=>{ G.totalRounds=n; renderRounds(); });
+    wrap.appendChild(b);
+  });
+}
+
+/* ============================ GAME FLOW ============================ */
+
+function startGame(){
+  G.names = G.names.map((n,i)=> (n||'').trim() || ('Player '+(i+1)) );
+  if(G.names.length<3){ $('homeErr').textContent='Need at least 3 players.'; return; }
+  const seen = new Set();
+  for(const n of G.names){
+    const k = n.toLowerCase();
+    if(seen.has(k)){ $('homeErr').textContent='Two players share the name "'+n+'". Make them unique.'; return; }
+    seen.add(k);
+  }
+  $('homeErr').textContent='';
+  renderPlayers();
+  saveSetup();
+
+  G.players = G.names.map(n=>({name:n, score:0, roundPts:0, dead:false}));
+  G.used = {};
+  G.round = 0;
+  nextRound();
+}
+
+function drawCard(){
+  const deck = G.decks[Math.floor(Math.random()*G.decks.length)];
+  if(!G.used[deck]) G.used[deck] = [];
+  if(G.used[deck].length >= DECKS[deck].cards.length) G.used[deck] = [];
+  let i;
+  do { i = Math.floor(Math.random()*DECKS[deck].cards.length); }
+  while(G.used[deck].includes(i));
+  G.used[deck].push(i);
+  const c = DECKS[deck].cards[i];
+  return {deck, prompt:c[0], truth:c[1]};
+}
+
+function nextRound(){
+  G.round++;
+  G.card = drawCard();
+  G.bluffs = [];
+  G.shuffled = [];
+  G.votes = G.players.map(()=>-1);
+  G.writeIdx = 0;
+  G.voteIdx = 0;
+  G.revealStep = 0;
+  G.players.forEach(p=>{ p.roundPts=0; p.dead=false; });
+  updateTag();
+  goHandoff('write');
+}
+
+function updateTag(){
+  $('tag').innerHTML = 'Round '+G.round+' of '+G.totalRounds;
+}
+
+function goHandoff(what){
+  G.next = what;
+  const idx = what==='write' ? G.writeIdx : G.voteIdx;
+  const p = G.players[idx];
+  $('handWho').textContent = p.name;
+  if(what==='write'){
+    $('handIcon').textContent = '✍️';
+    $('handTop').textContent = 'PASS THE PHONE TO';
+    $('handHint').textContent = 'Write a fake answer — ' + (idx+1) + ' of ' + G.players.length + ' this round.';
+  }else{
+    $('handIcon').textContent = '🗳️';
+    $('handTop').textContent = 'VOTING — PASS TO';
+    $('handHint').textContent = 'Pick the answer you think is real. ' + (idx+1) + ' of ' + G.players.length + '.';
+  }
+  show('s-hand');
+}
+
+function openWrite(){
+  const d = DECKS[G.card.deck];
+  $('wDeck').textContent = d.name;
+  $('wPrompt').textContent = G.card.prompt;
+  $('wPrompt').className = 'prompt' + (G.card.prompt.length>16?' small':'');
+  $('wSub').textContent = d.lead + ' ' + d.hint;
+  $('wLabel').textContent = G.players[G.writeIdx].name.toUpperCase() + '’S FAKE ANSWER';
+  $('wText').value = '';
+  $('wCount').textContent = '0 / 80';
+  $('wCount').className = 'count';
+  $('wErr').textContent = '';
+  show('s-write');
+}
+
+function submitWrite(){
+  const t = $('wText').value.trim().replace(/\s+/g,' ');
+  if(t.length<4){ $('wErr').textContent = 'Give it at least a few words.'; return; }
+  G.bluffs.push({text:t, owner:G.writeIdx});
+  $('wText').value = '';
+  $('wErr').textContent = '';
+  G.writeIdx++;
+  if(G.writeIdx < G.players.length) goHandoff('write');
+  else buildBallot();
+}
+
+/* Merge duplicate bluffs and dead-ringers, then shuffle ONCE and keep that order. */
+function buildBallot(){
+  const truthEntry = {text:G.card.truth, owner:-1, owners:[], isTruth:true};
+  const list = [truthEntry];
+  const tKey = norm(G.card.truth);
+
+  G.bluffs.forEach(b=>{
+    const k = norm(b.text);
+    if(k === tKey){
+      truthEntry.owners.push(b.owner);
+      G.players[b.owner].dead = true;
+      return;
+    }
+    const twin = list.find(e=>!e.isTruth && norm(e.text)===k);
+    if(twin){ twin.owners.push(b.owner); return; }
+    list.push({text:b.text, owner:b.owner, owners:[b.owner], isTruth:false});
+  });
+
+  G.shuffled = shuffle(list);
+  G.voteIdx = 0;
+  goHandoff('vote');
+}
+
+function openVote(){
+  const d = DECKS[G.card.deck];
+  $('vDeck').textContent = d.name;
+  $('vPrompt').textContent = G.card.prompt;
+  $('vSub').textContent = 'Which one is the real answer?';
+  $('vErr').textContent = '';
+  const me = G.voteIdx;
+  const wrap = $('vList');
+  wrap.innerHTML = '';
+  /* If every merged answer belongs to this player (all bluffs matched each other
+     or the truth) there is nothing left to vote for — let them pass instead of
+     stranding the round on a screen with no live buttons. */
+  const canVote = G.shuffled.some(a=>!a.owners.includes(me));
+
+  G.shuffled.forEach((a,i)=>{
+    const mine = canVote && a.owners.includes(me);
+    const b = document.createElement('button');
+    b.className = 'ans' + (mine?' mine':'');
+    b.disabled = mine;
+    b.innerHTML = '<span class="lt">'+LETTERS[i]+'</span><span>'+esc(disp(a.text))+
+      (mine?'<span class="meta">your answer — can’t vote for it</span>':'')+'</span>';
+    b.addEventListener('click',()=>{
+      G.votes[me] = i;
+      [...wrap.children].forEach(c=>c.classList.remove('sel'));
+      b.classList.add('sel');
+      $('vErr').textContent='';
+    });
+    wrap.appendChild(b);
+  });
+  G.votes[me] = -1;
+  show('s-vote');
+}
+
+function submitVote(){
+  const me = G.voteIdx;
+  if(G.votes[me] < 0){ $('vErr').textContent = 'Tap an answer first.'; return; }
+  G.voteIdx++;
+  if(G.voteIdx < G.players.length) goHandoff('vote');
+  else { scoreRound(); openReveal(); }
+}
+
+function scoreRound(){
+  G.votes.forEach((v,voter)=>{
+    if(v<0) return;
+    const pick = G.shuffled[v];
+    if(pick.isTruth){ G.players[voter].roundPts += 3; }
+    else { pick.owners.forEach(o=>{ G.players[o].roundPts += 2; }); }
+  });
+  G.players.forEach(p=>{ if(p.dead) p.roundPts += 3; });
+  G.players.forEach(p=>{ p.score += p.roundPts; });
+}
+
+/* ============================ REVEAL ============================ */
+
+function votersFor(i){
+  const names = [];
+  G.votes.forEach((v,voter)=>{ if(v===i) names.push(G.players[voter].name); });
+  return names;
+}
+
+function openReveal(){
+  $('rDeck').textContent = DECKS[G.card.deck].name;
+  $('rPrompt').textContent = G.card.prompt;
+  G.revealStep = 0;
+  drawReveal();
+  show('s-reveal');
+}
+
+function bluffOrder(){
+  return G.shuffled.map((a,i)=>({a,i})).filter(o=>!o.a.isTruth);
+}
+
+function drawReveal(){
+  const bluffs = bluffOrder();
+  const wrap = $('rList');
+  wrap.innerHTML = '';
+
+  const shown = Math.min(G.revealStep, bluffs.length);
+  for(let n=0;n<shown;n++){
+    const {a,i} = bluffs[n];
+    const who = a.owners.map(o=>G.players[o].name).join(' & ');
+    const vs = votersFor(i);
+    const el = document.createElement('div');
+    el.className='ans';
+    el.innerHTML = '<span class="lt">'+LETTERS[i]+'</span><span>'+esc(disp(a.text))+
+      '<span class="meta">a bluff by <b>'+esc(who)+'</b>'+
+      (vs.length ? ' — fooled '+esc(vs.join(', '))+' (+'+(vs.length*2)+')' : ' — fooled nobody')+
+      '</span></span>';
+    wrap.appendChild(el);
+  }
+
+  const truthDone = G.revealStep > bluffs.length;
+  const tWrap = $('rTruth');
+  tWrap.innerHTML = '';
+
+  if(truthDone){
+    const ti = G.shuffled.findIndex(a=>a.isTruth);
+    const vs = votersFor(ti);
+    const b = document.createElement('div');
+    b.className='banner';
+    b.innerHTML = '<div class="k">THE REAL ANSWER — '+LETTERS[ti]+'</div>'+
+      '<div class="v">'+esc(disp(G.card.truth))+'</div>'+
+      '<div class="note" style="margin-top:8px">'+
+        (vs.length ? 'Found it: <b style="color:var(--mint)">'+esc(vs.join(', '))+'</b> (+3 each)'
+                   : 'Nobody found it.')+
+      '</div>';
+    tWrap.appendChild(b);
+    const dead = G.players.filter(p=>p.dead).map(p=>p.name);
+    if(dead.length){
+      const d = document.createElement('div');
+      d.className='banner';
+      d.style.marginTop='10px';
+      d.innerHTML = '<div class="k">DEAD RINGER</div><div class="v">'+esc(dead.join(', '))+
+        ' wrote the real answer (+3)</div>';
+      tWrap.appendChild(d);
+    }
+  }
+
+  const btn = $('rGo');
+  if(G.revealStep < bluffs.length) btn.textContent = 'REVEAL ANSWER '+(G.revealStep+1)+' OF '+bluffs.length;
+  else if(G.revealStep === bluffs.length) btn.textContent = 'SO… WHICH WAS REAL?';
+  else btn.textContent = 'SCOREBOARD';
+}
+
+function stepReveal(){
+  const bluffs = bluffOrder();
+  if(G.revealStep > bluffs.length){ openScores(); return; }
+  G.revealStep++;
+  drawReveal();
+  const body = $('s-reveal').querySelector('.body');
+  body.scrollTop = body.scrollHeight;
+}
+
+/* ============================ SCORES ============================ */
+
+function openScores(){
+  const done = G.round >= G.totalRounds;
+  const order = G.players.map((p,i)=>({p,i})).sort((a,b)=> b.p.score-a.p.score || a.i-b.i);
+  const top = order[0].p.score;
+
+  $('sCrown').innerHTML = done
+    ? '<div class="c">🏆</div><div class="n">'+
+      esc(order.filter(o=>o.p.score===top).map(o=>o.p.name).join(' & '))+'</div>'+
+      '<div class="note">wins with '+top+' points</div>'
+    : '';
+
+  const wrap = $('sList');
+  wrap.innerHTML='';
+  order.forEach((o,rank)=>{
+    const el = document.createElement('div');
+    el.className='srow'+(o.p.score===top && top>0 ?' lead':'');
+    el.innerHTML = '<div class="rk">'+(rank+1)+'</div>'+
+      '<div class="nm">'+esc(o.p.name)+'</div>'+
+      (o.p.roundPts ? '<div class="dl">+'+o.p.roundPts+'</div>' : '')+
+      '<div class="pt">'+o.p.score+'</div>';
+    wrap.appendChild(el);
+  });
+
+  $('sNote').textContent = done
+    ? 'Game over. Tap below to play another set with the same crew.'
+    : 'Round '+G.round+' of '+G.totalRounds+' complete.';
+  $('sGo').textContent = done ? 'PLAY AGAIN' : 'NEXT ROUND';
+  $('tag').innerHTML = done ? 'Final scores' : 'Round '+G.round+' of '+G.totalRounds;
+  show('s-scores');
+}
+
+function afterScores(){
+  if(G.round >= G.totalRounds){
+    G.players.forEach(p=>{ p.score=0; p.roundPts=0; });
+    G.round = 0;
+  }
+  nextRound();
+}
+
+function resetToHome(){
+  G.round = 0;
+  $('tag').innerHTML = 'The Bluff Dictionary';
+  renderPlayers(); renderDecks(); renderRounds();
+  show('s-home');
+}
+
+/* ============================ WIRING ============================ */
+
+$('addP').addEventListener('click',()=>{
+  if(G.names.length>=6) return;
+  G.names.push('Player '+(G.names.length+1));
+  renderPlayers();
+});
+$('start').addEventListener('click', startGame);
+
+$('handGo').addEventListener('click',()=>{
+  if(G.next==='write') openWrite(); else openVote();
+});
+
+$('wText').addEventListener('input',()=>{
+  const n = $('wText').value.length;
+  $('wCount').textContent = n+' / 110';
+  $('wCount').className = 'count'+(n>=95?' warn':'');
+});
+$('wGo').addEventListener('click', submitWrite);
+$('vGo').addEventListener('click', submitVote);
+$('rGo').addEventListener('click', stepReveal);
+$('sGo').addEventListener('click', afterScores);
+$('sReset').addEventListener('click', resetToHome);
+
+loadSetup();
+renderPlayers();
+renderDecks();
+renderRounds();
+</script>
+</body>
+</html>

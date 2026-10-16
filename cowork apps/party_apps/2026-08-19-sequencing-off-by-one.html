@@ -1,0 +1,983 @@
+<!-- CONCEPT: SEQUENCING/ORDERING - "Off By One": teams argue five things into the right order along a scale (oldest to newest, shortest to tallest, slowest to fastest) by tapping tiles to swap them; before the answer is shown, any rival team may CHALLENGE one adjacent pair as backwards and steal points if they're right. 42 ladders, random direction flips, double-point Final Ladder | Players: 4-16 in 2-4 teams | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Off By One</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+}
+
+:root {
+  --bg: #0e1118;
+  --bg2: #131826;
+  --panel: #1a2032;
+  --panel2: #222a41;
+  --line: #2c3550;
+  --ink: #e8ecf7;
+  --dim: #8f9bbb;
+  --faint: #64708f;
+  --a: #2dd4bf;
+  --b: #818cf8;
+  --good: #34d399;
+  --bad: #fb7185;
+  --warn: #fbbf24;
+  --t1: #38bdf8;
+  --t2: #f472b6;
+  --t3: #a3e635;
+  --t4: #fbbf24;
+  --pad: clamp(10px, 3.2vw, 18px);
+  --r: 14px;
+}
+
+body {
+  background:
+    radial-gradient(1100px 620px at 50% -12%, #1d2740 0%, transparent 62%),
+    radial-gradient(760px 520px at 108% 108%, #1b2b34 0%, transparent 60%),
+    var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  height: 100vh; height: 100dvh;
+  width: 100vw;
+  display: flex; flex-direction: column;
+  overscroll-behavior: none;
+}
+
+.screen {
+  flex: 1; min-height: 0;
+  display: none;
+  flex-direction: column;
+  padding: var(--pad);
+  gap: clamp(8px, 2vw, 14px);
+}
+.screen.on { display: flex; }
+
+/* ---------- shared bits ---------- */
+h1 {
+  margin: 0;
+  font-size: clamp(30px, 10.5vw, 56px);
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  font-weight: 800;
+  background: linear-gradient(90deg, var(--a), var(--b));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-align: center;
+}
+.tag {
+  text-align: center; color: var(--dim);
+  font-size: clamp(12px, 3.4vw, 15px);
+  margin: -2px 0 0;
+  line-height: 1.45;
+}
+
+button {
+  font-family: inherit; color: inherit;
+  border: 0; background: none; cursor: pointer;
+  font-size: clamp(14px, 3.9vw, 17px);
+}
+
+.btn {
+  min-height: 54px;
+  border-radius: var(--r);
+  background: linear-gradient(135deg, var(--a), var(--b));
+  color: #08111c; font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 12px 18px;
+  width: 100%;
+  box-shadow: 0 6px 22px rgba(45, 212, 191, 0.22);
+  transition: transform .1s ease, filter .1s ease;
+}
+.btn:active { transform: scale(0.975); filter: brightness(1.1); }
+.btn.ghost {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: none;
+  font-weight: 700;
+}
+.btn.sm { min-height: 46px; font-size: clamp(13px, 3.5vw, 15px); padding: 8px 12px; }
+.btn[disabled] { opacity: .38; pointer-events: none; }
+
+.card {
+  background: linear-gradient(180deg, var(--panel), var(--bg2));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: clamp(10px, 3vw, 16px);
+}
+
+.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---------- setup ---------- */
+#setup { justify-content: center; gap: clamp(10px, 2.6vw, 16px); }
+#setupBody { display: flex; flex-direction: column; gap: clamp(9px, 2.4vw, 14px); }
+
+.lbl {
+  font-size: clamp(11px, 3vw, 12.5px);
+  letter-spacing: .13em; text-transform: uppercase;
+  color: var(--faint); font-weight: 800;
+  margin-bottom: 8px;
+}
+.seg { display: flex; gap: 8px; }
+.seg button {
+  flex: 1; min-height: 48px;
+  border-radius: 11px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  color: var(--dim); font-weight: 800;
+  transition: all .12s ease;
+}
+.seg button.sel {
+  background: linear-gradient(135deg, var(--a), var(--b));
+  color: #08111c; border-color: transparent;
+}
+.names { display: flex; flex-direction: column; gap: 8px; }
+.nameRow { display: flex; align-items: center; gap: 9px; }
+.dot { width: 15px; height: 15px; border-radius: 50%; flex: 0 0 auto; }
+.nameRow input {
+  flex: 1; min-height: 48px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--ink);
+  padding: 0 13px;
+  font-family: inherit;
+  font-size: clamp(14px, 4vw, 16px);
+  font-weight: 700;
+  min-width: 0;
+}
+.nameRow input:focus { outline: 2px solid var(--a); outline-offset: -1px; }
+
+.how { font-size: clamp(12px, 3.3vw, 14px); color: var(--dim); line-height: 1.55; }
+.how b { color: var(--ink); }
+.how ol { margin: 6px 0 0; padding-left: 19px; }
+.how li { margin-bottom: 5px; }
+
+/* ---------- play header ---------- */
+.top { display: flex; align-items: center; gap: 8px; }
+.rnd {
+  font-size: clamp(10px, 2.9vw, 12px);
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--faint); font-weight: 800;
+}
+.rnd b { color: var(--a); }
+.iconBtn {
+  margin-left: auto;
+  width: 44px; height: 44px;
+  border-radius: 11px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 17px;
+  display: flex; align-items: center; justify-content: center;
+  flex: 0 0 auto;
+}
+
+.scores { display: flex; gap: 6px; }
+.sc {
+  flex: 1; min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--tc, var(--line));
+  border-radius: 10px;
+  padding: 6px 4px 5px;
+  text-align: center;
+  transition: background .2s ease;
+}
+.sc.act { background: var(--panel2); box-shadow: 0 0 0 1px var(--tc) inset; }
+.sc .n {
+  font-size: clamp(9.5px, 2.7vw, 11.5px);
+  color: var(--dim); font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sc.act .n { color: var(--ink); }
+.sc .v { font-size: clamp(17px, 5vw, 22px); font-weight: 800; color: var(--tc); line-height: 1.1; }
+
+/* ---------- the ladder ---------- */
+.prompt { text-align: center; }
+.prompt .who {
+  font-size: clamp(12px, 3.5vw, 14px);
+  font-weight: 800; color: var(--tc, var(--a));
+  letter-spacing: .04em;
+}
+.prompt .q {
+  font-size: clamp(17px, 5.3vw, 23px);
+  font-weight: 800; line-height: 1.2;
+  margin-top: 3px;
+}
+.finalPill {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--warn), var(--bad));
+  color: #1a1005; font-weight: 900;
+  font-size: clamp(10px, 2.9vw, 12px);
+  letter-spacing: .1em;
+  padding: 3px 10px; border-radius: 999px;
+  margin-bottom: 5px;
+}
+
+.edge {
+  display: flex; align-items: center; gap: 8px;
+  font-size: clamp(10.5px, 3vw, 12.5px);
+  color: var(--faint); font-weight: 800;
+  letter-spacing: .1em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.edge::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line), transparent); }
+.edge.bot::after { background: linear-gradient(90deg, transparent, var(--line)); }
+.edge.bot { flex-direction: row-reverse; }
+
+/* the scale labels are grouped with the ladder so they always hug it,
+   and the group as a whole is centred in whatever space is left */
+.ladderWrap {
+  flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  gap: clamp(4px, 1.2vw, 7px);
+}
+#ladder {
+  display: flex; flex-direction: column;
+  gap: clamp(5px, 1.4vw, 8px);
+  padding: 2px 0;
+}
+
+.tile {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0 12px;
+  min-height: clamp(52px, 9.6vh, 66px);
+  will-change: transform;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.tile .pos {
+  width: 24px; flex: 0 0 auto;
+  text-align: center;
+  font-size: clamp(12px, 3.4vw, 14px);
+  font-weight: 800; color: var(--faint);
+}
+.tile .nm {
+  flex: 1; min-width: 0;
+  font-size: clamp(13.5px, 4vw, 16.5px);
+  font-weight: 700; line-height: 1.2;
+}
+.tile .val {
+  flex: 0 0 auto;
+  font-size: clamp(11px, 3.2vw, 13.5px);
+  font-weight: 800; color: var(--a);
+  text-align: right;
+  opacity: 0; transition: opacity .3s ease;
+}
+.tile.shown .val { opacity: 1; }
+.tile .mark { width: 22px; flex: 0 0 auto; text-align: center; font-size: 16px; opacity: 0; transition: opacity .3s ease; }
+.tile.shown .mark { opacity: 1; }
+
+.tile.tapable { cursor: pointer; }
+.tile.tapable:active { transform: scale(0.985); }
+.tile.sel {
+  background: var(--panel2);
+  border-color: var(--a);
+  box-shadow: 0 0 0 1px var(--a), 0 4px 18px rgba(45,212,191,.2);
+}
+.tile.ok { border-color: rgba(52,211,153,.55); background: linear-gradient(90deg, rgba(52,211,153,.11), var(--panel)); }
+.tile.no { border-color: rgba(251,113,133,.4); }
+.tile.chA, .tile.chB { border-color: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+
+.gap {
+  height: 0; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 9px;
+  color: var(--warn);
+  font-weight: 800;
+  font-size: clamp(11px, 3.1vw, 13px);
+  transition: height .18s ease;
+}
+.gap.live {
+  height: 44px;
+  background: rgba(251,191,36,.09);
+  border: 1px dashed rgba(251,191,36,.5);
+  cursor: pointer;
+}
+.gap.live:active { background: rgba(251,191,36,.2); }
+
+/* ---------- banners ---------- */
+.banner {
+  border-radius: 12px;
+  padding: 9px 12px;
+  text-align: center;
+  font-size: clamp(12px, 3.5vw, 14.5px);
+  font-weight: 700; line-height: 1.4;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--dim);
+}
+.banner b { color: var(--ink); }
+.banner.win { background: rgba(52,211,153,.12); border-color: rgba(52,211,153,.45); color: #b8f5dc; }
+.banner.lose { background: rgba(251,113,133,.1); border-color: rgba(251,113,133,.4); color: #ffd0d7; }
+.banner.warn { background: rgba(251,191,36,.1); border-color: rgba(251,191,36,.4); color: #ffe8ac; }
+
+.rowBtns { display: flex; gap: 8px; }
+.chalGrid { display: flex; gap: 8px; flex-wrap: wrap; }
+.chalGrid button {
+  flex: 1 1 40%;
+  min-height: 50px;
+  border-radius: 11px;
+  background: var(--panel2);
+  border: 1px solid var(--tc, var(--line));
+  color: var(--tc, var(--ink));
+  font-weight: 800;
+  padding: 6px 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chalGrid button:active { filter: brightness(1.25); }
+
+.tally { display: flex; flex-direction: column; gap: 5px; }
+.tally div { display: flex; justify-content: space-between; gap: 10px; font-size: clamp(12px, 3.4vw, 14.5px); color: var(--dim); }
+.tally div span:last-child { font-weight: 800; color: var(--ink); white-space: nowrap; }
+.tally div.tot { border-top: 1px solid var(--line); padding-top: 6px; margin-top: 2px; color: var(--ink); font-weight: 800; }
+.tally div.tot span:last-child { color: var(--a); font-size: 1.15em; }
+
+/* ---------- results ---------- */
+#results { justify-content: center; }
+.podium { display: flex; flex-direction: column; gap: 8px; }
+.pRow {
+  display: flex; align-items: center; gap: 11px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--tc);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.pRow.first {
+  background: linear-gradient(90deg, rgba(45,212,191,.14), var(--panel));
+  border-color: rgba(45,212,191,.4);
+}
+.pRow .rk { font-size: clamp(15px, 4.4vw, 19px); font-weight: 800; color: var(--faint); width: 26px; }
+.pRow .pn { flex: 1; font-size: clamp(14.5px, 4.3vw, 18px); font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pRow .pv { font-size: clamp(19px, 5.6vw, 25px); font-weight: 800; color: var(--tc); }
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP ============ -->
+<section id="setup" class="screen on scroll">
+  <div>
+    <h1>Off By One</h1>
+    <p class="tag">Argue five things into the right order.<br>Get one pair backwards and the room will pounce.</p>
+  </div>
+
+  <div id="setupBody">
+    <div class="card">
+      <div class="lbl">Teams</div>
+      <div class="seg" id="teamSeg"></div>
+      <div class="names" id="nameList" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <div class="lbl">Ladders per team</div>
+      <div class="seg" id="roundSeg"></div>
+    </div>
+
+    <div class="card how">
+      <ol>
+        <li>One team gets a <b>ladder</b> — five things and a scale. Tap two tiles to swap them until the order looks right, then <b>Lock It In</b>.</li>
+        <li>Before the answer shows, any <b>rival team</b> may challenge <b>one neighbouring pair</b> they think is backwards.</li>
+        <li><b>+1</b> per tile in the correct slot, <b>+2</b> for a perfect ladder. A good challenge steals <b>+2</b>; a bad one hands the ladder team <b>+1</b>.</li>
+        <li>The last ladder of the night is the <b>Final Ladder</b> — everything doubles.</li>
+      </ol>
+    </div>
+  </div>
+
+  <button class="btn" id="startBtn">Start Game</button>
+  <button class="btn ghost sm" id="wipeBtn">Clear saved teams &amp; ladder history</button>
+</section>
+
+<!-- ============ PLAY ============ -->
+<section id="play" class="screen">
+  <div class="top">
+    <div class="rnd" id="rndLbl">Ladder <b>1</b> of 6</div>
+    <button class="iconBtn" id="soundBtn" title="Sound">🔊</button>
+    <button class="iconBtn" id="quitBtn" title="End game">✕</button>
+  </div>
+
+  <div class="scores" id="scores"></div>
+
+  <div class="prompt" id="prompt"></div>
+
+  <div class="ladderWrap">
+    <div class="edge" id="edgeTop">Top</div>
+    <div id="ladder"></div>
+    <div class="edge bot" id="edgeBot">Bottom</div>
+  </div>
+
+  <div id="controls"></div>
+</section>
+
+<!-- ============ RESULTS ============ -->
+<section id="results" class="screen scroll">
+  <h1 id="winTitle">Winner</h1>
+  <p class="tag" id="winSub"></p>
+  <div class="podium" id="podium"></div>
+  <div class="rowBtns">
+    <button class="btn" id="againBtn">Play Again</button>
+  </div>
+  <button class="btn ghost sm" id="newBtn">Change Teams</button>
+</section>
+
+<script>
+'use strict';
+
+/* =========================================================================
+   CARD DATA
+   Each item is [name, value, displayed value]. The correct order is ALWAYS
+   derived by sorting on value — it is never hand-authored — so the reveal
+   doubles as the proof. kind:'ratio' items must be >=8% apart from their
+   neighbour; kind:'linear' (years, temperatures) items must be >=4% of the
+   card's full range apart.
+   ========================================================================= */
+const CARDS = [
+  { id:'planets1', q:'Planets by distance from the Sun', lo:'Closest to the Sun', hi:'Farthest out', kind:'ratio', items:[
+    ['Mercury',0.39,'0.39 AU'],['Venus',0.72,'0.72 AU'],['Earth',1,'1.00 AU'],['Mars',1.52,'1.52 AU'],['Jupiter',5.2,'5.20 AU']]},
+  { id:'planets2', q:'The outer solar system, by distance', lo:'Closest to the Sun', hi:'Farthest out', kind:'ratio', items:[
+    ['Jupiter',5.2,'5.2 AU'],['Saturn',9.6,'9.6 AU'],['Uranus',19.2,'19.2 AU'],['Neptune',30.1,'30.1 AU'],['Pluto',39.5,'39.5 AU']]},
+  { id:'planetsize', q:'Planets by diameter', lo:'Smallest',	hi:'Biggest', kind:'ratio', items:[
+    ['Mercury',4879,'4,879 km'],['Mars',6779,'6,779 km'],['Earth',12742,'12,742 km'],['Neptune',49244,'49,244 km'],['Jupiter',139820,'139,820 km']]},
+  { id:'towers', q:'Skyscrapers by height', lo:'Shortest', hi:'Tallest', kind:'ratio', items:[
+    ['The Shard, London',310,'310 m'],['Petronas Towers, KL',452,'452 m'],['Taipei 101',508,'508 m'],['Shanghai Tower',632,'632 m'],['Burj Khalifa, Dubai',828,'828 m']]},
+  { id:'landmarks', q:'Landmarks by height', lo:'Shortest', hi:'Tallest', kind:'ratio', items:[
+    ['Leaning Tower of Pisa',57,'57 m'],['Statue of Liberty',93,'93 m'],['Great Pyramid of Giza',139,'139 m'],['Space Needle, Seattle',184,'184 m'],['Eiffel Tower',330,'330 m']]},
+  { id:'mountains', q:'Mountains by height', lo:'Shortest', hi:'Tallest', kind:'ratio', items:[
+    ['Mount Olympus, Greece',2917,'2,917 m'],['Mount Fuji',3776,'3,776 m'],['The Matterhorn',4478,'4,478 m'],['Kilimanjaro',5895,'5,895 m'],['Mount Everest',8849,'8,849 m']]},
+  { id:'rivers', q:'Rivers by length', lo:'Shortest', hi:'Longest', kind:'ratio', items:[
+    ['The Thames',346,'346 km'],['The Rhine',1230,'1,230 km'],['The Danube',2850,'2,850 km'],['The Mississippi',3766,'3,766 km'],['The Nile',6650,'6,650 km']]},
+  { id:'area', q:'Countries by land area', lo:'Smallest', hi:'Biggest', kind:'ratio', items:[
+    ['France',551695,'551,695 km²'],['Mexico',1964375,'1.96 million km²'],['India',3287263,'3.29 million km²'],['Australia',7692024,'7.69 million km²'],['Russia',17098246,'17.1 million km²']]},
+  { id:'oceans', q:'Oceans by surface area', lo:'Smallest', hi:'Biggest', kind:'ratio', items:[
+    ['Arctic Ocean',14,'14 million km²'],['Southern Ocean',20,'20 million km²'],['Indian Ocean',70,'70 million km²'],['Atlantic Ocean',106,'106 million km²'],['Pacific Ocean',165,'165 million km²']]},
+  { id:'lakes', q:'Lakes by surface area', lo:'Smallest', hi:'Biggest', kind:'ratio', items:[
+    ['Great Bear Lake',31000,'31,000 km²'],['Lake Michigan',58000,'58,000 km²'],['Lake Victoria',68800,'68,800 km²'],['Lake Superior',82100,'82,100 km²'],['The Caspian Sea',371000,'371,000 km²']]},
+  { id:'depth', q:'How deep down it is', lo:'Nearest the surface', hi:'Deepest down', kind:'ratio', items:[
+    ['Scuba diving limit',40,'40 m'],['A blue whale’s dive',500,'500 m'],['A sperm whale’s dive',2000,'2,000 m'],['The Titanic wreck',3800,'3,800 m'],['Bottom of the Mariana Trench',10935,'10,935 m']]},
+  { id:'landspeed', q:'Land animals by top speed', lo:'Slowest', hi:'Fastest', kind:'ratio', items:[
+    ['Elephant',40,'40 km/h'],['House cat',48,'48 km/h'],['Greyhound',74,'74 km/h'],['Pronghorn antelope',88,'88 km/h'],['Cheetah',120,'120 km/h']]},
+  { id:'allspeed', q:'Animals by top speed', lo:'Slowest', hi:'Fastest', kind:'ratio', items:[
+    ['Giant tortoise',0.3,'0.3 km/h'],['Black mamba',20,'20 km/h'],['Ostrich',70,'70 km/h'],['Sailfish',110,'110 km/h'],['Peregrine falcon (diving)',390,'390 km/h']]},
+  { id:'mass', q:'Animals by weight', lo:'Lightest', hi:'Heaviest', kind:'ratio', items:[
+    ['House cat',4.5,'4.5 kg'],['Adult human',70,'70 kg'],['Polar bear',450,'450 kg'],['African elephant',6000,'6,000 kg'],['Blue whale',150000,'150,000 kg']]},
+  { id:'lifespan', q:'Typical lifespan', lo:'Shortest life', hi:'Longest life', kind:'ratio', items:[
+    ['Adult mayfly',1,'about 1 day'],['Housefly',28,'about 1 month'],['Mouse',730,'about 2 years'],['Dog',4380,'about 12 years'],['Giant tortoise',54750,'about 150 years']]},
+  { id:'gestation', q:'How long the pregnancy lasts', lo:'Shortest', hi:'Longest', kind:'ratio', items:[
+    ['Mouse',20,'20 days'],['Cat',64,'64 days'],['Human',280,'280 days'],['Horse',340,'340 days'],['Elephant',645,'645 days']]},
+  { id:'legs', q:'How many legs it has', lo:'Fewest legs', hi:'Most legs', kind:'ratio', items:[
+    ['Human',2,'2 legs'],['Dog',4,'4 legs'],['Ant',6,'6 legs'],['Spider',8,'8 legs'],['Crab',10,'10 legs']]},
+  { id:'body', q:'How many of these a person has', lo:'Fewest', hi:'Most', kind:'ratio', items:[
+    ['Chambers in the heart',4,'4'],['Fingers',10,'10'],['Ribs',24,'24'],['Adult teeth',32,'32'],['Bones',206,'206']]},
+  { id:'temp1', q:'Temperature, coldest first', lo:'Coldest', hi:'Hottest', kind:'linear', items:[
+    ['Dry ice turns to gas',-78,'−78 °C'],['Water freezes',0,'0 °C'],['Water boils',100,'100 °C'],['Lead melts',327,'327 °C'],['Iron melts',1538,'1,538 °C']]},
+  { id:'temp2', q:'Temperature, coldest first', lo:'Coldest', hi:'Hottest', kind:'linear', items:[
+    ['Liquid nitrogen boils',-196,'−196 °C'],['Mercury freezes',-39,'−39 °C'],['Butter melts',32,'32 °C'],['Paper catches fire',233,'233 °C'],['Gold melts',1064,'1,064 °C']]},
+  { id:'atomic', q:'Elements by atomic number', lo:'Lowest', hi:'Highest', kind:'ratio', items:[
+    ['Hydrogen',1,'1'],['Carbon',6,'6'],['Iron',26,'26'],['Silver',47,'47'],['Gold',79,'79']]},
+  { id:'ancient', q:'Ancient history, earliest first', lo:'Longest ago', hi:'Most recent', kind:'linear', items:[
+    ['The Great Pyramid is built',-2560,'about 2560 BC'],['Rome is founded',-753,'753 BC'],['The Great Wall is begun',-221,'221 BC'],['Pompeii is buried',79,'AD 79'],['Magna Carta is sealed',1215,'1215']]},
+  { id:'events', q:'World events, earliest first', lo:'Longest ago', hi:'Most recent', kind:'linear', items:[
+    ['US Declaration of Independence',1776,'1776'],['The Titanic sinks',1912,'1912'],['The Second World War ends',1945,'1945'],['The first Moon landing',1969,'1969'],['The Berlin Wall falls',1989,'1989']]},
+  { id:'invent', q:'Inventions, earliest first', lo:'Oldest', hi:'Newest', kind:'linear', items:[
+    ['The printing press',1440,'about 1440'],['The telephone',1876,'1876'],['Television',1927,'1927'],['The home games console',1972,'1972'],['The iPhone',2007,'2007']]},
+  { id:'space', q:'Space milestones, earliest first', lo:'Oldest', hi:'Newest', kind:'linear', items:[
+    ['Sputnik reaches orbit',1957,'1957'],['Gagarin flies in space',1961,'1961'],['Apollo 11 lands on the Moon',1969,'1969'],['The first Space Shuttle flight',1981,'1981'],['The Space Station’s first module',1998,'1998']]},
+  { id:'films', q:'Films, earliest first', lo:'Oldest', hi:'Newest', kind:'linear', items:[
+    ['The Wizard of Oz',1939,'1939'],['Star Wars',1977,'1977'],['E.T.',1982,'1982'],['Jurassic Park',1993,'1993'],['Titanic',1997,'1997']]},
+  { id:'toons', q:'Animated films, earliest first', lo:'Oldest', hi:'Newest', kind:'linear', items:[
+    ['Snow White',1937,'1937'],['The Lion King',1994,'1994'],['Shrek',2001,'2001'],['Frozen',2013,'2013'],['Encanto',2021,'2021']]},
+  { id:'games', q:'Video games, earliest first', lo:'Oldest', hi:'Newest', kind:'linear', items:[
+    ['Pong',1972,'1972'],['Pac-Man',1980,'1980'],['Super Mario Bros.',1985,'1985'],['Minecraft',2011,'2011'],['Fortnite',2017,'2017']]},
+  { id:'music', q:'Ways to play music, earliest first', lo:'Oldest', hi:'Newest', kind:'linear', items:[
+    ['The vinyl LP',1948,'1948'],['The cassette tape',1963,'1963'],['The compact disc',1982,'1982'],['The iPod',2001,'2001'],['Spotify',2008,'2008']]},
+  { id:'firms', q:'Companies, oldest first', lo:'Oldest', hi:'Newest', kind:'linear', items:[
+    ['Ford',1903,'1903'],['Disney',1923,'1923'],['McDonald’s',1940,'1940'],['Apple',1976,'1976'],['Amazon',1994,'1994']]},
+  { id:'olympics', q:'Olympic host cities, earliest first', lo:'Longest ago', hi:'Most recent', kind:'linear', items:[
+    ['Berlin',1936,'1936'],['Tokyo',1964,'1964'],['Los Angeles',1984,'1984'],['Sydney',2000,'2000'],['Rio de Janeiro',2016,'2016']]},
+  { id:'teamsize', q:'Players per team on the field', lo:'Fewest', hi:'Most', kind:'ratio', items:[
+    ['Basketball',5,'5'],['Ice hockey',6,'6'],['Baseball',9,'9'],['American football',11,'11'],['Rugby union',15,'15']]},
+  { id:'shapes', q:'Shapes by number of sides', lo:'Fewest sides', hi:'Most sides', kind:'ratio', items:[
+    ['Triangle',3,'3 sides'],['Pentagon',5,'5 sides'],['Heptagon',7,'7 sides'],['Decagon',10,'10 sides'],['Dodecagon',12,'12 sides']]},
+  { id:'strings', q:'Instruments by number of strings', lo:'Fewest strings', hi:'Most strings', kind:'ratio', items:[
+    ['Violin',4,'4 strings'],['Banjo',5,'5 strings'],['Guitar',6,'6 strings'],['12-string guitar',12,'12 strings'],['Concert harp',47,'47 strings']]},
+  { id:'numbers', q:'Everyday numbers, smallest first', lo:'Smallest', hi:'Biggest', kind:'ratio', items:[
+    ['Days in a fortnight',14,'14'],['Days in February',28,'28'],['Cards in a deck',52,'52'],['Squares on a chessboard',64,'64'],['Keys on a piano',88,'88']]},
+  { id:'fromlondon', q:'Distance from London', lo:'Nearest', hi:'Farthest', kind:'ratio', items:[
+    ['Paris',344,'344 km'],['Rome',1435,'1,435 km'],['New York',5570,'5,570 km'],['Tokyo',9560,'9,560 km'],['Sydney',16990,'16,990 km']]},
+  { id:'fromearth', q:'Distance from Earth', lo:'Nearest', hi:'Farthest', kind:'ratio', items:[
+    ['The Space Station',400,'400 km'],['The Moon',384400,'384,400 km'],['Mars at its closest',55000000,'55 million km'],['The Sun',149600000,'149.6 million km'],['Voyager 1',24000000000,'24 billion km']]},
+  { id:'light', q:'How long light takes to get there', lo:'Quickest', hi:'Longest', kind:'ratio', items:[
+    ['Earth to the Moon',1.3,'1.3 seconds'],['The Sun to Earth',499,'8.3 minutes'],['The Sun to Jupiter',2600,'43 minutes'],['Earth to the nearest star',1.34e8,'4.2 years'],['Earth to the Andromeda galaxy',7.9e13,'2.5 million years']]},
+  { id:'vehicles', q:'Top speeds, slowest first', lo:'Slowest', hi:'Fastest', kind:'ratio', items:[
+    ['A bicycle',25,'25 km/h'],['A Formula 1 car',350,'350 km/h'],['A passenger jet',900,'900 km/h'],['The speed of sound',1235,'1,235 km/h'],['A rocket at launch',28000,'28,000 km/h']]},
+  { id:'races', q:'Running races by distance', lo:'Shortest', hi:'Longest', kind:'ratio', items:[
+    ['The 100 metres',100,'100 m'],['One lap of a track',400,'400 m'],['A mile',1609,'1,609 m'],['A 5K',5000,'5,000 m'],['A marathon',42195,'42,195 m']]},
+  { id:'pitches', q:'Playing surfaces by length', lo:'Shortest', hi:'Longest', kind:'ratio', items:[
+    ['A bowling lane',18.3,'18.3 m'],['A tennis court',23.8,'23.8 m'],['A basketball court',28.7,'28.7 m'],['An ice hockey rink',61,'61 m'],['A football pitch',105,'105 m']]},
+  { id:'weights', q:'Everyday things by weight', lo:'Lightest', hi:'Heaviest', kind:'ratio', items:[
+    ['A paperclip',1,'1 g'],['A AA battery',24,'24 g'],['A baseball',145,'145 g'],['A basketball',620,'620 g'],['A bowling ball',7000,'7,000 g']]}
+];
+
+/* ========================= state ========================= */
+const COLORS = ['var(--t1)','var(--t2)','var(--t3)','var(--t4)'];
+const LS = k => 'cowork-offbyone-' + k;
+
+const S = {
+  teams: [],
+  nTeams: 3,
+  perTeam: 3,
+  round: 0,          // 0-indexed
+  startTeam: 0,      // which team opens, so the Final Ladder rotates
+  totalRounds: 9,
+  deck: [],
+  card: null,
+  flip: false,       // true = biggest at the top
+  order: [],         // item indices, top to bottom
+  sel: -1,           // selected tile for swapping
+  phase: 'order',    // order | challenge | pick | reveal
+  challenger: -1,
+  chalGap: -1,
+  sound: true,
+  seen: []
+};
+
+const $ = id => document.getElementById(id);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+/* ========================= sound ========================= */
+let AC = null;
+function beep(freq, dur, type, vol) {
+  if (!S.sound) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, AC.currentTime);
+    g.gain.setValueAtTime(0.0001, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(vol || 0.13, AC.currentTime + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(); o.stop(AC.currentTime + dur + 0.02);
+  } catch (e) { /* audio is optional */ }
+}
+const sTap    = () => beep(520, 0.06, 'triangle', 0.08);
+const sSwap   = () => { beep(420, 0.07, 'triangle', 0.09); setTimeout(() => beep(620, 0.07, 'triangle', 0.09), 55); };
+const sLock   = () => { beep(300, 0.1, 'square', 0.07); setTimeout(() => beep(450, 0.14, 'square', 0.07), 90); };
+const sGood   = () => { [523, 659, 784].forEach((f, i) => setTimeout(() => beep(f, 0.16, 'sine', 0.11), i * 85)); };
+const sBad    = () => { beep(200, 0.22, 'sawtooth', 0.08); setTimeout(() => beep(150, 0.28, 'sawtooth', 0.08), 130); };
+const sFanfare= () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.32, 'triangle', 0.12), i * 130)); };
+
+/* ========================= setup screen ========================= */
+function buildSetup() {
+  const saved = load('teams');
+  const seg = $('teamSeg');
+  seg.innerHTML = '';
+  [2, 3, 4].forEach(n => {
+    const b = document.createElement('button');
+    b.textContent = n + ' teams';
+    b.onclick = () => { S.nTeams = n; sTap(); buildSetup(); };
+    if (n === S.nTeams) b.className = 'sel';
+    seg.appendChild(b);
+  });
+
+  const rs = $('roundSeg');
+  rs.innerHTML = '';
+  [2, 3, 4].forEach(n => {
+    const b = document.createElement('button');
+    b.textContent = n;
+    b.onclick = () => { S.perTeam = n; sTap(); buildSetup(); };
+    if (n === S.perTeam) b.className = 'sel';
+    rs.appendChild(b);
+  });
+
+  const nl = $('nameList');
+  const existing = [...nl.querySelectorAll('input')].map(i => i.value);
+  nl.innerHTML = '';
+  for (let i = 0; i < S.nTeams; i++) {
+    const row = document.createElement('div');
+    row.className = 'nameRow';
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    dot.style.background = COLORS[i];
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.maxLength = 14;
+    inp.value = existing[i] || (saved && saved[i]) || 'Team ' + (i + 1);
+    inp.setAttribute('aria-label', 'Team ' + (i + 1) + ' name');
+    row.appendChild(dot); row.appendChild(inp);
+    nl.appendChild(row);
+  }
+}
+
+function load(k) { try { return JSON.parse(localStorage.getItem(LS(k))); } catch (e) { return null; } }
+function save(k, v) { try { localStorage.setItem(LS(k), JSON.stringify(v)); } catch (e) { /* private mode */ } }
+
+/* ========================= game flow ========================= */
+function startGame() {
+  const names = [...$('nameList').querySelectorAll('input')].map((i, n) => (i.value.trim() || 'Team ' + (n + 1)).slice(0, 14));
+  save('teams', names);
+  S.teams = names.map((n, i) => ({ name: n, score: 0, color: COLORS[i] }));
+  S.round = 0;
+  S.startTeam = Math.floor(Math.random() * S.nTeams);
+  S.totalRounds = S.nTeams * S.perTeam;
+  S.seen = load('seen') || [];
+  buildDeck();
+  show('play');
+  nextRound();
+}
+
+function buildDeck() {
+  let pool = CARDS.filter(c => !S.seen.includes(c.id));
+  if (pool.length < S.totalRounds) { S.seen = []; pool = CARDS.slice(); }
+  S.deck = shuffle(pool.slice());
+}
+
+function nextRound() {
+  if (S.round >= S.totalRounds) return endGame();
+  S.card = S.deck.pop() || shuffle(CARDS.slice()).pop();
+  S.seen.push(S.card.id);
+  save('seen', S.seen.slice(-30));
+  S.flip = Math.random() < 0.5;
+  S.order = shuffle(S.card.items.map((_, i) => i));
+  // never hand the team a ladder that is already correct
+  if (isPerfect(S.order)) S.order.reverse();
+  S.sel = -1;
+  S.challenger = -1;
+  S.chalGap = -1;
+  S.chalItems = null;
+  S.graded = null;
+  S.phase = 'order';
+  render();
+}
+
+/* The turn order starts on a random team, so the double-point Final Ladder
+   doesn't always land on whoever was typed in last. */
+const activeTeam = () => (S.round + S.startTeam) % S.teams.length;
+const isFinal = () => S.round === S.totalRounds - 1;
+const mult = () => (isFinal() ? 2 : 1);
+
+/* The true order, top to bottom: ascending by value, reversed when flipped. */
+function trueOrder() {
+  const idx = S.card.items.map((_, i) => i).sort((a, b) => S.card.items[a][1] - S.card.items[b][1]);
+  return S.flip ? idx.reverse() : idx;
+}
+function isPerfect(ord) {
+  const t = trueOrder();
+  return ord.every((v, i) => v === t[i]);
+}
+function correctCount(ord) {
+  const t = trueOrder();
+  return ord.reduce((n, v, i) => n + (v === t[i] ? 1 : 0), 0);
+}
+
+/* ========================= rendering ========================= */
+function show(id) {
+  ['setup', 'play', 'results'].forEach(s => $(s).classList.toggle('on', s === id));
+}
+
+function render() {
+  const c = S.card, at = activeTeam(), team = S.teams[at];
+
+  $('rndLbl').innerHTML = 'Ladder <b>' + (S.round + 1) + '</b> of ' + S.totalRounds;
+  $('soundBtn').textContent = S.sound ? '🔊' : '🔇';
+
+  // scoreboard
+  const sb = $('scores');
+  sb.innerHTML = '';
+  S.teams.forEach((t, i) => {
+    const d = document.createElement('div');
+    d.className = 'sc' + (i === at ? ' act' : '');
+    d.style.setProperty('--tc', t.color);
+    d.innerHTML = '<div class="n">' + esc(t.name) + '</div><div class="v">' + t.score + '</div>';
+    sb.appendChild(d);
+  });
+
+  // prompt
+  const p = $('prompt');
+  p.style.setProperty('--tc', team.color);
+  p.innerHTML = (isFinal() ? '<div class="finalPill">FINAL LADDER · DOUBLE POINTS</div>' : '') +
+    '<div class="who">' + esc(team.name) + '’s ladder</div>' +
+    '<div class="q">' + esc(c.q) + '</div>';
+
+  $('edgeTop').textContent = S.flip ? c.hi : c.lo;
+  $('edgeBot').textContent = S.flip ? c.lo : c.hi;
+
+  renderLadder(false);
+  renderControls();
+}
+
+function renderLadder(animate) {
+  const wrap = $('ladder'), c = S.card;
+  const t = trueOrder();
+
+  const prev = new Map();
+  if (animate) {
+    [...wrap.children].forEach(el => {
+      if (el.dataset.k) prev.set(el.dataset.k, el.getBoundingClientRect().top);
+    });
+  }
+
+  wrap.innerHTML = '';
+  S.order.forEach((it, pos) => {
+    const item = c.items[it];
+    const d = document.createElement('div');
+    d.className = 'tile';
+    d.dataset.k = 'i' + it;
+
+    if (S.phase === 'order') {
+      d.classList.add('tapable');
+      if (S.sel === pos) d.classList.add('sel');
+      d.onclick = () => tapTile(pos);
+    }
+    // the challenged pair stays marked even after the tiles slide into the true order
+    if (S.chalItems && S.chalItems.includes(it)) d.classList.add('chA');
+    // grading is frozen at reveal time, so it survives the slide into the true order
+    const wasRight = S.graded ? !!S.graded[it] : (it === t[pos]);
+    if (S.phase === 'reveal') {
+      d.classList.add('shown');
+      d.classList.add(wasRight ? 'ok' : 'no');
+    }
+
+    d.innerHTML =
+      '<div class="pos">' + (pos + 1) + '</div>' +
+      '<div class="nm">' + esc(item[0]) + '</div>' +
+      '<div class="val">' + esc(item[2]) + '</div>' +
+      '<div class="mark">' + (wasRight ? '✅' : '❌') + '</div>';
+    wrap.appendChild(d);
+
+    // gap marker below every tile except the last
+    if (pos < S.order.length - 1) {
+      const g = document.createElement('div');
+      g.className = 'gap' + (S.phase === 'pick' ? ' live' : '');
+      g.dataset.gap = pos;
+      if (S.phase === 'pick') {
+        g.textContent = '↕ these two are backwards';
+        g.onclick = () => pickGap(pos);
+      }
+      wrap.appendChild(g);
+    }
+  });
+
+  if (animate) {
+    [...wrap.children].forEach(el => {
+      const k = el.dataset.k;
+      if (k && prev.has(k)) {
+        const dy = prev.get(k) - el.getBoundingClientRect().top;
+        if (dy) {
+          el.style.transition = 'none';
+          el.style.transform = 'translateY(' + dy + 'px)';
+          requestAnimationFrame(() => {
+            el.style.transition = 'transform .3s cubic-bezier(.2,.85,.25,1)';
+            el.style.transform = '';
+          });
+        }
+      }
+    });
+  }
+}
+
+function renderControls() {
+  const box = $('controls');
+  box.innerHTML = '';
+  const team = S.teams[activeTeam()];
+
+  if (S.phase === 'order') {
+    box.appendChild(banner(S.sel < 0
+      ? 'Talk it out, then <b>tap two tiles to swap them</b>.'
+      : '<b>Now tap the tile to swap it with.</b>'));
+    box.appendChild(bigBtn('Lock It In', lockIn));
+
+  } else if (S.phase === 'challenge') {
+    box.appendChild(banner('Locked. Any <b>rival team</b> may call out one neighbouring pair as backwards. <b>+2</b> if they’re right — <b>+1</b> to ' + esc(team.name) + ' if they’re wrong.', 'warn'));
+    const grid = document.createElement('div');
+    grid.className = 'chalGrid';
+    S.teams.forEach((t, i) => {
+      if (i === activeTeam()) return;
+      const b = document.createElement('button');
+      b.style.setProperty('--tc', t.color);
+      b.textContent = t.name + ' challenges';
+      b.onclick = () => { S.challenger = i; S.phase = 'pick'; sTap(); render(); };
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+    const skip = bigBtn('No Challenge — Reveal', () => { S.challenger = -1; doReveal(); });
+    skip.classList.add('ghost');
+    skip.style.marginTop = '8px';
+    box.appendChild(skip);
+
+  } else if (S.phase === 'pick') {
+    const ch = S.teams[S.challenger];
+    box.appendChild(banner('<b>' + esc(ch.name) + '</b>, tap the gap between the two tiles you say are the wrong way round.', 'warn'));
+    const back = bigBtn('← Back', () => { S.challenger = -1; S.phase = 'challenge'; render(); });
+    back.classList.add('ghost', 'sm');
+    box.appendChild(back);
+
+  } else if (S.phase === 'reveal') {
+    box.appendChild(S.revealBox);
+    box.appendChild(bigBtn(S.round + 1 >= S.totalRounds ? 'See Final Scores' : 'Next Ladder', () => {
+      S.round++;
+      nextRound();
+    }));
+  }
+}
+
+function banner(html, kind) {
+  const d = document.createElement('div');
+  d.className = 'banner' + (kind ? ' ' + kind : '');
+  d.innerHTML = html;
+  d.style.marginBottom = '8px';
+  return d;
+}
+function bigBtn(label, fn) {
+  const b = document.createElement('button');
+  b.className = 'btn';
+  b.textContent = label;
+  b.onclick = fn;
+  return b;
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+
+/* ========================= interactions ========================= */
+function tapTile(pos) {
+  if (S.phase !== 'order') return;
+  if (S.sel < 0) { S.sel = pos; sTap(); renderLadder(false); return; }
+  if (S.sel === pos) { S.sel = -1; sTap(); renderLadder(false); return; }
+  const a = S.sel, b = pos;
+  [S.order[a], S.order[b]] = [S.order[b], S.order[a]];
+  S.sel = -1;
+  sSwap();
+  renderLadder(true);
+}
+
+function lockIn() {
+  S.phase = 'challenge';
+  S.sel = -1;
+  sLock();
+  render();
+}
+
+function pickGap(pos) {
+  S.chalGap = pos;
+  S.chalItems = [S.order[pos], S.order[pos + 1]];
+  doReveal();
+}
+
+/* ========================= reveal & scoring ========================= */
+function doReveal() {
+  S.phase = 'reveal';
+  const at = activeTeam(), team = S.teams[at], m = mult();
+  const c = S.card;
+
+  const truth = trueOrder();
+  S.graded = {};
+  S.order.forEach((it, i) => { S.graded[it] = (it === truth[i]); });
+
+  const right = correctCount(S.order);
+  const perfect = right === S.order.length;
+
+  const lines = [];
+  let activePts = right * m;
+  lines.push([right + ' tile' + (right === 1 ? '' : 's') + ' in the right slot', '+' + (right * m)]);
+  if (perfect) { activePts += 2 * m; lines.push(['Perfect ladder bonus', '+' + (2 * m)]); }
+
+  let verdict = null, chalPts = 0;
+  if (S.challenger >= 0 && S.chalGap >= 0) {
+    const upper = c.items[S.order[S.chalGap]];
+    const lower = c.items[S.order[S.chalGap + 1]];
+    // "backwards" means: relative to the true direction, upper should be below lower
+    const wrongWayRound = S.flip ? (upper[1] < lower[1]) : (upper[1] > lower[1]);
+    const ch = S.teams[S.challenger];
+    if (wrongWayRound) {
+      chalPts = 2 * m;
+      verdict = { ok: true, html: '<b>' + esc(ch.name) + '</b> called it — ' + esc(upper[0]) + ' and ' + esc(lower[0]) + ' really are the wrong way round. <b>+' + chalPts + '</b>' };
+      lines.push([esc(ch.name) + '’s challenge lands', '+' + chalPts + ' to ' + esc(ch.name)]);
+      ch.score += chalPts;
+    } else {
+      verdict = { ok: false, html: '<b>' + esc(ch.name) + '</b> got greedy — ' + esc(upper[0]) + ' really does sit above ' + esc(lower[0] ) + '. <b>+' + (1 * m) + '</b> to ' + esc(team.name) };
+      activePts += 1 * m;
+      lines.push(['Failed challenge bonus', '+' + (1 * m)]);
+    }
+  }
+
+  team.score += activePts;
+
+  const box = document.createElement('div');
+  if (verdict) box.appendChild(banner(verdict.html, verdict.ok ? 'win' : 'lose'));
+  else if (perfect) box.appendChild(banner('Flawless — every tile in its slot.', 'win'));
+
+  const t = document.createElement('div');
+  t.className = 'card tally';
+  t.style.marginBottom = '8px';
+  lines.forEach(l => { t.innerHTML += '<div><span>' + l[0] + '</span><span>' + l[1] + '</span></div>'; });
+  t.innerHTML += '<div class="tot"><span>' + esc(team.name) + ' this ladder</span><span>+' + activePts + '</span></div>';
+  box.appendChild(t);
+  S.revealBox = box;
+
+  if (perfect || (verdict && !verdict.ok)) sGood();
+  else if (verdict && verdict.ok) sBad();
+  else if (right >= 3) sGood(); else sBad();
+
+  render();
+  // slide the tiles into the true order so the room can see the answer
+  setTimeout(() => {
+    S.order = trueOrder();
+    renderLadder(true);
+  }, 900);
+}
+
+/* ========================= end ========================= */
+function endGame() {
+  const ranked = S.teams.map((t, i) => ({ ...t, i })).sort((a, b) => b.score - a.score);
+  const top = ranked[0].score;
+  const winners = ranked.filter(t => t.score === top);
+
+  $('winTitle').textContent = winners.length > 1 ? 'Dead Heat' : winners[0].name;
+  $('winSub').textContent = winners.length > 1
+    ? winners.map(w => w.name).join(' and ') + ' tie on ' + top + ' points.'
+    : 'Wins with ' + top + ' point' + (top === 1 ? '' : 's') + '.';
+
+  const pod = $('podium');
+  pod.innerHTML = '';
+  ranked.forEach((t, n) => {
+    const d = document.createElement('div');
+    d.className = 'pRow' + (t.score === top ? ' first' : '');
+    d.style.setProperty('--tc', t.color);
+    d.innerHTML = '<div class="rk">' + (n + 1) + '</div><div class="pn">' + esc(t.name) +
+      '</div><div class="pv">' + t.score + '</div>';
+    pod.appendChild(d);
+  });
+
+  show('results');
+  sFanfare();
+}
+
+/* ========================= wiring ========================= */
+$('startBtn').onclick = () => { sTap(); startGame(); };
+$('soundBtn').onclick = () => { S.sound = !S.sound; save('sound', S.sound); $('soundBtn').textContent = S.sound ? '🔊' : '🔇'; if (S.sound) sTap(); };
+$('quitBtn').onclick = () => { if (S.round > 0 || S.phase !== 'order') { endGame(); } else { show('setup'); } };
+$('againBtn').onclick = () => { sTap(); startGame(); };
+$('newBtn').onclick = () => { sTap(); show('setup'); buildSetup(); };
+$('wipeBtn').onclick = () => {
+  ['teams', 'seen', 'sound'].forEach(k => { try { localStorage.removeItem(LS(k)); } catch (e) {} });
+  S.seen = [];
+  [...$('nameList').querySelectorAll('input')].forEach((inp, i) => { inp.value = 'Team ' + (i + 1); });
+  $('wipeBtn').textContent = 'Cleared ✓';
+  setTimeout(() => { $('wipeBtn').textContent = 'Clear saved teams & ladder history'; }, 1400);
+};
+
+const savedSound = load('sound');
+if (savedSound === false) S.sound = false;
+buildSetup();
+</script>
+</body>
+</html>

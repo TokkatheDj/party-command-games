@@ -1,0 +1,921 @@
+<!-- CONCEPT: DEDUCTION/BLUFFING - "Decoy": pass-the-phone hidden-role game where everyone secretly sees the same word except one player; each player says ONE word aloud, then the room votes on who's faking. Two modes: BLANK (the Decoy sees only the category and must bluff, with a steal-the-round word guess if caught) and TWIN (the Decoy gets a near-miss word and doesn't even know they're the odd one out). 100 word pairs across 10 categories | Players: 3-12 | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Decoy</title>
+<style>
+:root{
+  --bg:#0b0713;
+  --bg2:#150c26;
+  --panel:#1c1230;
+  --panel2:#251840;
+  --line:#3a2a5c;
+  --ink:#f3edff;
+  --dim:#a394c4;
+  --a:#ff3d8b;
+  --b:#00e5ff;
+  --gold:#ffd23f;
+  --good:#3ddc84;
+  --bad:#ff5c5c;
+  --pad:clamp(12px,4vw,20px);
+  --r:16px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{
+  margin:0;padding:0;height:100%;
+  touch-action:manipulation;
+  user-select:none;-webkit-user-select:none;
+  overflow:hidden;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+}
+body{
+  background:
+    radial-gradient(120% 70% at 15% -5%, #2a0f3d 0%, transparent 60%),
+    radial-gradient(110% 60% at 90% 105%, #06263a 0%, transparent 62%),
+    var(--bg);
+}
+#app{height:100%;display:flex;flex-direction:column;max-width:640px;margin:0 auto;position:relative;}
+.screen{
+  display:none;flex-direction:column;flex:1;min-height:0;
+  padding:var(--pad);gap:12px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+}
+.screen.on{display:flex;}
+h1{
+  margin:0;font-size:clamp(38px,13vw,64px);letter-spacing:.14em;font-weight:900;
+  background:linear-gradient(90deg,var(--a),var(--b));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-align:center;line-height:1;
+}
+h2{
+  margin:0;font-size:clamp(18px,5.2vw,26px);font-weight:800;letter-spacing:.02em;
+  background:linear-gradient(90deg,var(--a),var(--b));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  text-align:center;
+}
+.tag{text-align:center;color:var(--dim);font-size:clamp(12px,3.4vw,15px);line-height:1.5;}
+.tag b{color:var(--ink);}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:var(--pad);}
+.lbl{font-size:clamp(11px,3vw,13px);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:700;margin-bottom:8px;text-align:center;}
+button{font-family:inherit;color:inherit;border:none;background:none;cursor:pointer;}
+.btn{
+  width:100%;min-height:56px;border-radius:14px;font-size:clamp(16px,4.4vw,20px);
+  font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  background:linear-gradient(90deg,var(--a),#c33bd6);color:#fff;
+  box-shadow:0 6px 0 rgba(0,0,0,.35);transition:transform .06s,box-shadow .06s,opacity .15s;
+  padding:10px 14px;
+}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 rgba(0,0,0,.35);}
+.btn.alt{background:linear-gradient(90deg,#1f7fa8,var(--b));color:#04222b;}
+.btn.ghost{background:var(--panel2);border:1px solid var(--line);color:var(--ink);box-shadow:none;}
+.btn.ghost:active{transform:translateY(2px);}
+.btn.gold{background:linear-gradient(90deg,#ffab2e,var(--gold));color:#3a2600;}
+.btn[disabled]{opacity:.32;pointer-events:none;}
+.btn.sm{min-height:46px;font-size:clamp(13px,3.6vw,15px);}
+.row{display:flex;gap:10px;}
+.row>*{flex:1;}
+.spacer{flex:1;min-height:6px;}
+
+/* setup */
+.pl{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.pl .num{width:26px;text-align:center;color:var(--dim);font-weight:800;font-size:13px;flex:none;}
+.pl input{
+  flex:1;min-height:48px;border-radius:12px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--ink);padding:0 14px;font-size:16px;font-family:inherit;
+  user-select:text;-webkit-user-select:text;min-width:0;
+}
+.pl input:focus{outline:2px solid var(--b);outline-offset:-2px;}
+.pl .x{
+  width:48px;height:48px;flex:none;border-radius:12px;background:var(--panel2);
+  border:1px solid var(--line);color:var(--dim);font-size:20px;font-weight:800;
+}
+.seg{display:flex;gap:8px;}
+.seg button{
+  flex:1;min-height:52px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--dim);font-weight:800;font-size:clamp(13px,3.6vw,15px);letter-spacing:.04em;padding:6px;
+  line-height:1.25;
+}
+.seg button.sel{background:linear-gradient(90deg,var(--a),#c33bd6);color:#fff;border-color:transparent;}
+.seg button.sel .sub{color:rgba(255,255,255,.8);}
+.seg .sub{display:block;font-size:10px;letter-spacing:.06em;font-weight:600;margin-top:3px;text-transform:uppercase;}
+
+/* deal */
+.dealname{font-size:clamp(28px,9vw,44px);font-weight:900;text-align:center;letter-spacing:.02em;}
+.card{
+  flex:1;min-height:210px;border-radius:22px;border:2px dashed var(--line);
+  background:linear-gradient(160deg,var(--panel),var(--bg2));
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:18px;text-align:center;position:relative;overflow:hidden;
+}
+.card.live{border-style:solid;border-color:var(--b);box-shadow:inset 0 0 60px rgba(0,229,255,.14);}
+.card .hint{color:var(--dim);font-size:clamp(13px,3.8vw,16px);line-height:1.5;}
+.word{font-size:clamp(30px,10vw,52px);font-weight:900;letter-spacing:.01em;line-height:1.1;color:var(--ink);}
+.cat{font-size:clamp(13px,3.6vw,16px);letter-spacing:.2em;text-transform:uppercase;color:var(--b);font-weight:800;}
+.decoyBadge{font-size:clamp(26px,8vw,40px);font-weight:900;color:var(--a);letter-spacing:.1em;}
+.dots{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--line);}
+.dot.done{background:var(--good);}
+.dot.now{background:var(--b);transform:scale(1.35);}
+
+/* clue */
+.turnlist{display:flex;flex-direction:column;gap:8px;}
+.turn{
+  display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:12px;
+  background:var(--panel2);border:1px solid var(--line);opacity:.5;
+}
+.turn.now{opacity:1;border-color:var(--b);background:#0e2b38;box-shadow:0 0 0 2px rgba(0,229,255,.2);}
+.turn.past{opacity:.42;}
+.turn .n{font-weight:800;font-size:clamp(15px,4.4vw,18px);flex:1;}
+.turn .s{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:700;}
+.bigtimer{font-size:clamp(46px,16vw,76px);font-weight:900;text-align:center;line-height:1;font-variant-numeric:tabular-nums;}
+.bigtimer.hot{color:var(--a);}
+.lap{text-align:center;color:var(--gold);font-weight:800;letter-spacing:.14em;text-transform:uppercase;font-size:clamp(12px,3.4vw,14px);}
+
+/* grids */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.grid.three{grid-template-columns:repeat(3,1fr);}
+@media (max-width:359px){ .grid.three{grid-template-columns:repeat(2,1fr);} }
+.pbtn{
+  min-height:60px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--ink);font-weight:800;font-size:clamp(14px,4vw,17px);padding:8px 6px;line-height:1.2;
+}
+.pbtn:active{transform:scale(.97);}
+.wbtn{
+  min-height:58px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);
+  color:var(--ink);font-weight:700;font-size:clamp(12px,3.4vw,15px);padding:8px 5px;line-height:1.25;
+  overflow-wrap:break-word;word-break:break-word;
+}
+.wbtn:active{transform:scale(.97);}
+
+/* reveal */
+.verdict{font-size:clamp(30px,10vw,50px);font-weight:900;text-align:center;letter-spacing:.05em;line-height:1.05;}
+.verdict.good{color:var(--good);}
+.verdict.bad{color:var(--a);}
+.factline{text-align:center;font-size:clamp(14px,4vw,18px);line-height:1.6;}
+.factline b{color:var(--gold);}
+.factline .w{color:var(--b);font-weight:800;}
+
+/* scoreboard */
+.sb{display:flex;flex-direction:column;gap:8px;}
+.sbrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);}
+.sbrow.lead{border-color:var(--gold);background:#2b2210;}
+.sbrow .rk{width:24px;color:var(--dim);font-weight:900;font-size:14px;flex:none;text-align:center;}
+.sbrow .nm{flex:1;font-weight:800;font-size:clamp(14px,4vw,17px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sbrow .pt{font-weight:900;font-size:clamp(17px,5vw,22px);color:var(--gold);font-variant-numeric:tabular-nums;}
+.sbrow .gain{font-size:12px;font-weight:800;color:var(--good);min-width:30px;text-align:right;}
+.bar{height:5px;border-radius:3px;background:linear-gradient(90deg,var(--a),var(--b));margin-top:6px;}
+.err{color:var(--bad);text-align:center;font-size:13px;font-weight:700;min-height:16px;}
+.rules{font-size:clamp(12px,3.4vw,14px);color:var(--dim);line-height:1.65;}
+.rules b{color:var(--ink);}
+.rules li{margin-bottom:5px;}
+.rules ul{margin:6px 0;padding-left:18px;}
+.crown{font-size:clamp(50px,17vw,80px);text-align:center;line-height:1;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= TITLE ================= -->
+  <section class="screen on" id="s-title">
+    <div class="spacer"></div>
+    <h1>DECOY</h1>
+    <div class="tag">Everyone sees the same secret word.<br><b>One of you doesn't.</b></div>
+    <div class="spacer"></div>
+    <div class="panel rules">
+      <b>How it works</b>
+      <ul>
+        <li>Pass the phone — each player privately reveals their card.</li>
+        <li>Go around the room; each player says <b>ONE word</b> out loud that hints at the secret word.</li>
+        <li>Too obvious and you hand it to the Decoy. Too vague and you look like the Decoy.</li>
+        <li>Then everyone votes. Catch the fake — or let them escape.</li>
+      </ul>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="b-start">Set up players</button>
+    <div class="tag" style="font-size:11px;letter-spacing:.1em;">3–12 players · one shared phone · 20–30 min</div>
+  </section>
+
+  <!-- ================= SETUP ================= -->
+  <section class="screen" id="s-setup">
+    <h2>Who's playing?</h2>
+    <div class="panel">
+      <div id="playerList"></div>
+      <button class="btn ghost sm" id="b-addPlayer">+ Add player</button>
+    </div>
+    <div class="panel">
+      <div class="lbl">Game mode</div>
+      <div class="seg" id="modeSeg">
+        <button data-mode="blank" class="sel">BLANK<span class="sub">Decoy is bluffing</span></button>
+        <button data-mode="twin">TWIN<span class="sub">Decoy doesn't know</span></button>
+      </div>
+      <div class="tag" id="modeHelp" style="margin-top:10px;"></div>
+    </div>
+    <div class="panel">
+      <div class="lbl">Words per player each round</div>
+      <div class="seg" id="lapSeg">
+        <button data-laps="1">1 lap<span class="sub">quick</span></button>
+        <button data-laps="2" class="sel">2 laps<span class="sub">classic</span></button>
+      </div>
+      <div class="lbl" style="margin-top:14px;">Clue timer</div>
+      <div class="seg" id="timerSeg">
+        <button data-timer="0" class="sel">Off<span class="sub">talk freely</span></button>
+        <button data-timer="8">8 sec<span class="sub">pressure</span></button>
+      </div>
+    </div>
+    <div class="err" id="setupErr"></div>
+    <button class="btn" id="b-begin">Start game</button>
+    <button class="btn ghost sm" id="b-backTitle">Back</button>
+  </section>
+
+  <!-- ================= HANDOFF (pass to next player) ================= -->
+  <section class="screen" id="s-handoff">
+    <div class="lbl" id="handRound">Round 1</div>
+    <div class="spacer"></div>
+    <div class="tag">Pass the phone to</div>
+    <div class="dealname" id="handName">—</div>
+    <div class="tag" id="handWarn">Everyone else: eyes away!</div>
+    <div class="spacer"></div>
+    <div class="dots" id="handDots"></div>
+    <div class="spacer"></div>
+    <button class="btn alt" id="b-handReady">I'm holding it</button>
+  </section>
+
+  <!-- ================= REVEAL CARD ================= -->
+  <section class="screen" id="s-deal">
+    <div class="dealname" id="dealName">—</div>
+    <div class="card" id="dealCard">
+      <div class="hint" id="dealHint">Press and hold to reveal your card</div>
+      <div id="dealBody" style="display:none;"></div>
+    </div>
+    <button class="btn" id="b-dealDone" disabled>Got it — hide &amp; pass</button>
+  </section>
+
+  <!-- ================= CLUE PHASE ================= -->
+  <section class="screen" id="s-clue">
+    <div class="lbl" id="clueCat">Category</div>
+    <div class="lap" id="clueLap">Lap 1 of 2</div>
+    <div class="bigtimer" id="clueTimer" style="display:none;">8</div>
+    <div class="turnlist" id="turnList"></div>
+    <div class="spacer"></div>
+    <div class="tag">Say <b>one single word</b> that fits the secret word.<br>No repeats. No pointing at the word itself.</div>
+    <button class="btn alt" id="b-nextTurn">Said it — next</button>
+  </section>
+
+  <!-- ================= VOTE ================= -->
+  <section class="screen" id="s-vote">
+    <h2>Who's the Decoy?</h2>
+    <div class="tag">Count down from 3 and <b>everyone point at once</b>.<br>Then tap the accused player below.</div>
+    <div class="grid" id="voteGrid"></div>
+    <div class="spacer"></div>
+    <button class="btn ghost sm" id="b-recap">Replay the clue order</button>
+  </section>
+
+  <!-- ================= STEAL (blank mode, decoy caught) ================= -->
+  <section class="screen" id="s-steal">
+    <h2>Caught!</h2>
+    <div class="tag"><b id="stealName">The Decoy</b> gets one shot to steal the round.<br>Tap the word you think everyone else had.</div>
+    <div class="grid three" id="stealGrid"></div>
+  </section>
+
+  <!-- ================= REVEAL ================= -->
+  <section class="screen" id="s-reveal">
+    <div class="spacer"></div>
+    <div class="verdict" id="revVerdict">—</div>
+    <div class="panel">
+      <div class="factline" id="revFacts"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="sb" id="revScores"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="b-toScores">Scoreboard</button>
+  </section>
+
+  <!-- ================= SCOREBOARD ================= -->
+  <section class="screen" id="s-scores">
+    <h2 id="scoreTitle">Scores</h2>
+    <div class="tag" id="scoreSub"></div>
+    <div class="sb" id="scoreBoard"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="b-nextRound">Next round</button>
+    <div class="row">
+      <button class="btn ghost sm" id="b-endEarly">End game</button>
+      <button class="btn ghost sm" id="b-rules">Rules</button>
+    </div>
+  </section>
+
+  <!-- ================= GAME OVER ================= -->
+  <section class="screen" id="s-over">
+    <div class="spacer"></div>
+    <div class="crown">👑</div>
+    <h2 id="winName">Winner</h2>
+    <div class="tag" id="winSub"></div>
+    <div class="sb" id="finalBoard"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="b-again">Play again — same players</button>
+    <button class="btn ghost sm" id="b-newPlayers">New players</button>
+  </section>
+
+  <!-- ================= RULES ================= -->
+  <section class="screen" id="s-rules">
+    <h2>Rules</h2>
+    <div class="panel rules" id="rulesBody"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="b-rulesBack">Back</button>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   DECOY — hidden-role party game
+   ============================================================ */
+
+const CATEGORIES = [
+  { name:'Animals', pairs:[
+    ['Lion','Tiger'],['Dolphin','Whale'],['Frog','Toad'],['Rabbit','Hamster'],['Eagle','Hawk'],
+    ['Crocodile','Lizard'],['Penguin','Puffin'],['Horse','Donkey'],['Octopus','Squid'],['Wolf','Coyote']
+  ]},
+  { name:'Food & Drink', pairs:[
+    ['Pizza','Lasagna'],['Pancake','Waffle'],['Ice Cream','Frozen Yogurt'],['Burger','Hot Dog'],['Taco','Burrito'],
+    ['Coffee','Tea'],['Popcorn','Pretzel'],['Sushi','Noodles'],['Cupcake','Muffin'],['Orange Juice','Lemonade']
+  ]},
+  { name:'Places', pairs:[
+    ['Beach','Lake'],['Library','Museum'],['Airport','Train Station'],['Hospital','Dentist Office'],['Farm','Zoo'],
+    ['Mountain','Desert'],['Castle','Cathedral'],['Mall','Grocery Store'],['Campground','Cabin'],['Stadium','Theater']
+  ]},
+  { name:'Sports & Games', pairs:[
+    ['Soccer','Basketball'],['Chess','Checkers'],['Bowling','Curling'],['Swimming','Diving'],['Skiing','Snowboarding'],
+    ['Tennis','Badminton'],['Baseball','Cricket'],['Karate','Wrestling'],['Hide and Seek','Tag'],['Skateboarding','Rollerblading']
+  ]},
+  { name:'Jobs', pairs:[
+    ['Firefighter','Police Officer'],['Chef','Baker'],['Teacher','Coach'],['Doctor','Nurse'],['Pilot','Bus Driver'],
+    ['Farmer','Gardener'],['Astronaut','Scientist'],['Magician','Clown'],['Barber','Tailor'],['Artist','Photographer']
+  ]},
+  { name:'Around the House', pairs:[
+    ['Toothbrush','Comb'],['Umbrella','Raincoat'],['Pillow','Blanket'],['Vacuum','Broom'],['Fridge','Freezer'],
+    ['Mirror','Window'],['Lamp','Candle'],['Scissors','Stapler'],['Clock','Calendar'],['Toaster','Microwave']
+  ]},
+  { name:'Nature & Weather', pairs:[
+    ['Thunderstorm','Hurricane'],['Snow','Hail'],['Rainbow','Sunset'],['Volcano','Earthquake'],['River','Waterfall'],
+    ['Forest','Jungle'],['Cactus','Palm Tree'],['Moon','Stars'],['Fog','Smoke'],['Tornado','Whirlpool']
+  ]},
+  { name:'Vehicles', pairs:[
+    ['Bicycle','Motorcycle'],['Helicopter','Airplane'],['Submarine','Ship'],['Ambulance','Fire Truck'],['Tractor','Bulldozer'],
+    ['Rocket','Satellite'],['Skateboard','Scooter'],['Canoe','Raft'],['Train','Subway'],['Hot Air Balloon','Blimp']
+  ]},
+  { name:'School', pairs:[
+    ['Homework','Quiz'],['Backpack','Lunchbox'],['Recess','Gym Class'],['Whiteboard','Projector'],['Field Trip','Assembly'],
+    ['Report Card','Detention'],['Pencil','Marker'],['Science Fair','Spelling Bee'],['Locker','Cubby'],['Cafeteria','Playground']
+  ]},
+  { name:'Entertainment', pairs:[
+    ['Movie Theater','Drive-In'],['Cartoon','Comic Book'],['Video Game','Board Game'],['Concert','Parade'],['Circus','Carnival'],
+    ['Superhero','Wizard'],['Podcast','Radio Show'],['Puppet Show','Magic Show'],['Roller Coaster','Ferris Wheel'],['Karaoke','Talent Show']
+  ]}
+];
+
+const SAVE_KEY = 'cowork-decoy-players';
+
+const G = {
+  players: [],          // {name, score, gain}
+  mode: 'blank',
+  laps: 2,
+  clueSecs: 0,
+  totalRounds: 0,
+  round: 0,
+  decoyPool: [],        // indices not yet used as decoy this game
+  // per-round
+  decoy: 0,
+  word: '',
+  twinWord: '',
+  catIndex: 0,
+  order: [],            // player indices in speaking order
+  dealIdx: 0,
+  turnIdx: 0,
+  lap: 1,
+  accused: -1,
+  recap: false,
+  tick: null
+};
+
+/* ---------- tiny audio ---------- */
+let ac = null;
+function beep(freq, dur, type, vol){
+  try{
+    if(!ac) ac = new (window.AudioContext||window.webkitAudioContext)();
+    if(ac.state === 'suspended') ac.resume();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, ac.currentTime);
+    g.gain.setValueAtTime(0.0001, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(vol || 0.14, ac.currentTime + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + (dur||0.15));
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + (dur||0.15) + 0.03);
+  }catch(e){}
+}
+const sfxTap    = () => beep(520, .07, 'triangle', .08);
+const sfxReveal = () => { beep(440,.10,'sine',.12); setTimeout(()=>beep(660,.16,'sine',.12),90); };
+const sfxGood   = () => { beep(523,.12,'square',.09); setTimeout(()=>beep(784,.20,'square',.09),110); };
+const sfxBad    = () => { beep(220,.20,'sawtooth',.09); setTimeout(()=>beep(160,.28,'sawtooth',.09),140); };
+const sfxTock   = () => beep(880, .05, 'square', .06);
+
+/* ---------- helpers ---------- */
+const $  = id => document.getElementById(id);
+const rand = n => Math.floor(Math.random()*n);
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=rand(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function show(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  $(id).classList.add('on');
+  $(id).scrollTop = 0;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ============================================================
+   SETUP
+   ============================================================ */
+function loadNames(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(raw){
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr) && arr.length >= 2) return arr.slice(0,12);
+    }
+  }catch(e){}
+  return ['', '', '', ''];
+}
+function saveNames(names){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(names)); }catch(e){}
+}
+
+function renderPlayerInputs(names){
+  const wrap = $('playerList');
+  wrap.innerHTML = '';
+  names.forEach((n, i) => {
+    const row = document.createElement('div');
+    row.className = 'pl';
+    row.innerHTML =
+      '<div class="num">' + (i+1) + '</div>' +
+      '<input type="text" maxlength="12" placeholder="Player ' + (i+1) + '" value="' + esc(n) + '">' +
+      '<button class="x" aria-label="Remove player">×</button>';
+    row.querySelector('.x').addEventListener('click', () => {
+      const cur = collectNames();
+      if(cur.length <= 3){ $('setupErr').textContent = 'You need at least 3 players.'; return; }
+      cur.splice(i,1);
+      renderPlayerInputs(cur);
+      $('setupErr').textContent = '';
+      sfxTap();
+    });
+    wrap.appendChild(row);
+  });
+  $('b-addPlayer').disabled = names.length >= 12;
+}
+function collectNames(){
+  return Array.from($('playerList').querySelectorAll('input')).map(i => i.value);
+}
+
+$('b-addPlayer').addEventListener('click', () => {
+  const cur = collectNames();
+  if(cur.length >= 12) return;
+  cur.push('');
+  renderPlayerInputs(cur);
+  sfxTap();
+});
+
+const MODE_HELP = {
+  blank: 'The Decoy sees only the <b>category</b> — they must fake a clue and blend in. If caught, they get one guess at the real word to steal the round.',
+  twin:  'The Decoy gets a <b>different but similar word</b> and has no idea they\'re the odd one out. Everyone plays honestly — chaos follows.'
+};
+function segWire(segId, attr, onPick){
+  $(segId).querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      $(segId).querySelectorAll('button').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      onPick(b.dataset[attr]);
+      sfxTap();
+    });
+  });
+}
+segWire('modeSeg','mode', v => { G.mode = v; $('modeHelp').innerHTML = MODE_HELP[v]; });
+segWire('lapSeg','laps', v => { G.laps = +v; });
+segWire('timerSeg','timer', v => { G.clueSecs = +v; });
+
+$('b-start').addEventListener('click', () => {
+  renderPlayerInputs(loadNames());
+  $('modeHelp').innerHTML = MODE_HELP[G.mode];
+  $('setupErr').textContent = '';
+  show('s-setup');
+  sfxTap();
+});
+$('b-backTitle').addEventListener('click', () => { show('s-title'); sfxTap(); });
+
+$('b-begin').addEventListener('click', () => {
+  const raw = collectNames();
+  const names = raw.map((n,i) => (n.trim() || 'Player ' + (i+1)));
+  if(names.length < 3){ $('setupErr').textContent = 'You need at least 3 players.'; return; }
+  const lower = names.map(n => n.toLowerCase());
+  if(new Set(lower).size !== lower.length){ $('setupErr').textContent = 'Two players have the same name — make them different.'; return; }
+  saveNames(names);
+  G.players = names.map(n => ({ name:n, score:0, gain:0 }));
+  G.totalRounds = Math.max(4, G.players.length);
+  G.round = 0;
+  G.decoyPool = [];
+  sfxGood();
+  startRound();
+});
+
+/* ============================================================
+   ROUND SETUP
+   ============================================================ */
+function pickDecoy(){
+  if(G.decoyPool.length === 0){
+    // fresh cycle: everyone is Decoy once, but never twice in a row across the seam
+    const last = G.round > 1 ? G.decoy : -1;
+    do { G.decoyPool = shuffle(G.players.map((_,i) => i)); }
+    while(G.players.length > 1 && G.decoyPool[G.decoyPool.length-1] === last);
+  }
+  return G.decoyPool.pop();
+}
+
+function startRound(){
+  G.round++;
+  G.decoy = pickDecoy();
+  G.catIndex = rand(CATEGORIES.length);
+  const cat = CATEGORIES[G.catIndex];
+  const pair = cat.pairs[rand(cat.pairs.length)].slice();
+  if(rand(2)) pair.reverse();
+  G.word = pair[0];
+  G.twinWord = pair[1];
+  G.order = shuffle(G.players.map((_,i) => i));
+  G.dealIdx = 0;
+  G.turnIdx = 0;
+  G.lap = 1;
+  G.accused = -1;
+  G.recap = false;
+  G.players.forEach(p => p.gain = 0);
+  goHandoff();
+}
+
+/* ============================================================
+   DEAL PHASE — pass & privately reveal
+   ============================================================ */
+function goHandoff(){
+  const pi = G.order[G.dealIdx];
+  $('handRound').textContent = 'Round ' + G.round + ' of ' + G.totalRounds + ' · ' + G.mode.toUpperCase() + ' mode';
+  $('handName').textContent = G.players[pi].name;
+  $('handWarn').textContent = 'Everyone else: eyes away!';
+  const dots = G.order.map((_, i) =>
+    '<div class="dot ' + (i < G.dealIdx ? 'done' : (i === G.dealIdx ? 'now' : '')) + '"></div>'
+  ).join('');
+  $('handDots').innerHTML = dots;
+  show('s-handoff');
+}
+$('b-handReady').addEventListener('click', () => { sfxTap(); goDeal(); });
+
+let holdMs = 0, holdTimer = null;
+function goDeal(){
+  const pi = G.order[G.dealIdx];
+  $('dealName').textContent = G.players[pi].name;
+  $('dealHint').style.display = '';
+  $('dealHint').innerHTML = 'Press and <b>hold</b> to reveal your card';
+  $('dealBody').style.display = 'none';
+  $('dealCard').classList.remove('live');
+  $('b-dealDone').disabled = true;
+  holdMs = 0;
+  show('s-deal');
+}
+
+function cardHTML(pi){
+  const cat = CATEGORIES[G.catIndex].name;
+  if(G.mode === 'blank' && pi === G.decoy){
+    return '<div class="decoyBadge">YOU ARE<br>THE DECOY</div>' +
+           '<div class="cat" style="margin-top:12px;">' + esc(cat) + '</div>' +
+           '<div class="hint" style="margin-top:10px;">You don\'t know the word. Bluff a clue that fits the category — and figure out the real word before they catch you.</div>';
+  }
+  const w = (G.mode === 'twin' && pi === G.decoy) ? G.twinWord : G.word;
+  return '<div class="cat">' + esc(cat) + '</div>' +
+         '<div class="word" style="margin-top:10px;">' + esc(w) + '</div>';
+}
+
+(function wireHold(){
+  const card = $('dealCard');
+  const startHold = e => {
+    e.preventDefault();
+    if(!$('s-deal').classList.contains('on')) return;
+    const pi = G.order[G.dealIdx];
+    $('dealHint').style.display = 'none';
+    $('dealBody').innerHTML = cardHTML(pi);
+    $('dealBody').style.display = '';
+    card.classList.add('live');
+    if(holdMs === 0) sfxReveal();
+    clearInterval(holdTimer);
+    holdTimer = setInterval(() => {
+      holdMs += 100;
+      if(holdMs >= 1000) $('b-dealDone').disabled = false;
+    }, 100);
+  };
+  const endHold = () => {
+    clearInterval(holdTimer);
+    if(!$('s-deal').classList.contains('on')) return;
+    $('dealBody').style.display = 'none';
+    $('dealHint').style.display = '';
+    card.classList.remove('live');
+    $('dealHint').innerHTML = holdMs >= 1000
+      ? 'Hidden. Hold again to peek, or tap below to pass.'
+      : 'Keep holding a moment longer…';
+  };
+  card.addEventListener('pointerdown', startHold);
+  card.addEventListener('pointerup', endHold);
+  card.addEventListener('pointercancel', endHold);
+  card.addEventListener('pointerleave', endHold);
+  card.addEventListener('contextmenu', e => e.preventDefault());
+})();
+
+$('b-dealDone').addEventListener('click', () => {
+  sfxTap();
+  G.dealIdx++;
+  if(G.dealIdx >= G.order.length) goClues();
+  else goHandoff();
+});
+
+/* ============================================================
+   CLUE PHASE
+   ============================================================ */
+function goClues(){
+  G.turnIdx = 0;
+  G.lap = 1;
+  $('clueCat').textContent = 'Category: ' + CATEGORIES[G.catIndex].name;
+  renderTurns();
+  show('s-clue');
+}
+
+function renderTurns(){
+  $('clueLap').textContent = G.recap ? 'Clue order this round' : 'Lap ' + G.lap + ' of ' + G.laps;
+  $('turnList').innerHTML = G.order.map((pi, i) => {
+    const cls = i === G.turnIdx ? 'now' : (i < G.turnIdx ? 'past' : '');
+    const state = i === G.turnIdx ? 'Say your word' : (i < G.turnIdx ? 'done' : '');
+    return '<div class="turn ' + cls + '">' +
+             '<div class="n">' + esc(G.players[pi].name) + '</div>' +
+             '<div class="s">' + state + '</div>' +
+           '</div>';
+  }).join('');
+  if(G.recap){
+    $('b-nextTurn').textContent = 'Back to vote';
+    stopTimer();
+    $('clueTimer').style.display = 'none';
+    return;
+  }
+  $('b-nextTurn').textContent = (G.turnIdx === G.order.length - 1 && G.lap === G.laps)
+    ? 'Said it — go to vote' : 'Said it — next';
+  startClueTimer();
+}
+
+function stopTimer(){ if(G.tick){ clearInterval(G.tick); G.tick = null; } }
+
+function startClueTimer(){
+  stopTimer();
+  const el = $('clueTimer');
+  if(!G.clueSecs){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  let t = G.clueSecs;
+  el.textContent = t;
+  el.classList.remove('hot');
+  G.tick = setInterval(() => {
+    t--;
+    if(t <= 0){
+      stopTimer();
+      el.textContent = '0';
+      sfxBad();
+      return;
+    }
+    el.textContent = t;
+    if(t <= 3){ el.classList.add('hot'); sfxTock(); }
+  }, 1000);
+}
+
+$('b-nextTurn').addEventListener('click', () => {
+  sfxTap();
+  if(G.recap){ G.recap = false; goVote(); return; }
+  G.turnIdx++;
+  if(G.turnIdx >= G.order.length){
+    if(G.lap < G.laps){ G.lap++; G.turnIdx = 0; renderTurns(); }
+    else { stopTimer(); goVote(); }
+  } else {
+    renderTurns();
+  }
+});
+
+/* ============================================================
+   VOTE
+   ============================================================ */
+function goVote(){
+  stopTimer();
+  $('voteGrid').innerHTML = G.order.map(pi =>
+    '<button class="pbtn" data-p="' + pi + '">' + esc(G.players[pi].name) + '</button>'
+  ).join('');
+  $('voteGrid').querySelectorAll('.pbtn').forEach(b => {
+    b.addEventListener('click', () => {
+      G.accused = +b.dataset.p;
+      sfxTap();
+      resolveRound();
+    });
+  });
+  show('s-vote');
+}
+$('b-recap').addEventListener('click', () => {
+  sfxTap();
+  G.recap = true;
+  G.turnIdx = G.order.length; // every name shown as "done"
+  G.lap = G.laps;
+  renderTurns();
+  show('s-clue');
+});
+
+/* ============================================================
+   RESOLUTION
+   ============================================================ */
+function stealPool(){
+  const words = [];
+  CATEGORIES[G.catIndex].pairs.forEach(p => { words.push(p[0]); words.push(p[1]); });
+  const others = shuffle(words.filter(w => w !== G.word)).slice(0, 11);
+  return shuffle(others.concat([G.word]));
+}
+
+function resolveRound(){
+  const caught = (G.accused === G.decoy);
+  if(caught && G.mode === 'blank'){
+    $('stealName').textContent = G.players[G.decoy].name;
+    $('stealGrid').innerHTML = stealPool().map(w =>
+      '<button class="wbtn" data-w="' + esc(w) + '">' + esc(w) + '</button>'
+    ).join('');
+    $('stealGrid').querySelectorAll('.wbtn').forEach(b => {
+      b.addEventListener('click', () => {
+        sfxTap();
+        finishRound(true, b.dataset.w === G.word, b.dataset.w);
+      });
+    });
+    show('s-steal');
+    return;
+  }
+  finishRound(caught, false, null);
+}
+
+function finishRound(caught, stole, guess){
+  G.players.forEach(p => p.gain = 0);
+  const d = G.players[G.decoy];
+  let verdict, vclass, facts;
+  const catName = CATEGORIES[G.catIndex].name;
+  const wordLine = 'The word was <span class="w">' + esc(G.word) + '</span> <span style="color:var(--dim)">(' + esc(catName) + ')</span>';
+
+  if(!caught){
+    d.gain = 4;
+    verdict = 'THE DECOY<br>ESCAPES';
+    vclass = 'bad';
+    facts = wordLine + '<br><b>' + esc(d.name) + '</b> was the Decoy' +
+            (G.mode === 'twin' ? ' with <span class="w">' + esc(G.twinWord) + '</span>' : '') +
+            '.<br>You accused <b>' + esc(G.players[G.accused].name) + '</b>. Wrong.<br>+4 to the Decoy.';
+    sfxBad();
+  } else if(stole){
+    d.gain = 4;
+    verdict = 'CAUGHT —<br>BUT STOLEN!';
+    vclass = 'bad';
+    facts = wordLine + '<br>You caught <b>' + esc(d.name) + '</b>… but they guessed <span class="w">' +
+            esc(guess) + '</span> correctly and steal the round.<br>+4 to the Decoy, nothing for the room.';
+    sfxBad();
+  } else {
+    G.players.forEach((p, i) => { if(i !== G.decoy) p.gain = 2; });
+    verdict = 'DECOY<br>CAUGHT!';
+    vclass = 'good';
+    facts = wordLine + '<br><b>' + esc(d.name) + '</b> was the Decoy' +
+            (G.mode === 'twin' ? ' with <span class="w">' + esc(G.twinWord) + '</span>' : '') + '.' +
+            (guess ? '<br>Their steal guess: <span class="w">' + esc(guess) + '</span> — wrong.' : '') +
+            '<br>+2 to everyone else.';
+    sfxGood();
+  }
+
+  G.players.forEach(p => p.score += p.gain);
+
+  $('revVerdict').className = 'verdict ' + vclass;
+  $('revVerdict').innerHTML = verdict;
+  $('revFacts').innerHTML = facts;
+  $('revScores').innerHTML = G.order.map(pi => {
+    const p = G.players[pi];
+    return '<div class="sbrow"><div class="nm">' + esc(p.name) + '</div>' +
+           '<div class="gain">' + (p.gain ? '+' + p.gain : '—') + '</div>' +
+           '<div class="pt">' + p.score + '</div></div>';
+  }).join('');
+  show('s-reveal');
+}
+
+$('b-toScores').addEventListener('click', () => { sfxTap(); goScores(); });
+
+/* ============================================================
+   SCOREBOARD
+   ============================================================ */
+function boardHTML(){
+  const sorted = G.players.map((p,i) => ({p, i})).sort((a,b) => b.p.score - a.p.score);
+  const top = sorted.length ? sorted[0].p.score : 0;
+  return sorted.map((e, idx) => {
+    const p = e.p;
+    const pct = top > 0 ? Math.max(6, Math.round(p.score / top * 100)) : 6;
+    return '<div class="sbrow ' + (p.score === top && top > 0 ? 'lead' : '') + '">' +
+             '<div class="rk">' + (idx+1) + '</div>' +
+             '<div style="flex:1;min-width:0;">' +
+               '<div class="nm">' + esc(p.name) + '</div>' +
+               '<div class="bar" style="width:' + pct + '%"></div>' +
+             '</div>' +
+             '<div class="pt">' + p.score + '</div>' +
+           '</div>';
+  }).join('');
+}
+
+function goScores(){
+  $('scoreTitle').textContent = 'After round ' + G.round;
+  $('scoreSub').innerHTML = G.round >= G.totalRounds
+    ? 'That was the last scheduled round.'
+    : 'Round ' + (G.round + 1) + ' of ' + G.totalRounds + ' is next.';
+  $('scoreBoard').innerHTML = boardHTML();
+  $('b-nextRound').textContent = G.round >= G.totalRounds ? 'One more round anyway' : 'Next round';
+  show('s-scores');
+}
+
+$('b-nextRound').addEventListener('click', () => {
+  sfxTap();
+  if(G.round >= G.totalRounds) G.totalRounds = G.round + 1;
+  startRound();
+});
+$('b-endEarly').addEventListener('click', () => { sfxTap(); gameOver(); });
+
+function gameOver(){
+  const sorted = G.players.slice().sort((a,b) => b.score - a.score);
+  const top = sorted[0].score;
+  const winners = sorted.filter(p => p.score === top);
+  $('winName').textContent = winners.length > 1
+    ? winners.map(w => w.name).join(' & ')
+    : winners[0].name;
+  $('winSub').innerHTML = winners.length > 1
+    ? 'Tied at <b>' + top + '</b> points after ' + G.round + ' rounds.'
+    : 'Wins with <b>' + top + '</b> points after ' + G.round + ' rounds.';
+  $('finalBoard').innerHTML = boardHTML();
+  sfxGood();
+  setTimeout(() => { beep(1046,.25,'square',.10); }, 300);
+  show('s-over');
+}
+
+$('b-again').addEventListener('click', () => {
+  sfxTap();
+  G.players.forEach(p => { p.score = 0; p.gain = 0; });
+  G.round = 0;
+  G.decoyPool = [];
+  G.totalRounds = Math.max(4, G.players.length);
+  startRound();
+});
+$('b-newPlayers').addEventListener('click', () => {
+  sfxTap();
+  renderPlayerInputs(G.players.map(p => p.name));
+  $('setupErr').textContent = '';
+  show('s-setup');
+});
+
+/* ============================================================
+   RULES
+   ============================================================ */
+const RULES_HTML =
+  '<b>Setup</b><ul>' +
+  '<li>Pass the phone around. Each player <b>holds</b> the card to see it privately, then hides it and passes on.</li>' +
+  '<li>Everyone gets the same secret word — except the <b>Decoy</b>.</li>' +
+  '</ul><b>Blank mode</b><ul>' +
+  '<li>The Decoy is told they\'re the Decoy and sees only the category.</li>' +
+  '<li>If the room catches them, they get <b>one guess</b> at the real word from a 12-word grid. Guess right and they steal the round.</li>' +
+  '</ul><b>Twin mode</b><ul>' +
+  '<li>The Decoy gets a similar-but-different word and <b>doesn\'t know</b> they\'re the odd one out.</li>' +
+  '<li>Nobody is lying — everyone just quietly disagrees. No steal guess in this mode.</li>' +
+  '</ul><b>Clues</b><ul>' +
+  '<li>In turn order, each player says exactly <b>one word</b> that relates to the secret word.</li>' +
+  '<li>No repeating a word already said. No rhyming with, spelling out, or saying the word itself.</li>' +
+  '<li>Play 1 or 2 laps, then vote.</li>' +
+  '</ul><b>Voting</b><ul>' +
+  '<li>Count down from 3, everyone points at once, then tap the accused. Ties are settled by the room.</li>' +
+  '</ul><b>Scoring</b><ul>' +
+  '<li>Decoy escapes the vote: <b>+4 Decoy</b></li>' +
+  '<li>Decoy caught: <b>+2 to every other player</b></li>' +
+  '<li>Decoy caught but steals the word (Blank mode): <b>+4 Decoy</b>, nothing for the room</li>' +
+  '</ul><b>Strategy</b><ul>' +
+  '<li>A clue so good only a word-knower could say it will get you the win — but it hands the Decoy the answer.</li>' +
+  '<li>Going last is safest and most suspicious at the same time.</li>' +
+  '</ul>';
+
+$('b-rules').addEventListener('click', () => {
+  sfxTap();
+  $('rulesBody').innerHTML = RULES_HTML;
+  show('s-rules');
+});
+$('b-rulesBack').addEventListener('click', () => { sfxTap(); goScores(); });
+
+/* prevent accidental pinch/double-tap zoom on iOS */
+document.addEventListener('gesturestart', e => e.preventDefault());
+</script>
+</body>
+</html>

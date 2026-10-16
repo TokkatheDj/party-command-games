@@ -1,0 +1,631 @@
+<!-- CONCEPT: COOPERATIVE CLUE-GIVING - "Jinx!": a co-op pass-the-phone one-word-clue game where every clue-giver secretly types a single clue for a mystery word, the app auto-cancels any clues that match (plurals and word forms included) and the givers can jinx near-synonyms by hand, then the Guesser sees only the surviving clues and must name the word - right saves the card, a pass loses it, a wrong guess burns the next card too; the whole room races to save as many of 13 cards as possible, with optional app-checked Twist cards (banned letter, 5 letters max, 7+ letters, all start with one letter). 300 words in 5 decks | Players: 3-10 (3 players give two clues each) | ~15-25 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Jinx! — Great Minds Cancel Out</title>
+<style>
+:root{
+  --bg:#0e1018; --bg2:#141726; --panel:#1a1e2e; --panel2:#232843; --line:#2f3555;
+  --ink:#eef0f8; --mute:#8d93ad; --a:#ff5ea8; --b:#ffb84d; --c:#7b8cff;
+  --ok:#3ddc97; --bad:#ff5b6b; --jinx:#a77bff; --warn:#ffcf5c;
+  --r:16px; --gap:clamp(10px,2.8vw,16px);
+  --font:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(120% 80% at 50% 0%,#1b1f36 0%,var(--bg) 60%);color:var(--ink);font-family:var(--font)}
+button{font-family:inherit;cursor:pointer;border:0;color:inherit}
+input{font-family:inherit;user-select:text;-webkit-user-select:text}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;max-width:640px;margin:0 auto}
+.grad{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* top bar */
+#bar{display:none;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:rgba(14,16,24,.85)}
+#bar.on{display:flex}
+#bar .t{font-weight:900;font-size:20px;letter-spacing:.5px}
+#pips{flex:1;display:flex;justify-content:center;gap:3px;flex-wrap:wrap}
+.pip{width:clamp(10px,3vw,15px);height:clamp(10px,3vw,15px);border-radius:50%;background:var(--panel2);border:1px solid var(--line)}
+.pip.cur{border:2px solid var(--b);background:transparent}
+.pip.saved{background:var(--ok);border-color:var(--ok)}
+.pip.lost{background:var(--bad);border-color:var(--bad)}
+.pip.burned{background:#5a2330;border-color:var(--bad)}
+.iconbtn{min-width:44px;min-height:44px;border-radius:12px;background:var(--panel);font-size:18px}
+
+/* screens */
+.screen{display:none;flex:1;flex-direction:column;gap:var(--gap);padding:clamp(14px,4vw,24px);overflow-y:auto;overflow-x:hidden}
+.screen.on{display:flex}
+/* auto margins centre short content but never push tall content above the scroll top */
+.center{justify-content:flex-start;align-items:center;text-align:center}
+.center::before{content:"";margin-top:auto}
+.center::after{content:"";margin-bottom:auto}
+h1{margin:0;font-size:clamp(46px,15vw,84px);font-weight:900;letter-spacing:1px;line-height:1}
+h2{margin:0;font-size:clamp(20px,5.5vw,28px)}
+.sub{color:var(--mute);font-size:clamp(14px,3.8vw,17px);margin:0;line-height:1.4}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:clamp(12px,3.5vw,18px)}
+.lbl{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--mute);font-weight:700;margin-bottom:8px}
+.btn{min-height:52px;border-radius:14px;padding:12px 18px;font-size:clamp(16px,4.4vw,19px);font-weight:800;background:var(--panel2);border:1px solid var(--line)}
+.btn.main{background:linear-gradient(90deg,var(--a),#ff7f6e 55%,var(--b));color:#1a0f18;border:0;box-shadow:0 6px 22px rgba(255,94,168,.28)}
+.btn.ghost{background:transparent}
+.btn.okb{background:var(--ok);color:#06251a;border:0}
+.btn.badb{background:transparent;border:2px solid var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.4}
+.row{display:flex;gap:10px}
+.row>.btn{flex:1}
+.small{font-size:13px;color:var(--mute)}
+
+/* setup */
+#plist{display:flex;flex-direction:column;gap:8px}
+.prow{display:flex;gap:8px;align-items:center}
+.prow .num{width:26px;text-align:center;color:var(--mute);font-weight:800}
+.prow input{flex:1;min-width:0;min-height:46px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--ink);padding:0 12px;font-size:17px}
+.prow button{width:46px;height:46px;border-radius:12px;background:var(--bg2);font-size:18px;color:var(--mute)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:44px;padding:8px 14px;border-radius:999px;background:var(--bg2);border:1px solid var(--line);font-size:15px;font-weight:700;color:var(--mute)}
+.chip.on{background:rgba(123,140,255,.18);border-color:var(--c);color:var(--ink)}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;width:100%;background:transparent;text-align:left;padding:0}
+.sw{flex:0 0 auto;width:54px;height:30px;border-radius:99px;background:var(--panel2);position:relative;border:1px solid var(--line);transition:.2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--mute);transition:.2s}
+.toggle.on .sw{background:rgba(255,94,168,.35);border-color:var(--a)}
+.toggle.on .sw::after{left:27px;background:var(--a)}
+
+/* pass */
+.bigname{font-size:clamp(34px,11vw,60px);font-weight:900;word-break:break-word}
+.avatar{font-size:clamp(56px,18vw,90px);line-height:1}
+.warnline{background:rgba(255,91,107,.12);border:1px solid rgba(255,91,107,.45);color:#ffb3bb;border-radius:12px;padding:10px 14px;font-weight:700;font-size:clamp(14px,3.8vw,16px)}
+
+/* clue */
+.word{font-size:clamp(36px,12vw,64px);font-weight:900;letter-spacing:1px;text-transform:uppercase;word-break:break-word;line-height:1.05}
+.twist{display:flex;gap:10px;align-items:center;background:rgba(255,207,92,.1);border:1px dashed var(--warn);border-radius:12px;padding:10px 12px;text-align:left}
+.twist b{color:var(--warn)}
+.cluein{width:100%;min-height:56px;border-radius:14px;border:2px solid var(--line);background:var(--bg2);color:var(--ink);font-size:20px;font-weight:700;padding:0 16px;text-align:center}
+.cluein:focus{outline:none;border-color:var(--c)}
+.err{min-height:20px;color:var(--bad);font-weight:700;font-size:14px}
+.linkbtn{background:transparent;color:var(--mute);text-decoration:underline;min-height:44px;font-size:14px}
+
+/* clue chips */
+.clues{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.cl{position:relative;min-height:54px;min-width:90px;padding:10px 16px;border-radius:14px;background:var(--panel2);border:2px solid var(--line);font-size:clamp(18px,5vw,24px);font-weight:800;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.cl .who{font-size:11px;font-weight:700;color:var(--mute);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+.cl.jx{border-color:var(--jinx);background:rgba(167,123,255,.12);color:#b8a6e0}
+.cl.jx .txt{text-decoration:line-through;text-decoration-thickness:3px;text-decoration-color:var(--jinx)}
+.cl.jx::after{content:"🤐";position:absolute;top:-10px;right:-8px;font-size:20px}
+.cl.lock::before{content:"AUTO";position:absolute;top:-9px;left:8px;font-size:9px;font-weight:900;letter-spacing:1px;background:var(--jinx);color:#160b2e;border-radius:6px;padding:1px 5px}
+.cl.pop{animation:pop .45s ease-out}
+.cl.shake{animation:shake .5s}
+@keyframes pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px) rotate(-3deg)}40%{transform:translateX(6px) rotate(3deg)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.gclue{font-size:clamp(24px,7.5vw,38px);min-height:64px;padding:10px 20px;background:linear-gradient(160deg,var(--panel2),#2b2350);border-color:var(--c)}
+.jcount{color:var(--jinx);font-weight:800;font-size:clamp(15px,4vw,18px)}
+
+/* result */
+.verdict{font-size:clamp(30px,9vw,46px);font-weight:900;line-height:1.1}
+.v-ok{color:var(--ok)} .v-bad{color:var(--bad)} .v-pass{color:var(--warn)}
+.reveal{display:inline-block;padding:8px 18px;border-radius:14px;background:var(--panel2);border:1px solid var(--line)}
+
+/* end */
+.score{font-size:clamp(64px,22vw,120px);font-weight:900;line-height:1}
+.hist{display:flex;flex-direction:column;gap:6px;text-align:left}
+.hrow{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:12px;background:var(--bg2);font-size:14px}
+.hrow .ic{font-size:18px;width:24px;flex:0 0 auto}
+.hrow .w{font-weight:800;text-transform:uppercase}
+.hrow .d{color:var(--mute);font-size:12.5px;margin-top:2px;word-break:break-word}
+.stats{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;min-width:90px}
+.stat b{display:block;font-size:22px}
+.stat span{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:1px}
+
+/* overlays */
+.ov{position:fixed;inset:0;background:rgba(5,6,12,.82);display:none;align-items:center;justify-content:center;padding:18px;z-index:10}
+.ov.on{display:flex}
+.ov .box{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px;max-width:520px;width:100%;max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
+.ov ol{margin:0;padding-left:20px;line-height:1.5;color:#cfd3e6;font-size:15px}
+.ov li{margin-bottom:6px}
+.spacer{flex:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <span class="t grad">JINX!</span>
+    <div id="pips"></div>
+    <button class="iconbtn" id="quitBtn" aria-label="Quit game">✕</button>
+  </div>
+
+  <!-- SETUP -->
+  <section class="screen on" id="setup">
+    <div style="text-align:center;margin-top:6px">
+      <h1 class="grad">JINX!</h1>
+      <p class="sub" style="margin-top:8px">The co-op clue game where great minds think alike&hellip; and <b style="color:var(--jinx)">cancel out</b>.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">Players <span id="pcount"></span></div>
+      <div id="plist"></div>
+      <button class="btn ghost" id="addP" style="width:100%;margin-top:8px">+ Add player</button>
+      <p class="small" id="p3note" style="margin:8px 0 0"></p>
+    </div>
+    <div class="card">
+      <div class="lbl">Word decks</div>
+      <div class="chips" id="deckChips"></div>
+    </div>
+    <div class="card">
+      <button class="toggle on" id="twTog"><span><b>Twist cards</b><br><span class="small">Some rounds add a rule the app checks: banned letter, 5 letters max, 7+ letters, or every clue starts with one letter.</span></span><span class="sw"></span></button>
+    </div>
+    <p class="small" id="bestLine" style="text-align:center;margin:0"></p>
+    <div class="row">
+      <button class="btn" id="helpBtn">How to play</button>
+      <button class="btn main" id="startBtn">Start — 13 cards</button>
+    </div>
+  </section>
+
+  <!-- PASS -->
+  <section class="screen center" id="pass">
+    <div class="avatar" id="passEmoji">📱</div>
+    <p class="sub" id="passPre">Pass the phone to</p>
+    <div class="bigname grad" id="passName">Name</div>
+    <p class="sub" id="passRole"></p>
+    <div class="warnline" id="passWarn"></div>
+    <button class="btn main" id="passGo" style="min-width:240px">Show me</button>
+  </section>
+
+  <!-- CLUE -->
+  <section class="screen center" id="clue">
+    <p class="sub" id="clueHead"></p>
+    <div class="lbl" style="margin:0">Mystery word</div>
+    <div class="word grad" id="clueWord"></div>
+    <div class="twist" id="clueTwist"></div>
+    <div id="clueInputs" style="width:100%;display:flex;flex-direction:column;gap:10px"></div>
+    <div class="err" id="clueErr"></div>
+    <button class="btn main" id="clueGo" style="width:100%">Lock in clue</button>
+    <button class="linkbtn" id="swapBtn">Nobody knows this word? Swap it</button>
+  </section>
+
+  <!-- REVIEW -->
+  <section class="screen center" id="review">
+    <div class="lbl" style="margin:0">Clue check — givers only</div>
+    <div class="warnline" id="revWarn"></div>
+    <div class="word grad" id="revWord" style="font-size:clamp(26px,8vw,40px)"></div>
+    <div class="clues" id="revClues"></div>
+    <p class="sub" id="revMsg"></p>
+    <p class="small" style="margin:0">Matching clues cancel automatically. Tap any clue to jinx it by hand if it's too close to another (same word family, kitten/kitty&hellip;).</p>
+    <div class="spacer"></div>
+    <button class="btn main" id="revGo" style="width:100%">Hide clues &amp; pass to guesser</button>
+  </section>
+
+  <!-- GUESS -->
+  <section class="screen center" id="guess">
+    <p class="sub" id="gHead"></p>
+    <div class="clues" id="gClues"></div>
+    <div class="jcount" id="gJinx"></div>
+    <input class="cluein" id="gIn" type="text" maxlength="30" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Your guess">
+    <div class="err" id="gErr"></div>
+    <div class="row" style="width:100%">
+      <button class="btn badb" id="gPass">Pass</button>
+      <button class="btn main" id="gGo" style="flex:2">Guess!</button>
+    </div>
+    <p class="small" style="margin-top:0">Pass loses only this card. A wrong guess loses this card <b>and</b> the next one.</p>
+  </section>
+
+  <!-- RESULT -->
+  <section class="screen center" id="result">
+    <div class="verdict" id="rVerdict"></div>
+    <div><span class="lbl">The word was</span><br><span class="word reveal" id="rWord" style="font-size:clamp(28px,9vw,44px)"></span></div>
+    <p class="sub" id="rGuess"></p>
+    <button class="btn ghost" id="rOverride">Close enough — count it</button>
+    <div class="clues" id="rClues"></div>
+    <p class="small" id="rLeft" style="margin:0"></p>
+    <div class="spacer"></div>
+    <button class="btn main" id="rNext" style="width:100%">Next card</button>
+  </section>
+
+  <!-- END -->
+  <section class="screen" id="end">
+    <div style="text-align:center">
+      <div class="lbl">Cards saved</div>
+      <div class="score grad" id="eScore"></div>
+      <h2 id="eRank" style="margin-top:6px"></h2>
+      <p class="sub" id="eBest" style="margin-top:6px"></p>
+    </div>
+    <div id="ePips" style="display:flex;justify-content:center;gap:4px;flex-wrap:wrap"></div>
+    <div class="stats" id="eStats"></div>
+    <div class="card"><div class="lbl">Every card</div><div class="hist" id="eHist"></div></div>
+    <div class="row">
+      <button class="btn" id="eMenu">Change setup</button>
+      <button class="btn main" id="eAgain">Play again</button>
+    </div>
+  </section>
+</div>
+
+<!-- HELP -->
+<div class="ov" id="helpOv"><div class="box">
+  <h2 class="grad">How to play Jinx!</h2>
+  <ol>
+    <li>You're <b>all on one team</b>. Try to save as many of the <b>13 cards</b> as you can.</li>
+    <li>Each card, one player is the <b>Guesser</b> (it rotates). Everyone else is a <b>clue-giver</b>.</li>
+    <li>Pass the phone round the givers. Each one secretly sees the mystery word and types <b>one single-word clue</b>. No talking, no peeking at other clues.</li>
+    <li>Then the <b>jinx</b>: any clues that match each other (including plurals and word forms like <i>run/running</i>) are <b>cancelled</b>. Givers can also tap to jinx clues that are basically the same.</li>
+    <li>The Guesser sees only the clues that survive, then gets <b>one guess</b>. Right = card saved. Pass = card lost. Wrong = this card <b>and the next</b> are lost.</li>
+    <li>Your clue can't contain the mystery word or be part of it. With <b>3 players</b>, each giver writes <b>two</b> clues.</li>
+    <li>The trick: the obvious clue is the one everyone else writes. Be helpful, but be <i>different</i>.</li>
+  </ol>
+  <button class="btn main" id="helpClose">Got it</button>
+</div></div>
+
+<!-- QUIT -->
+<div class="ov" id="quitOv"><div class="box" style="text-align:center">
+  <h2>Quit this game?</h2>
+  <p class="sub">Progress on these 13 cards will be lost.</p>
+  <div class="row"><button class="btn" id="quitNo">Keep playing</button><button class="btn badb" id="quitYes">Quit</button></div>
+</div></div>
+
+<script>
+'use strict';
+const DECKS = {
+  home:   {name:'Everyday', emoji:'🏠', words:'chair pillow umbrella mirror candle ladder blanket wallet toothbrush clock kettle scissors backpack keyboard bucket doorbell envelope magnet sock spoon hammer battery pencil helmet rope soap towel balloon button camera pocket ticket window bridge fence chimney carpet lamp sofa ribbon sticker crayon whistle compass anchor lantern trophy crown mask glove necklace bathtub fridge pajamas skateboard bicycle telescope suitcase'},
+  nature: {name:'Animals & Nature', emoji:'🦒', words:'penguin giraffe octopus kangaroo owl shark spider camel squirrel dolphin zebra turtle peacock bat snail eagle lobster flamingo hedgehog gorilla parrot jellyfish beaver wolf frog butterfly volcano rainbow thunder glacier desert waterfall cactus mushroom island cave tornado forest moon comet avalanche swamp coral acorn pebble iceberg puddle sunflower lightning earthquake canyon feather nest seashell crocodile panda koala skunk walrus'},
+  food:   {name:'Food & Drink', emoji:'🍕', words:'pizza pancake popcorn pretzel cupcake lemon pineapple banana cheese noodle burrito sushi waffle donut cookie carrot potato onion mustard ketchup sandwich cereal yogurt coconut avocado watermelon chocolate lollipop marshmallow toast omelet spaghetti cucumber broccoli pumpkin cherry peanut muffin bagel smoothie lemonade coffee milkshake jelly soup salad taco dumpling pickle butter vanilla cinnamon garlic mango grape strawberry sausage honey popsicle'},
+  places: {name:'People & Places', emoji:'🏰', words:'castle airport library museum hospital circus jungle pyramid lighthouse stadium farm prison school beach bakery zoo igloo palace theater subway harbor carnival attic basement kitchen pirate wizard ninja astronaut chef detective firefighter dentist clown mermaid vampire ghost dragon knight cowboy robot queen teacher farmer superhero zombie alien mummy giant Paris Egypt Hollywood Antarctica Venice Tokyo volcano spaceship treehouse aquarium cinema'},
+  tricky: {name:'Tricky Ideas', emoji:'🌀', words:'gravity echo shadow dream secret birthday vacation homework nightmare applause silence rumor magic luck freedom memory sneeze hiccup yawn tickle wink gossip traffic weekend deadline password selfie karaoke sunrise midnight holiday wedding picnic sleepover tantrum jealousy courage patience nostalgia tradition invisible balance chaos recipe alarm snooze marathon auction election orchestra encore riddle mystery treasure sarcasm hurricane rocket puzzle'}
+};
+const LS = 'cowork-jinx-';
+const $ = id => document.getElementById(id);
+const rnd = n => Math.floor(Math.random()*n);
+const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];} return a; };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- text normalising ---------- */
+const clean = s => String(s).normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^a-z0-9]/g,'');
+function stem(s){
+  let w = clean(s);
+  if(w.length>4 && w.endsWith('ies')) w = w.slice(0,-3)+'y';
+  else if(w.length>4 && /(s|x|z|ch|sh)es$/.test(w)) w = w.slice(0,-2);
+  else if(w.length>3 && w.endsWith('s') && !/(ss|us|is)$/.test(w)) w = w.slice(0,-1);
+  if(w.length>5 && w.endsWith('ing')) w = w.slice(0,-3);
+  else if(w.length>4 && w.endsWith('ed')) w = w.slice(0,-2);
+  if(w.length>3 && /([b-df-hj-np-tv-z])\1$/.test(w)) w = w.slice(0,-1);
+  if(w.length>3 && w.endsWith('e')) w = w.slice(0,-1);
+  return w;
+}
+/* returns an error string, or '' if the clue is legal */
+function clueProblem(raw, word, twist){
+  const t = String(raw).trim();
+  if(!t) return 'Type a clue first.';
+  if(/\s/.test(t)) return 'One word only — no spaces.';
+  const c = clean(t);
+  if(!c) return 'Use letters or numbers.';
+  const w = clean(word), cs = stem(t), ws = stem(word);
+  if(c===w || cs===ws) return "That's the mystery word itself!";
+  if(c.length>=3 && c.includes(w)) return 'Your clue contains the mystery word.';
+  if(ws.length>=3 && c.includes(ws)) return 'Your clue contains the mystery word.';
+  if(c.length>=4 && w.includes(c)) return "That's part of the mystery word.";
+  if(twist && !twist.test(c)) return twist.err;
+  return '';
+}
+const isRight = (guess, word) => clean(guess)===clean(word) || (stem(guess)!=='' && stem(guess)===stem(word));
+
+/* ---------- twists ---------- */
+const TWISTS = [
+  {w:3, make:()=>({icon:'✂️', name:'Short & Sweet', desc:'Clues must be <b>5 letters or fewer</b>.', test:c=>c.length<=5, err:'Twist: 5 letters max this round.'})},
+  {w:2, make:()=>({icon:'📏', name:'Big Words', desc:'Clues must be <b>7+ letters</b> long.', test:c=>c.length>=7, err:'Twist: clue must be 7+ letters.'})},
+  {w:3, make:word=>{ const pool=[...'eaoirtnsl'].filter(l=>!clean(word).startsWith(l)); const L=pool[rnd(pool.length)];
+      return {icon:'🚫', name:`No "${L.toUpperCase()}"`, desc:`Clues can't contain the letter <b>${L.toUpperCase()}</b>.`, test:c=>!c.includes(L), err:`Twist: no letter ${L.toUpperCase()} allowed!`}; }},
+  {w:1, make:()=>{ const L='bcdfghlmpst'[rnd(11)];
+      return {icon:'🔤', name:`All "${L.toUpperCase()}" words`, desc:`Every clue must <b>start with ${L.toUpperCase()}</b>. Expect jinxes!`, test:c=>c[0]===L, err:`Twist: clue must start with ${L.toUpperCase()}.`}; }}
+];
+function drawTwist(word){
+  let tot = TWISTS.reduce((s,t)=>s+t.w,0), r = Math.random()*tot;
+  for(const t of TWISTS){ if((r-=t.w)<0) return t.make(word); }
+  return TWISTS[0].make(word);
+}
+
+/* ---------- sound ---------- */
+let AC = null;
+function tone(f, d=.12, type='sine', v=.12, delay=0){
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const t = AC.currentTime+delay, o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.setValueAtTime(f,t);
+    g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(v,t+.01); g.gain.exponentialRampToValueAtTime(.0001,t+d);
+    o.connect(g).connect(AC.destination); o.start(t); o.stop(t+d+.02);
+  }catch(e){}
+}
+const sfx = {
+  tap:()=>tone(660,.06,'triangle',.08),
+  lock:()=>{tone(520,.08,'triangle');tone(780,.1,'triangle',.1,.07);},
+  jinx:()=>{tone(300,.18,'sawtooth',.07);tone(220,.25,'sawtooth',.07,.15);},
+  win:()=>[523,659,784,1046].forEach((f,i)=>tone(f,.18,'triangle',.11,i*.09)),
+  lose:()=>{tone(330,.2,'square',.06);tone(247,.35,'square',.06,.18);},
+  pass:()=>tone(440,.2,'sine',.09)
+};
+
+/* ---------- state ---------- */
+const TOTAL = 13;
+const S = {
+  players: JSON.parse(localStorage.getItem(LS+'players')||'null') || ['Player 1','Player 2','Player 3','Player 4'],
+  decks: new Set(JSON.parse(localStorage.getItem(LS+'decks')||'null') || ['home','nature','food','places']),
+  twists: localStorage.getItem(LS+'twists')!=='0',
+  pool:[], cards:[], used:0, round:0, start:0, cur:null, history:[], jinxTotal:0
+};
+const saveSetup = () => {
+  localStorage.setItem(LS+'players', JSON.stringify(S.players));
+  localStorage.setItem(LS+'decks', JSON.stringify([...S.decks]));
+  localStorage.setItem(LS+'twists', S.twists?'1':'0');
+};
+const best = () => +(localStorage.getItem(LS+'best')||-1);
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on', s.id===id));
+  $('bar').classList.toggle('on', !['setup','end'].includes(id));
+  const sc = $(id); sc.scrollTop = 0;
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+
+/* ---------- setup screen ---------- */
+function renderSetup(){
+  const pl = $('plist'); pl.innerHTML = '';
+  S.players.forEach((name,i)=>{
+    const r = document.createElement('div'); r.className='prow';
+    r.innerHTML = `<span class="num">${i+1}</span><input maxlength="14" value="${esc(name)}" aria-label="Player ${i+1} name"><button aria-label="Remove">✕</button>`;
+    r.querySelector('input').addEventListener('input', e=>{ S.players[i]=e.target.value; saveSetup(); });
+    const del = r.querySelector('button');
+    del.disabled = S.players.length<=3; del.style.opacity = del.disabled ? .3 : 1;
+    del.addEventListener('click', ()=>{ if(S.players.length>3){ S.players.splice(i,1); saveSetup(); renderSetup(); } });
+    pl.appendChild(r);
+  });
+  $('pcount').textContent = `(${S.players.length})`;
+  $('addP').disabled = S.players.length>=10;
+  $('p3note').textContent = S.players.length===3 ? '3 players: each clue-giver writes TWO clues per card.' : '3–10 players. The Guesser role rotates every card.';
+  const dc = $('deckChips'); dc.innerHTML = '';
+  for(const [k,d] of Object.entries(DECKS)){
+    const b = document.createElement('button'); b.className = 'chip'+(S.decks.has(k)?' on':'');
+    b.textContent = `${d.emoji} ${d.name}`;
+    b.addEventListener('click', ()=>{ if(S.decks.has(k)){ if(S.decks.size>1) S.decks.delete(k); } else S.decks.add(k); sfx.tap(); saveSetup(); renderSetup(); });
+    dc.appendChild(b);
+  }
+  $('twTog').classList.toggle('on', S.twists);
+  const b = best();
+  $('bestLine').textContent = b>=0 ? `Your best: ${b} / ${TOTAL} cards saved` : 'Can your group save all 13?';
+}
+$('addP').addEventListener('click', ()=>{ if(S.players.length<10){ S.players.push('Player '+(S.players.length+1)); saveSetup(); renderSetup(); const ins=$('plist').querySelectorAll('input'); ins[ins.length-1].focus(); ins[ins.length-1].select(); } });
+$('twTog').addEventListener('click', ()=>{ S.twists=!S.twists; sfx.tap(); saveSetup(); renderSetup(); });
+$('helpBtn').addEventListener('click', ()=>$('helpOv').classList.add('on'));
+$('helpClose').addEventListener('click', ()=>$('helpOv').classList.remove('on'));
+$('quitBtn').addEventListener('click', ()=>$('quitOv').classList.add('on'));
+$('quitNo').addEventListener('click', ()=>$('quitOv').classList.remove('on'));
+$('quitYes').addEventListener('click', ()=>{ $('quitOv').classList.remove('on'); renderSetup(); show('setup'); });
+$('startBtn').addEventListener('click', startGame);
+
+function startGame(){
+  S.players = S.players.map((p,i)=>p.trim() || 'Player '+(i+1));
+  const seen = {}; S.players = S.players.map(p=>{ seen[p]=(seen[p]||0)+1; return seen[p]>1 ? `${p} ${seen[p]}` : p; });
+  saveSetup();
+  const words = new Set();
+  S.decks.forEach(k=>DECKS[k].words.split(/\s+/).forEach(w=>w&&words.add(w)));
+  S.pool = shuffle([...words]);
+  S.cards = Array(TOTAL).fill(null);
+  S.used = 0; S.round = 0; S.start = rnd(S.players.length); S.history = []; S.jinxTotal = 0;
+  sfx.lock();
+  newRound();
+}
+function nextWord(){
+  if(!S.pool.length){
+    const words = new Set(); S.decks.forEach(k=>DECKS[k].words.split(/\s+/).forEach(w=>w&&words.add(w)));
+    S.pool = shuffle([...words]);
+  }
+  return S.pool.pop();
+}
+const shakeEl = el => el.animate([{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(-4px)'},{transform:'translateX(0)'}],{duration:320});
+function pips(el, live){
+  el.innerHTML = S.cards.map((c,i)=>`<span class="pip ${c||''}${live && !c && i===S.used ? ' cur':''}"></span>`).join('');
+}
+let passAction = null;
+$('passGo').addEventListener('click', ()=>{ sfx.tap(); const f = passAction; passAction = null; if(f) f(); });
+
+/* ---------- a round ---------- */
+function newRound(){
+  if(S.used>=TOTAL) return endGame();
+  const n = S.players.length, g = (S.start+S.round)%n, givers = [];
+  for(let k=1;k<n;k++) givers.push((g+k)%n);
+  const word = nextWord();
+  S.cur = {word, guesser:g, givers, pos:0, per:n===3?2:1,
+    twist: S.twists && Math.random()<.3 ? drawTwist(word) : null,
+    clues:[], guess:'', outcome:null, override:false};
+  pips($('pips'), true);
+  passToGiver();
+}
+function passToGiver(){
+  const c = S.cur, p = c.givers[c.pos];
+  $('passEmoji').textContent = '✍️';
+  $('passPre').textContent = 'Pass the phone to';
+  $('passName').textContent = S.players[p];
+  $('passRole').textContent = `Clue-giver ${c.pos+1} of ${c.givers.length} · card ${S.used+1} of ${TOTAL}`;
+  $('passWarn').style.display = '';
+  $('passWarn').textContent = `${S.players[c.guesser]} is guessing — eyes off the screen!`;
+  $('passGo').textContent = `I'm ${S.players[p]} — show the word`;
+  passAction = showClue;
+  show('pass');
+}
+function showClue(){
+  const c = S.cur, p = c.givers[c.pos];
+  $('clueHead').innerHTML = `<b>${esc(S.players[p])}</b>, write ${c.per===2?'<b>two different</b> one-word clues':'<b>one</b> single-word clue'} for <b>${esc(S.players[c.guesser])}</b>`;
+  $('clueWord').textContent = c.word;
+  const tw = $('clueTwist');
+  if(c.twist){ tw.style.display=''; tw.innerHTML = `<span style="font-size:26px">${c.twist.icon}</span><span><b>Twist: ${esc(c.twist.name)}</b><br><span class="small">${c.twist.desc}</span></span>`; }
+  else tw.style.display = 'none';
+  const box = $('clueInputs'); box.innerHTML = '';
+  for(let i=0;i<c.per;i++){
+    const inp = document.createElement('input');
+    inp.className = 'cluein'; inp.type = 'text'; inp.maxLength = 24;
+    inp.setAttribute('autocomplete','off'); inp.setAttribute('autocapitalize','off'); inp.setAttribute('autocorrect','off');
+    inp.setAttribute('spellcheck','false'); inp.setAttribute('enterkeyhint', i<c.per-1?'next':'done');
+    inp.placeholder = c.per===2 ? `Clue ${i+1}` : 'Your one-word clue';
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); const nx = box.querySelectorAll('input')[i+1]; if(nx) nx.focus(); else submitClue(); } });
+    inp.addEventListener('input', ()=>{ $('clueErr').textContent=''; });
+    box.appendChild(inp);
+  }
+  $('clueErr').textContent = '';
+  $('clueGo').textContent = c.pos===c.givers.length-1 ? 'Lock in — last clue!' : 'Lock in clue';
+  $('swapBtn').style.display = c.pos===0 ? '' : 'none';
+  show('clue');
+}
+function submitClue(){
+  const c = S.cur, p = c.givers[c.pos];
+  const ins = [...$('clueInputs').querySelectorAll('input')];
+  for(const inp of ins){
+    const e = clueProblem(inp.value, c.word, c.twist);
+    if(e){ $('clueErr').textContent = e; shakeEl(inp); inp.focus(); return; }
+  }
+  if(ins.length===2 && stem(ins[0].value)===stem(ins[1].value)){ $('clueErr').textContent = 'Your two clues must be different.'; shakeEl(ins[1]); return; }
+  ins.forEach(inp=>c.clues.push({who:p, text:inp.value.trim(), key:stem(inp.value), auto:false, manual:false}));
+  $('clueInputs').innerHTML = '';
+  sfx.lock();
+  c.pos++;
+  if(c.pos<c.givers.length) passToGiver(); else toReview();
+}
+$('clueGo').addEventListener('click', submitClue);
+$('swapBtn').addEventListener('click', ()=>{
+  const c = S.cur; if(c.pos!==0) return;
+  c.word = nextWord(); if(c.twist) c.twist = drawTwist(c.word);
+  sfx.tap(); showClue();
+});
+
+function toReview(){
+  const c = S.cur, cnt = {};
+  c.clues.forEach(k=>cnt[k.key]=(cnt[k.key]||0)+1);
+  c.clues.forEach(k=>k.auto = cnt[k.key]>1);
+  $('revWarn').textContent = `${S.players[c.guesser]}: keep looking away!`;
+  $('revWord').textContent = c.word;
+  $('revGo').textContent = `Hide clues & pass to ${S.players[c.guesser]}`;
+  renderReview(true);
+  show('review');
+  if(c.clues.some(k=>k.auto)) setTimeout(sfx.jinx, 250);
+}
+function renderReview(anim){
+  const c = S.cur, box = $('revClues'); box.innerHTML = '';
+  c.clues.forEach(k=>{
+    const jx = k.auto||k.manual, b = document.createElement('button');
+    b.className = 'cl'+(jx?' jx':'')+(k.auto?' lock':'')+(anim?(jx?' shake':' pop'):'');
+    b.innerHTML = `<span class="txt">${esc(k.text)}</span><span class="who">${esc(S.players[k.who])}</span>`;
+    b.addEventListener('click', ()=>{
+      if(k.auto){ shakeEl(b); $('revMsg').innerHTML = 'Matching clues <b>always</b> cancel — no rescue!'; return; }
+      k.manual = !k.manual; k.manual ? sfx.jinx() : sfx.tap(); renderReview(false);
+    });
+    box.appendChild(b);
+  });
+  const alive = c.clues.filter(k=>!k.auto&&!k.manual).length, dead = c.clues.length-alive;
+  $('revMsg').innerHTML = !dead ? `✨ No jinxes — all ${alive} clues survive!`
+    : `<b style="color:var(--jinx)">🤐 ${dead} jinxed</b> · ${alive} clue${alive===1?'':'s'} survive${alive===1?'s':''}${alive?'':' — the Guesser gets nothing!'}`;
+}
+$('revGo').addEventListener('click', passToGuesser);
+
+function passToGuesser(){
+  const c = S.cur;
+  $('revClues').innerHTML = ''; $('revWord').textContent = ''; $('revMsg').textContent = '';
+  $('passEmoji').textContent = '🔮';
+  $('passPre').textContent = 'Pass the phone to the Guesser';
+  $('passName').textContent = S.players[c.guesser];
+  $('passRole').textContent = 'Everyone else: no hints, no faces, no groans!';
+  $('passWarn').style.display = 'none';
+  $('passGo').textContent = `I'm ${S.players[c.guesser]} — show my clues`;
+  passAction = showGuess;
+  show('pass');
+}
+function showGuess(){
+  const c = S.cur, alive = c.clues.filter(k=>!k.auto&&!k.manual), dead = c.clues.length-alive.length;
+  $('gHead').innerHTML = `<b>${esc(S.players[c.guesser])}</b>, here's what survived the jinx:`;
+  $('gClues').innerHTML = alive.length
+    ? shuffle(alive.slice()).map((k,i)=>`<div class="cl gclue pop" style="animation-delay:${i*.09}s;animation-fill-mode:both"><span class="txt">${esc(k.text)}</span></div>`).join('')
+    : '<p class="sub">Every single clue got jinxed! 😱<br>Take a wild guess or pass.</p>';
+  $('gJinx').textContent = dead ? `🤐 ${dead} clue${dead>1?'s':''} jinxed` : '✨ No jinxes!';
+  $('gIn').value = ''; $('gErr').textContent = '';
+  show('guess');
+}
+$('gGo').addEventListener('click', ()=>{
+  const v = $('gIn').value.trim();
+  if(!v){ $('gErr').textContent = 'Type a guess — or Pass.'; shakeEl($('gIn')); return; }
+  resolve(v);
+});
+$('gIn').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); $('gGo').click(); } });
+$('gIn').addEventListener('input', ()=>{ $('gErr').textContent=''; });
+$('gPass').addEventListener('click', ()=>resolve(null));
+
+function resolve(g){
+  const c = S.cur;
+  c.guess = g; c.override = false;
+  c.outcome = g===null ? 'pass' : isRight(g, c.word) ? 'right' : 'wrong';
+  renderResult(true);
+  show('result');
+}
+const effOf = c => c.override ? 'right' : c.outcome;
+function renderResult(fx){
+  const c = S.cur, eff = effOf(c), v = $('rVerdict');
+  const burns = eff==='wrong' && S.used+1<TOTAL;
+  if(eff==='right'){ v.className='verdict v-ok'; v.textContent = c.override ? '✅ Counted — saved!' : '✅ Saved!'; if(fx) sfx.win(); }
+  else if(eff==='pass'){ v.className='verdict v-pass'; v.textContent = '🙈 Passed — 1 card lost'; if(fx) sfx.pass(); }
+  else { v.className='verdict v-bad'; v.textContent = burns ? '❌ Wrong — 2 cards lost' : '❌ Wrong — card lost'; if(fx) sfx.lose(); }
+  $('rWord').textContent = c.word;
+  $('rGuess').innerHTML = c.guess===null ? `${esc(S.players[c.guesser])} passed.` : `${esc(S.players[c.guesser])} guessed <b>“${esc(c.guess)}”</b>`;
+  const ov = $('rOverride');
+  ov.style.display = c.outcome==='wrong' ? '' : 'none';
+  ov.textContent = c.override ? 'Undo — it was wrong after all' : 'Close enough (typo)? Count it';
+  $('rClues').innerHTML = c.clues.map(k=>`<div class="cl${(k.auto||k.manual)?' jx':''}"><span class="txt">${esc(k.text)}</span><span class="who">${esc(S.players[k.who])}</span></div>`).join('');
+  const left = TOTAL - S.used - (burns ? 2 : 1);
+  $('rLeft').textContent = left>0 ? `${left} card${left>1?'s':''} left in the stack` : 'That was the last card!';
+  $('rNext').textContent = left>0 ? 'Next card' : 'See final score';
+}
+$('rOverride').addEventListener('click', ()=>{ S.cur.override = !S.cur.override; renderResult(true); });
+$('rNext').addEventListener('click', ()=>{
+  const c = S.cur, eff = effOf(c);
+  const jx = c.clues.filter(k=>k.auto||k.manual).length;
+  S.jinxTotal += jx;
+  S.cards[S.used++] = eff==='right' ? 'saved' : 'lost';
+  let burned = false;
+  if(eff==='wrong' && S.used<TOTAL){ S.cards[S.used++] = 'burned'; burned = true; }
+  S.history.push({word:c.word, guesser:c.guesser, guess:c.guess, eff, burned, jx,
+    clues:c.clues.map(k=>({t:k.text, jx:k.auto||k.manual})), twist:c.twist?c.twist.name:null});
+  S.round++;
+  sfx.tap();
+  newRound();
+});
+
+/* ---------- end ---------- */
+const RANKS = [
+  [13,'Perfect! Are you all sharing one brain? 🧠'],
+  [12,'Incredible — almost telepathic!'],
+  [11,'Awesome. That\'s a brag-worthy score.'],
+  [9,'Great teamwork — not bad at all!'],
+  [7,'Solid! But you can read each other better.'],
+  [4,'A good start. Run it back!'],
+  [0,'Too many great minds thinking alike… try again!']
+];
+function endGame(){
+  const score = S.cards.filter(c=>c==='saved').length, prev = best(), nb = score>prev;
+  if(nb) localStorage.setItem(LS+'best', score);
+  $('eScore').textContent = `${score}/${TOTAL}`;
+  $('eRank').textContent = RANKS.find(r=>score>=r[0])[1];
+  $('eBest').textContent = nb ? (prev>=0 ? `🏆 New best! (old best ${prev})` : '🏆 First score on the board!') : `Your best: ${prev} / ${TOTAL}`;
+  pips($('ePips'), false);
+  const H = S.history, pile = H.reduce((m,h)=>Math.max(m,h.jx),0);
+  $('eStats').innerHTML = [
+    [H.filter(h=>h.eff==='right').length,'guessed'],
+    [S.jinxTotal,'clues jinxed'],
+    [H.filter(h=>h.eff==='wrong').length,'wrong guesses'],
+    [pile,'worst pile-up']
+  ].map(([n,l])=>`<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
+  $('eHist').innerHTML = H.map(h=>{
+    const ic = h.eff==='right' ? '✅' : h.eff==='pass' ? '🙈' : '❌';
+    const clues = h.clues.map(k=>k.jx ? `<s style="color:var(--jinx)">${esc(k.t)}</s>` : esc(k.t)).join(', ');
+    const g = h.guess===null ? 'passed' : `guessed “${esc(h.guess)}”`;
+    return `<div class="hrow"><span class="ic">${ic}</span><div><span class="w">${esc(h.word)}</span> <span class="small">· ${esc(S.players[h.guesser])} ${g}${h.burned?' · next card burned':''}${h.twist?' · '+esc(h.twist):''}</span><div class="d">${clues}</div></div></div>`;
+  }).join('');
+  show('end');
+  score>=9 ? sfx.win() : sfx.pass();
+}
+$('eAgain').addEventListener('click', startGame);
+$('eMenu').addEventListener('click', ()=>{ renderSetup(); show('setup'); });
+
+renderSetup();
+</script>
+</body>
+</html>

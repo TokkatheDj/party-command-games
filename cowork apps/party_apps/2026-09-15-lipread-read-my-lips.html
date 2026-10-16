@@ -1,0 +1,1058 @@
+<!-- CONCEPT: READ MY LIPS - a same-room lip-reading party game where one player silently MOUTHS a secret phrase to their team while a rival team holds the phone as Judge, ticking off each word the moment it's guessed aloud; any stray whisper or hum costs points (three and you're busted), and the Mouther can gamble on a handicap card like "Teeth Together" or "Sky Gazer" for double points. | Players: 4-16 in 2-4 teams | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Read My Lips</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+}
+
+:root {
+  --bg: #0e0a16;
+  --panel: #1a1426;
+  --panel-2: #241c35;
+  --line: #3a2f52;
+  --ink: #f3ecff;
+  --dim: #9d90b8;
+
+  --lip-a: #ff3d8b;
+  --lip-b: #b04dff;
+  --mint: #2de2a6;
+  --mint-b: #16b6d9;
+  --gold: #ffd166;
+  --bad: #ff5470;
+
+  --pad: clamp(12px, 4vw, 20px);
+  --r: 16px;
+}
+
+html { background: var(--bg); height: 100%; }   /* own the canvas so body's gradient paints its box, not a 0-height root */
+body {
+  background: radial-gradient(120% 70% at 50% 0%, #22103a 0%, var(--bg) 60%);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  position: fixed; inset: 0;
+  height: 100vh; height: 100dvh;
+}
+
+#app { height: 100%; width: 100%; max-width: 720px; margin: 0 auto; position: relative; }
+
+.screen {
+  position: absolute; inset: 0;
+  display: none;
+  flex-direction: column;
+  padding: var(--pad);
+  gap: 10px;
+}
+.screen.on { display: flex; }
+.scroller { overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.hidden { display: none !important; }
+
+.mouth { text-align: center; font-size: clamp(40px, 12vw, 60px); line-height: 1; margin-top: 4px; }
+h1.logo {
+  margin: 0;
+  font-size: clamp(36px, 12vw, 60px);
+  letter-spacing: 1px;
+  font-weight: 900;
+  text-align: center;
+  line-height: 0.95;
+  background: linear-gradient(90deg, var(--lip-a), var(--lip-b));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tagline {
+  text-align: center; color: var(--dim);
+  font-size: clamp(13px, 3.5vw, 15px);
+  line-height: 1.45; margin: 0 0 2px;
+}
+.tagline b { color: var(--lip-a); }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 12px;
+}
+.card h2 {
+  margin: 0 0 9px;
+  font-size: clamp(11px, 3vw, 13px);
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--dim); font-weight: 800;
+  display: flex; justify-content: space-between; gap: 8px;
+}
+.card h2 span { letter-spacing: 0; text-transform: none; font-weight: 600; }
+
+button {
+  font-family: inherit; color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-height: 48px;
+  font-size: clamp(14px, 3.8vw, 17px);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 10px 12px;
+}
+button:active { transform: scale(0.975); }
+button:disabled { opacity: 0.4; cursor: default; transform: none; }
+.big {
+  min-height: 62px;
+  font-size: clamp(17px, 5vw, 22px);
+  font-weight: 900;
+  letter-spacing: 1px;
+  border: none;
+  color: #1a0418;
+  background: linear-gradient(90deg, var(--lip-a), var(--lip-b));
+  width: 100%;
+}
+.big.go { background: linear-gradient(90deg, var(--mint), var(--mint-b)); color: #04161a; }
+.ghost { background: transparent; }
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip { flex: 1 1 auto; min-width: 58px; min-height: 46px; font-size: clamp(13px, 3.5vw, 15px); }
+.chip.sel { background: linear-gradient(90deg, rgba(255,61,139,.28), rgba(176,77,255,.28)); border-color: var(--lip-a); color: #fff; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; margin-top: 7px; }
+.toggle small { display: block; color: var(--dim); font-weight: 500; font-size: clamp(11px, 3vw, 13px); margin-top: 2px; }
+.toggle .sw { flex: none; width: 46px; height: 26px; border-radius: 13px; background: var(--line); position: relative; transition: background .2s; }
+.toggle .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; }
+.toggle.sel .sw { background: var(--mint); }
+.toggle.sel .sw::after { left: 23px; }
+
+.teamRow { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.teamRow .temoji { font-size: 26px; width: 36px; text-align: center; }
+.teamRow input {
+  flex: 1; min-width: 0; min-height: 46px; border-radius: 12px;
+  border: 2px solid var(--tc); background: var(--panel-2); color: var(--ink);
+  font-family: inherit; font-weight: 700; font-size: clamp(15px, 4vw, 17px); padding: 0 12px;
+  user-select: text; -webkit-user-select: text;
+}
+
+/* ---- turn intro ---- */
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.topbar .lbl { color: var(--dim); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; font-size: clamp(11px, 3vw, 13px); }
+.mini { min-height: 44px; min-width: 44px; padding: 6px 12px; font-size: clamp(13px, 3.5vw, 15px); }
+.bigTeam {
+  font-size: clamp(26px, 8.5vw, 42px); font-weight: 900; text-align: center; color: var(--tc, var(--ink));
+  line-height: 1.05; margin: 6px 0 2px;
+}
+.sub { text-align: center; color: var(--dim); font-size: clamp(14px, 3.8vw, 17px); line-height: 1.45; margin: 0; }
+.sub b { color: var(--ink); }
+.judgeLine { text-align: center; font-weight: 800; font-size: clamp(15px, 4.2vw, 19px); color: var(--tc); }
+.board { display: flex; flex-direction: column; gap: 6px; }
+.bRow { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: var(--panel-2); border-left: 5px solid var(--tc); }
+.bRow .nm { flex: 1; font-weight: 800; font-size: clamp(14px, 4vw, 17px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bRow .tag { font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); }
+.bRow .sc { font-weight: 900; font-size: clamp(18px, 5vw, 24px); min-width: 40px; text-align: right; }
+.bRow.me { outline: 2px solid var(--tc); }
+
+/* ---- peek ---- */
+#peekPad {
+  flex: 1; min-height: 180px; border-radius: 22px; border: 3px dashed var(--line);
+  background: var(--panel); display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 16px; cursor: pointer; touch-action: none;
+}
+#peekPad .peekShown { display: none; }
+#peekPad.show { border-style: solid; border-color: var(--lip-a); background: #2a1433; }
+#peekPad.show .peekShown { display: block; }
+#peekPad.show .peekHidden { display: none; }
+.peekHidden { color: var(--dim); font-weight: 900; font-size: clamp(18px, 5.5vw, 24px); letter-spacing: 2px; line-height: 1.5; }
+.peekHidden .eye { font-size: clamp(44px, 14vw, 64px); }
+.peekDeck { color: var(--dim); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; font-size: 12px; margin-bottom: 8px; }
+.peekPhrase { font-size: clamp(28px, 9vw, 46px); font-weight: 900; line-height: 1.12; }
+.offer { display: flex; gap: 10px; align-items: center; }
+.offer .ic { font-size: 38px; flex: none; }
+.offer b { font-size: clamp(15px, 4.2vw, 18px); }
+.offer p { margin: 2px 0 0; color: var(--dim); font-size: clamp(12px, 3.4vw, 14px); line-height: 1.35; }
+#offerBtn.sel { background: linear-gradient(90deg, var(--gold), #ff9f43); color: #2a1800; border: none; }
+
+/* ---- judge ---- */
+.steps { margin: 0; padding-left: 22px; line-height: 1.5; font-size: clamp(14px, 3.9vw, 17px); }
+.steps li { margin-bottom: 6px; }
+.steps b { color: var(--lip-a); }
+.handiTag {
+  background: rgba(255,209,102,.12); border: 1px solid var(--gold); color: var(--gold);
+  border-radius: 12px; padding: 8px 12px; font-weight: 700; font-size: clamp(13px, 3.6vw, 15px); text-align: center;
+}
+
+/* ---- round ---- */
+.rTeam { font-weight: 900; font-size: clamp(16px, 4.6vw, 20px); color: var(--tc); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timerWrap { display: flex; align-items: center; gap: 12px; }
+#tNum { font-size: clamp(40px, 13vw, 64px); font-weight: 900; font-variant-numeric: tabular-nums; min-width: 2.2ch; text-align: center; line-height: 1; }
+#tNum.low { color: var(--bad); animation: throb .5s infinite alternate; }
+@keyframes throb { to { transform: scale(1.08); } }
+.tBar { flex: 1; height: 16px; background: var(--panel-2); border-radius: 8px; overflow: hidden; }
+#tFill { height: 100%; width: 100%; background: linear-gradient(90deg, var(--mint), var(--lip-a)); border-radius: 8px; }
+#chips { display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; align-content: flex-start; padding: 6px 0; }
+.wchip {
+  position: relative; min-height: 58px; padding: 8px 16px;
+  font-size: clamp(20px, 6.4vw, 32px); font-weight: 900; border-radius: 16px;
+  background: var(--panel-2); border: 2px solid var(--line);
+  transition: background .15s, border-color .15s;
+}
+.wchip .pts {
+  position: absolute; top: -8px; right: -6px; background: var(--lip-b); color: #fff;
+  font-size: 11px; font-weight: 900; border-radius: 9px; padding: 2px 6px;
+}
+.wchip.got { background: linear-gradient(135deg, var(--mint), var(--mint-b)); border-color: var(--mint); color: #04161a; }
+.wchip.got .pts { background: #04161a; color: var(--mint); }
+.wchip.small { opacity: .45; font-size: clamp(15px, 4.4vw, 22px); min-height: 44px; cursor: default; border-style: dashed; }
+.wchip.pop { animation: pop .25s; }
+@keyframes pop { 50% { transform: scale(1.12); } }
+.rHint { text-align: center; color: var(--dim); font-size: clamp(12px, 3.3vw, 14px); }
+#rPts { text-align: center; font-weight: 900; font-size: clamp(18px, 5vw, 24px); color: var(--mint); }
+.rBottom { display: flex; gap: 8px; }
+#soundBtn { flex: 1; min-height: 60px; background: linear-gradient(90deg, #ff5470, #ff8a3d); color: #2a0510; border: none; font-weight: 900; font-size: clamp(16px, 4.6vw, 20px); }
+#noiseBtn.sel { border-color: var(--mint); color: var(--mint); }
+#endBtn.arm { background: var(--bad); color: #fff; }
+.flash { animation: flash .4s; }
+@keyframes flash { 0% { box-shadow: inset 0 0 0 200px rgba(255,84,112,.35); } 100% { box-shadow: inset 0 0 0 200px rgba(255,84,112,0); } }
+.veil {
+  position: absolute; inset: 0; background: rgba(14,10,22,.96); z-index: 5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: var(--pad);
+  font-size: clamp(30px, 10vw, 48px); font-weight: 900; text-align: center;
+}
+.veil .big { max-width: 420px; }
+#cd { font-size: clamp(90px, 34vw, 180px); background: rgba(14,10,22,.9); }
+#cd span { background: linear-gradient(90deg, var(--lip-a), var(--lip-b)); -webkit-background-clip: text; background-clip: text; color: transparent; animation: pop .5s; }
+
+/* ---- result ---- */
+#resHead { text-align: center; font-size: clamp(34px, 11vw, 56px); font-weight: 900; line-height: 1; margin-top: 8px; }
+#resHead.clear { color: var(--mint); }
+#resHead.time { color: var(--gold); }
+#resHead.bust { color: var(--bad); }
+.resPhrase { text-align: center; font-size: clamp(22px, 6.5vw, 32px); font-weight: 900; line-height: 1.25; }
+.resPhrase .g { color: var(--mint); }
+.resPhrase .m { color: var(--bad); text-decoration: line-through; text-decoration-thickness: 3px; }
+.resPhrase .s { color: var(--dim); }
+.line { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: clamp(14px, 4vw, 17px); opacity: 0; animation: slideIn .35s forwards; }
+.line:last-child { border-bottom: none; }
+.line b { font-variant-numeric: tabular-nums; }
+.line.neg b { color: var(--bad); }
+.line.mult b { color: var(--gold); }
+@keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+#resTotal { text-align: center; font-size: clamp(28px, 9vw, 44px); font-weight: 900; color: var(--tc); }
+
+/* ---- final ---- */
+.award { display: flex; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: clamp(13px, 3.7vw, 16px); line-height: 1.35; }
+.award:last-child { border-bottom: none; }
+.award .ic { font-size: 26px; flex: none; }
+.award small { color: var(--dim); display: block; }
+.confetti { position: fixed; top: -40px; font-size: 26px; pointer-events: none; z-index: 20; animation: fall linear forwards; }
+@keyframes fall { to { transform: translateY(110vh) rotate(540deg); } }
+
+/* ---- rules ---- */
+#rules { justify-content: flex-start; align-items: stretch; font-size: clamp(14px, 3.9vw, 16px); font-weight: 400; text-align: left; }
+#rules h2 { margin: 0; font-size: clamp(24px, 7vw, 32px); font-weight: 900; text-align: center; }
+#rules .scroller { gap: 0; line-height: 1.5; }
+#rules h3 { margin: 12px 0 4px; color: var(--lip-a); font-size: clamp(15px, 4.2vw, 18px); }
+#rules p, #rules ul { margin: 0 0 6px; }
+#rules ul { padding-left: 20px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SETUP -->
+  <section class="screen on" id="sSetup">
+    <div class="scroller">
+      <div class="mouth">👄</div>
+      <h1 class="logo">READ MY LIPS</h1>
+      <p class="tagline">Mouth it. <b>Don't say it.</b> Your team lip-reads while a rival team holds the phone and judges.</p>
+
+      <div class="card">
+        <h2>Teams <span>2–4 teams · 4+ players</span></h2>
+        <div id="teamList"></div>
+        <div class="row">
+          <button id="remTeam" class="ghost">− Team</button>
+          <button id="addTeam">+ Team</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Phrase decks <span id="deckCount"></span></h2>
+        <div class="chips" id="deckChips"></div>
+      </div>
+
+      <div class="card">
+        <h2>Turns per team</h2>
+        <div class="chips" id="roundChips"></div>
+        <h2 style="margin-top:12px">Mouthing time</h2>
+        <div class="chips" id="secChips"></div>
+        <button class="toggle" id="tgHandi"><div>🎴 Handicap cards<small>Mouther may take a challenge card for double points</small></div><span class="sw"></span></button>
+        <button class="toggle" id="tgNoise"><div>📻 Noise mask<small>Judge's phone plays a soft hiss so whispers can't sneak through</small></div><span class="sw"></span></button>
+      </div>
+    </div>
+    <div class="row">
+      <button id="rulesBtn" class="ghost" style="flex:0 0 34%">How to play</button>
+      <button id="startBtn" class="big">START 👄</button>
+    </div>
+  </section>
+
+  <!-- TURN INTRO -->
+  <section class="screen" id="sIntro">
+    <div class="topbar">
+      <span class="lbl" id="introRound">Turn 1</span>
+      <button class="mini ghost" id="quitBtn">✕ Quit</button>
+    </div>
+    <div class="scroller">
+      <div class="bigTeam" id="introTeam"></div>
+      <p class="sub">Pick your <b>Mouther</b> — someone who hasn't gone yet. Everyone else on the team: get ready to read lips and shout guesses.</p>
+      <div class="judgeLine" id="introJudge"></div>
+      <div class="card"><h2>Scores</h2><div class="board" id="introBoard"></div></div>
+    </div>
+    <button class="big" id="introGo">👄 I'm the Mouther</button>
+  </section>
+
+  <!-- PEEK -->
+  <section class="screen" id="sPeek">
+    <div class="topbar">
+      <span class="lbl">Mouther only 🤫</span>
+      <span class="lbl" id="peekTeam"></span>
+    </div>
+    <div id="peekPad">
+      <div class="peekHidden"><div class="eye">👁️</div>HOLD TO PEEK<br><span style="font-size:.6em;font-weight:600;letter-spacing:0">release to hide it again</span></div>
+      <div class="peekShown"><div class="peekDeck" id="peekDeck"></div><div class="peekPhrase" id="peekPhrase"></div></div>
+    </div>
+    <div class="card hidden" id="offerCard">
+      <div class="offer">
+        <div class="ic" id="offerIc"></div>
+        <div><b id="offerName"></b><p id="offerText"></p></div>
+      </div>
+      <button id="offerBtn" style="width:100%;margin-top:9px">🎴 Take the card · ×2 points</button>
+    </div>
+    <div class="row">
+      <button id="redrawBtn" style="flex:0 0 36%">🔄 Redraw</button>
+      <button id="readyBtn" class="big" disabled>Hand to Judge →</button>
+    </div>
+  </section>
+
+  <!-- JUDGE BRIEFING -->
+  <section class="screen" id="sJudge">
+    <div class="topbar"><span class="lbl">Judge's phone</span><span class="lbl" id="judgeSecs"></span></div>
+    <div class="scroller">
+      <div class="bigTeam" id="judgeTeam"></div>
+      <div class="card">
+        <ol class="steps" id="judgeSteps"></ol>
+      </div>
+      <div class="handiTag hidden" id="judgeHandi"></div>
+    </div>
+    <button class="big go" id="startRound">START</button>
+  </section>
+
+  <!-- ROUND -->
+  <section class="screen" id="sRound">
+    <div class="topbar">
+      <div class="rTeam" id="rTeam"></div>
+      <button class="mini" id="pauseBtn">⏸ Pause</button>
+    </div>
+    <div class="timerWrap"><div id="tNum">60</div><div class="tBar"><div id="tFill"></div></div></div>
+    <div class="handiTag hidden" id="rHandi"></div>
+    <div class="scroller">
+      <div id="chips"></div>
+      <div class="rHint">Tap each word the moment it's said · tap again to undo</div>
+    </div>
+    <div id="rPts">0 pts</div>
+    <div class="rBottom">
+      <button id="soundBtn">🔊 SOUND <span id="soundCt">0/3</span></button>
+      <button class="mini" id="soundUndo" aria-label="Undo sound">↶</button>
+      <button class="mini" id="noiseBtn" aria-label="Noise mask">📻</button>
+      <button class="mini" id="endBtn">End</button>
+    </div>
+    <div class="veil hidden" id="pauseVeil">⏸ PAUSED<button class="big go" id="resumeBtn">Resume</button></div>
+    <div class="veil hidden" id="cd"><span>3</span></div>
+  </section>
+
+  <!-- RESULT -->
+  <section class="screen" id="sResult">
+    <div class="scroller">
+      <div id="resHead"></div>
+      <div class="card resPhrase" id="resPhrase"></div>
+      <div class="card" id="resLines"></div>
+      <div id="resTotal"></div>
+      <div class="card"><h2>Scores</h2><div class="board" id="resBoard"></div></div>
+    </div>
+    <button class="big" id="resNext">Next turn →</button>
+  </section>
+
+  <!-- FINAL -->
+  <section class="screen" id="sFinal">
+    <div class="scroller">
+      <div class="mouth">💋</div>
+      <h1 class="logo">FINAL LIPS</h1>
+      <div class="bigTeam" id="finalWinner"></div>
+      <div class="card"><h2>Final scores</h2><div class="board" id="finalBoard"></div></div>
+      <div class="card"><h2>Awards</h2><div id="awards"></div></div>
+    </div>
+    <div class="row">
+      <button id="finalSetup" class="ghost" style="flex:0 0 36%">Setup</button>
+      <button id="finalAgain" class="big">Play again</button>
+    </div>
+  </section>
+
+  <!-- RULES -->
+  <div class="veil hidden" id="rules">
+    <h2>How to play</h2>
+    <div class="scroller">
+      <h3>👄 The Mouther</h3>
+      <p>Each turn, one team picks a Mouther. They <b>hold to peek</b> at a secret phrase, then mouth it to their own team with <b>zero sound</b> — no whispering, humming, clapping out syllables or pointing at things. Gestures for "sounds like" or word count are fine.</p>
+      <h3>🧑‍⚖️ The Judge</h3>
+      <p>The phone goes to the <b>next team</b>, who holds it where the guessers can't see. Hit START. Every time a guesser says a word from the phrase out loud, tap it. Order doesn't matter, and tiny words (the, a, of…) are free.</p>
+      <p>Hear a sound from the Mouther? Tap <b>SOUND</b>. Each costs 1 point, and the third busts the whole turn to zero.</p>
+      <h3>🎴 Handicap cards</h3>
+      <p>After peeking, the Mouther may take the offered card (Teeth Together, Big Grin, Sky Gazer…). Breaking the card counts as a SOUND. Survive it and the turn scores <b>double</b>.</p>
+      <h3>⭐ Scoring</h3>
+      <ul>
+        <li>+1 per word, +2 for long words (8+ letters)</li>
+        <li>👯 Twin Lips deck: +1 extra per word (b/p/m and f/v look identical!)</li>
+        <li>+3 Clean Sweep for getting every word</li>
+        <li>+2 Speed bonus for sweeping with half the time left</li>
+        <li>×2 with a handicap card, then −1 per sound</li>
+      </ul>
+      <p>Each team gets one 🔄 redraw per game. Most points after everyone's turns wins.</p>
+    </div>
+    <button class="big" id="rulesClose">Got it</button>
+  </div>
+
+</div>
+
+<script>
+const DECKS = {
+  everyday: { name: 'Everyday', icon: '🏠', hard: false, list: [
+    'Brush your teeth', 'Turn off the lights', 'Where are my keys', 'I need a nap', 'Close the door',
+    'See you later', 'Wash your hands', 'The dog is barking', 'Pass the salt', 'It is raining again',
+    'Call your mother', 'Take out the trash', 'Put on your shoes', 'Feed the cat', 'What time is it',
+    'My phone is dead', 'Open the window', 'Good morning sunshine', 'Let us go home', 'Clean your room',
+    'Do not forget your coat', 'I lost my sock', 'The bus is late', 'Sit down please', 'Who ate my sandwich',
+    'Turn up the music', 'Read me a story', 'Water the plants', 'Tie your shoelaces', 'Grab the umbrella'
+  ]},
+  food: { name: 'Food & Drink', icon: '🍝', hard: false, list: [
+    'Spaghetti and meatballs', 'Chocolate milkshake', 'Peanut butter sandwich', 'Hot buttered popcorn', 'Scrambled eggs',
+    'Pineapple pizza', 'Strawberry ice cream', 'Banana pancakes', 'Fish and chips', 'Grilled cheese',
+    'Blueberry muffin', 'Fresh orange juice', 'Chicken noodle soup', 'Mashed potatoes', 'Birthday cake',
+    'Cinnamon toast', 'Cheeseburger with pickles', 'Watermelon slice', 'Maple syrup', 'Macaroni and cheese',
+    'Lemonade stand', 'Frozen peas', 'Tomato ketchup', 'Garlic bread', 'Bubble gum',
+    'Hot chocolate with marshmallows', 'Fruit salad', 'Broccoli is delicious', 'Vanilla cupcake', 'Crunchy tacos'
+  ]},
+  silly: { name: 'Silly Sentences', icon: '🦙', hard: false, list: [
+    'My goldfish plays the banjo', 'A penguin stole my bicycle', 'Grandma won the wrestling match', 'The toaster is haunted', 'My pants are full of bees',
+    'Never trust a talking potato', 'The moon smells like cheese', 'A giraffe in a bathtub', 'Dancing with a wet noodle', 'My hamster pays the rent',
+    'The robot needs a hug', 'Socks on a rooster', 'Pirates love tiny umbrellas', 'My teacher is a werewolf', 'A dinosaur ate my homework',
+    'Llamas wearing sunglasses', 'The pickle ran for president', 'Bouncing on a giant marshmallow', 'My shadow ran away', 'A walrus ordered spaghetti',
+    'Cows cannot use computers', 'The volcano sneezed', 'Spiders knitting sweaters', 'A ghost stole my sandwich', 'Unicorns hate Mondays',
+    'A shark at the dentist', 'My bed is a boat', 'The cactus is ticklish', 'Octopus doing jumping jacks', 'Squirrels planning a heist'
+  ]},
+  sayings: { name: 'Sayings', icon: '💬', hard: false, list: [
+    'Break a leg', 'Piece of cake', 'Better late than never', 'Time flies', 'Cool as a cucumber',
+    'Let the cat out of the bag', 'Raining cats and dogs', 'Hit the hay', 'Under the weather', 'Once in a blue moon',
+    'Spill the beans', 'Actions speak louder than words', 'The early bird gets the worm', 'Easy peasy lemon squeezy', 'Do not cry over spilled milk',
+    'Two peas in a pod', 'Bite the bullet', 'Cold feet', 'Practice makes perfect', 'Every cloud has a silver lining',
+    'Butterflies in my stomach', 'When pigs fly', 'On cloud nine', 'Home sweet home', 'Hold your horses',
+    'It takes two to tango', 'No pain no gain', 'Keep your chin up', 'Barking up the wrong tree', 'Out of the blue'
+  ]},
+  twin: { name: 'Twin Lips', icon: '👯', hard: true, list: [
+    'Pat the mat', 'Big pig, mad bat', 'Five fat vans', 'Ban the pan', 'Mom made bread',
+    'Bob bought mops', 'Ten tan tents', 'Buy me a map', 'Peep at the bees', 'Very fine vine',
+    'My pup bit a mop', 'Fill the vase', 'Dad needs a nap', 'Bumpy mumps', 'Pop the bubble',
+    'Mean beans', 'Fan the van', 'Bibs and mittens', 'Pumpkin muffin', 'Maybe baby',
+    'Bat, mat, pat', 'Nine tiny dots', 'Bake me a pie', 'Poppy picked plums', 'Big moose, bad mood',
+    'Mop the bump', 'Tap the pad', 'Vivid violet fever', 'Pink mittens', 'Fifty muffins'
+  ]}
+};
+
+const TEAM_PRESETS = [
+  { name: 'Lobsters', emoji: '🦞', color: '#ff5a7a' },
+  { name: 'Owls',     emoji: '🦉', color: '#ffb627' },
+  { name: 'Pickles',  emoji: '🥒', color: '#3ddc84' },
+  { name: 'Comets',   emoji: '☄️', color: '#5ab8ff' }
+];
+
+const HANDICAPS = [
+  { icon: '🦷', name: 'Teeth Together', text: 'Your teeth must stay touching the whole time.' },
+  { icon: '✋', name: 'Half Curtain', text: 'Keep one hand covering the left half of your mouth.' },
+  { icon: '🙃', name: 'Sky Gazer', text: 'Tilt your head back and stare at the ceiling.' },
+  { icon: '🐁', name: 'Tiny Mouth', text: 'Move your lips as little as humanly possible.' },
+  { icon: '😁', name: 'Big Grin', text: 'Keep a huge smile on your face between every word.' },
+  { icon: '👤', name: 'Side Profile', text: 'Stand sideways — your team only sees your profile.' },
+  { icon: '😑', name: 'Eyes Shut', text: 'Keep your eyes closed until time runs out.' },
+  { icon: '🐡', name: 'Puffer Fish', text: 'Puff your cheeks out full between every word.' },
+  { icon: '🤖', name: 'Robot Jaw', text: 'Stiff, choppy robot mouth movements only.' },
+  { icon: '🙈', name: 'No Hands', text: 'Hands behind your back — no gestures at all.' }
+];
+
+const STOP = new Set(['a', 'an', 'the', 'of', 'to', 'in', 'on', 'at', 'is', 'my', 'me', 'and', 'it', 'i', 'for', 'as']);
+const KEY = 'cowork-readmylips-settings';
+const SOUND_LIMIT = 3;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+/* ---------- settings ---------- */
+const S = {
+  teams: ['Lobsters', 'Owls'],
+  decks: ['everyday', 'food', 'silly', 'sayings'],
+  rounds: 2, secs: 60, handicaps: true, noise: true
+};
+try {
+  const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (saved) {
+    if (Array.isArray(saved.teams) && saved.teams.length >= 2 && saved.teams.length <= 4) S.teams = saved.teams.map(String);
+    if (Array.isArray(saved.decks)) S.decks = saved.decks.filter(d => DECKS[d]);
+    if ([2, 3, 4].includes(saved.rounds)) S.rounds = saved.rounds;
+    if ([45, 60, 90].includes(saved.secs)) S.secs = saved.secs;
+    if (typeof saved.handicaps === 'boolean') S.handicaps = saved.handicaps;
+    if (typeof saved.noise === 'boolean') S.noise = saved.noise;
+  }
+} catch (e) { /* ignore corrupt settings */ }
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const teamName = i => (S.teams[i] || '').trim() || TEAM_PRESETS[i].name;
+
+/* ---------- audio ---------- */
+let AC = null, noiseNode = null, noiseGain = null;
+function ac() {
+  if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type = 'sine', vol = 0.2, when = 0, slide = 0) {
+  const c = ac(); if (!c) return;
+  const t = c.currentTime + when;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.linearRampToValueAtTime(Math.max(40, freq + slide), t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(c.destination);
+  o.start(t); o.stop(t + dur + 0.05);
+}
+const sfx = {
+  ding: n => { tone(620 + n * 45, 0.12, 'triangle', 0.25); tone(930 + n * 70, 0.2, 'sine', 0.14, 0.06); },
+  undo: () => tone(420, 0.12, 'sine', 0.15, 0, -160),
+  tick: () => tone(900, 0.06, 'square', 0.07),
+  count: () => tone(523, 0.14, 'triangle', 0.22),
+  go: () => { tone(784, 0.12, 'triangle', 0.22); tone(1175, 0.3, 'triangle', 0.22, 0.1); },
+  honk: () => { tone(230, 0.16, 'square', 0.18, 0, -60); tone(170, 0.28, 'square', 0.18, 0.13, -40); },
+  buzz: () => { tone(150, 0.6, 'sawtooth', 0.22, 0, -40); tone(155, 0.6, 'sawtooth', 0.12); },
+  fanfare: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i === 4 ? 0.5 : 0.18, 'triangle', 0.2, i * 0.09)),
+  kiss: () => { tone(1400, 0.08, 'sine', 0.2, 0, -900); tone(700, 0.06, 'sine', 0.1, 0.07, 500); }
+};
+function noiseStart() {
+  const c = ac(); if (!c || noiseNode) return;
+  const len = c.sampleRate * 2, buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; d[i] = last * 3.5; }
+  noiseNode = c.createBufferSource(); noiseNode.buffer = buf; noiseNode.loop = true;
+  noiseGain = c.createGain(); noiseGain.gain.setValueAtTime(0.0001, c.currentTime);
+  noiseGain.gain.exponentialRampToValueAtTime(0.5, c.currentTime + 0.6);
+  noiseNode.connect(noiseGain).connect(c.destination);
+  noiseNode.start();
+}
+function noiseStop() {
+  if (!noiseNode || !AC) return;
+  const n = noiseNode, g = noiseGain;
+  g.gain.cancelScheduledValues(AC.currentTime);
+  g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), AC.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + 0.25);
+  n.stop(AC.currentTime + 0.3);
+  noiseNode = null; noiseGain = null;
+}
+
+/* ---------- screens ---------- */
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+}
+
+/* ---------- setup ---------- */
+function chipRow(el, values, current, label, onPick) {
+  el.innerHTML = '';
+  values.forEach(v => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (v === current ? ' sel' : '');
+    b.textContent = label(v);
+    b.onclick = () => { onPick(v); renderSetup(); };
+    el.appendChild(b);
+  });
+}
+function renderSetup() {
+  const tl = $('#teamList'); tl.innerHTML = '';
+  S.teams.forEach((t, i) => {
+    const row = document.createElement('div');
+    row.className = 'teamRow';
+    row.style.setProperty('--tc', TEAM_PRESETS[i].color);
+    row.innerHTML = `<span class="temoji">${TEAM_PRESETS[i].emoji}</span><input maxlength="14" aria-label="Team ${i + 1} name" placeholder="${TEAM_PRESETS[i].name}">`;
+    const inp = row.querySelector('input');
+    inp.value = t;
+    inp.addEventListener('input', () => { S.teams[i] = inp.value; save(); });
+    tl.appendChild(row);
+  });
+  $('#addTeam').disabled = S.teams.length >= 4;
+  $('#remTeam').disabled = S.teams.length <= 2;
+
+  const dc = $('#deckChips'); dc.innerHTML = '';
+  Object.entries(DECKS).forEach(([k, d]) => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (S.decks.includes(k) ? ' sel' : '');
+    b.dataset.deck = k;
+    b.textContent = `${d.icon} ${d.name}${d.hard ? ' ★' : ''}`;
+    b.onclick = () => {
+      S.decks = S.decks.includes(k) ? S.decks.filter(x => x !== k) : [...S.decks, k];
+      save(); renderSetup();
+    };
+    dc.appendChild(b);
+  });
+  const n = S.decks.reduce((sum, k) => sum + DECKS[k].list.length, 0);
+  $('#deckCount').textContent = n ? `${n} phrases` : 'pick at least one';
+
+  chipRow($('#roundChips'), [2, 3, 4], S.rounds, v => `${v} each`, v => { S.rounds = v; save(); });
+  chipRow($('#secChips'), [45, 60, 90], S.secs, v => `${v}s`, v => { S.secs = v; save(); });
+  $('#tgHandi').classList.toggle('sel', S.handicaps);
+  $('#tgNoise').classList.toggle('sel', S.noise);
+  $('#startBtn').disabled = S.decks.length === 0;
+}
+$('#addTeam').onclick = () => { if (S.teams.length < 4) { S.teams.push(TEAM_PRESETS[S.teams.length].name); save(); renderSetup(); } };
+$('#remTeam').onclick = () => { if (S.teams.length > 2) { S.teams.pop(); save(); renderSetup(); } };
+$('#tgHandi').onclick = () => { S.handicaps = !S.handicaps; save(); renderSetup(); };
+$('#tgNoise').onclick = () => { S.noise = !S.noise; save(); renderSetup(); };
+$('#rulesBtn').onclick = () => $('#rules').classList.remove('hidden');
+$('#rulesClose').onclick = () => $('#rules').classList.add('hidden');
+
+/* ---------- game ---------- */
+let G = null;   // whole game
+let T = null;   // current turn
+
+function newGame() {
+  ac();
+  G = {
+    teams: S.teams.map((_, i) => ({ ...TEAM_PRESETS[i], name: teamName(i) })),
+    turn: 0,
+    totalTurns: S.rounds * S.teams.length,
+    scores: S.teams.map(() => 0),
+    stats: S.teams.map(() => ({ words: 0, sweeps: 0, busts: 0, sounds: 0 })),
+    redraws: S.teams.map(() => 1),
+    best: null,
+    used: new Set(),
+    decks: [...S.decks], secs: S.secs, handicaps: S.handicaps
+  };
+  sfx.kiss();
+  renderIntro();
+}
+
+function drawPhrase() {
+  let pool = [];
+  G.decks.forEach(k => DECKS[k].list.forEach(p => { if (!G.used.has(p)) pool.push({ deck: k, phrase: p }); }));
+  if (!pool.length) { G.used.clear(); return drawPhrase(); }
+  const c = pick(pool);
+  G.used.add(c.phrase);
+  return c;
+}
+
+function parseWords(phrase, hard) {
+  return phrase.split(/\s+/).map(raw => {
+    const clean = raw.replace(/[^A-Za-z]/g, '');
+    const small = STOP.has(clean.toLowerCase()) || clean.length <= 1;
+    const pts = small ? 0 : (clean.length >= 8 ? 2 : 1) + (hard ? 1 : 0);
+    return { text: raw, small, pts, got: false };
+  });
+}
+
+const guesser = () => G.turn % G.teams.length;
+const judge = () => (G.turn + 1) % G.teams.length;
+
+function boardHTML(highlight) {
+  const order = G.teams.map((t, i) => i);
+  return order.map(i => {
+    const t = G.teams[i];
+    let tag = '';
+    if (highlight) {
+      if (i === guesser()) tag = 'mouthing';
+      else if (i === judge()) tag = 'judging';
+    }
+    return `<div class="bRow${highlight && i === guesser() ? ' me' : ''}" style="--tc:${t.color}">
+      <span>${t.emoji}</span><span class="nm">${esc(t.name)}</span><span class="tag">${tag}</span><span class="sc">${G.scores[i]}</span></div>`;
+  }).join('');
+}
+
+function renderIntro() {
+  const g = G.teams[guesser()], j = G.teams[judge()];
+  const round = Math.floor(G.turn / G.teams.length) + 1;
+  $('#introRound').textContent = `Round ${round} of ${S.rounds} · turn ${G.turn + 1}/${G.totalTurns}`;
+  const it = $('#introTeam');
+  it.style.setProperty('--tc', g.color);
+  it.textContent = `${g.emoji} ${g.name}`;
+  const ij = $('#introJudge');
+  ij.style.setProperty('--tc', j.color);
+  ij.textContent = `${j.emoji} ${j.name} will judge`;
+  $('#introBoard').innerHTML = boardHTML(true);
+  quitArmed = false; $('#quitBtn').textContent = '✕ Quit';
+  show('sIntro');
+}
+
+let quitArmed = false, quitTimer = 0;
+$('#quitBtn').onclick = () => {
+  if (!quitArmed) {
+    quitArmed = true; $('#quitBtn').textContent = 'Tap again to quit';
+    clearTimeout(quitTimer);
+    quitTimer = setTimeout(() => { quitArmed = false; $('#quitBtn').textContent = '✕ Quit'; }, 2500);
+    return;
+  }
+  G = null; renderSetup(); show('sSetup');
+};
+
+function newTurn() {
+  const c = drawPhrase();
+  T = {
+    deck: c.deck, phrase: c.phrase,
+    words: parseWords(c.phrase, DECKS[c.deck].hard),
+    offered: G.handicaps ? pick(HANDICAPS) : null,
+    accepted: false, peeked: false,
+    sounds: 0, left: G.secs, lastWhole: G.secs,
+    running: false, paused: false, ended: false,
+    noise: S.noise, raf: 0
+  };
+}
+
+$('#introGo').onclick = () => { newTurn(); renderPeek(); show('sPeek'); };
+
+/* ---------- peek ---------- */
+function renderPeek() {
+  const gi = guesser(), g = G.teams[gi];
+  $('#peekTeam').textContent = `${g.emoji} ${g.name}`;
+  const d = DECKS[T.deck];
+  $('#peekDeck').textContent = `${d.icon} ${d.name}${d.hard ? ' · +1 per word' : ''}`;
+  $('#peekPhrase').textContent = T.phrase;
+  $('#peekPad').classList.remove('show');
+  $('#readyBtn').disabled = !T.peeked;
+  $('#redrawBtn').textContent = `🔄 Redraw (${G.redraws[gi]})`;
+  $('#redrawBtn').disabled = G.redraws[gi] <= 0 || !T.peeked;
+  const oc = $('#offerCard');
+  oc.classList.toggle('hidden', !T.offered || !T.peeked);
+  if (T.offered) {
+    $('#offerIc').textContent = T.offered.icon;
+    $('#offerName').textContent = T.offered.name;
+    $('#offerText').textContent = T.offered.text;
+    $('#offerBtn').classList.toggle('sel', T.accepted);
+    $('#offerBtn').textContent = T.accepted ? '✅ Card taken · DOUBLE points (tap to drop)' : '🎴 Take the card · ×2 points';
+  }
+}
+const pad = $('#peekPad');
+const peekOn = e => {
+  e.preventDefault();
+  pad.classList.add('show');
+  if (!T.peeked) { T.peeked = true; }
+};
+const peekOff = () => {
+  if (!pad.classList.contains('show')) return;
+  pad.classList.remove('show');
+  renderPeek();
+};
+pad.addEventListener('pointerdown', peekOn);
+['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => pad.addEventListener(ev, peekOff));
+pad.addEventListener('contextmenu', e => e.preventDefault());
+
+$('#offerBtn').onclick = () => { T.accepted = !T.accepted; T.accepted ? sfx.go() : sfx.undo(); renderPeek(); };
+$('#redrawBtn').onclick = () => {
+  const gi = guesser();
+  if (G.redraws[gi] <= 0) return;
+  G.redraws[gi]--;
+  const keepPeeked = true, acc = T.accepted, off = T.offered;
+  newTurn();
+  T.peeked = keepPeeked;
+  if (off) { T.offered = off; T.accepted = acc; }
+  sfx.undo();
+  renderPeek();
+  pad.classList.add('show');
+  setTimeout(() => { pad.classList.remove('show'); }, 1400);
+};
+$('#readyBtn').onclick = () => { renderJudge(); show('sJudge'); };
+
+/* ---------- judge briefing ---------- */
+function renderJudge() {
+  const g = G.teams[guesser()], j = G.teams[judge()];
+  const jt = $('#judgeTeam');
+  jt.style.setProperty('--tc', j.color);
+  jt.textContent = `${j.emoji} ${j.name}, you're the Judge`;
+  $('#judgeSecs').textContent = `${G.secs}s`;
+  $('#judgeSteps').innerHTML = `
+    <li>Stand where <b>${esc(g.name)}</b> can't see this screen.</li>
+    <li>When their Mouther is ready, hit <b>START</b>. The phrase appears on this phone only.</li>
+    <li>Tap each word the moment a guesser <b>says it out loud</b>. Any order.</li>
+    <li>Whisper, hum, click or a real sound from the Mouther? Hit <b>SOUND</b>. ${SOUND_LIMIT} = busted.</li>`;
+  const h = $('#judgeHandi');
+  h.classList.toggle('hidden', !T.accepted);
+  if (T.accepted) h.textContent = `🎴 Mouther took ${T.offered.icon} ${T.offered.name}: ${T.offered.text} Breaking it counts as a SOUND.`;
+  $('#startRound').textContent = `START ${G.secs}s ▶`;
+}
+$('#startRound').onclick = () => {
+  ac();
+  renderRound();
+  show('sRound');
+  countdown();
+};
+
+/* ---------- round ---------- */
+function renderRound() {
+  const g = G.teams[guesser()];
+  const rt = $('#rTeam');
+  rt.style.setProperty('--tc', g.color);
+  rt.textContent = `${g.emoji} ${g.name} guessing`;
+  const rh = $('#rHandi');
+  rh.classList.toggle('hidden', !T.accepted);
+  if (T.accepted) rh.textContent = `${T.offered.icon} ${T.offered.name} · ×2`;
+  const box = $('#chips'); box.innerHTML = '';
+  T.words.forEach((w, i) => {
+    const b = document.createElement('button');
+    b.className = 'wchip' + (w.small ? ' small' : '');
+    b.innerHTML = esc(w.text) + (w.small ? '' : `<span class="pts">+${w.pts}</span>`);
+    if (w.small) b.disabled = true;
+    else b.onclick = () => tapWord(i, b);
+    box.appendChild(b);
+  });
+  $('#pauseVeil').classList.add('hidden');
+  $('#noiseBtn').classList.toggle('sel', T.noise);
+  $('#endBtn').classList.remove('arm'); $('#endBtn').textContent = 'End';
+  drawTimer(); drawLive();
+}
+
+function countdown() {
+  const cd = $('#cd'); cd.classList.remove('hidden');
+  let n = 3;
+  const step = () => {
+    if (!T || T.ended) { cd.classList.add('hidden'); return; }
+    if (n > 0) { cd.innerHTML = `<span>${n}</span>`; sfx.count(); n--; setTimeout(step, 750); }
+    else { cd.innerHTML = '<span>👄</span>'; sfx.go(); setTimeout(() => { cd.classList.add('hidden'); startTimer(); }, 450); }
+  };
+  step();
+}
+
+function startTimer() {
+  T.running = true;
+  T.lastTs = performance.now();
+  if (T.noise) noiseStart();
+  T.raf = requestAnimationFrame(loop);
+}
+function loop(now) {
+  if (!T || !T.running) return;
+  if (!T.paused) T.left -= (now - T.lastTs) / 1000;
+  T.lastTs = now;
+  if (T.left <= 0) { T.left = 0; drawTimer(); endTurn('time'); return; }
+  const w = Math.ceil(T.left);
+  if (w !== T.lastWhole) { T.lastWhole = w; if (w <= 5) sfx.tick(); }
+  drawTimer();
+  T.raf = requestAnimationFrame(loop);
+}
+function drawTimer() {
+  const w = Math.ceil(T.left);
+  $('#tNum').textContent = w;
+  $('#tNum').classList.toggle('low', w <= 10 && T.running);
+  $('#tFill').style.width = (100 * T.left / G.secs) + '%';
+}
+function wordPoints() { return T.words.reduce((s, w) => s + (w.got ? w.pts : 0), 0); }
+const allGot = () => T.words.every(w => w.small || w.got);
+function drawLive() {
+  const p = wordPoints() * (T.accepted ? 2 : 1) - T.sounds;
+  $('#rPts').textContent = `${p >= 0 ? '+' : ''}${p} pts so far`;
+  $('#soundCt').textContent = `${T.sounds}/${SOUND_LIMIT}`;
+}
+
+function tapWord(i, btn) {
+  if (!T.running || T.paused || T.ended) return;
+  const w = T.words[i];
+  w.got = !w.got;
+  btn.classList.toggle('got', w.got);
+  btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
+  if (w.got) sfx.ding(T.words.filter(x => x.got).length); else sfx.undo();
+  drawLive();
+  if (allGot()) {
+    // short grace so a mis-tap can still be undone before the sweep locks in
+    clearTimeout(T.sweepTimer);
+    T.sweepTimer = setTimeout(() => { if (T && !T.ended && allGot()) endTurn('clear'); }, 650);
+  }
+}
+
+$('#soundBtn').onclick = () => {
+  if (!T || !T.running || T.paused || T.ended) return;
+  T.sounds++;
+  sfx.honk();
+  const r = $('#sRound'); r.classList.remove('flash'); void r.offsetWidth; r.classList.add('flash');
+  if (navigator.vibrate) navigator.vibrate(120);
+  drawLive();
+  if (T.sounds >= SOUND_LIMIT) endTurn('bust');
+};
+$('#soundUndo').onclick = () => {
+  if (!T || !T.running || T.ended || T.sounds <= 0) return;
+  T.sounds--; sfx.undo(); drawLive();
+};
+$('#noiseBtn').onclick = () => {
+  if (!T) return;
+  T.noise = !T.noise;
+  $('#noiseBtn').classList.toggle('sel', T.noise);
+  if (T.noise && T.running && !T.paused) noiseStart(); else noiseStop();
+};
+$('#pauseBtn').onclick = () => {
+  if (!T || !T.running || T.ended) return;
+  T.paused = true; noiseStop();
+  $('#pauseVeil').classList.remove('hidden');
+};
+$('#resumeBtn').onclick = () => {
+  if (!T) return;
+  T.paused = false; T.lastTs = performance.now();
+  if (T.noise) noiseStart();
+  $('#pauseVeil').classList.add('hidden');
+};
+let endArmTimer = 0;
+$('#endBtn').onclick = () => {
+  if (!T || !T.running || T.ended) return;
+  const b = $('#endBtn');
+  if (!b.classList.contains('arm')) {
+    b.classList.add('arm'); b.textContent = 'Sure?';
+    clearTimeout(endArmTimer);
+    endArmTimer = setTimeout(() => { b.classList.remove('arm'); b.textContent = 'End'; }, 2200);
+    return;
+  }
+  endTurn('time');
+};
+
+/* ---------- scoring ---------- */
+function scoreTurn() {
+  const words = wordPoints();
+  const sweep = allGot();
+  const sweepBonus = sweep ? 3 : 0;
+  const speedBonus = sweep && T.left >= G.secs / 2 ? 2 : 0;
+  const mult = T.accepted ? 2 : 1;
+  const sub = (words + sweepBonus + speedBonus) * mult;
+  const busted = T.reason === 'bust';
+  const total = busted ? 0 : Math.max(0, sub - T.sounds);
+  const scoring = T.words.filter(w => !w.small);
+  return { words, sweep, sweepBonus, speedBonus, mult, sub, busted, total,
+           got: scoring.filter(w => w.got).length, of: scoring.length };
+}
+
+function endTurn(reason) {
+  if (!T || T.ended) return;
+  if (reason === 'time' && allGot()) reason = 'clear';   // last word landed inside the sweep grace as the clock hit zero
+  T.ended = true; T.running = false; T.reason = reason;
+  cancelAnimationFrame(T.raf);
+  clearTimeout(T.sweepTimer);
+  noiseStop();
+  $('#cd').classList.add('hidden');
+  const r = scoreTurn();
+  const gi = guesser();
+  G.scores[gi] += r.total;
+  const st = G.stats[gi];
+  st.words += r.got; st.sounds += T.sounds;
+  if (r.sweep) st.sweeps++;
+  if (r.busted) st.busts++;
+  if (!G.best || r.total > G.best.total) G.best = { total: r.total, team: gi, phrase: T.phrase };
+  if (reason === 'clear') sfx.fanfare(); else if (reason === 'bust') sfx.buzz(); else sfx.buzz();
+  setTimeout(() => renderResult(r), reason === 'clear' ? 150 : 400);
+}
+
+function renderResult(r) {
+  const head = $('#resHead');
+  head.className = T.reason;
+  head.textContent = T.reason === 'clear' ? '💋 CLEAN SWEEP!' : T.reason === 'bust' ? '🔊 BUSTED!' : '⏰ TIME!';
+  $('#resPhrase').innerHTML = T.words.map(w =>
+    `<span class="${w.small ? 's' : w.got ? 'g' : 'm'}">${esc(w.text)}</span>`).join(' ');
+
+  const lines = [];
+  lines.push(['', `Words read (${r.got}/${r.of})`, `+${r.words}`]);
+  if (r.sweepBonus) lines.push(['', 'Clean sweep', `+${r.sweepBonus}`]);
+  if (r.speedBonus) lines.push(['', 'Speed bonus', `+${r.speedBonus}`]);
+  if (r.mult > 1) lines.push(['mult', `${T.offered.icon} ${T.offered.name} card`, `×2 = ${r.sub}`]);
+  if (T.sounds) lines.push(['neg', `Sounds (${T.sounds})`, r.busted ? 'BUSTED' : `−${T.sounds}`]);
+  $('#resLines').innerHTML = lines.map((l, i) =>
+    `<div class="line ${l[0]}" style="animation-delay:${i * 0.18}s"><span>${esc(l[1])}</span><b>${l[2]}</b></div>`).join('');
+
+  const g = G.teams[guesser()];
+  const tot = $('#resTotal');
+  tot.style.setProperty('--tc', g.color);
+  tot.textContent = `${g.emoji} ${g.name} +${r.total}`;
+  $('#resBoard').innerHTML = boardHTML(false);
+  $('#resNext').textContent = G.turn + 1 >= G.totalTurns ? 'See the winner 🏆' : 'Next turn →';
+  show('sResult');
+}
+
+$('#resNext').onclick = () => {
+  G.turn++;
+  T = null;
+  if (G.turn >= G.totalTurns) renderFinal(); else renderIntro();
+};
+
+/* ---------- final ---------- */
+function renderFinal() {
+  const ranked = G.teams.map((t, i) => ({ ...t, i, score: G.scores[i] })).sort((a, b) => b.score - a.score);
+  const top = ranked[0].score;
+  const winners = ranked.filter(t => t.score === top);
+  const fw = $('#finalWinner');
+  if (winners.length > 1) {
+    fw.style.setProperty('--tc', 'var(--gold)');
+    fw.textContent = `🤝 Tie! ${winners.map(w => w.emoji + ' ' + w.name).join(' & ')}`;
+  } else {
+    fw.style.setProperty('--tc', winners[0].color);
+    fw.textContent = `🏆 ${winners[0].emoji} ${winners[0].name} win!`;
+  }
+  const medals = ['🥇', '🥈', '🥉', '4️⃣'];
+  let rank = 0;
+  $('#finalBoard').innerHTML = ranked.map((t, k) => {
+    if (k > 0 && t.score < ranked[k - 1].score) rank = k;
+    return `<div class="bRow${t.score === top ? ' me' : ''}" style="--tc:${t.color}"><span>${medals[rank]}</span><span>${t.emoji}</span>
+      <span class="nm">${esc(t.name)}</span><span class="sc">${t.score}</span></div>`;
+  }).join('');
+
+  const aw = [];
+  const maxBy = key => {
+    const best = Math.max(...G.stats.map(s => s[key]));
+    if (best <= 0) return null;
+    return { v: best, names: G.teams.filter((t, i) => G.stats[i][key] === best).map(t => `${t.emoji} ${t.name}`).join(' & ') };
+  };
+  const eyes = maxBy('words');
+  if (eyes) aw.push(['👀', 'Sharpest Eyes', `${eyes.names} — ${eyes.v} words read`]);
+  const sw = maxBy('sweeps');
+  if (sw) aw.push(['💋', 'Sweep Kings', `${sw.names} — ${sw.v} clean sweep${sw.v > 1 ? 's' : ''}`]);
+  if (G.best && G.best.total > 0) aw.push(['⭐', 'Best Turn', `${G.teams[G.best.team].emoji} ${G.teams[G.best.team].name} scored ${G.best.total} on "${G.best.phrase}"`]);
+  const loud = maxBy('sounds');
+  if (loud) aw.push(['📢', 'Loudest Lips', `${loud.names} — ${loud.v} sound${loud.v > 1 ? 's' : ''} caught`]);
+  if (!aw.length) aw.push(['🤐', 'Silent Night', 'Nobody read a single word. Impressive, honestly.']);
+  $('#awards').innerHTML = aw.map(a => `<div class="award"><span class="ic">${a[0]}</span><div><b>${esc(a[1])}</b><small>${esc(a[2])}</small></div></div>`).join('');
+
+  show('sFinal');
+  sfx.fanfare();
+  confetti();
+}
+function confetti() {
+  const bits = ['👄', '💋', '✨', '🎉', '⭐'];
+  for (let k = 0; k < 36; k++) {
+    const s = document.createElement('span');
+    s.className = 'confetti';
+    s.textContent = pick(bits);
+    s.style.left = Math.random() * 100 + 'vw';
+    s.style.animationDuration = (2.2 + Math.random() * 2.2) + 's';
+    s.style.animationDelay = Math.random() * 0.9 + 's';
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 5500);
+  }
+}
+$('#finalAgain').onclick = () => newGame();
+$('#finalSetup').onclick = () => { G = null; renderSetup(); show('sSetup'); };
+$('#startBtn').onclick = () => { if (S.decks.length) newGame(); };
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && T && T.running && !T.paused) $('#pauseBtn').onclick();
+});
+
+renderSetup();
+</script>
+</body>
+</html>

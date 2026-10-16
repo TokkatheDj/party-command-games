@@ -1,0 +1,684 @@
+<!-- CONCEPT: TIMING/SENSE OF TIME - "Blackout Clock": 2-6 players lay one phone or tablet flat and each keeps a finger pressed on their own glowing pad; the screen shows a target ("let go at 13 seconds"), counts down, then BLACKS OUT - no clock, no numbers - and everyone lifts the moment their gut says time's up. A sliding reveal lines every finger up against the target with scores for bullseyes. Each round a rotating HECKLER sits out and does everything legal to wreck the room's inner clock (counting out loud wrong, singing, clapping off-beat) and scores for every player they throw more than 2 s off; Round Cards bend the rules - No Going Over, a lying metronome, decoy chimes, a mystery target revealed only after the lift. Keyboard keys work as pads on a laptop | Players: 2-6 (+Heckler from 3) | ~15-25 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Blackout Clock</title>
+<style>
+:root{
+  --bg:#07080f; --panel:#131728; --panel2:#1b2036; --line:#2a3152; --text:#eef0ff; --muted:#8e95b8;
+  --a:#ffcf4a; --b:#ff5fa2; --good:#49e39b; --bad:#ff5d5d; --warn:#ffb03a;
+  --p0:#ff5fa2; --p1:#4ad6ff; --p2:#ffcf4a; --p3:#49e39b; --p4:#b28cff; --p5:#ff8a4a;
+  --r:16px; --gap:12px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;cursor:pointer;border:0;min-height:44px;border-radius:12px}
+.screen{position:fixed;inset:0;display:none;flex-direction:column;overflow-y:auto;padding:16px max(14px,env(safe-area-inset-left)) 20px}
+.screen.on{display:flex}
+.wrap{width:100%;max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:var(--gap)}
+h1{margin:6px 0 0;font-size:clamp(34px,10vw,58px);line-height:1;font-weight:900;letter-spacing:-1px;text-align:center;
+  background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{margin:0;font-size:clamp(20px,5.5vw,28px);text-align:center}
+.tag{text-align:center;color:var(--muted);font-size:clamp(13px,3.6vw,16px);margin:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.card h3{margin:0 0 10px;font-size:clamp(14px,3.8vw,17px);color:var(--a);text-transform:uppercase;letter-spacing:1px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pl{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.pl .dot{width:18px;height:18px;border-radius:50%;flex:none}
+.pl input{flex:1;min-width:0;min-height:44px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;color:var(--text);
+  padding:0 12px;font:inherit;font-size:16px}
+.pl .x{width:44px;background:var(--panel2);color:var(--muted);font-size:20px}
+.seg{display:flex;background:var(--panel2);border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;background:transparent;color:var(--muted);font-weight:700;font-size:clamp(13px,3.6vw,16px)}
+.seg button.on{background:linear-gradient(90deg,var(--a),var(--b));color:#1a0b14}
+.toggle{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:44px}
+.toggle small{display:block;color:var(--muted);font-size:13px}
+.sw{width:58px;height:34px;min-height:34px;border-radius:20px;background:var(--line);position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;background:#fff;transition:.2s}
+.sw.on{background:var(--good)}
+.sw.on::after{left:28px}
+.big{width:100%;min-height:58px;font-size:clamp(18px,5vw,22px);font-weight:900;letter-spacing:.5px;
+  background:linear-gradient(90deg,var(--a),var(--b));color:#1a0b14;border-radius:16px;box-shadow:0 6px 24px #ff5fa244}
+.big:disabled{opacity:.4;box-shadow:none}
+.ghost{background:var(--panel2);border:1px solid var(--line);padding:0 16px;font-weight:700}
+.muted{color:var(--muted)}
+.how{font-size:14px;line-height:1.5;color:#c9cde6;margin:0;padding-left:18px}
+.how li{margin-bottom:4px}
+
+/* round intro */
+.target{text-align:center;font-weight:900;font-size:clamp(64px,22vw,120px);line-height:1;margin:4px 0;
+  background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+.target small{font-size:.3em}
+.rcard{border-radius:var(--r);padding:14px;background:linear-gradient(135deg,#2b1830,#1a2140);border:1px solid #ff5fa255;text-align:center}
+.rcard b{display:block;font-size:clamp(18px,5vw,24px);margin-bottom:4px}
+.rcard span{color:#d5d8f0;font-size:14px;line-height:1.4}
+.heckler{border-radius:var(--r);padding:12px 14px;background:#2a1a08;border:1px solid #ffb03a66;font-size:14px;line-height:1.45}
+.heckler b{color:var(--warn)}
+
+/* play arena */
+#play{padding:0;overflow:hidden}
+#arena{position:absolute;inset:78px 0 0 0;display:grid;gap:8px;padding:0 8px 8px;touch-action:none}
+.pad{position:relative;border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border:3px solid var(--c);background:color-mix(in srgb,var(--c) 14%,#0a0b14);touch-action:none;-webkit-touch-callout:none;transition:background .15s,opacity .3s}
+.pad .nm{font-weight:900;font-size:clamp(18px,5.5vw,30px);text-align:center;padding:0 8px;word-break:break-word}
+.pad .st{margin-top:6px;font-size:clamp(12px,3.4vw,15px);color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.pad .key{position:absolute;top:8px;right:12px;font-size:13px;color:var(--muted);font-weight:700}
+.pad.held{background:color-mix(in srgb,var(--c) 55%,#0a0b14);box-shadow:0 0 30px var(--c) inset}
+.pad.held .st{color:#fff}
+.pad.hecklerpad{border-style:dashed;opacity:.55;background:#16110a;border-color:var(--warn)}
+.pad.done{opacity:.35}
+#hud{position:absolute;left:0;right:0;top:0;height:78px;pointer-events:none;z-index:5;
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:0 14px}
+#hud .l1{font-size:clamp(12px,3.6vw,16px);color:var(--muted);text-align:right}
+#hud .l2{font-size:clamp(38px,12vw,56px);font-weight:900;line-height:1}
+#hud .l3{font-size:clamp(12px,3.6vw,16px);color:var(--muted);text-align:left}
+#play.black{background:#000}
+#play.black .pad{background:#050508;border-color:#1c1c24;box-shadow:none}
+#play.black .pad .nm{color:#2b2b36}
+#play.black .pad .st,#play.black .pad .key{color:#20202a}
+#play.black .pad.done{opacity:1}
+#play.black .pad.done .st{color:#3a3a48}
+#play.black #hud .l1,#play.black #hud .l3{color:#262630}
+#play.black #hud .l2{color:#1c1c26}
+#play.flash{animation:flash .35s}
+@keyframes flash{0%{background:#fff3}100%{background:#000}}
+#abortBtn{position:absolute;top:17px;left:10px;z-index:6;width:44px;height:44px;padding:0;background:#ffffff10;color:var(--muted);font-size:18px}
+#play.black #abortBtn{color:#2a2a36;background:#ffffff08}
+
+/* reveal */
+.timeline{position:relative;height:auto;padding:30px 8px 10px}
+.tl-track{position:relative;height:8px;border-radius:4px;background:linear-gradient(90deg,#27304f,#3a4570,#27304f);margin:0 6px}
+.tl-target{position:absolute;top:-22px;bottom:-22px;width:3px;margin-left:-1.5px;background:var(--a);box-shadow:0 0 12px var(--a)}
+.tl-target span{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;color:var(--a);white-space:nowrap}
+.tl-mark{position:absolute;top:-9px;width:26px;height:26px;margin-left:-13px;border-radius:50%;border:3px solid #07080f;
+  background:var(--c);transition:left 1.1s cubic-bezier(.2,.9,.25,1.1);display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:900;color:#07080f}
+.tl-scale{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin:16px 6px 0}
+.res{display:flex;flex-direction:column;gap:8px}
+.ritem{display:flex;align-items:center;gap:10px;background:var(--panel2);border-radius:12px;padding:10px 12px;border-left:5px solid var(--c);
+  opacity:0;transform:translateY(8px);transition:.35s}
+.ritem.in{opacity:1;transform:none}
+.ritem .who{flex:1;min-width:0}
+.ritem .who b{display:block;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ritem .who small{color:var(--muted);font-size:13px}
+.ritem .pts{font-weight:900;font-size:22px;min-width:52px;text-align:right}
+.badge{display:inline-block;font-size:11px;font-weight:900;padding:2px 7px;border-radius:8px;margin-left:6px;vertical-align:middle}
+.b-bull{background:var(--good);color:#06210f}
+.b-bust{background:var(--bad);color:#2a0606}
+.b-heck{background:var(--warn);color:#2a1a02}
+.mystery{text-align:center;font-size:15px;color:#d5d8f0}
+.mystery b{font-size:28px;color:var(--a);display:block}
+
+/* scoreboard */
+.sb{display:flex;flex-direction:column;gap:6px}
+.sbr{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--panel2)}
+.sbr .bar{flex:1;height:10px;border-radius:5px;background:#0c0f1c;overflow:hidden}
+.sbr .bar i{display:block;height:100%;background:var(--c);border-radius:5px;transition:width .8s}
+.sbr .n{width:32%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.sbr .v{width:40px;text-align:right;font-weight:900}
+.podium{font-size:clamp(40px,14vw,70px);text-align:center;margin:0}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:var(--panel2);border-radius:12px;padding:10px}
+.stat small{color:var(--muted);font-size:12px;display:block}
+.stat b{font-size:15px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--bad);color:#fff;font-weight:900;padding:12px 18px;
+  border-radius:14px;z-index:50;display:none;text-align:center;max-width:90vw}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<section class="screen on" id="setup">
+  <div class="wrap">
+    <h1>BLACKOUT<br>CLOCK</h1>
+    <p class="tag">Hold your pad. The lights go out. Let go when your gut says time's up.</p>
+
+    <div class="card">
+      <h3>Players <span class="muted" id="pcount" style="text-transform:none;letter-spacing:0"></span></h3>
+      <div id="plist"></div>
+      <button class="ghost" id="addP" style="width:100%">+ Add player</button>
+    </div>
+
+    <div class="card">
+      <h3>Rounds</h3>
+      <div class="seg" id="segRounds">
+        <button data-v="5">5</button><button data-v="8" class="on">8</button><button data-v="12">12</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toggle"><div><b>The Heckler</b><small>Each round one player sits out and tries to throw everyone off (needs 3+ players)</small></div>
+        <button class="sw on" id="swHeck" aria-label="Heckler on/off"></button></div>
+      <div class="toggle" style="margin-top:8px"><div><b>Round Cards</b><small>Rule twists: No Going Over, lying metronome, decoy chimes, mystery target</small></div>
+        <button class="sw on" id="swCards" aria-label="Round cards on/off"></button></div>
+      <div class="toggle" style="margin-top:8px"><div><b>Sound</b><small>Countdown beeps, chimes and the big reveal</small></div>
+        <button class="sw on" id="swSound" aria-label="Sound on/off"></button></div>
+    </div>
+
+    <div class="card">
+      <h3>How to play</h3>
+      <ol class="how">
+        <li>Lay the phone flat in the middle. Everyone presses and <b>holds</b> their own pad (laptop: hold your key). iPhones read at most 5 fingers at once, so use a tablet or turn the Heckler on for 6 players.</li>
+        <li>Once all fingers are down, a 3-2-1 countdown runs and the screen <b>goes black</b>. No clock, no numbers.</li>
+        <li>Lift your finger the moment you think the <b>target time</b> has passed.</li>
+        <li>Within 0.25 s is a <b>Bullseye</b> (5 pts). Then 4 / 3 / 2 / 1 as you drift up to 3 s off, plus +1 for the closest.</li>
+        <li><b>Heckler:</b> count out loud wrongly, hum, clap off-beat, tell a story. No touching the phone or the players. +1 for every player who ends up more than 2 s off.</li>
+      </ol>
+    </div>
+
+    <button class="big" id="startBtn">START GAME</button>
+  </div>
+</section>
+
+<!-- ROUND INTRO -->
+<section class="screen" id="intro">
+  <div class="wrap">
+    <p class="tag" id="roundLbl">Round 1 of 8</p>
+    <p class="tag" style="margin-top:6px">Let go at</p>
+    <div class="target" id="targetBig">13<small>s</small></div>
+    <div class="rcard" id="rcard"><b>Classic</b><span>Closest to the target wins. Over or under, it all counts.</span></div>
+    <div class="heckler" id="heckBox"></div>
+    <div class="card" style="padding:10px 14px"><div class="sb" id="miniSb"></div></div>
+    <button class="big" id="toArena">PLACE YOUR FINGERS</button>
+  </div>
+</section>
+
+<!-- PLAY -->
+<section class="screen" id="play">
+  <div id="arena"></div>
+  <div id="hud"><div class="l1" id="hud1"></div><div class="l2" id="hud2"></div><div class="l3" id="hud3"></div></div>
+  <button id="abortBtn" aria-label="Back to round card">✕</button>
+</section>
+
+<!-- REVEAL -->
+<section class="screen" id="reveal">
+  <div class="wrap">
+    <h2 id="revTitle">The Reveal</h2>
+    <div class="mystery" id="mystery" style="display:none"></div>
+    <div class="card timeline">
+      <div class="tl-track" id="track"></div>
+      <div class="tl-scale" id="scale"></div>
+    </div>
+    <div class="res" id="res"></div>
+    <button class="big" id="nextBtn">NEXT ROUND</button>
+  </div>
+</section>
+
+<!-- FINAL -->
+<section class="screen" id="final">
+  <div class="wrap">
+    <p class="podium">🏆</p>
+    <h1 id="winName" style="font-size:clamp(28px,9vw,48px)">Winner</h1>
+    <p class="tag" id="winSub"></p>
+    <div class="card"><h3>Final scores</h3><div class="sb" id="finalSb"></div></div>
+    <div class="card"><h3>Hall of Clocks</h3><div class="stats" id="stats"></div></div>
+    <button class="big" id="rematchBtn">REMATCH (same players)</button>
+    <button class="ghost" id="newBtn" style="width:100%">New game setup</button>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const LS = 'cowork-blackoutclock-';
+const COLORS = ['--p0','--p1','--p2','--p3','--p4','--p5'];
+const KEYS = ['A','L','Q','P','Z','M'];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const col = i => `var(${COLORS[i]})`;
+const fmt = t => t.toFixed(2) + 's';
+
+/* ---------- round cards ---------- */
+const CARDS = {
+  classic:  {name:'Classic', icon:'⏱️', w:3, txt:'Closest to the target wins. Over or under, it all counts.'},
+  nogo:     {name:'No Going Over', icon:'🚫', w:2, txt:'Lift even a hair past the target and you BUST for 0. Closest without going over wins.'},
+  metro:    {name:'The Lying Metronome', icon:'🎵', w:2, sound:true, txt:'A metronome ticks in the dark. It might be keeping time... or it might be lying.'},
+  decoy:    {name:'Decoy Chimes', icon:'🔔', w:2, sound:true, txt:'Chimes will ring in the dark. None of them mean anything. Don\'t trust the bell.'},
+  hive:     {name:'Hive Mind', icon:'🐝', w:1, txt:'No target at all! Lift TOGETHER. You score by how close you are to the room\'s middle lift time.'},
+  marathon: {name:'Marathon', icon:'🏃', w:1, txt:'A long one. Scoring bands are doubled, so a 0.5 s miss still hits the Bullseye.'},
+  quick:    {name:'Quickdraw', icon:'⚡', w:1, txt:'Tiny target, razor-thin scoring bands (halved). Bullseye means within 0.125 s.'}
+};
+const BANDS = [[0.25,5],[0.5,4],[1,3],[2,2],[3,1]];
+
+/* ---------- state ---------- */
+const S = {
+  players: [], rounds: 8, heck: true, cards: true, sound: true,
+  round: 0, target: 0, card: 'classic', hecklerIdx: -1, lastCard: '', tempo: 1, chimes: [],
+  final: false, history: []
+};
+let setupNames = [];
+
+function loadPrefs(){
+  try{
+    const p = JSON.parse(localStorage.getItem(LS+'prefs') || 'null');
+    if (p){
+      if (Array.isArray(p.names) && p.names.length >= 2) setupNames = p.names.slice(0,6);
+      if ([5,8,12].includes(p.rounds)) S.rounds = p.rounds;
+      if (typeof p.heck === 'boolean') S.heck = p.heck;
+      if (typeof p.cards === 'boolean') S.cards = p.cards;
+      if (typeof p.sound === 'boolean') S.sound = p.sound;
+    }
+  }catch(e){}
+  if (setupNames.length < 2) setupNames = ['Player 1','Player 2','Player 3'];
+}
+function savePrefs(){
+  try{ localStorage.setItem(LS+'prefs', JSON.stringify({names:setupNames, rounds:S.rounds, heck:S.heck, cards:S.cards, sound:S.sound})); }catch(e){}
+}
+
+/* ---------- audio ---------- */
+let AC = null;
+function audio(){
+  if (!S.sound) return null;
+  if (!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function beep(f, dur=0.12, type='sine', vol=0.25, when=0){
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t+dur+0.05);
+}
+const sTick = () => { beep(1800,0.04,'square',0.12); beep(900,0.05,'triangle',0.1,0.005); };
+const sChime = () => { beep(1318,0.9,'sine',0.22); beep(1975,0.7,'sine',0.1,0.02); };
+const sCount = n => beep(n ? 660 : 1320, n ? 0.12 : 0.35, 'triangle', 0.3);
+const sLift = () => beep(240,0.05,'sine',0.08);
+const sFanfare = () => [523,659,784,1046].forEach((f,i)=>beep(f,0.22,'triangle',0.22,i*0.11));
+const sBuzz = () => beep(110,0.35,'sawtooth',0.18);
+
+/* ---------- screens ---------- */
+function show(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+}
+let toastT = 0;
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toastT); toastT = setTimeout(()=> t.style.display = 'none', 2200);
+}
+
+/* ---------- setup ---------- */
+function renderSetup(){
+  const L = $('plist'); L.innerHTML = '';
+  setupNames.forEach((n,i) => {
+    const d = document.createElement('div'); d.className = 'pl';
+    d.innerHTML = `<span class="dot" style="background:${col(i)}"></span><input maxlength="14" value="${esc(n)}" aria-label="Player ${i+1} name"><button class="x" aria-label="Remove">×</button>`;
+    d.querySelector('input').addEventListener('input', e => { setupNames[i] = e.target.value; savePrefs(); });
+    d.querySelector('.x').addEventListener('click', () => {
+      if (setupNames.length <= 2) return toast('Need at least 2 players');
+      setupNames.splice(i,1); savePrefs(); renderSetup();
+    });
+    L.appendChild(d);
+  });
+  $('addP').style.display = setupNames.length >= 6 ? 'none' : '';
+  const n = setupNames.length;
+  $('pcount').textContent = `(${n}/6${S.heck && n >= 3 ? ' · 1 heckles each round' : ''})`;
+  document.querySelectorAll('#segRounds button').forEach(b => b.classList.toggle('on', +b.dataset.v === S.rounds));
+  $('swHeck').classList.toggle('on', S.heck);
+  $('swCards').classList.toggle('on', S.cards);
+  $('swSound').classList.toggle('on', S.sound);
+}
+$('addP').addEventListener('click', () => {
+  if (setupNames.length >= 6) return;
+  setupNames.push('Player ' + (setupNames.length+1)); savePrefs(); renderSetup();
+  const ins = $('plist').querySelectorAll('input'); ins[ins.length-1].select();
+});
+$('segRounds').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.rounds = +b.dataset.v; savePrefs(); renderSetup(); });
+$('swHeck').addEventListener('click', () => { S.heck = !S.heck; savePrefs(); renderSetup(); });
+$('swCards').addEventListener('click', () => { S.cards = !S.cards; savePrefs(); renderSetup(); });
+$('swSound').addEventListener('click', () => { S.sound = !S.sound; savePrefs(); renderSetup(); });
+$('startBtn').addEventListener('click', () => { audio(); startGame(); });
+
+function startGame(keepPlayers){
+  if (!keepPlayers){
+    const names = setupNames.map((n,i) => (n||'').trim() || ('Player '+(i+1)));
+    S.players = names.map(name => ({name, score:0, errs:[], bulls:0, busts:0, heckPts:0, worst:null}));
+  } else {
+    S.players.forEach(p => Object.assign(p, {score:0, errs:[], bulls:0, busts:0, heckPts:0, worst:null}));
+  }
+  S.round = 0; S.lastCard = ''; S.history = [];
+  nextRound();
+}
+
+/* ---------- rounds ---------- */
+const hecklerOn = () => S.heck && S.players.length >= 3;
+const rand = (a,b) => a + Math.random()*(b-a);
+const randi = (a,b) => Math.floor(rand(a, b+1));
+
+function pickCard(){
+  if (!S.cards) return 'classic';
+  if (S.round === 1) return 'classic';
+  const pool = [];
+  for (const [k,c] of Object.entries(CARDS)){
+    if (c.sound && !S.sound) continue;
+    if (k === S.lastCard && k !== 'classic') continue;
+    for (let i=0;i<c.w;i++) pool.push(k);
+  }
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function pickTarget(card){
+  if (card === 'hive') return 0;
+  if (card === 'marathon') return randi(28,42);
+  if (card === 'quick') return randi(3,5) + (Math.random()<0.5 ? 0.5 : 0);
+  return randi(7,19) + (Math.random()<0.25 ? 0.5 : 0);
+}
+function bandMult(card){ return card === 'marathon' ? 2 : card === 'quick' ? 0.5 : 1; }
+
+function nextRound(){
+  S.round++;
+  S.final = S.round === S.rounds;
+  S.card = pickCard(); S.lastCard = S.card;
+  S.target = pickTarget(S.card);
+  S.hecklerIdx = hecklerOn() ? (S.round-1) % S.players.length : -1;
+  // lying metronome: never exactly 1 s
+  S.tempo = S.card === 'metro' ? (Math.random()<0.5 ? rand(0.76,0.88) : rand(1.13,1.26)) : 1;
+  S.chimes = [];
+  if (S.card === 'decoy'){
+    const T = S.target, c = [];
+    c.push(Math.max(1.5, T - rand(1.6,3.2)));          // a sneaky one just before the target
+    c.push(rand(2, Math.max(2.5, T*0.55)));             // an early one
+    if (Math.random() < 0.5) c.push(T + rand(1.4,2.5)); // and maybe one late, for the stragglers
+    S.chimes = c.sort((a,b)=>a-b);
+  }
+  renderIntro(); show('intro');
+}
+
+function renderIntro(){
+  const c = CARDS[S.card];
+  $('roundLbl').textContent = S.final ? `FINAL ROUND · double points` : `Round ${S.round} of ${S.rounds}`;
+  $('targetBig').innerHTML = S.card === 'hive' ? '🐝<small> ?</small>' : `${S.target}<small>s</small>`;
+  $('rcard').innerHTML = `<b>${c.icon} ${c.name}</b><span>${c.txt}</span>`;
+  const hb = $('heckBox');
+  if (S.hecklerIdx >= 0){
+    hb.style.display = '';
+    hb.innerHTML = `📣 <b>${esc(S.players[S.hecklerIdx].name)}</b> is the Heckler this round. Sit out, then count out loud wrongly, hum, clap off-beat, tell a long story. No touching the phone or the players! +1${S.final?' (x2)':''} for every player you throw more than ${2*bandMult(S.card)} s off.`;
+  } else hb.style.display = 'none';
+  renderSb($('miniSb'), true);
+}
+
+function renderSb(el, compact){
+  const max = Math.max(1, ...S.players.map(p=>p.score));
+  const order = S.players.map((p,i)=>({p,i})).sort((a,b)=>b.p.score-a.p.score);
+  el.innerHTML = order.map(({p,i}) =>
+    `<div class="sbr" style="--c:${col(i)}${compact?';padding:5px 8px':''}"><span class="n">${esc(p.name)}</span><span class="bar"><i style="width:${p.score/max*100}%"></i></span><span class="v">${p.score}</span></div>`
+  ).join('');
+}
+
+/* ---------- play ---------- */
+const P = { phase:'idle', held:null, ptr:new Map(), keys:new Map(), t0:0, lifts:null, cdTimer:0, raf:0, ticks:0, chimeI:0, maxT:0, active:[] };
+
+$('toArena').addEventListener('click', () => { audio(); enterArena(); });
+$('abortBtn').addEventListener('click', () => { stopPlay(); show('intro'); });
+
+function enterArena(){
+  const n = S.players.length;
+  P.active = S.players.map((_,i)=>i).filter(i => i !== S.hecklerIdx);
+  P.held = new Array(n).fill(0); P.ptr.clear(); P.keys.clear();
+  P.lifts = new Array(n).fill(undefined);
+  P.phase = 'arming';
+  const A = $('arena'); A.innerHTML = '';
+  S.players.forEach((p,i) => {
+    const d = document.createElement('div');
+    d.className = 'pad' + (i === S.hecklerIdx ? ' hecklerpad' : '');
+    d.style.setProperty('--c', col(i)); d.dataset.i = i;
+    d.innerHTML = `<span class="key">${KEYS[i]}</span><div class="nm">${esc(p.name)}</div><div class="st">${i===S.hecklerIdx?'📣 heckler':'press & hold'}</div>`;
+    A.appendChild(d);
+  });
+  layoutArena();
+  $('play').classList.remove('black');
+  show('play'); hud();
+}
+function layoutArena(){
+  const n = S.players.length, A = $('arena'), wide = innerWidth > innerHeight * 1.1;
+  let cols = wide ? (n <= 3 ? n : Math.ceil(n/2)) : (n <= 2 ? 1 : 2);
+  const rows = Math.ceil(n/cols);
+  A.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+  A.style.gridTemplateRows = `repeat(${rows},1fr)`;
+}
+addEventListener('resize', () => { if ($('play').classList.contains('on')) layoutArena(); });
+
+function padEl(i){ return $('arena').children[i]; }
+function setPadState(i){
+  const el = padEl(i); if (!el || i === S.hecklerIdx) return;
+  const lifted = P.lifts[i] !== undefined;
+  el.classList.toggle('held', P.held[i] > 0 && !lifted);
+  el.classList.toggle('done', lifted);
+  el.querySelector('.st').textContent = lifted ? 'lifted' : P.held[i] > 0 ? (P.phase==='black' ? 'holding…' : 'ready') : 'press & hold';
+}
+function hud(){
+  const h1 = $('hud1'), h2 = $('hud2'), h3 = $('hud3');
+  const need = P.active.filter(i => !P.held[i]).length;
+  if (P.phase === 'arming'){
+    h1.textContent = S.card === 'hive' ? 'Hive Mind · lift together' : 'Target';
+    h2.textContent = S.card === 'hive' ? '🐝' : S.target + 's';
+    h3.textContent = need ? `waiting for ${need} finger${need>1?'s':''}` : '';
+  } else if (P.phase === 'countdown'){
+    h1.textContent = S.card === 'hive' ? 'lift together' : `let go at ${S.target}s`;
+    h3.textContent = 'keep holding…';
+  } else if (P.phase === 'black'){
+    h1.textContent = ''; h2.textContent = '●'; h3.textContent = '';
+  }
+}
+
+function press(i){
+  if (P.phase !== 'arming' && P.phase !== 'countdown') return;
+  if (i === S.hecklerIdx) return;
+  P.held[i]++; setPadState(i);
+  if (P.phase === 'arming' && P.active.every(j => P.held[j] > 0)) beginCountdown();
+  else hud();
+}
+function release(i){
+  if (i === S.hecklerIdx || P.held[i] <= 0) return;
+  P.held[i]--;
+  if (P.held[i] > 0) { return; }
+  if (P.phase === 'countdown'){
+    clearTimeout(P.cdTimer); P.phase = 'arming'; sBuzz();
+    toast(`False start: ${S.players[i].name}! Everyone hold again.`);
+    setPadState(i); hud(); return;
+  }
+  if (P.phase === 'black' && P.lifts[i] === undefined){
+    P.lifts[i] = (performance.now() - P.t0) / 1000; sLift();
+    setPadState(i);
+    if (P.active.every(j => P.lifts[j] !== undefined)) endPlay();
+    return;
+  }
+  setPadState(i); hud();
+}
+
+function beginCountdown(){
+  P.phase = 'countdown'; hud();
+  let n = 3;
+  const step = () => {
+    if (P.phase !== 'countdown') return;
+    if (n > 0){ $('hud2').textContent = n; sCount(n); n--; P.cdTimer = setTimeout(step, 800); }
+    else goBlack();
+  };
+  step();
+}
+function goBlack(){
+  sCount(0);
+  P.phase = 'black'; P.t0 = performance.now(); P.ticks = 0; P.chimeI = 0;
+  P.maxT = S.card === 'hive' ? 45 : S.target * 2 + 6;
+  const pl = $('play'); pl.classList.add('black','flash'); setTimeout(()=>pl.classList.remove('flash'), 400);
+  P.active.forEach(setPadState); hud();
+  cancelAnimationFrame(P.raf); P.raf = requestAnimationFrame(loop);
+}
+function loop(){
+  if (P.phase !== 'black') return;
+  const t = (performance.now() - P.t0) / 1000;
+  if (S.card === 'metro'){ while ((P.ticks+1) * S.tempo <= t){ P.ticks++; sTick(); } }
+  if (S.card === 'decoy'){ while (P.chimeI < S.chimes.length && S.chimes[P.chimeI] <= t){ P.chimeI++; sChime(); } }
+  if (t >= P.maxT){ endPlay(); return; }
+  P.raf = requestAnimationFrame(loop);
+}
+function stopPlay(){
+  P.phase = 'idle'; clearTimeout(P.cdTimer); cancelAnimationFrame(P.raf);
+}
+function endPlay(){
+  stopPlay();
+  P.active.forEach(i => { if (P.lifts[i] === undefined) P.lifts[i] = null; });  // null = still holding at the cut-off
+  $('play').classList.remove('black');
+  setTimeout(() => { scoreRound(); show('reveal'); animateReveal(); }, 500);
+}
+
+/* pointer + keyboard input */
+const arena = $('arena');
+arena.addEventListener('pointerdown', e => {
+  const pad = e.target.closest('.pad'); if (!pad) return;
+  e.preventDefault();
+  try{ pad.setPointerCapture(e.pointerId); }catch(_){}
+  const i = +pad.dataset.i; P.ptr.set(e.pointerId, i); press(i);
+});
+const ptrUp = e => { if (!P.ptr.has(e.pointerId)) return; const i = P.ptr.get(e.pointerId); P.ptr.delete(e.pointerId); release(i); };
+arena.addEventListener('pointerup', ptrUp);
+arena.addEventListener('pointercancel', ptrUp);
+arena.addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('keydown', e => {
+  if (!$('play').classList.contains('on') || e.repeat) return;
+  const i = KEYS.indexOf(e.key.toUpperCase());
+  if (i < 0 || i >= S.players.length || P.keys.has(i)) return;
+  e.preventDefault(); P.keys.set(i, true); press(i);
+});
+addEventListener('keyup', e => {
+  const i = KEYS.indexOf(e.key.toUpperCase());
+  if (!P.keys.has(i)) return; P.keys.delete(i); release(i);
+});
+addEventListener('blur', () => { P.keys.forEach((_,i) => release(i)); P.keys.clear(); });
+
+/* ---------- scoring ---------- */
+function median(a){ const s = [...a].sort((x,y)=>x-y), m = s.length>>1; return s.length % 2 ? s[m] : (s[m-1]+s[m])/2; }
+function bandPts(err, mult){ for (const [lim,pts] of BANDS) if (err <= lim*mult + 1e-9) return pts; return 0; }
+
+let R = null;  // last round's result
+function scoreRound(){
+  const mult = bandMult(S.card), x = S.final ? 2 : 1;
+  const times = P.active.map(i => P.lifts[i]).filter(t => t !== null);
+  let target = S.target;
+  if (S.card === 'hive') target = times.length ? median(times) : 0;
+  const rows = P.active.map(i => {
+    const t = P.lifts[i];
+    let bust = null, err = null;
+    if (t === null) bust = 'froze';
+    else {
+      err = Math.abs(t - target);
+      if (S.card === 'nogo' && t > target) bust = 'over';
+    }
+    const pts = bust ? 0 : bandPts(err, mult);
+    return {i, t, err, bust, pts, bull: !bust && pts === 5, closest:false};
+  });
+  const live = rows.filter(r => !r.bust && r.pts > 0);  // no "closest" bonus for a whole room of wild misses
+  if (live.length){
+    const best = Math.min(...live.map(r => r.err));
+    live.forEach(r => { if (r.err - best < 0.005) r.closest = true; });
+  }
+  rows.forEach(r => {
+    r.total = (r.pts + (r.closest && P.active.length > 1 ? 1 : 0)) * x;
+    const p = S.players[r.i];
+    p.score += r.total;
+    if (r.bull) p.bulls++;
+    if (r.bust) p.busts++;
+    if (r.err !== null){
+      p.errs.push(r.err);
+      if (!p.worst || r.err > p.worst.err) p.worst = {err:r.err, round:S.round};
+    }
+  });
+  let heck = null;
+  if (S.hecklerIdx >= 0){
+    const thrown = rows.filter(r => r.bust || r.err > 2*mult).length;
+    heck = {i:S.hecklerIdx, thrown, pts: thrown * x};
+    S.players[S.hecklerIdx].score += heck.pts;
+    S.players[S.hecklerIdx].heckPts += heck.pts;
+  }
+  rows.sort((a,b) => (a.bust?1:0)-(b.bust?1:0) || (a.err??99)-(b.err??99));
+  R = {rows, heck, target, card:S.card, tempo:S.tempo, chimes:S.chimes.slice(), final:S.final};
+  S.history.push(R);
+  return R;
+}
+
+/* ---------- reveal ---------- */
+// initial if it's unique in the room, otherwise the player's seat number
+const initial = i => (S.players[i].name.trim()[0] || '?').toUpperCase();
+const markLabel = i => S.players.filter((_,j) => initial(j) === initial(i)).length > 1 ? String(i+1) : initial(i);
+function animateReveal(){
+  const r = R, c = CARDS[r.card];
+  $('revTitle').textContent = `${c.icon} ${c.name}${r.final ? ' · x2' : ''}`;
+  const my = $('mystery');
+  if (r.card === 'hive'){ my.style.display=''; my.innerHTML = `The room's middle lift<b>${fmt(r.target)}</b>`; }
+  else if (r.card === 'metro'){ my.style.display=''; my.innerHTML = `The metronome was ticking every<b>${r.tempo.toFixed(2)}s</b>${r.tempo<1?'Too fast. Counting ticks made you early.':'Too slow. Counting ticks made you late.'}`; }
+  else if (r.card === 'decoy'){ my.style.display=''; my.innerHTML = `Decoy chimes rang at ${r.chimes.map(fmt).join(', ')}`; }
+  else my.style.display = 'none';
+
+  const ts = r.rows.map(x => x.t).filter(t => t !== null);
+  const hi = Math.max(r.target * 1.5, ...ts.map(t => t + 1), 4);
+  const pos = t => Math.min(100, t / hi * 100);
+  const tr = $('track');
+  tr.innerHTML = `<div class="tl-target" style="left:${pos(r.target)}%"><span>${r.card==='hive'?'middle ':'target '}${fmt(r.target)}</span></div>`;
+  r.rows.forEach(x => {
+    const m = document.createElement('div'); m.className = 'tl-mark';
+    m.style.setProperty('--c', col(x.i)); m.style.left = '0%';
+    m.textContent = markLabel(x.i);
+    tr.appendChild(m);
+    requestAnimationFrame(() => requestAnimationFrame(() => { m.style.left = (x.t === null ? 100 : pos(x.t)) + '%'; }));
+  });
+  $('scale').innerHTML = `<span>0s</span><span>${fmt(hi/2)}</span><span>${fmt(hi)}</span>`;
+
+  const res = $('res'); res.innerHTML = '';
+  const items = r.rows.map(x => {
+    const p = S.players[x.i];
+    let sub, badge = '';
+    if (x.bust === 'froze'){ sub = `still holding at ${fmt(P.maxT)}`; badge = '<span class="badge b-bust">FROZE</span>'; }
+    else {
+      const d = x.t - r.target;
+      sub = `${fmt(x.t)} · ${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(2)}s ${d >= 0 ? 'late' : 'early'}`;
+      if (x.bust === 'over') badge = '<span class="badge b-bust">BUST</span>';
+      else if (x.bull) badge = '<span class="badge b-bull">BULLSEYE</span>';
+      if (x.closest && !x.bust && r.rows.length > 1) sub += ' · closest +1';
+    }
+    return `<div class="ritem" style="--c:${col(x.i)}"><div class="who"><b>${esc(p.name)}${badge}</b><small>${sub}</small></div><div class="pts" style="color:${x.total?'var(--good)':'var(--muted)'}">+${x.total}</div></div>`;
+  });
+  if (r.heck){
+    const p = S.players[r.heck.i];
+    items.push(`<div class="ritem" style="--c:var(--warn)"><div class="who"><b>${esc(p.name)}<span class="badge b-heck">HECKLER</span></b><small>threw ${r.heck.thrown} player${r.heck.thrown===1?'':'s'} off</small></div><div class="pts" style="color:${r.heck.pts?'var(--warn)':'var(--muted)'}">+${r.heck.pts}</div></div>`);
+  }
+  res.innerHTML = items.join('');
+  [...res.children].forEach((el,k) => setTimeout(() => el.classList.add('in'), 900 + k*160));
+  if (r.rows.some(x => x.bull)) setTimeout(sFanfare, 1000); else setTimeout(() => beep(520,0.25,'triangle',0.2), 1000);
+  $('nextBtn').textContent = r.final ? 'SEE FINAL RESULTS' : 'NEXT ROUND';
+}
+$('nextBtn').addEventListener('click', () => { if (S.round >= S.rounds) showFinal(); else nextRound(); });
+
+/* ---------- final ---------- */
+function showFinal(){
+  const ps = S.players, top = Math.max(...ps.map(p => p.score));
+  const winners = ps.filter(p => p.score === top);
+  $('winName').textContent = winners.map(p => p.name).join(' & ');
+  $('winSub').textContent = winners.length > 1 ? `Tied on ${top} points. Perfectly in sync.` : `${top} points. Has a clock for a heart.`;
+  renderSb($('finalSb'));
+  const avg = p => p.errs.length ? p.errs.reduce((a,b)=>a+b,0) / p.errs.length : Infinity;
+  const sharp = ps.filter(p => p.errs.length).sort((a,b) => avg(a)-avg(b))[0];
+  const bulls = [...ps].sort((a,b) => b.bulls-a.bulls)[0];
+  const worst = ps.filter(p => p.worst).sort((a,b) => b.worst.err-a.worst.err)[0];
+  const heck = [...ps].sort((a,b) => b.heckPts-a.heckPts)[0];
+  const st = [];
+  st.push(`<div class="stat"><small>Sharpest clock</small><b>${sharp ? esc(sharp.name)+' · avg '+avg(sharp).toFixed(2)+'s off' : '-'}</b></div>`);
+  st.push(`<div class="stat"><small>Most bullseyes</small><b>${bulls.bulls ? esc(bulls.name)+' · '+bulls.bulls : 'nobody. Ouch.'}</b></div>`);
+  st.push(`<div class="stat"><small>Wildest miss</small><b>${worst ? esc(worst.name)+' · '+worst.worst.err.toFixed(2)+'s (R'+worst.worst.round+')' : '-'}</b></div>`);
+  st.push(`<div class="stat"><small>Best heckler</small><b>${hecklerOn() && heck.heckPts ? esc(heck.name)+' · +'+heck.heckPts : '-'}</b></div>`);
+  $('stats').innerHTML = st.join('');
+  try{
+    const best = +(localStorage.getItem(LS+'best') || 0);
+    if (top > best) localStorage.setItem(LS+'best', top);
+  }catch(e){}
+  show('final'); sFanfare();
+}
+$('rematchBtn').addEventListener('click', () => startGame(true));
+$('newBtn').addEventListener('click', () => { renderSetup(); show('setup'); });
+
+loadPrefs(); renderSetup();
+</script>
+</body>
+</html>

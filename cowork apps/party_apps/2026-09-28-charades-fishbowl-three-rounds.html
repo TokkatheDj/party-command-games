@@ -1,0 +1,883 @@
+<!-- CONCEPT: PHYSICAL & CHARADES (same-deck escalating rounds) - "Fishbowl": everyone secretly writes words on pass-the-phone slips into one shared bowl, then two or three teams race a turn timer to get teammates guessing them - and the SAME slips come back every round under a harsher rule: Round 1 describe it freely, Round 2 ONE word only, Round 3 act it out in silence (optional Round 4 sounds only), so the room's memory of earlier rounds becomes the whole game; emptying the bowl mid-turn carries your leftover seconds into the next round. Skip limits, foul penalty, host-disputable turn summary, awards for MVP / slipperiest fish / fastest catch, 220-slip built-in deck for a no-writing mode | Players: 4-12 in 2-3 teams | ~20-40 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fishbowl — Describe, One Word, Act It Out</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #0a1326; --bg2: #0e1d3a; --panel: #142342; --panel2: #1c2f57; --line: #2a4170;
+  --text: #eef4ff; --muted: #93a7c9;
+  --aqua: #2ee6d6; --blue: #3aa0ff; --coral: #ff7a59; --gold: #ffd166; --violet: #b18cff;
+  --green: #2fd47a; --red: #ff4d6d;
+  --r: 18px; --gap: clamp(8px, 2.4vw, 14px);
+  --font: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+}
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  background: radial-gradient(120% 80% at 50% 0%, #15305e 0%, var(--bg) 60%) fixed, var(--bg);
+  color: var(--text); font-family: var(--font);
+}
+input, textarea { user-select: text; -webkit-user-select: text; }
+button { font-family: inherit; cursor: pointer; border: 0; color: inherit; }
+.screen { display: none; position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; padding: clamp(12px, 3.5vw, 24px); padding-bottom: 28px; }
+.screen.active { display: flex; flex-direction: column; align-items: center; }
+.wrap { width: 100%; max-width: 620px; display: flex; flex-direction: column; gap: var(--gap); }
+.card { background: linear-gradient(180deg, var(--panel), var(--bg2)); border: 1px solid var(--line); border-radius: var(--r); padding: clamp(12px, 3.5vw, 18px); }
+.card h3 { margin: 0 0 10px; font-size: clamp(14px, 3.8vw, 17px); color: var(--aqua); letter-spacing: .06em; text-transform: uppercase; }
+.muted { color: var(--muted); }
+.small { font-size: clamp(12px, 3.2vw, 14px); }
+.center { text-align: center; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; }
+
+/* hero */
+.hero { text-align: center; padding-top: 4px; }
+.fishrow { font-size: clamp(26px, 8vw, 40px); letter-spacing: 8px; }
+h1 { margin: 2px 0 4px; font-size: clamp(40px, 13vw, 68px); font-weight: 900; letter-spacing: -.02em;
+  background: linear-gradient(90deg, var(--aqua), var(--blue) 50%, var(--coral)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.tag { margin: 0 auto; max-width: 520px; font-size: clamp(14px, 3.8vw, 17px); line-height: 1.4; }
+.meta { display: inline-block; margin-top: 8px; padding: 5px 12px; border-radius: 99px; background: var(--panel2); color: var(--gold); font-weight: 700; font-size: clamp(12px, 3.3vw, 14px); }
+
+/* buttons */
+.btn { min-height: 48px; padding: 10px 18px; border-radius: 14px; font-weight: 800; font-size: clamp(15px, 4vw, 18px); background: var(--panel2); border: 1px solid var(--line); }
+.btn:active { transform: scale(.97); }
+.btn.primary { background: linear-gradient(90deg, var(--aqua), var(--blue)); color: #04142a; border: 0; box-shadow: 0 6px 22px #2ee6d633; }
+.btn.coral { background: linear-gradient(90deg, var(--coral), #ff5f8a); color: #230812; border: 0; }
+.btn.big { min-height: 64px; font-size: clamp(18px, 5vw, 24px); width: 100%; }
+.btn.ghost { background: transparent; }
+.btn:disabled { opacity: .4; cursor: default; transform: none; }
+.seg { display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 3px; gap: 3px; }
+.seg button { flex: 1; min-height: 44px; border-radius: 11px; background: transparent; font-weight: 700; font-size: clamp(13px, 3.5vw, 16px); color: var(--muted); }
+.seg button.on { background: var(--panel2); color: var(--text); box-shadow: inset 0 0 0 2px var(--aqua); }
+.set-row { display: grid; grid-template-columns: minmax(84px, 30%) 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+.set-row label { font-weight: 700; font-size: clamp(13px, 3.5vw, 15px); }
+
+/* players */
+.addrow { display: flex; gap: 8px; }
+.addrow input, .slip-in input { flex: 1; min-width: 0; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); padding: 0 14px; font-size: 16px; font-family: inherit; }
+.addrow input:focus, .slip-in input:focus { outline: 2px solid var(--aqua); }
+.teams { display: grid; gap: 8px; margin-top: 10px; }
+.teams.t2 { grid-template-columns: 1fr 1fr; }
+.teams.t3 { grid-template-columns: 1fr 1fr 1fr; }
+.teambox { border-radius: 14px; padding: 8px; border: 2px solid var(--tc); background: color-mix(in srgb, var(--tc) 10%, transparent); min-height: 90px; }
+.teambox .tname { font-weight: 900; color: var(--tc); font-size: clamp(13px, 3.6vw, 16px); margin-bottom: 6px; }
+.chip { display: flex; align-items: center; width: 100%; min-height: 44px; margin-bottom: 5px; border-radius: 10px; background: var(--panel2); font-weight: 700; font-size: clamp(13px, 3.6vw, 15px); overflow: hidden; }
+.chip .nm { flex: 1; padding: 0 8px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 44px; display: flex; align-items: center; background: transparent; }
+.chip .x { width: 36px; min-height: 44px; background: transparent; color: var(--muted); font-size: 18px; }
+.warn { color: var(--gold); font-weight: 700; min-height: 1.2em; font-size: clamp(13px, 3.5vw, 15px); }
+
+/* bowl */
+.bowl { position: relative; width: min(200px, 52vw); aspect-ratio: 1.15; margin: 4px auto; }
+.bowl .glass { position: absolute; inset: 10% 0 0 0; border-radius: 42% 42% 48% 48% / 30% 30% 70% 70%; background: radial-gradient(120% 90% at 50% 20%, #9ff3ff22, #2ee6d611 50%, #3aa0ff22); border: 3px solid #9fe9ff66; overflow: hidden; }
+.bowl .rim { position: absolute; left: 12%; right: 12%; top: 5%; height: 12%; border-radius: 50%; border: 3px solid #9fe9ff88; background: #0a1326aa; }
+.bowl .water { position: absolute; left: 0; right: 0; bottom: 0; height: 58%; background: linear-gradient(180deg, #2ee6d633, #3aa0ff55); }
+.slip { position: absolute; width: 18%; height: 9%; border-radius: 3px; box-shadow: 0 1px 2px #0006; }
+.bowl .count { position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%); padding: 2px 14px 4px; border-radius: 14px; background: #0a1326d9; border: 1px solid #9fe9ff55; text-align: center; font-weight: 900; font-size: clamp(22px, 7vw, 32px); line-height: 1.1; }
+.bowl .count small { display: block; font-size: 10px; letter-spacing: .1em; color: var(--aqua); font-weight: 800; }
+.bowl .fish { position: absolute; font-size: 22px; top: 38%; animation: swim 6s ease-in-out infinite alternate; }
+@keyframes swim { from { left: 12%; transform: scaleX(-1); } to { left: 70%; transform: scaleX(-1) translateY(-6px); } }
+
+/* scorestrip */
+.scorestrip { display: flex; gap: 6px; width: 100%; }
+.sc { flex: 1; border-radius: 12px; padding: 6px 8px; background: var(--panel); border: 2px solid var(--tc); text-align: center; }
+.sc b { display: block; font-size: clamp(20px, 6vw, 28px); line-height: 1.1; }
+.sc span { font-size: 12px; font-weight: 800; color: var(--tc); text-transform: uppercase; letter-spacing: .05em; }
+.sc.now { box-shadow: 0 0 0 3px color-mix(in srgb, var(--tc) 40%, transparent); }
+
+/* round badge */
+.roundbadge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; background: var(--panel2); font-weight: 800; font-size: clamp(13px, 3.6vw, 16px); }
+.bigicon { font-size: clamp(64px, 20vw, 110px); line-height: 1; }
+.roundtitle { font-size: clamp(30px, 9vw, 48px); font-weight: 900; margin: 6px 0; }
+.rulebox { font-size: clamp(16px, 4.4vw, 20px); line-height: 1.4; background: var(--panel2); border-radius: 14px; padding: 14px; border-left: 5px solid var(--aqua); text-align: left; }
+.dots { display: flex; justify-content: center; gap: 8px; margin: 6px 0; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
+.dots i.done { background: var(--aqua); }
+.dots i.now { background: var(--gold); box-shadow: 0 0 0 3px #ffd16655; }
+
+/* ready */
+.teamhead { font-size: clamp(26px, 8vw, 40px); font-weight: 900; color: var(--tc); }
+.giver { font-size: clamp(20px, 6vw, 30px); font-weight: 800; }
+.carrybadge { display: inline-block; padding: 6px 12px; border-radius: 99px; background: #ffd16622; color: var(--gold); font-weight: 800; border: 1px solid #ffd16688; }
+
+/* turn */
+#s-turn { padding-bottom: 12px; }
+#s-turn .wrap { height: 100%; min-height: 0; }
+.turnbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 800; font-size: clamp(13px, 3.6vw, 16px); }
+.timerwrap { position: relative; width: clamp(84px, 24vw, 120px); aspect-ratio: 1; margin: 0 auto; flex-shrink: 0; }
+.timerwrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.timerwrap .num { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: clamp(28px, 8.5vw, 44px); font-weight: 900; }
+.timerwrap.low .num { color: var(--red); animation: pulse .5s ease-in-out infinite alternate; }
+@keyframes pulse { to { transform: scale(1.12); } }
+.wordcard { flex: 1; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border-radius: 22px; padding: 14px;
+  background: linear-gradient(160deg, #fffbe8, #ffe9b8); color: #1e1400; box-shadow: 0 10px 30px #0008, inset 0 0 0 3px #ffffff88; position: relative; overflow: hidden; }
+.wordcard .w { font-size: clamp(28px, 9vw, 54px); font-weight: 900; line-height: 1.1; word-break: break-word; }
+.wordcard .by { position: absolute; bottom: 8px; left: 0; right: 0; font-size: 12px; color: #7a6326; font-weight: 700; }
+.wordcard.flip { animation: flipin .22s ease-out; }
+@keyframes flipin { from { transform: rotateX(70deg); opacity: .2; } to { transform: none; opacity: 1; } }
+.wordcard.paused .w { filter: blur(16px); }
+.rulemini { text-align: center; font-size: clamp(12px, 3.3vw, 14px); color: var(--muted); }
+.gotbtn { min-height: clamp(76px, 15vh, 110px); width: 100%; border-radius: 20px; font-size: clamp(26px, 8vw, 40px); font-weight: 900; color: #032114; background: linear-gradient(180deg, #5ff09a, var(--green)); box-shadow: 0 8px 0 #1a8d4f, 0 12px 26px #0008; flex-shrink: 0; }
+.gotbtn:active { transform: translateY(5px); box-shadow: 0 3px 0 #1a8d4f; }
+.actrow { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 8px; flex-shrink: 0; }
+.actrow .btn { padding: 8px 6px; font-size: clamp(14px, 3.8vw, 17px); }
+
+/* summary */
+.gotlist { display: flex; flex-direction: column; gap: 6px; }
+.gotitem { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 12px; border-radius: 12px; background: var(--panel2); font-weight: 700; font-size: clamp(15px, 4vw, 18px); text-align: left; width: 100%; }
+.gotitem .mk { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--green); color: #032114; font-weight: 900; flex-shrink: 0; }
+.gotitem.off { opacity: .6; text-decoration: line-through; }
+.gotitem.off .mk { background: var(--red); color: #fff; }
+.gotitem .t { margin-left: auto; font-size: 12px; color: var(--muted); }
+.bigstat { font-size: clamp(48px, 15vw, 80px); font-weight: 900; line-height: 1; color: var(--green); }
+
+/* tables */
+table.sb { width: 100%; border-collapse: collapse; font-size: clamp(14px, 3.8vw, 17px); }
+table.sb th, table.sb td { padding: 8px 4px; text-align: center; border-bottom: 1px solid var(--line); }
+table.sb th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+table.sb td:first-child, table.sb th:first-child { text-align: left; }
+table.sb td.tot { font-weight: 900; font-size: 1.2em; }
+.winner { font-size: clamp(30px, 9vw, 48px); font-weight: 900; text-align: center; }
+.award { display: flex; gap: 12px; align-items: center; padding: 10px; border-radius: 14px; background: var(--panel2); margin-bottom: 8px; }
+.award .ai { font-size: 32px; }
+.award b { display: block; color: var(--gold); font-size: 13px; text-transform: uppercase; letter-spacing: .05em; }
+
+/* entry */
+.slip-in { display: flex; gap: 8px; margin-bottom: 8px; }
+.slip-in .dice { width: 48px; min-height: 48px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); font-size: 22px; }
+.passbig { font-size: clamp(30px, 9vw, 48px); font-weight: 900; }
+
+/* modal */
+.modal { position: fixed; inset: 0; background: #000b; display: none; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
+.modal.show { display: flex; }
+.modal .card { max-width: 520px; width: 100%; max-height: 90vh; overflow-y: auto; }
+.modal ol { padding-left: 20px; margin: 0 0 12px; line-height: 1.5; font-size: clamp(14px, 3.8vw, 16px); }
+.modal li { margin-bottom: 6px; }
+
+.toast { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); padding: 10px 18px; border-radius: 99px; background: var(--gold); color: #231600; font-weight: 900; z-index: 60; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<section class="screen active" id="s-setup">
+  <div class="wrap">
+    <header class="hero">
+      <div class="fishrow" aria-hidden="true">🐠🫧🐟</div>
+      <h1>Fishbowl</h1>
+      <p class="tag">Everyone drops secret words into one bowl. Then the <b>same words</b> come back three times: <b>describe</b> them, then <b>one word</b> only, then <b>act them out</b>.</p>
+      <span class="meta">4–12 players · 2–3 teams · 20–40 min</span>
+    </header>
+
+    <div class="card">
+      <h3>Players</h3>
+      <div class="addrow">
+        <input id="nameIn" maxlength="16" placeholder="Type a name…" autocomplete="off">
+        <button class="btn primary" id="addBtn">Add</button>
+      </div>
+      <div class="row small muted" style="margin-top:8px">
+        <span class="grow">Tap a name to move it to another team.</span>
+        <button class="btn ghost small" id="shuffleBtn" style="min-height:44px">🔀 Shuffle teams</button>
+      </div>
+      <div class="teams t2" id="teamsBox"></div>
+    </div>
+
+    <div class="card">
+      <h3>Settings</h3>
+      <div class="set-row"><label>Teams</label><div class="seg" data-key="teams"><button data-v="2">2</button><button data-v="3">3</button></div></div>
+      <div class="set-row"><label>Slips each</label><div class="seg" data-key="per"><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button></div></div>
+      <div class="set-row"><label>Turn timer</label><div class="seg" data-key="secs"><button data-v="30">30s</button><button data-v="45">45s</button><button data-v="60">60s</button></div></div>
+      <div class="set-row"><label>Skips / turn</label><div class="seg" data-key="skips"><button data-v="0">0</button><button data-v="1">1</button><button data-v="2">2</button><button data-v="99">∞</button></div></div>
+      <div class="set-row"><label>Rounds</label><div class="seg" data-key="rounds"><button data-v="3">Classic 3</button><button data-v="4">+ Sounds</button></div></div>
+      <div class="set-row"><label>The bowl</label><div class="seg" data-key="mode"><button data-v="write">We write</button><button data-v="deck">Deal deck</button></div></div>
+    </div>
+
+    <div class="warn center" id="setupWarn"></div>
+    <button class="btn primary big" id="startBtn">Fill the bowl 🐟</button>
+    <button class="btn ghost" id="rulesBtn1">How to play</button>
+  </div>
+</section>
+
+<!-- ENTRY: pass -->
+<section class="screen" id="s-pass">
+  <div class="wrap center">
+    <div class="dots" id="passDots"></div>
+    <div class="bowl" id="passBowl"></div>
+    <div class="muted small">Pass the phone to</div>
+    <div class="passbig" id="passName">Name</div>
+    <p class="muted">Everyone else: no peeking at the slips!</p>
+    <button class="btn primary big" id="passGo">I'm <span id="passName2"></span> — let me write</button>
+  </div>
+</section>
+
+<!-- ENTRY: write -->
+<section class="screen" id="s-write">
+  <div class="wrap">
+    <div class="center"><span class="roundbadge" id="writeWho">✍️ Name's slips</span></div>
+    <div class="card">
+      <h3>Write <span id="writeN">3</span> slips</h3>
+      <p class="small muted" style="margin:0 0 10px">A person, character, thing, place or action everyone in the room would know. Tap 🎲 for an idea.</p>
+      <div id="slipInputs"></div>
+      <div class="warn" id="writeWarn"></div>
+    </div>
+    <button class="btn primary big" id="writeDone">Drop them in the bowl 🐟</button>
+    <button class="btn ghost small" id="writeDeal">Stuck? Deal mine from the deck</button>
+  </div>
+</section>
+
+<!-- ROUND INTRO -->
+<section class="screen" id="s-round">
+  <div class="wrap center">
+    <div class="dots" id="roundDots"></div>
+    <div class="muted" id="roundNum" style="font-weight:800;letter-spacing:.1em">ROUND 1 OF 3</div>
+    <div class="bigicon" id="roundIcon">🗣️</div>
+    <div class="roundtitle" id="roundTitle">Describe It</div>
+    <div class="rulebox" id="roundRule"></div>
+    <p class="muted small" id="roundNote"></p>
+    <button class="btn primary big" id="roundGo">Let's go</button>
+  </div>
+</section>
+
+<!-- READY -->
+<section class="screen" id="s-ready">
+  <div class="wrap center">
+    <div class="scorestrip" id="readyScores"></div>
+    <div><span class="roundbadge" id="readyRound"></span></div>
+    <div class="bowl" id="readyBowl"></div>
+    <div class="teamhead" id="readyTeam">Team</div>
+    <div class="giver" id="readyGiver"></div>
+    <div class="muted small" id="readyGuessers"></div>
+    <div id="readyCarry"></div>
+    <button class="btn primary big" id="readyGo">Start turn ▶</button>
+    <div class="row" style="justify-content:center">
+      <button class="btn ghost small" id="rulesBtn2">Rules</button>
+      <button class="btn ghost small" id="quitBtn">Quit game</button>
+    </div>
+  </div>
+</section>
+
+<!-- TURN -->
+<section class="screen" id="s-turn">
+  <div class="wrap">
+    <div class="turnbar">
+      <span id="turnRound">🗣️ Describe</span>
+      <span id="turnTeam" style="color:var(--tc)">Team</span>
+      <span>🐟 <span id="turnBowl">0</span></span>
+    </div>
+    <div class="timerwrap" id="timerWrap">
+      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#1c2f57" stroke-width="9"/><circle id="timerArc" cx="50" cy="50" r="44" fill="none" stroke="var(--aqua)" stroke-width="9" stroke-linecap="round" stroke-dasharray="276.46" stroke-dashoffset="0"/></svg>
+      <div class="num" id="timerNum">45</div>
+    </div>
+    <div class="wordcard" id="wordCard"><div class="w" id="wordText">—</div><div class="by" id="wordBy"></div></div>
+    <div class="rulemini" id="turnRule"></div>
+    <button class="gotbtn" id="gotBtn">GOT IT ✓ <span id="gotCount" style="font-size:.6em"></span></button>
+    <div class="actrow">
+      <button class="btn" id="skipBtn">Skip ↷</button>
+      <button class="btn" id="foulBtn" title="Clue-giver broke the rule: slip goes back, lose 5 seconds">Foul −5s</button>
+      <button class="btn" id="pauseBtn">Pause</button>
+    </div>
+  </div>
+</section>
+
+<!-- SUMMARY -->
+<section class="screen" id="s-summary">
+  <div class="wrap center">
+    <div class="passbig" id="sumTitle">Time!</div>
+    <div class="bigstat" id="sumStat">0</div>
+    <div class="muted" id="sumSub">slips caught</div>
+    <div id="sumCarry"></div>
+    <div class="card" style="text-align:left">
+      <h3>This turn</h3>
+      <p class="small muted" style="margin:0 0 8px">Spot a cheat? Tap a slip to throw it back in the bowl.</p>
+      <div class="gotlist" id="sumList"></div>
+    </div>
+    <button class="btn primary big" id="sumGo">Confirm</button>
+  </div>
+</section>
+
+<!-- ROUND END -->
+<section class="screen" id="s-roundend">
+  <div class="wrap center">
+    <div class="bigicon">🫙</div>
+    <div class="roundtitle" id="reTitle">Bowl empty!</div>
+    <div class="card"><table class="sb" id="reTable"></table></div>
+    <p class="muted" id="reNote"></p>
+    <button class="btn primary big" id="reGo">Refill the bowl</button>
+  </div>
+</section>
+
+<!-- FINAL -->
+<section class="screen" id="s-final">
+  <div class="wrap">
+    <div class="center bigicon" aria-hidden="true">🏆</div>
+    <div class="winner" id="finWinner"></div>
+    <div class="card"><h3>Scoreboard</h3><table class="sb" id="finTable"></table></div>
+    <div class="card"><h3>Awards</h3><div id="finAwards"></div></div>
+    <button class="btn primary big" id="rematchBtn">Rematch — same slips 🔁</button>
+    <button class="btn coral big" id="newGameBtn">New game</button>
+  </div>
+</section>
+
+<!-- RULES -->
+<div class="modal" id="rulesModal">
+  <div class="card">
+    <h3>How to play Fishbowl</h3>
+    <ol>
+      <li><b>Fill the bowl.</b> Pass the phone around. Each player secretly writes a few slips (people, characters, things, places, actions). Or tap <i>Deal deck</i> if you don't want to write.</li>
+      <li><b>Take turns.</b> Teams alternate. The clue-giver holds the phone and gets their team to guess as many slips as possible before the timer runs out. Tap <b>GOT IT</b> for each one. Only your own team may guess.</li>
+      <li><b>Same slips, harder rules.</b> When the bowl is empty the round ends and every slip goes back in.<br>🗣️ Round 1: describe it with any words except the word itself.<br>☝️ Round 2: ONE word only.<br>🎭 Round 3: act it out, no sounds.<br>🔊 Optional Round 4: sounds only, hands behind your back.</li>
+      <li><b>Bonus time.</b> Empty the bowl with seconds to spare and your team keeps those seconds to start the next round.</li>
+      <li><b>Fouls.</b> Break the round's rule? Tap <b>Foul</b>: the slip goes back and you lose 5 seconds. Skips are limited too, so choose them carefully.</li>
+    </ol>
+    <p class="small muted">1 point per slip. Most points after the last round wins.</p>
+    <button class="btn primary big" id="rulesClose">Got it</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+// ---------- content ----------
+const DECK = [
+  // characters & famous figures
+  'Harry Potter','Darth Vader','Mickey Mouse','SpongeBob','Pikachu','Super Mario','Sonic the Hedgehog','Elsa','Shrek','Batman',
+  'Spider-Man','Wonder Woman','Cinderella','Santa Claus','the Tooth Fairy','the Easter Bunny','Sherlock Holmes','Robin Hood','Peter Pan','Captain Hook',
+  'Winnie the Pooh','Scooby-Doo','Yoda','Frankenstein','Dracula','King Kong','Godzilla','Bigfoot','the Loch Ness Monster','Cookie Monster',
+  'Kermit the Frog','Pinocchio','Tarzan','Buzz Lightyear','Wall-E','the Grinch','Humpty Dumpty','Goldilocks','Little Red Riding Hood','Paddington Bear',
+  'Superman','the Hulk','Albert Einstein','Cleopatra','Shakespeare','Mona Lisa','Rapunzel','Aladdin','the Cheshire Cat','Mary Poppins',
+  // animals
+  'penguin','giraffe','kangaroo','octopus','flamingo','sloth','jellyfish','peacock','porcupine','chameleon',
+  'hedgehog','walrus','platypus','gorilla','hummingbird','crab','llama','T-rex','woodpecker','snail',
+  'bat','seahorse','ostrich','skunk','pufferfish',
+  // things
+  'trampoline','lava lamp','umbrella','rubber duck','toaster','disco ball','snow globe','whoopee cushion','fire extinguisher','hot air balloon',
+  'bubble wrap','vacuum cleaner','jack-in-the-box','lawn mower','telescope','pogo stick','time machine','treasure map','magic carpet','boomerang',
+  'yo-yo','traffic cone','bagpipes','accordion','roller skates','piñata','message in a bottle','sandcastle','scarecrow','slinky',
+  'rocket ship','kite','crystal ball','paper airplane','cuckoo clock',
+  // places
+  'Eiffel Tower','Great Wall of China','the Moon','Antarctica','haunted house',"dentist's office",'roller coaster','the pyramids','volcano','Statue of Liberty',
+  'submarine','library','car wash','North Pole','desert island','Mount Everest','bowling alley','waterpark','space station','igloo',
+  // actions
+  'brushing your teeth','walking a dog','building a snowman','parallel parking','sneezing','juggling','doing the limbo','changing a diaper','milking a cow','blowing bubbles',
+  'surfing','sword fighting','riding a unicycle','flipping pancakes','conducting an orchestra','bungee jumping','walking on the Moon','taking a selfie','chasing a butterfly','stuck in a revolving door',
+  'ice skating','doing the robot','playing air guitar','knitting','fishing','rowing a boat','arm wrestling','climbing a ladder','walking a tightrope','wrapping a present',
+  // food
+  'spaghetti','birthday cake','corn on the cob','popcorn','sushi','pineapple','cotton candy','hot dog','ice cream cone','jelly beans',
+  'pretzel','chewing gum','watermelon','taco','fortune cookie',"s'mores",'lemon','broccoli','pizza','marshmallow',
+  // jobs & roles
+  'firefighter','astronaut','lifeguard','magician','pirate','ninja','chef','lion tamer','mime','zookeeper',
+  'referee','plumber','knight','wizard','mermaid','cowboy','detective','ballerina','dentist','robot',
+  // events & weather
+  'the Olympics','fireworks','sleepover','rainbow','thunderstorm','tornado','wedding','Halloween',"April Fools' Day",'traffic jam',
+  'pillow fight','hiccups','snowball fight','tug of war','solar eclipse'
+];
+const ROUNDS = [
+  { name: 'Describe It', short: 'Describe', icon: '🗣️', rule: 'Say anything you like <b>except the word itself</b>. No spelling it, no "sounds like", no rhymes.', mini: 'Any words except the answer' },
+  { name: 'One Word', short: 'One Word', icon: '☝️', rule: 'You may say <b>exactly ONE word</b> per slip. Your team can shout as many guesses as they want. You can repeat your one word, but not say a new one.', mini: 'ONE word per slip' },
+  { name: 'Act It Out', short: 'Act It Out', icon: '🎭', rule: '<b>No words. No sounds.</b> Mime only. Pointing at things in the room is allowed.', mini: 'Silent mime only' },
+  { name: 'Sounds Only', short: 'Sounds', icon: '🔊', rule: '<b>Hands behind your back.</b> No words and no gestures. Noises, hums and sound effects only!', mini: 'Noises only, no words or gestures' }
+];
+const TEAMS = [
+  { name: 'Coral', c: 'var(--coral)', e: '🐠' },
+  { name: 'Lagoon', c: 'var(--aqua)', e: '🐬' },
+  { name: 'Goldfish', c: 'var(--gold)', e: '🐡' }
+];
+const SLIP_COLORS = ['#fff3c4', '#ffd6e0', '#c9f5ff', '#d9ffd1', '#ffe0c2', '#e6dcff'];
+const LS_KEY = 'cowork-fishbowl-setup';
+const FOUL_PENALTY = 5;
+const MIN_CARRY = 3;
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const rnd = n => Math.floor(Math.random() * n);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const norm = s => s.toLowerCase().replace(/^(the|a|an)\s+/, '').replace(/[^a-z0-9]/g, '');
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+  const el = document.getElementById(id); if (el) el.scrollTop = 0;
+}
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1600); }
+
+// ---------- audio ----------
+let AC = null;
+function ac() { if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { AC = null; } } if (AC && AC.state === 'suspended') AC.resume(); return AC; }
+function tone(freq, dur = .12, type = 'sine', vol = .18, when = 0, slide = 0) {
+  const a = ac(); if (!a) return;
+  const t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .02);
+}
+const sfx = {
+  got() { tone(880, .1, 'triangle', .2); tone(1320, .16, 'triangle', .18, .07); },
+  skip() { tone(500, .18, 'sine', .14, 0, -300); },
+  foul() { tone(180, .25, 'sawtooth', .12); },
+  tick() { tone(1000, .05, 'square', .06); },
+  buzz() { tone(140, .6, 'sawtooth', .18); tone(147, .6, 'square', .08); },
+  bloop() { tone(300, .08, 'sine', .15, 0, 400); tone(520, .1, 'sine', .12, .08, 300); },
+  fanfare() { [523, 659, 784, 1047].forEach((f, i) => tone(f, .22, 'triangle', .16, i * .12)); }
+};
+
+// ---------- setup state ----------
+let S = { players: [], teams: 2, per: 3, secs: 45, skips: 1, rounds: 3, mode: 'write' };
+try { const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); if (saved && Array.isArray(saved.players)) S = Object.assign(S, saved); } catch (e) {}
+function saveSetup() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} }
+const teamPlayers = t => S.players.filter(p => p.team === t);
+
+function renderSetup() {
+  document.querySelectorAll('.seg').forEach(seg => {
+    const key = seg.dataset.key;
+    seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(S[key]) === b.dataset.v));
+  });
+  const box = $('#teamsBox');
+  box.className = 'teams t' + S.teams;
+  box.innerHTML = '';
+  for (let t = 0; t < S.teams; t++) {
+    const d = document.createElement('div');
+    d.className = 'teambox'; d.style.setProperty('--tc', TEAMS[t].c);
+    d.innerHTML = `<div class="tname">${TEAMS[t].e} ${TEAMS[t].name}</div>`;
+    teamPlayers(t).forEach(p => {
+      const i = S.players.indexOf(p);
+      const c = document.createElement('div'); c.className = 'chip';
+      c.innerHTML = `<button class="nm" data-i="${i}" title="Move to next team">${esc(p.name)}</button><button class="x" data-x="${i}" aria-label="Remove ${esc(p.name)}">×</button>`;
+      d.appendChild(c);
+    });
+    if (!teamPlayers(t).length) d.insertAdjacentHTML('beforeend', '<div class="small muted">No one yet</div>');
+    box.appendChild(d);
+  }
+  $('#setupWarn').textContent = setupProblem() || '';
+  $('#startBtn').textContent = S.mode === 'deck' ? 'Deal the bowl 🐟' : 'Fill the bowl 🐟';
+}
+function setupProblem() {
+  if (S.players.length < S.teams * 2) return `Add at least ${S.teams * 2} players (2 per team).`;
+  for (let t = 0; t < S.teams; t++) if (teamPlayers(t).length < 2) return `Team ${TEAMS[t].name} needs at least 2 players.`;
+  return '';
+}
+function smallestTeam() {
+  let best = 0;
+  for (let t = 1; t < S.teams; t++) if (teamPlayers(t).length < teamPlayers(best).length) best = t;
+  return best;
+}
+function addPlayer() {
+  const inp = $('#nameIn'); const name = inp.value.trim().replace(/\s+/g, ' ');
+  if (!name) return;
+  if (S.players.some(p => p.name.toLowerCase() === name.toLowerCase())) { toast('That name is taken'); return; }
+  if (S.players.length >= 12) { toast('12 players max'); return; }
+  S.players.push({ name, team: smallestTeam() });
+  inp.value = ''; inp.focus();
+  saveSetup(); renderSetup();
+}
+function rebalance() {
+  S.players.forEach(p => { if (p.team >= S.teams) p.team = -1; });
+  S.players.forEach(p => { if (p.team === -1) p.team = smallestTeam(); });
+  // even out team sizes (e.g. a fresh third team starts empty)
+  for (let guard = 0; guard < 24; guard++) {
+    const sizes = [...Array(S.teams)].map((_, t) => teamPlayers(t).length);
+    const big = sizes.indexOf(Math.max(...sizes)), small = sizes.indexOf(Math.min(...sizes));
+    if (sizes[big] - sizes[small] <= 1) break;
+    teamPlayers(big).slice(-1)[0].team = small;
+  }
+}
+$('#addBtn').onclick = addPlayer;
+$('#nameIn').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
+$('#teamsBox').addEventListener('click', e => {
+  const x = e.target.closest('[data-x]'), n = e.target.closest('[data-i]');
+  if (x) { S.players.splice(+x.dataset.x, 1); }
+  else if (n) { const p = S.players[+n.dataset.i]; p.team = (p.team + 1) % S.teams; }
+  else return;
+  saveSetup(); renderSetup();
+});
+$('#shuffleBtn').onclick = () => {
+  shuffle(S.players).forEach((p, i) => p.team = i % S.teams);
+  saveSetup(); renderSetup(); sfx.bloop();
+};
+document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const key = seg.dataset.key, v = b.dataset.v;
+  S[key] = key === 'mode' ? v : +v;
+  if (key === 'teams') rebalance();
+  saveSetup(); renderSetup();
+}));
+
+// ---------- bowl visual ----------
+function renderBowl(el, n) {
+  const shown = Math.min(n, 36);
+  let slips = '';
+  for (let i = 0; i < shown; i++) {
+    // deterministic-ish scatter so it doesn't jitter every render
+    const a = (i * 137.5) % 360, row = Math.floor(i / 8);
+    // bowl narrows toward the bottom, so low rows stay near the middle
+    const span = Math.min(62, 28 + row * 9);
+    const left = 41 - span / 2 + ((i * 37) % span), bottom = 9 + row * 7 + ((i * 13) % 4);
+    slips += `<div class="slip" style="left:${left}%;bottom:${bottom}%;background:${SLIP_COLORS[i % SLIP_COLORS.length]};transform:rotate(${a % 70 - 35}deg)"></div>`;
+  }
+  el.innerHTML = `<div class="glass"><div class="water"></div>${slips}</div><div class="rim"></div><div class="fish">🐟</div><div class="count">${n}<small>SLIPS</small></div>`;
+}
+
+// ---------- game state ----------
+let G = null;
+function newGame() {
+  G = {
+    words: [],          // {text, by, skips, best}
+    bowl: [],           // indices into words
+    round: 0, team: 0,
+    giver: new Array(S.teams).fill(0),
+    scores: Array.from({ length: S.teams }, () => new Array(S.rounds).fill(0)),
+    playerGot: {},
+    carry: null,        // {secs}
+    entry: 0, entryOrder: [],
+    turn: null
+  };
+  S.players.forEach(p => G.playerGot[p.name] = 0);
+}
+function dealFromDeck(n, taken) {
+  const used = new Set(taken.map(norm));
+  const pool = shuffle(DECK.filter(w => !used.has(norm(w))));
+  return pool.slice(0, n);
+}
+
+// ---------- entry flow ----------
+$('#startBtn').onclick = () => {
+  const prob = setupProblem();
+  if (prob) { toast(prob); return; }
+  ac(); newGame();
+  if (S.mode === 'deck') {
+    dealFromDeck(S.per * S.players.length, []).forEach(w => G.words.push({ text: w, by: '', skips: 0, best: null }));
+    toast(`${G.words.length} slips dealt into the bowl`);
+    startRound(0);
+  } else {
+    // interleave teams so the phone travels around the room
+    const lists = [...Array(S.teams)].map((_, t) => teamPlayers(t));
+    const order = [];
+    for (let i = 0; i < 12; i++) lists.forEach(l => { if (l[i]) order.push(l[i].name); });
+    G.entryOrder = order; G.entry = 0;
+    showPass();
+  }
+};
+function showPass() {
+  const name = G.entryOrder[G.entry];
+  $('#passName').textContent = name; $('#passName2').textContent = name;
+  $('#passDots').innerHTML = G.entryOrder.map((_, i) => `<i class="${i < G.entry ? 'done' : i === G.entry ? 'now' : ''}"></i>`).join('');
+  renderBowl($('#passBowl'), G.words.length);
+  show('s-pass');
+}
+$('#passGo').onclick = () => {
+  const name = G.entryOrder[G.entry];
+  $('#writeWho').textContent = `✍️ ${name}'s slips`;
+  $('#writeN').textContent = S.per;
+  const box = $('#slipInputs'); box.innerHTML = '';
+  for (let i = 0; i < S.per; i++) {
+    const r = document.createElement('div'); r.className = 'slip-in';
+    r.innerHTML = `<input maxlength="32" autocomplete="off" autocapitalize="words" placeholder="Slip ${i + 1}"><button class="dice" aria-label="Random idea">🎲</button>`;
+    box.appendChild(r);
+  }
+  $('#writeWarn').textContent = '';
+  show('s-write');
+  setTimeout(() => { const f = box.querySelector('input'); if (f) f.focus({ preventScroll: true }); }, 50);
+};
+$('#slipInputs').addEventListener('click', e => {
+  const d = e.target.closest('.dice'); if (!d) return;
+  const inputs = [...document.querySelectorAll('#slipInputs input')];
+  const taken = G.words.map(w => w.text).concat(inputs.map(i => i.value).filter(Boolean));
+  const [w] = dealFromDeck(1, taken);
+  if (w) { d.previousElementSibling.value = w; sfx.bloop(); }
+});
+function commitSlips(texts, dealt) {
+  const name = G.entryOrder[G.entry];
+  texts.forEach(t => G.words.push({ text: t, by: dealt ? '' : name, skips: 0, best: null }));
+  sfx.bloop();
+  G.entry++;
+  if (G.entry >= G.entryOrder.length) { toast(`${G.words.length} slips in the bowl!`); startRound(0); }
+  else showPass();
+}
+$('#writeDone').onclick = () => {
+  const inputs = [...document.querySelectorAll('#slipInputs input')];
+  const texts = inputs.map(i => i.value.trim().replace(/\s+/g, ' '));
+  const warn = $('#writeWarn');
+  if (texts.some(t => !t)) { warn.textContent = `Fill all ${S.per} slips (or tap 🎲).`; return; }
+  if (texts.some(t => !norm(t))) { warn.textContent = 'Each slip needs at least one letter or number.'; return; }
+  const seen = new Set(G.words.map(w => norm(w.text)));
+  for (let i = 0; i < texts.length; i++) {
+    const k = norm(texts[i]);
+    if (seen.has(k)) { warn.textContent = `"${texts[i]}" is already in the bowl, so pick another!`; inputs[i].focus(); return; }
+    seen.add(k);
+  }
+  commitSlips(texts, false);
+};
+$('#writeDeal').onclick = () => commitSlips(dealFromDeck(S.per, G.words.map(w => w.text)), true);
+
+// ---------- rounds ----------
+function startRound(r) {
+  G.round = r;
+  G.bowl = shuffle(G.words.map((_, i) => i));
+  const R = ROUNDS[r];
+  $('#roundNum').textContent = `ROUND ${r + 1} OF ${S.rounds}`;
+  $('#roundDots').innerHTML = [...Array(S.rounds)].map((_, i) => `<i class="${i < r ? 'done' : i === r ? 'now' : ''}"></i>`).join('');
+  $('#roundIcon').textContent = R.icon;
+  $('#roundTitle').textContent = R.name;
+  $('#roundRule').innerHTML = R.rule;
+  $('#roundNote').textContent = r === 0
+    ? `${G.words.length} slips in the bowl. Listen closely: these exact slips come back next round.`
+    : `Same ${G.words.length} slips as before. Use what you remember from earlier rounds!`;
+  sfx.fanfare();
+  show('s-round');
+}
+$('#roundGo').onclick = showReady;
+
+function scoreTotal(t) { return G.scores[t].reduce((a, b) => a + b, 0); }
+function renderScores(el, highlight) {
+  el.innerHTML = [...Array(S.teams)].map((_, t) =>
+    `<div class="sc ${t === highlight ? 'now' : ''}" style="--tc:${TEAMS[t].c}"><span>${TEAMS[t].e} ${TEAMS[t].name}</span><b>${scoreTotal(t)}</b></div>`).join('');
+}
+function currentGiver(t) { const tp = teamPlayers(t); return tp[G.giver[t] % tp.length].name; }
+function showReady() {
+  const t = G.team, R = ROUNDS[G.round];
+  renderScores($('#readyScores'), t);
+  $('#readyRound').textContent = `${R.icon} Round ${G.round + 1}: ${R.name}`;
+  renderBowl($('#readyBowl'), G.bowl.length);
+  const tEl = $('#readyTeam'); tEl.style.setProperty('--tc', TEAMS[t].c);
+  tEl.textContent = `${TEAMS[t].e} Team ${TEAMS[t].name}`;
+  const giver = currentGiver(t);
+  $('#readyGiver').textContent = `${giver} gives the clues`;
+  const guessers = teamPlayers(t).map(p => p.name).filter(n => n !== giver);
+  $('#readyGuessers').textContent = `Guessing: ${guessers.join(', ')}`;
+  $('#readyCarry').innerHTML = G.carry
+    ? `<span class="carrybadge">⏱ Bonus turn: ${G.carry.secs}s carried over</span>`
+    : `<span class="muted small">${S.secs} seconds · ${S.skips >= 99 ? 'unlimited' : S.skips} skip${S.skips === 1 ? '' : 's'}</span>`;
+  $('#readyGo').textContent = `${giver}, take the phone. Start ▶`;
+  show('s-ready');
+}
+
+// ---------- turn ----------
+let timerInt = 0, gotLock = 0;
+const ARC = 276.46;
+$('#readyGo').onclick = startTurn;
+function startTurn() {
+  ac();
+  const t = G.team;
+  const secs = G.carry ? G.carry.secs : S.secs;
+  const bonus = !!G.carry;
+  G.carry = null;
+  G.turn = {
+    team: t, giver: currentGiver(t), total: secs * 1000, remaining: secs * 1000, endAt: 0,
+    paused: false, got: [], times: {}, skipsUsed: 0, fouls: 0, current: null, shownAt: 0, lastSkipped: -1,
+    bonus, lastTick: secs + 1, over: false
+  };
+  const R = ROUNDS[G.round];
+  $('#turnRound').textContent = `${R.icon} ${R.short}`;
+  const tt = $('#turnTeam'); tt.style.setProperty('--tc', TEAMS[t].c); tt.textContent = `${TEAMS[t].e} ${G.turn.giver}`;
+  $('#turnRule').textContent = R.mini;
+  $('#wordCard').classList.remove('paused');
+  $('#pauseBtn').textContent = 'Pause';
+  show('s-turn');
+  G.turn.endAt = performance.now() + G.turn.remaining;
+  drawWord();
+  clearInterval(timerInt);
+  timerInt = setInterval(tick, 100);
+  tick();
+}
+function drawWord() {
+  const T = G.turn;
+  if (!G.bowl.length) { endTurn('empty'); return; }
+  let choices = G.bowl.map((w, i) => i);
+  if (G.bowl.length > 1 && T.lastSkipped >= 0) choices = choices.filter(i => G.bowl[i] !== T.lastSkipped);
+  const pick = choices[rnd(choices.length)];
+  T.current = G.bowl.splice(pick, 1)[0];
+  T.shownAt = performance.now();
+  const w = G.words[T.current];
+  $('#wordText').textContent = w.text;
+  $('#wordBy').textContent = w.by ? `slip by ${w.by}` : '';
+  const card = $('#wordCard'); card.classList.remove('flip'); void card.offsetWidth; card.classList.add('flip');
+  updateTurnUI();
+}
+function updateTurnUI() {
+  const T = G.turn;
+  $('#turnBowl').textContent = G.bowl.length + (T.current !== null ? 1 : 0);
+  $('#gotCount').textContent = T.got.length ? `(${T.got.length})` : '';
+  const left = S.skips >= 99 ? Infinity : S.skips - T.skipsUsed;
+  const sb = $('#skipBtn');
+  sb.disabled = left <= 0 || T.paused;
+  sb.textContent = left === Infinity ? 'Skip ↷' : `Skip ↷ ${Math.max(0, left)}`;
+  $('#foulBtn').disabled = T.paused;
+  $('#gotBtn').disabled = T.paused;
+}
+function tick() {
+  const T = G.turn; if (!T || T.over) return;
+  const rem = T.paused ? T.remaining : Math.max(0, T.endAt - performance.now());
+  if (!T.paused) T.remaining = rem;
+  const s = Math.ceil(rem / 1000);
+  $('#timerNum').textContent = s;
+  $('#timerArc').style.strokeDashoffset = ARC * (1 - rem / Math.max(T.total, 1));
+  $('#timerArc').style.stroke = s <= 5 ? 'var(--red)' : s <= 10 ? 'var(--gold)' : 'var(--aqua)';
+  $('#timerWrap').classList.toggle('low', s <= 5 && !T.paused);
+  if (!T.paused && s <= 5 && s >= 1 && s < T.lastTick) { T.lastTick = s; sfx.tick(); }
+  if (!T.paused && rem <= 0) endTurn('time');
+}
+$('#gotBtn').onclick = () => {
+  const T = G.turn; if (!T || T.over || T.paused || T.current === null) return;
+  const now = performance.now(); if (now - gotLock < 280) return; gotLock = now;
+  const id = T.current, w = G.words[id];
+  const ms = now - T.shownAt;
+  T.got.push(id); T.times[id] = ms;
+  if (w.best === null || ms < w.best.ms) w.best = { ms, giver: T.giver, round: G.round };
+  G.scores[T.team][G.round]++;
+  G.playerGot[T.giver] = (G.playerGot[T.giver] || 0) + 1;
+  T.current = null; T.lastSkipped = -1;
+  sfx.got();
+  if (!G.bowl.length) endTurn('empty'); else drawWord();
+};
+$('#skipBtn').onclick = () => {
+  const T = G.turn; if (!T || T.over || T.paused || T.current === null) return;
+  if (S.skips < 99 && T.skipsUsed >= S.skips) return;
+  T.skipsUsed++;
+  G.words[T.current].skips++;
+  G.bowl.push(T.current); T.lastSkipped = T.current; T.current = null;
+  sfx.skip(); drawWord();
+};
+$('#foulBtn').onclick = () => {
+  const T = G.turn; if (!T || T.over || T.paused || T.current === null) return;
+  T.fouls++;
+  G.bowl.push(T.current); T.lastSkipped = T.current; T.current = null;
+  T.endAt -= FOUL_PENALTY * 1000;
+  sfx.foul(); toast(`Foul! −${FOUL_PENALTY}s`);
+  if (T.endAt - performance.now() <= 0) { tick(); return; }
+  drawWord(); tick();
+};
+function setPaused(p) {
+  const T = G && G.turn; if (!T || T.over || T.paused === p) return;
+  if (p) { T.remaining = Math.max(0, T.endAt - performance.now()); T.pausedAt = performance.now(); }
+  else { T.endAt = performance.now() + T.remaining; T.shownAt += performance.now() - T.pausedAt; }
+  T.paused = p;
+  $('#wordCard').classList.toggle('paused', p);
+  $('#pauseBtn').textContent = p ? 'Resume' : 'Pause';
+  updateTurnUI(); tick();
+}
+$('#pauseBtn').onclick = () => setPaused(!G.turn.paused);
+document.addEventListener('visibilitychange', () => { if (document.hidden && $('#s-turn').classList.contains('active')) setPaused(true); });
+
+function endTurn(reason) {
+  const T = G.turn; if (!T || T.over) return;
+  T.over = true; T.reason = reason;
+  clearInterval(timerInt);
+  if (T.current !== null) { G.bowl.push(T.current); T.current = null; }
+  T.carrySecs = reason === 'empty' ? Math.floor(Math.max(0, T.endAt - performance.now()) / 1000) : 0;
+  T.off = new Set();
+  if (reason === 'time') sfx.buzz(); else sfx.fanfare();
+  showSummary();
+}
+function showSummary() {
+  const T = G.turn;
+  $('#sumTitle').textContent = T.reason === 'empty' ? 'Bowl empty! 🫙' : 'Time! ⏰';
+  const kept = T.got.length - T.off.size;
+  $('#sumStat').textContent = kept;
+  $('#sumSub').textContent = `slip${kept === 1 ? '' : 's'} caught by ${TEAMS[T.team].name}` + (T.fouls ? ` · ${T.fouls} foul${T.fouls > 1 ? 's' : ''}` : '') + (T.skipsUsed ? ` · ${T.skipsUsed} skip${T.skipsUsed > 1 ? 's' : ''}` : '');
+  const last = G.round >= S.rounds - 1;
+  $('#sumCarry').innerHTML = T.reason === 'empty' && T.carrySecs >= MIN_CARRY && !last && !T.off.size
+    ? `<span class="carrybadge">⏱ ${T.carrySecs}s carry over: ${esc(T.giver)} starts next round!</span>` : '';
+  $('#sumList').innerHTML = T.got.length
+    ? T.got.map(id => `<button class="gotitem ${T.off.has(id) ? 'off' : ''}" data-id="${id}"><span class="mk">${T.off.has(id) ? '✕' : '✓'}</span>${esc(G.words[id].text)}<span class="t">${(T.times[id] / 1000).toFixed(1)}s</span></button>`).join('')
+    : '<div class="muted">No slips caught this turn.</div>';
+  const bowlAfter = G.bowl.length + T.off.size;
+  $('#sumGo').textContent = bowlAfter === 0 ? (last ? 'Final scores 🏆' : 'End round') : `Next: Team ${TEAMS[(T.team + 1) % S.teams].name}`;
+  show('s-summary');
+}
+$('#sumList').addEventListener('click', e => {
+  const b = e.target.closest('.gotitem'); if (!b) return;
+  const id = +b.dataset.id, T = G.turn;
+  if (T.off.has(id)) T.off.delete(id); else T.off.add(id);
+  const sc = $('#s-summary').scrollTop; showSummary(); $('#s-summary').scrollTop = sc;
+});
+function advance() {
+  G.giver[G.team]++;
+  G.team = (G.team + 1) % S.teams;
+}
+$('#sumGo').onclick = () => {
+  const T = G.turn;
+  T.off.forEach(id => {
+    G.scores[T.team][G.round]--;
+    G.playerGot[T.giver]--;
+    G.bowl.push(id);
+    const w = G.words[id]; if (w.best && w.best.round === G.round && w.best.giver === T.giver && Math.abs(w.best.ms - T.times[id]) < 1) w.best = null;
+  });
+  G.turn = null;
+  if (G.bowl.length === 0) {
+    if (T.reason === 'empty' && T.carrySecs >= MIN_CARRY) G.carry = { secs: T.carrySecs };   // same team & giver continue next round
+    else { G.carry = null; advance(); }
+    showRoundEnd();
+  } else {
+    G.carry = null; advance(); showReady();
+  }
+};
+
+// ---------- round end / final ----------
+function tableHTML(upto) {
+  let h = '<tr><th>Team</th>' + [...Array(upto + 1)].map((_, r) => `<th>${ROUNDS[r].icon} R${r + 1}</th>`).join('') + '<th>Total</th></tr>';
+  const order = [...Array(S.teams).keys()].sort((a, b) => scoreTotal(b) - scoreTotal(a));
+  order.forEach(t => {
+    h += `<tr><td style="color:${TEAMS[t].c};font-weight:800">${TEAMS[t].e} ${TEAMS[t].name}</td>` +
+      G.scores[t].slice(0, upto + 1).map(v => `<td>${v}</td>`).join('') + `<td class="tot">${scoreTotal(t)}</td></tr>`;
+  });
+  return h;
+}
+function showRoundEnd() {
+  const r = G.round, last = r >= S.rounds - 1;
+  if (last) { showFinal(); return; }
+  $('#reTitle').textContent = `Round ${r + 1} done!`;
+  $('#reTable').innerHTML = tableHTML(r);
+  const nx = ROUNDS[r + 1];
+  $('#reNote').innerHTML = `Every slip goes back in. Next up: <b>${nx.icon} ${nx.name}</b>, and Team ${TEAMS[G.team].name} starts` + (G.carry ? ` with a <b>${G.carry.secs}s</b> bonus turn.` : '.');
+  $('#reGo').textContent = `Refill the bowl → ${nx.name}`;
+  show('s-roundend');
+}
+$('#reGo').onclick = () => startRound(G.round + 1);
+
+function showFinal() {
+  G.carry = null;
+  const tots = [...Array(S.teams)].map((_, t) => scoreTotal(t));
+  const max = Math.max(...tots), winners = tots.map((v, t) => v === max ? t : -1).filter(t => t >= 0);
+  $('#finWinner').innerHTML = winners.length > 1
+    ? `It's a tie! ${winners.map(t => `<span style="color:${TEAMS[t].c}">${TEAMS[t].name}</span>`).join(' & ')}`
+    : `<span style="color:${TEAMS[winners[0]].c}">${TEAMS[winners[0]].e} Team ${TEAMS[winners[0]].name} wins!</span>`;
+  $('#finTable').innerHTML = tableHTML(S.rounds - 1);
+  const aw = [];
+  const mvp = Object.entries(G.playerGot).sort((a, b) => b[1] - a[1])[0];
+  if (mvp && mvp[1] > 0) aw.push(['🎤', 'MVP clue-giver', `${esc(mvp[0])}: ${mvp[1]} slips caught`]);
+  const slip = G.words.slice().sort((a, b) => b.skips - a.skips)[0];
+  aw.push(['🐍', 'Slipperiest fish', slip && slip.skips > 0 ? `"${esc(slip.text)}": skipped ${slip.skips}×` : 'Nobody skipped a thing. Sharp crew!']);
+  const fast = G.words.filter(w => w.best).sort((a, b) => a.best.ms - b.best.ms)[0];
+  if (fast) aw.push(['⚡', 'Fastest catch', `"${esc(fast.text)}" in ${(fast.best.ms / 1000).toFixed(1)}s (${esc(fast.best.giver)}, ${ROUNDS[fast.best.round].name})`]);
+  const byWriter = {};
+  G.words.forEach(w => { if (w.by) byWriter[w.by] = (byWriter[w.by] || 0) + w.skips; });
+  const tricky = Object.entries(byWriter).sort((a, b) => b[1] - a[1])[0];
+  if (tricky && tricky[1] > 0) aw.push(['🎣', 'Trickiest slip-writer', `${esc(tricky[0])}: their slips were skipped ${tricky[1]}×`]);
+  $('#finAwards').innerHTML = aw.map(a => `<div class="award"><div class="ai">${a[0]}</div><div><b>${a[1]}</b>${a[2]}</div></div>`).join('');
+  sfx.fanfare();
+  show('s-final');
+}
+$('#rematchBtn').onclick = () => {
+  const words = G.words.map(w => ({ text: w.text, by: w.by, skips: 0, best: null }));
+  newGame(); G.words = words;
+  startRound(0);
+};
+$('#newGameBtn').onclick = () => { G = null; renderSetup(); show('s-setup'); };
+$('#quitBtn').onclick = () => { if (confirm('Quit this game and go back to setup?')) { G = null; renderSetup(); show('s-setup'); } };
+
+// ---------- rules ----------
+const openRules = () => $('#rulesModal').classList.add('show');
+$('#rulesBtn1').onclick = openRules; $('#rulesBtn2').onclick = openRules;
+$('#rulesClose').onclick = () => $('#rulesModal').classList.remove('show');
+$('#rulesModal').addEventListener('click', e => { if (e.target.id === 'rulesModal') e.currentTarget.classList.remove('show'); });
+
+renderSetup();
+</script>
+</body>
+</html>

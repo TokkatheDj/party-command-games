@@ -1,0 +1,830 @@
+<!-- CONCEPT: WORD GRID / CLUE-GIVING - "Crosswire": two teams share one 20-word grid and one phone; each team's Handler privately studies a hidden key, gives a single clue word plus a number out loud, and their team taps tiles to find their own wires - but one tile is CROSSWIRED to both teams, so whoever touches it banks it for the rival too and shorts out their own turn, and one tile is a LIVE WIRE that loses the case instantly. Best of 3 cases. 340+ words, clue legality check, rush timer | Players: 4-12 in 2 teams | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Crosswire</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #0b0f1a;
+  --panel: #151b2b;
+  --panel-2: #1d2539;
+  --line: #2a3450;
+  --ink: #e8edfa;
+  --dim: #8794b0;
+  --a: #ff4d6d;
+  --a-deep: #7a1a2c;
+  --b: #3d8bff;
+  --b-deep: #14396e;
+  --cross: #a96bff;
+  --cross-deep: #3f2270;
+  --wire: #ffb02e;
+  --wire-deep: #6b3d00;
+  --neutral: #4a566f;
+  --gap: 6px;
+  --r: 12px;
+}
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+#app {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  background:
+    radial-gradient(120% 60% at 10% -10%, #1a2340 0%, transparent 60%),
+    radial-gradient(120% 60% at 90% 110%, #1b1730 0%, transparent 60%),
+    var(--bg);
+}
+
+.screen { display: none; flex-direction: column; height: 100%; padding: 10px; gap: 8px; }
+.screen.on { display: flex; }
+
+/* ---------- shared bits ---------- */
+h1 {
+  margin: 0;
+  font-size: clamp(30px, 10vw, 54px);
+  letter-spacing: 3px;
+  font-weight: 800;
+  background: linear-gradient(90deg, var(--a), var(--cross) 50%, var(--b));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tag { color: var(--dim); font-size: clamp(11px, 3.2vw, 14px); line-height: 1.5; }
+
+.btn {
+  min-height: 52px; padding: 12px 16px;
+  border: 1px solid var(--line); border-radius: var(--r);
+  background: var(--panel-2); color: var(--ink);
+  font-size: clamp(14px, 4vw, 17px); font-weight: 700; letter-spacing: 1px;
+  font-family: inherit; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn:active { transform: scale(0.98); }
+.btn.go {
+  background: linear-gradient(135deg, var(--a), var(--cross) 55%, var(--b));
+  border-color: transparent; color: #0b0f1a; font-weight: 800;
+}
+.btn.ghost { background: transparent; color: var(--dim); min-height: 46px; font-weight: 600; }
+.btn[disabled] { opacity: .38; pointer-events: none; }
+.btn.red { background: linear-gradient(135deg, var(--a), var(--a-deep)); border-color: transparent; color: #fff; }
+.btn.blue { background: linear-gradient(135deg, var(--b), var(--b-deep)); border-color: transparent; color: #fff; }
+
+.scroller { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ---------- setup ---------- */
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 12px; margin-bottom: 10px;
+}
+.lbl { font-size: 11px; letter-spacing: 2px; color: var(--dim); margin-bottom: 6px; font-weight: 700; }
+input[type=text] {
+  width: 100%; min-height: 48px; padding: 10px 12px;
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+  /* 16px floor: iOS auto-zooms on focus below that, and user-scalable=no won't stop it */
+  color: var(--ink); font-size: clamp(16px, 4.4vw, 18px); font-family: inherit;
+  font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  user-select: text; -webkit-user-select: text;
+}
+input[type=text]:focus { outline: none; border-color: var(--cross); }
+.swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; vertical-align: -2px; }
+
+.toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 52px; gap: 10px;
+}
+.tswitch {
+  width: 58px; height: 32px; border-radius: 16px; background: var(--panel-2);
+  border: 1px solid var(--line); position: relative; flex: 0 0 auto; cursor: pointer;
+}
+.tswitch::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 24px; height: 24px; border-radius: 50%; background: var(--dim);
+  transition: transform .18s, background .18s;
+}
+.tswitch.on { border-color: var(--cross); }
+.tswitch.on::after { transform: translateX(26px); background: var(--cross); }
+
+/* ---------- headers ---------- */
+.bar {
+  display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+}
+.pill {
+  flex: 1; border-radius: 10px; padding: 7px 8px; text-align: center;
+  border: 1px solid var(--line); background: var(--panel);
+  font-size: clamp(10px, 2.9vw, 13px); font-weight: 800; letter-spacing: 1px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pill .big { display: block; font-size: clamp(15px, 4.6vw, 20px); letter-spacing: 0; }
+.pill.pa { border-color: var(--a); color: var(--a); }
+.pill.pb { border-color: var(--b); color: var(--b); }
+.pill.active { background: rgba(255,255,255,.07); box-shadow: 0 0 0 2px currentColor inset; }
+.vs { color: var(--dim); font-size: 11px; font-weight: 800; flex: 0 0 auto; }
+
+/* ---------- grid ---------- */
+.grid {
+  flex: 1; min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: var(--gap);
+}
+.tile {
+  border-radius: 10px; border: 1px solid var(--line);
+  background: linear-gradient(180deg, #202942, #171e30);
+  display: flex; align-items: center; justify-content: center;
+  padding: 3px; cursor: pointer; position: relative;
+  font-weight: 800; letter-spacing: .3px;
+  font-size: clamp(8px, 2.7vw, 14px);
+  text-align: center; overflow-wrap: anywhere; line-height: 1.05;
+  color: var(--ink);
+}
+.tile:active { transform: scale(0.97); }
+.tile.sel { box-shadow: 0 0 0 3px var(--cross); border-color: var(--cross); }
+.tile.done { cursor: default; }
+.tile.done:active { transform: none; }
+
+/* owner paint - only ever applied on the key screen or after a reveal */
+.tile.own-a { background: linear-gradient(180deg, var(--a), var(--a-deep)); border-color: var(--a); color: #fff; }
+.tile.own-b { background: linear-gradient(180deg, var(--b), var(--b-deep)); border-color: var(--b); color: #fff; }
+.tile.own-both {
+  background: linear-gradient(135deg, var(--a) 0%, var(--cross) 50%, var(--b) 100%);
+  border-color: var(--cross); color: #fff;
+}
+.tile.own-neutral { background: linear-gradient(180deg, #3a4560, #2b3449); border-color: var(--neutral); color: #c3ccdf; }
+.tile.own-wire {
+  background: linear-gradient(180deg, var(--wire), var(--wire-deep));
+  border-color: var(--wire); color: #201400;
+}
+.tile.faded { opacity: .42; }
+.tile .mark { position: absolute; top: 2px; right: 4px; font-size: 9px; opacity: .85; }
+
+/* ---------- clue strip ---------- */
+.clue {
+  flex: 0 0 auto; border-radius: var(--r); border: 1px solid var(--line);
+  background: var(--panel); padding: 8px 10px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.clue .word {
+  font-size: clamp(18px, 6vw, 28px); font-weight: 800; letter-spacing: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.clue .cnt {
+  flex: 0 0 auto; text-align: right; font-size: 10px; color: var(--dim);
+  letter-spacing: 1px; font-weight: 700;
+}
+.clue .cnt b { display: block; font-size: clamp(18px, 6vw, 26px); color: var(--ink); letter-spacing: 0; }
+
+.msg {
+  flex: 0 0 auto; min-height: 20px; text-align: center;
+  font-size: clamp(11px, 3.3vw, 14px); font-weight: 700; color: var(--dim);
+}
+.msg .hl { color: var(--ink); }
+
+/* ---------- number row ---------- */
+.nums { display: flex; gap: 6px; flex: 0 0 auto; }
+.num {
+  flex: 1; min-height: 48px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink);
+  font-size: clamp(15px, 4.6vw, 19px); font-weight: 800; font-family: inherit;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.num.on { background: var(--cross); border-color: var(--cross); color: #14081f; }
+
+/* ---------- big centered screens ---------- */
+.mid { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; padding: 6px; }
+.shield { font-size: clamp(44px, 16vw, 90px); line-height: 1; }
+.who { font-size: clamp(22px, 7.5vw, 38px); font-weight: 800; letter-spacing: 2px; }
+.who.ta { color: var(--a); } .who.tb { color: var(--b); }
+.verdict { font-size: clamp(24px, 8vw, 42px); font-weight: 800; letter-spacing: 2px; }
+
+.foot { flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; flex: 0 0 auto; }
+.lg {
+  font-size: 10px; letter-spacing: .5px; font-weight: 700; padding: 4px 8px;
+  border-radius: 20px; border: 1px solid var(--line); color: var(--dim);
+}
+.lg i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; margin-right: 4px; vertical-align: -1px; }
+
+.rules { color: var(--dim); font-size: clamp(12px, 3.5vw, 15px); line-height: 1.6; }
+.rules h3 { color: var(--ink); font-size: clamp(13px, 3.8vw, 16px); margin: 14px 0 5px; letter-spacing: 1px; }
+.rules b { color: var(--ink); }
+.rules ul { margin: 4px 0; padding-left: 18px; }
+.rules li { margin-bottom: 4px; }
+
+.err { color: var(--wire); font-size: 12px; font-weight: 700; min-height: 16px; text-align: center; }
+
+@media (min-height: 780px) { .tile { font-size: clamp(11px, 3vw, 17px); } }
+@media (min-width: 620px) {
+  .screen { padding: 14px 16px; max-width: 760px; width: 100%; margin: 0 auto; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= SETUP ================= -->
+  <section id="s-setup" class="screen on">
+    <div class="mid" style="justify-content:flex-start;padding-top:8px;flex:0 0 auto">
+      <h1>CROSSWIRE</h1>
+      <div class="tag">Two teams · one grid · one phone<br>Find your wires before they find theirs.</div>
+    </div>
+    <div class="scroller">
+      <div class="card">
+        <div class="lbl"><span class="swatch" style="background:var(--a)"></span> TEAM ONE</div>
+        <input type="text" id="nameA" maxlength="12" value="CRIMSON">
+      </div>
+      <div class="card">
+        <div class="lbl"><span class="swatch" style="background:var(--b)"></span> TEAM TWO</div>
+        <input type="text" id="nameB" maxlength="12" value="COBALT">
+      </div>
+      <div class="card">
+        <div class="toggle">
+          <div>
+            <div style="font-weight:700;font-size:15px">Rush timer</div>
+            <div class="tag">60 seconds to guess, or the turn dies.</div>
+          </div>
+          <div class="tswitch" id="rushSw"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="lbl">ALL-TIME CASES SOLVED</div>
+        <div id="lifetime" class="tag" style="font-size:14px">No cases on file yet.</div>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="btn go" id="btnStart">START MATCH</button>
+      <div class="row">
+        <button class="btn ghost" id="btnHow">HOW TO PLAY</button>
+        <button class="btn ghost" id="btnWipe">CLEAR RECORD</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= HOW TO PLAY ================= -->
+  <section id="s-howto" class="screen">
+    <div class="bar"><div class="pill" style="flex:1">HOW TO PLAY</div></div>
+    <div class="scroller">
+      <div class="rules">
+        <p>Split into <b>two teams</b> facing one phone. Each round is a <b>case</b> — first team to win <b>2 cases</b> takes the match.</p>
+
+        <h3>THE GRID</h3>
+        <p>20 words sit face up. Hidden underneath:</p>
+        <ul>
+          <li><b>5 wires</b> belong to Team One</li>
+          <li><b>5 wires</b> belong to Team Two</li>
+          <li><b>1 CROSSWIRE</b> belongs to <b>both</b> teams</li>
+          <li><b>8 dead ends</b> belong to nobody</li>
+          <li><b>1 LIVE WIRE</b> — do not touch it</li>
+        </ul>
+        <p>Each team needs <b>6 wires</b> to win the case: their own 5 <i>plus</i> the crosswire.</p>
+
+        <h3>YOUR TURN</h3>
+        <p>One player on the team is the <b>Handler</b> (rotate each case). Everyone else looks away while the Handler takes the phone and studies the key.</p>
+        <p>The Handler types <b>one clue word</b> and a <b>number</b> — how many of their wires that clue points at. Then the phone goes face up on the table and the Handler <b>says the clue out loud and then shuts up</b>.</p>
+        <p>The team taps a tile, then taps <b>REVEAL</b> to commit. You get your number of guesses <b>plus one bonus guess</b>.</p>
+
+        <h3>WHAT HAPPENS WHEN YOU TAP</h3>
+        <ul>
+          <li><b>Your wire</b> — banked, keep guessing.</li>
+          <li><b>Dead end</b> — turn over.</li>
+          <li><b>Their wire</b> — banked <i>for them</i>, turn over. Ouch.</li>
+          <li><b>CROSSWIRE</b> — it counts for <b>you AND them</b>, and the sparks end your turn. Everybody needs it, nobody wants to be the one who spends a guess on it. Play chicken.</li>
+          <li><b>LIVE WIRE</b> — the case is over and the other team wins it, right there.</li>
+        </ul>
+
+        <h3>CLUE LAW</h3>
+        <p>One word only. It can't contain — or be contained by — any word printed on the grid. The app refuses illegal clues so nobody has to argue.</p>
+
+        <h3>THE HANDLER MAY NOT</h3>
+        <p>Speak, point, nod, grimace, or breathe suggestively after the clue is given. The team is on its own.</p>
+      </div>
+    </div>
+    <div class="foot"><button class="btn go" id="btnHowBack">GOT IT</button></div>
+  </section>
+
+  <!-- ================= HANDOFF ================= -->
+  <section id="s-handoff" class="screen">
+    <div class="bar" id="hoScores"></div>
+    <div class="mid">
+      <div class="shield">🤫</div>
+      <div class="tag" style="font-size:clamp(13px,4vw,17px)">PASS THE PHONE TO THE HANDLER FOR</div>
+      <div class="who" id="hoTeam">TEAM</div>
+      <div class="tag" id="hoSub">Everyone else: eyes off the screen.</div>
+    </div>
+    <div class="foot">
+      <button class="btn go" id="btnShowKey">I'M THE HANDLER — SHOW THE KEY</button>
+      <button class="btn ghost" id="btnQuit1">QUIT MATCH</button>
+    </div>
+  </section>
+
+  <!-- ================= BRIEF (key + clue entry) ================= -->
+  <section id="s-brief" class="screen">
+    <div class="bar">
+      <div class="pill" id="brTitle" style="flex:1">HANDLER KEY</div>
+    </div>
+    <div class="legend" id="brLegend"></div>
+    <div class="grid" id="keyGrid"></div>
+    <div class="card" style="margin:0;padding:10px">
+      <div class="lbl">YOUR CLUE — ONE WORD</div>
+      <input type="text" id="clueIn" maxlength="16" placeholder="TYPE IT" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="lbl" style="margin-top:10px">HOW MANY OF YOUR WIRES?</div>
+      <div class="nums" id="numRow"></div>
+      <div class="err" id="clueErr"></div>
+    </div>
+    <div class="foot"><button class="btn go" id="btnLock">LOCK IN &amp; LAY IT DOWN</button></div>
+  </section>
+
+  <!-- ================= TABLE (public board) ================= -->
+  <section id="s-table" class="screen">
+    <div class="bar" id="tbScores"></div>
+    <div class="clue">
+      <div>
+        <div class="lbl" style="margin:0" id="tbWho">TEAM</div>
+        <div class="word" id="tbClue">CLUE</div>
+      </div>
+      <div class="cnt" id="tbCount">GUESSES<b>0</b></div>
+    </div>
+    <div class="grid" id="playGrid"></div>
+    <div class="msg" id="tbMsg"></div>
+    <div class="foot">
+      <div class="row">
+        <button class="btn go" id="btnReveal" disabled>PICK A TILE</button>
+        <button class="btn" id="btnEnd" style="flex:0 0 38%">END TURN</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CASE END ================= -->
+  <section id="s-case" class="screen">
+    <div class="bar" id="ceScores"></div>
+    <div class="mid" style="gap:10px">
+      <div class="shield" id="ceIcon">🏁</div>
+      <div class="verdict" id="ceWho">TEAM</div>
+      <div class="tag" id="ceWhy" style="font-size:clamp(13px,4vw,16px)"></div>
+    </div>
+    <div class="grid" id="ceGrid" style="flex:0 0 auto;height:34%"></div>
+    <div class="foot"><button class="btn go" id="btnNext">NEXT CASE</button></div>
+  </section>
+
+  <!-- ================= MATCH END ================= -->
+  <section id="s-match" class="screen">
+    <div class="mid">
+      <div class="shield">🏆</div>
+      <div class="tag">MATCH WINNER</div>
+      <div class="verdict" id="mtWho">TEAM</div>
+      <div class="tag" id="mtScore"></div>
+    </div>
+    <div class="foot">
+      <button class="btn go" id="btnAgain">PLAY AGAIN</button>
+      <button class="btn ghost" id="btnHome">BACK TO SETUP</button>
+    </div>
+  </section>
+
+</div>
+<script>
+'use strict';
+
+/* ---------------------------------------------------------------
+   WORD BANK - 300 associative nouns, all <= 8 characters so they
+   never overflow a tile on a 375px phone.
+   --------------------------------------------------------------- */
+const WORDS = (
+ 'ANCHOR ANGEL APPLE ARROW ATLAS BADGE BALLOON BAND BANK BARK ' +
+ 'BEACH BEAM BEAR BELL BENCH BERRY BISHOP BLOCK BOARD BOLT ' +
+ 'BOOT BOTTLE BRIDGE BRUSH BUBBLE BUCKET BULB BUTTON CABIN CABLE ' +
+ 'CACTUS CAKE CAMP CANDLE CANNON CANOE CAPE CARD CARROT CASTLE ' +
+ 'CHAIN CHAIR CHALK CHARM CHEESE CHEST CHIP CIRCUS CLIFF CLOCK ' +
+ 'CLOUD CLOVER CLUB COACH COAL COAST COIN COMET COMPASS COOKIE ' +
+ 'COPPER CORD CORN CRANE CRATER CROWN CRYSTAL CUP DECK DESERT ' +
+ 'DIAMOND DICE DISH DIVER DOCK DOLPHIN DRAGON DRESS DRUM DUST ' +
+ 'EAGLE ECHO ENGINE FABRIC FALCON FEATHER FENCE FIDDLE FIELD FILM ' +
+ 'FLAG FLAME FLASK FLUTE FOG FOREST FORK FOSSIL FOUNTAIN FOX ' +
+ 'FRAME FROST GARDEN GATE GHOST GIANT GLACIER GLASS GLOVE GLUE ' +
+ 'GOAT GOLD GRAPE GRAVITY GUITAR HAMMER HARBOR HAWK HELMET HIVE ' +
+ 'HOOK HORN HORSE HOTEL IGLOO INK IRON IVORY JACKET JELLY ' +
+ 'JEWEL JUNGLE KETTLE KITE KNIGHT KNOT LADDER LAMP LANTERN LASER ' +
+ 'LAVA LEAF LEDGE LEMON LENS LEVER LIME LION LOCK LOG ' +
+ 'MAGNET MAMMOTH MAPLE MARBLE MASK MAZE MEADOW MEDAL METEOR MILL ' +
+ 'MINE MINT MIRROR MITTEN MONKEY MOON MOSS MOTH MOTOR MOUSE ' +
+ 'MUSEUM NAIL NEEDLE NEST NIGHT NOODLE NORTH NOVEL NURSE OASIS ' +
+ 'OCEAN ONION OPERA ORBIT ORGAN OTTER OVEN OWL PADDLE PAGE ' +
+ 'PAINT PALACE PALM PANDA PAPER PARADE PARK PATCH PEACH PEARL ' +
+ 'PEBBLE PENCIL PENGUIN PEPPER PIANO PILOT PIPE PIRATE PIZZA PLANET ' +
+ 'PLATE PLUG POCKET POLE POND PONY PORT POTION PRISM PUMPKIN ' +
+ 'PUPPET PYRAMID QUEEN QUILT RABBIT RACKET RADIO RAFT RAIL RANCH ' +
+ 'RAVEN RIBBON RIDDLE RING RIVER ROBOT ROCKET ROOT ROPE ROSE ' +
+ 'RUBY RUST SADDLE SAFARI SAIL SALT SAND SAUCE SCALE SCARF ' +
+ 'SCHOOL SCOUT SCREEN SEAL SEED SHADOW SHARK SHEEP SHELF SHELL ' +
+ 'SHIELD SHIP SHOE SHORE SILK SILVER SKATE SKULL SKY SLED ' +
+ 'SLIDE SMOKE SNAIL SNAKE SNOW SOAP SOCK SOUP SPACE SPARK ' +
+ 'SPIDER SPIRAL SPOON SPRING SQUARE STABLE STAGE STAMP STATUE STEAM ' +
+ 'STICK STONE STORM STOVE STRAW STREAM STRING SUGAR SWAMP SWAN ' +
+ 'SWITCH SWORD TABLE TAIL TANK TAPE TEMPLE TENT THREAD THRONE ' +
+ 'THUNDER TICKET TIGER TOAST TOKEN TOOTH TORCH TOWER TRACK TRAIN ' +
+ 'TRAP TRAY TREE TRUCK TRUMPET TUNNEL TURTLE VALLEY VAULT VELVET ' +
+ 'VIOLIN VOLCANO WAFFLE WAGON WALL WALRUS WAND WATCH WAVE WEB ' +
+ 'WHALE WHEEL WHISTLE WIND WINDOW WING WITCH WIZARD WOLF WOOL ' +
+ 'WORM YARN ZEBRA ZIPPER'
+).split(' ');
+
+/* ---------------------------------------------------------------
+   STATE
+   --------------------------------------------------------------- */
+const NEED = 6;          // wires a team must trace to win a case
+const WIN_CASES = 2;     // cases needed to win the match
+const RUSH_SECS = 60;
+
+const LS_NAMES = 'cowork-crosswire-names';
+const LS_RUSH  = 'cowork-crosswire-rush';
+const LS_REC   = 'cowork-crosswire-record';
+
+const S = {
+  teams: [
+    { name: 'CRIMSON', cls: 'a', cases: 0, got: new Set() },
+    { name: 'COBALT',  cls: 'b', cases: 0, got: new Set() }
+  ],
+  board: [],
+  used: new Set(),
+  turn: 0,
+  starter: 0,
+  sel: null,
+  clue: '',
+  num: null,
+  guesses: 0,
+  over: false,      // turn finished, waiting for the pass
+  rush: false,
+  timer: null,
+  secs: 0,
+  caseNo: 0
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  $(id).classList.add('on');
+}
+
+/* ---------------------------------------------------------------
+   SOUND
+   --------------------------------------------------------------- */
+let AC = null;
+function tone(freq, dur, type, vol) {
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(vol || 0.16, AC.currentTime + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, AC.currentTime + dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(); o.stop(AC.currentTime + dur + 0.03);
+  } catch (e) { /* audio is decoration only */ }
+}
+function beep(kind) {
+  if (kind === 'good') { tone(660, 0.12, 'triangle'); setTimeout(() => tone(990, 0.16, 'triangle'), 90); }
+  else if (kind === 'bad') { tone(200, 0.28, 'sawtooth', 0.12); }
+  else if (kind === 'cross') { tone(520, 0.1, 'square', 0.1); setTimeout(() => tone(740, 0.1, 'square', 0.1), 80); setTimeout(() => tone(520, 0.18, 'square', 0.1), 160); }
+  else if (kind === 'wire') { tone(140, 0.5, 'sawtooth', 0.2); setTimeout(() => tone(95, 0.6, 'sawtooth', 0.2), 140); }
+  else if (kind === 'win') { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.22, 'triangle'), i * 110)); }
+  else { tone(440, 0.08, 'sine', 0.1); }
+}
+
+/* ---------------------------------------------------------------
+   BOARD
+   --------------------------------------------------------------- */
+function buildBoard() {
+  let pool = WORDS.filter(w => !S.used.has(w));
+  if (pool.length < 60) { S.used.clear(); pool = WORDS.slice(); }
+  shuffle(pool);
+  const picked = [];
+  for (const w of pool) {
+    if (picked.length === 20) break;
+    // no word may be a substring of another on the same grid (RAIN / TRAIN)
+    if (picked.some(p => p.includes(w) || w.includes(p))) continue;
+    picked.push(w);
+  }
+  picked.forEach(w => S.used.add(w));
+  const owners = shuffle(
+    ['a', 'a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'both', 'wire']
+      .concat(new Array(8).fill('neutral'))
+  );
+  S.board = picked.map((w, i) => ({ w: w, owner: owners[i], rev: false }));
+}
+
+function paint(el, mode) {   // mode: 'key' | 'play' | 'final'
+  el.innerHTML = '';
+  S.board.forEach((t, i) => {
+    const d = document.createElement('div');
+    let c = 'tile';
+    if (mode !== 'play' || t.rev) c += ' own-' + t.owner;   // table screen never paints an unrevealed owner
+    if (t.rev) c += ' done faded';
+    if (mode === 'play' && !t.rev && S.sel === i) c += ' sel';
+    d.className = c;
+    d.textContent = t.w;
+    if (t.rev) { const m = document.createElement('span'); m.className = 'mark'; m.textContent = '✓'; d.appendChild(m); }
+    if (mode === 'play' && !t.rev && !S.over) {
+      d.addEventListener('click', () => { S.sel = i; beep('tap'); drawTable(); });
+    }
+    el.appendChild(d);
+  });
+}
+
+function scoreBar(el, activeIdx) {
+  el.innerHTML = S.teams.map((t, i) => {
+    const dots = '●'.repeat(t.cases) + '○'.repeat(Math.max(0, WIN_CASES - t.cases));
+    return '<div class="pill p' + (i ? 'b' : 'a') + (i === activeIdx ? ' active' : '') + '">' +
+      esc(t.name) + ' ' + dots + '<span class="big">' + t.got.size + '/' + NEED + '</span></div>';
+  }).join('<div class="vs">VS</div>');
+}
+
+/* ---------------------------------------------------------------
+   FLOW
+   --------------------------------------------------------------- */
+function startMatch() {
+  S.teams[0].name = ($('nameA').value.trim().toUpperCase() || 'CRIMSON').slice(0, 12);
+  S.teams[1].name = ($('nameB').value.trim().toUpperCase() || 'COBALT').slice(0, 12);
+  try { localStorage.setItem(LS_NAMES, JSON.stringify([S.teams[0].name, S.teams[1].name])); } catch (e) {}
+  S.teams.forEach(t => { t.cases = 0; });
+  S.used.clear();
+  S.caseNo = 0;
+  S.starter = (Math.random() * 2) | 0;
+  newCase();
+}
+
+function newCase() {
+  S.caseNo++;
+  buildBoard();
+  S.teams.forEach(t => t.got = new Set());
+  S.turn = S.starter;
+  S.starter = 1 - S.starter;      // alternate who opens each case
+  toHandoff();
+}
+
+function toHandoff() {
+  stopTimer();
+  S.sel = null; S.over = false; S.clue = ''; S.num = null;
+  scoreBar($('hoScores'), S.turn);
+  const t = S.teams[S.turn];
+  const w = $('hoTeam');
+  w.textContent = t.name;
+  w.className = 'who t' + t.cls;
+  $('hoSub').innerHTML = 'Case ' + S.caseNo + ' · Handler rotates each case.<br>Everyone else: eyes off the screen.';
+  show('s-handoff');
+}
+
+function toBrief() {
+  const t = S.teams[S.turn];
+  $('brTitle').textContent = 'KEY — ' + t.name + ' HANDLER';
+  $('brTitle').className = 'pill p' + t.cls;
+  $('brLegend').innerHTML =
+    '<span class="lg"><i style="background:var(--a)"></i>' + esc(S.teams[0].name) + '</span>' +
+    '<span class="lg"><i style="background:var(--b)"></i>' + esc(S.teams[1].name) + '</span>' +
+    '<span class="lg"><i style="background:linear-gradient(135deg,var(--a),var(--b))"></i>CROSSWIRE</span>' +
+    '<span class="lg"><i style="background:var(--neutral)"></i>DEAD END</span>' +
+    '<span class="lg"><i style="background:var(--wire)"></i>LIVE WIRE</span>';
+  paint($('keyGrid'), 'key');
+  $('clueIn').value = '';
+  $('clueErr').textContent = '';
+  S.num = null;
+  drawNums();
+  show('s-brief');
+}
+
+function drawNums() {
+  const row = $('numRow');
+  row.innerHTML = '';
+  [1, 2, 3, 4, 5, '∞'].forEach(n => {
+    const b = document.createElement('button');
+    b.className = 'num' + (S.num === n ? ' on' : '');
+    b.type = 'button';
+    b.textContent = n;
+    b.addEventListener('click', () => { S.num = n; beep('tap'); drawNums(); });
+    row.appendChild(b);
+  });
+}
+
+function lockIn() {
+  const c = $('clueIn').value.trim().toUpperCase();
+  const e = $('clueErr');
+  if (!c) { e.textContent = 'Type a clue word first.'; return; }
+  if (!/^[A-Z][A-Z'-]*$/.test(c)) { e.textContent = 'One word only — letters, no spaces or digits.'; return; }
+  for (const t of S.board) {
+    if (c.indexOf(t.w) !== -1 || t.w.indexOf(c) !== -1) {
+      e.textContent = 'Illegal clue — too close to ' + t.w + ' on the grid.'; beep('bad'); return;
+    }
+  }
+  if (S.num === null) { e.textContent = 'Pick how many wires it points at.'; return; }
+  S.clue = c;
+  S.guesses = (S.num === '∞') ? 99 : S.num + 1;
+  S.sel = null; S.over = false;
+  toTable();
+}
+
+function toTable() {
+  const t = S.teams[S.turn];
+  $('tbWho').textContent = t.name + ' SAYS';
+  $('tbWho').style.color = t.cls === 'a' ? 'var(--a)' : 'var(--b)';
+  $('tbClue').textContent = S.clue + '  ' + S.num;
+  $('tbMsg').innerHTML = 'Tap a tile, then REVEAL. Handler: silence.';
+  if (S.rush) { S.secs = RUSH_SECS; startTimer(); }
+  drawTable();
+  show('s-table');
+}
+
+/* the counter ticks once a second, so it re-renders on its own and never
+   forces a grid rebuild under a finger that is mid-tap */
+function drawCount() {
+  const g = (S.num === '∞') ? '∞' : S.guesses;
+  $('tbCount').innerHTML = 'GUESSES<b>' + g + '</b>' +
+    (S.rush && !S.over ? '<span style="color:var(--wire)">⏱ ' + S.secs + 's</span>' : '');
+}
+
+function drawTable() {
+  scoreBar($('tbScores'), S.turn);
+  paint($('playGrid'), 'play');
+  drawCount();
+  const btn = $('btnReveal'), end = $('btnEnd');
+  if (S.over) {
+    btn.disabled = false;
+    btn.textContent = 'PASS TO ' + S.teams[1 - S.turn].name;
+    end.style.display = 'none';
+  } else {
+    end.style.display = '';
+    end.textContent = 'END TURN';
+    btn.disabled = S.sel === null;
+    btn.textContent = S.sel === null ? 'PICK A TILE' : 'REVEAL ' + S.board[S.sel].w;
+  }
+}
+
+function startTimer() {
+  stopTimer();
+  S.timer = setInterval(() => {
+    S.secs--;
+    if (S.secs <= 0) { stopTimer(); if (!S.over) finishTurn('Time! The clock ran out.'); }
+    else { drawCount(); if (S.secs <= 5) tone(880, 0.06, 'square', 0.08); }
+  }, 1000);
+}
+function stopTimer() { if (S.timer) { clearInterval(S.timer); S.timer = null; } }
+
+function finishTurn(msg) {
+  S.over = true; S.sel = null; stopTimer();
+  $('tbMsg').innerHTML = '<span>' + msg + '</span>';
+  drawTable();
+}
+
+function reveal() {
+  if (S.over) { S.turn = 1 - S.turn; toHandoff(); return; }   // the pass hands play to the other team
+  if (S.sel === null) return;
+  const i = S.sel, t = S.board[i];
+  const act = S.turn, opp = 1 - S.turn;
+  t.rev = true; S.sel = null;
+  let keepGoing = false, msg = '';
+
+  if (t.owner === 'a' || t.owner === 'b') {
+    const ownerIdx = t.owner === 'a' ? 0 : 1;
+    S.teams[ownerIdx].got.add(i);
+    if (ownerIdx === act) { msg = '<span class="hl">' + t.w + '</span> is yours. Keep going.'; keepGoing = true; beep('good'); }
+    else { msg = '<span class="hl">' + t.w + '</span> was one of THEIRS — banked for ' + esc(S.teams[opp].name) + '.'; beep('bad'); }
+  } else if (t.owner === 'both') {
+    S.teams[0].got.add(i); S.teams[1].got.add(i);
+    msg = '⚡ CROSSWIRE! <span class="hl">' + t.w + '</span> counts for BOTH teams — and the sparks end your turn.';
+    beep('cross');
+  } else if (t.owner === 'neutral') {
+    msg = '<span class="hl">' + t.w + '</span> is a dead end.'; beep('bad');
+  } else {
+    beep('wire');
+    paint($('playGrid'), 'play');
+    endCase(opp, esc(S.teams[act].name) + ' grabbed the LIVE WIRE — ' + t.w + '.', '💥');
+    return;
+  }
+
+  // win check runs for BOTH teams every reveal; a simultaneous 6/6 goes to
+  // the team that made the play.
+  if (S.teams[act].got.size >= NEED) {
+    paint($('playGrid'), 'play');
+    endCase(act, esc(S.teams[act].name) + ' traced all six wires.', '🏁');
+    return;
+  }
+  if (S.teams[opp].got.size >= NEED) {
+    paint($('playGrid'), 'play');
+    endCase(opp, esc(S.teams[opp].name) + ' reached six — handed to them on a plate.', '🎁');
+    return;
+  }
+
+  if (keepGoing) {
+    S.guesses--;
+    if (S.guesses <= 0) { finishTurn(msg + ' Out of guesses.'); return; }
+    $('tbMsg').innerHTML = msg;
+    drawTable();
+    return;
+  }
+  finishTurn(msg);
+}
+
+function endCase(winner, why, icon) {
+  stopTimer();
+  S.over = true;
+  S.teams[winner].cases++;
+  bumpRecord(S.teams[winner].name);
+  beep('win');
+  const t = S.teams[winner];
+  scoreBar($('ceScores'), winner);
+  $('ceIcon').textContent = icon || '🏁';
+  $('ceWho').textContent = t.name + ' TAKE THE CASE';
+  $('ceWho').style.color = t.cls === 'a' ? 'var(--a)' : 'var(--b)';
+  $('ceWhy').innerHTML = why;
+  paint($('ceGrid'), 'final');   // full key; found tiles stay ticked & faded
+  const done = t.cases >= WIN_CASES;
+  $('btnNext').textContent = done ? 'SEE THE RESULT' : 'NEXT CASE';
+  $('btnNext').dataset.done = done ? '1' : '';
+  show('s-case');
+}
+
+function toMatch() {
+  const w = S.teams[0].cases >= S.teams[1].cases ? 0 : 1;
+  const t = S.teams[w];
+  $('mtWho').textContent = t.name;
+  $('mtWho').style.color = t.cls === 'a' ? 'var(--a)' : 'var(--b)';
+  $('mtScore').textContent = S.teams[0].name + ' ' + S.teams[0].cases + ' — ' + S.teams[1].cases + ' ' + S.teams[1].name;
+  beep('win');
+  show('s-match');
+}
+
+/* ---------------------------------------------------------------
+   RECORD
+   --------------------------------------------------------------- */
+function loadRecord() {
+  try { return JSON.parse(localStorage.getItem(LS_REC) || '{}') || {}; } catch (e) { return {}; }
+}
+function bumpRecord(name) {
+  const r = loadRecord();
+  r[name] = (r[name] || 0) + 1;
+  try { localStorage.setItem(LS_REC, JSON.stringify(r)); } catch (e) {}
+  drawRecord();
+}
+function drawRecord() {
+  const r = loadRecord();
+  const rows = Object.keys(r).sort((a, b) => r[b] - r[a]).slice(0, 5);
+  $('lifetime').innerHTML = rows.length
+    ? rows.map(n => esc(n) + ' — <b style="color:var(--ink)">' + r[n] + '</b>').join('<br>')
+    : 'No cases on file yet.';
+}
+
+/* ---------------------------------------------------------------
+   WIRING
+   --------------------------------------------------------------- */
+$('btnStart').addEventListener('click', () => { beep('tap'); startMatch(); });
+$('btnHow').addEventListener('click', () => show('s-howto'));
+$('btnHowBack').addEventListener('click', () => show('s-setup'));
+$('btnWipe').addEventListener('click', () => {
+  try { localStorage.removeItem(LS_REC); } catch (e) {}
+  drawRecord();
+});
+$('btnShowKey').addEventListener('click', () => { beep('tap'); toBrief(); });
+$('btnLock').addEventListener('click', lockIn);
+$('btnReveal').addEventListener('click', reveal);
+$('btnEnd').addEventListener('click', () => { if (!S.over) finishTurn('Turn handed over.'); });
+$('btnNext').addEventListener('click', () => {
+  if ($('btnNext').dataset.done) toMatch(); else newCase();
+});
+$('btnAgain').addEventListener('click', startMatch);
+$('btnHome').addEventListener('click', () => { stopTimer(); show('s-setup'); });
+$('btnQuit1').addEventListener('click', () => { stopTimer(); show('s-setup'); });
+$('rushSw').addEventListener('click', () => {
+  S.rush = !S.rush;
+  $('rushSw').classList.toggle('on', S.rush);
+  try { localStorage.setItem(LS_RUSH, S.rush ? '1' : '0'); } catch (e) {}
+});
+$('clueIn').addEventListener('input', () => { $('clueErr').textContent = ''; });
+
+/* restore prefs */
+(function init() {
+  try {
+    const n = JSON.parse(localStorage.getItem(LS_NAMES) || 'null');
+    if (n && n.length === 2) { $('nameA').value = n[0]; $('nameB').value = n[1]; }
+    S.rush = localStorage.getItem(LS_RUSH) === '1';
+    $('rushSw').classList.toggle('on', S.rush);
+  } catch (e) {}
+  drawRecord();
+})();
+
+</script>
+</body>
+</html>

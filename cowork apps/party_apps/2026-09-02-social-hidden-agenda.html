@@ -1,0 +1,1370 @@
+<!-- CONCEPT: Hidden Agenda - a same-room social party game where every player secretly draws a mission to pull off during a real timed conversation, then the whole lineup of missions is revealed and each player secretly matches missions to the people they think were running them. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Hidden Agenda</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root{
+  --bg:#0b0e15;
+  --bg2:#111725;
+  --panel:#171e2e;
+  --panel2:#1e2739;
+  --line:#2a3550;
+  --ink:#e8edf7;
+  --dim:#8b97b3;
+  --faint:#5d6884;
+  --gold:#f0b429;
+  --amber:#ff8a3d;
+  --teal:#3ddad7;
+  --green:#43d67f;
+  --red:#ff5f6d;
+  --violet:#9a7dff;
+  --r:16px;
+  --pad:14px;
+}
+
+html, body{
+  margin:0; padding:0;
+  touch-action: manipulation;
+  user-select:none; -webkit-user-select:none;
+  overflow:hidden;
+  height:100%;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+#app{
+  position:relative;
+  height:100%;
+  max-width:620px;
+  margin:0 auto;
+  background:
+    radial-gradient(1000px 520px at 50% -8%, #1b2440 0%, rgba(27,36,64,0) 62%),
+    linear-gradient(180deg,#0b0e15 0%, #0a0d14 100%);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+.screen{
+  display:none;
+  flex-direction:column;
+  height:100%;
+  padding:calc(var(--pad) + 4px) var(--pad) var(--pad);
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.screen.on{ display:flex; }
+
+/* ---------- type ---------- */
+.brand{
+  text-align:center;
+  font-size:clamp(30px,9vw,46px);
+  font-weight:800;
+  letter-spacing:-0.5px;
+  line-height:1;
+  background:linear-gradient(90deg,var(--gold),var(--amber) 55%,var(--violet));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  margin:0;
+}
+.tag{
+  text-align:center;
+  color:var(--dim);
+  font-size:clamp(12px,3.3vw,15px);
+  margin:8px 0 0;
+  line-height:1.45;
+}
+.eyebrow{
+  text-transform:uppercase;
+  letter-spacing:2.2px;
+  font-size:clamp(10px,2.7vw,12px);
+  font-weight:800;
+  color:var(--gold);
+  text-align:center;
+}
+.h2{
+  font-size:clamp(20px,5.6vw,27px);
+  font-weight:800;
+  margin:4px 0 2px;
+  text-align:center;
+  line-height:1.15;
+}
+.sub{
+  color:var(--dim);
+  font-size:clamp(12px,3.2vw,14.5px);
+  text-align:center;
+  line-height:1.45;
+  margin:6px 0 0;
+}
+
+/* ---------- panels ---------- */
+.panel{
+  background:linear-gradient(180deg,var(--panel),var(--panel2));
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  padding:14px;
+}
+.stack{ display:flex; flex-direction:column; gap:10px; }
+.grow{ flex:1 1 auto; min-height:8px; }
+.center{ display:flex; flex-direction:column; justify-content:center; }
+
+/* ---------- buttons ---------- */
+button{
+  font-family:inherit;
+  border:none;
+  cursor:pointer;
+  border-radius:14px;
+  font-weight:800;
+  color:#0b0e15;
+  min-height:52px;
+  font-size:clamp(15px,4.1vw,18px);
+  letter-spacing:0.2px;
+  transition:transform .08s ease, filter .12s ease;
+}
+button:active{ transform:scale(.975); }
+.btn-main{
+  width:100%;
+  background:linear-gradient(135deg,var(--gold),var(--amber));
+  box-shadow:0 8px 22px rgba(240,180,41,.22);
+}
+.btn-teal{
+  width:100%;
+  background:linear-gradient(135deg,var(--teal),#2fb6f2);
+  box-shadow:0 8px 22px rgba(61,218,215,.18);
+}
+.btn-green{
+  width:100%;
+  background:linear-gradient(135deg,var(--green),#22b46a);
+}
+.btn-red{
+  width:100%;
+  background:linear-gradient(135deg,var(--red),#e0344a);
+  color:#fff;
+}
+.btn-ghost{
+  width:100%;
+  background:transparent;
+  border:1.5px solid var(--line);
+  color:var(--dim);
+  min-height:46px;
+  font-size:clamp(13px,3.4vw,15px);
+}
+.btn-sm{ min-height:44px; font-size:clamp(13px,3.4vw,15px); }
+.row{ display:flex; gap:10px; }
+.row > *{ flex:1 1 0; min-width:0; }
+
+/* ---------- setup ---------- */
+.namerow{ display:flex; gap:8px; align-items:center; }
+input[type=text]{
+  flex:1 1 auto;
+  min-width:0;
+  min-height:50px;
+  background:#0d1220;
+  border:1.5px solid var(--line);
+  border-radius:13px;
+  color:var(--ink);
+  padding:0 14px;
+  font-size:16px;
+  font-family:inherit;
+  user-select:text; -webkit-user-select:text;
+}
+input[type=text]:focus{ outline:none; border-color:var(--gold); }
+.add{
+  flex:0 0 54px;
+  background:linear-gradient(135deg,var(--gold),var(--amber));
+  border-radius:13px;
+  font-size:26px;
+  min-height:50px;
+}
+.plist{ display:flex; flex-direction:column; gap:7px; margin-top:10px; }
+.pchip{
+  display:flex; align-items:center; gap:10px;
+  background:#0f1524;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:9px 10px 9px 12px;
+}
+.pchip .num{
+  flex:0 0 26px; height:26px; border-radius:8px;
+  background:#1d2740; color:var(--gold);
+  font-size:12px; font-weight:800;
+  display:flex; align-items:center; justify-content:center;
+}
+.pchip .nm{ flex:1 1 auto; font-weight:700; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pchip .x{
+  flex:0 0 40px; min-height:40px;
+  background:transparent; color:var(--faint);
+  font-size:20px; border-radius:10px;
+}
+.opt{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:11px 2px;
+  border-bottom:1px solid #202a41;
+}
+.opt:last-child{ border-bottom:none; }
+.opt .lbl{ font-size:14px; font-weight:700; }
+.opt .hint{ font-size:11.5px; color:var(--faint); margin-top:3px; line-height:1.35; }
+.seg{ display:flex; gap:6px; flex:0 0 auto; }
+.seg button{
+  min-height:42px; padding:0 12px;
+  background:#0f1524; border:1.5px solid var(--line);
+  color:var(--dim); font-size:14px; border-radius:11px;
+}
+.seg button.sel{ background:linear-gradient(135deg,var(--gold),var(--amber)); color:#0b0e15; border-color:transparent; }
+.tog{
+  flex:0 0 62px; height:36px; border-radius:20px;
+  background:#0f1524; border:1.5px solid var(--line);
+  position:relative; min-height:36px;
+}
+.tog::after{
+  content:''; position:absolute; top:3px; left:3px;
+  width:26px; height:26px; border-radius:50%;
+  background:var(--faint); transition:.16s ease;
+}
+.tog.on{ background:rgba(240,180,41,.18); border-color:var(--gold); }
+.tog.on::after{ left:29px; background:var(--gold); }
+
+/* ---------- pass gate ---------- */
+.gate{ flex:1 1 auto; display:flex; flex-direction:column; justify-content:center; gap:16px; text-align:center; }
+.gate .who{
+  font-size:clamp(30px,9.5vw,44px);
+  font-weight:800;
+  background:linear-gradient(90deg,var(--gold),var(--amber));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  line-height:1.1;
+  word-break:break-word;
+}
+.warn{
+  font-size:12px; color:var(--faint);
+  border:1px dashed #2c3752; border-radius:12px;
+  padding:10px 12px; line-height:1.45;
+}
+
+/* ---------- mission card ---------- */
+.card{
+  border-radius:18px;
+  padding:18px 16px;
+  border:1px solid var(--line);
+  background:linear-gradient(180deg,#1a2234,#141b2a);
+  position:relative;
+  overflow:hidden;
+}
+.card::before{
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(320px 160px at 20% 0%, rgba(240,180,41,.12), transparent 70%);
+  pointer-events:none;
+}
+.tier{
+  display:inline-flex; align-items:center; gap:7px;
+  font-size:11px; font-weight:800; letter-spacing:1.6px;
+  text-transform:uppercase;
+  padding:6px 11px; border-radius:999px;
+  border:1px solid currentColor;
+}
+.t-easy{ color:var(--teal); }
+.t-tricky{ color:var(--gold); }
+.t-bold{ color:var(--amber); }
+.t-clean{ color:var(--violet); }
+.mtext{
+  font-size:clamp(20px,5.8vw,27px);
+  font-weight:800;
+  line-height:1.28;
+  margin:14px 0 12px;
+}
+.mpts{ font-size:13px; color:var(--dim); font-weight:700; }
+
+/* ---------- topic / timer ---------- */
+.topicbox{
+  border-radius:18px; padding:18px 16px;
+  border:1px solid #33406b;
+  background:linear-gradient(180deg,#1b2440,#141b2c);
+}
+.topictext{
+  font-size:clamp(20px,5.8vw,28px);
+  font-weight:800; line-height:1.3;
+}
+.clock{
+  font-size:clamp(54px,17vw,86px);
+  font-weight:800;
+  text-align:center;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-1px;
+  line-height:1;
+  background:linear-gradient(90deg,var(--teal),#5bb8ff);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.clock.low{ background:linear-gradient(90deg,var(--red),var(--amber)); -webkit-background-clip:text; background-clip:text; }
+.bar{ height:9px; border-radius:99px; background:#141b2c; border:1px solid var(--line); overflow:hidden; }
+.bar > i{ display:block; height:100%; width:100%; background:linear-gradient(90deg,var(--teal),#5bb8ff); transition:width .3s linear; }
+.bar.low > i{ background:linear-gradient(90deg,var(--red),var(--amber)); }
+.curve{
+  border-radius:14px; padding:12px 13px;
+  border:1px solid rgba(154,125,255,.45);
+  background:rgba(154,125,255,.10);
+  font-size:14px; line-height:1.4; font-weight:700;
+}
+.curve b{ display:block; color:var(--violet); font-size:11px; letter-spacing:1.6px; margin-bottom:5px; }
+
+/* ---------- lineup ---------- */
+.lu{ display:flex; flex-direction:column; gap:8px; }
+.lurow{
+  display:flex; gap:11px; align-items:flex-start;
+  background:#0f1524; border:1px solid var(--line);
+  border-radius:13px; padding:11px 12px;
+}
+.lt{
+  flex:0 0 32px; height:32px; border-radius:9px;
+  background:linear-gradient(135deg,var(--gold),var(--amber));
+  color:#0b0e15; font-weight:800; font-size:16px;
+  display:flex; align-items:center; justify-content:center;
+}
+.lb{ flex:1 1 auto; font-size:14.5px; line-height:1.38; font-weight:600; }
+.lb small{ display:block; margin-top:4px; font-size:11px; letter-spacing:1.3px; text-transform:uppercase; font-weight:800; }
+
+/* ---------- accuse pickers ---------- */
+.pickgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px; }
+.pk{
+  min-height:50px; padding:8px 6px;
+  background:#0f1524; border:1.5px solid var(--line);
+  color:var(--ink); font-size:14px; border-radius:12px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.pk.sel{ background:linear-gradient(135deg,var(--gold),var(--amber)); color:#0b0e15; border-color:transparent; }
+.pk:disabled{ opacity:.28; }
+.letgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(52px,1fr)); gap:8px; }
+.lk{
+  min-height:52px;
+  background:#0f1524; border:1.5px solid var(--line);
+  color:var(--ink); font-size:19px; border-radius:12px;
+}
+.lk.sel{ background:linear-gradient(135deg,var(--teal),#2fb6f2); color:#0b0e15; border-color:transparent; }
+.miniline{ font-size:12.5px; color:var(--dim); line-height:1.4; min-height:34px; }
+
+/* ---------- debrief ---------- */
+.verdict{
+  display:flex; flex-direction:column; gap:7px; margin-top:4px;
+}
+.vr{
+  display:flex; gap:9px; align-items:center;
+  font-size:13.5px; padding:9px 11px;
+  border-radius:11px; background:#0f1524; border:1px solid var(--line);
+  line-height:1.35;
+}
+.vr .ic{ flex:0 0 20px; font-size:15px; text-align:center; }
+.vr.hit{ border-color:rgba(67,214,127,.45); background:rgba(67,214,127,.08); }
+.vr.miss{ opacity:.72; }
+.ptline{
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:14px; padding:9px 2px; border-bottom:1px solid #202a41;
+}
+.ptline:last-child{ border-bottom:none; }
+.ptline b{ font-variant-numeric:tabular-nums; }
+.plus{ color:var(--green); }
+.zero{ color:var(--faint); }
+.totalrow{
+  margin-top:8px; padding-top:11px; border-top:1.5px solid var(--line);
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-size:17px; font-weight:800;
+}
+.totalrow span:last-child{ color:var(--gold); font-size:23px; }
+
+/* ---------- scoreboard ---------- */
+.sb{ display:flex; flex-direction:column; gap:8px; }
+.sbrow{
+  display:flex; align-items:center; gap:11px;
+  background:#0f1524; border:1px solid var(--line);
+  border-radius:13px; padding:11px 13px;
+}
+.sbrow.lead{ border-color:var(--gold); background:linear-gradient(90deg,rgba(240,180,41,.13),#0f1524 70%); }
+.sbrow .rk{ flex:0 0 24px; color:var(--faint); font-weight:800; font-size:14px; }
+.sbrow .nm{ flex:1 1 auto; font-weight:700; font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sbrow .dl{ flex:0 0 auto; color:var(--green); font-size:13px; font-weight:800; }
+.sbrow .sc{ flex:0 0 auto; font-weight:800; font-size:20px; color:var(--gold); font-variant-numeric:tabular-nums; }
+
+.crown{ font-size:clamp(46px,14vw,64px); text-align:center; line-height:1; }
+.winner{
+  text-align:center; font-size:clamp(26px,8vw,38px); font-weight:800;
+  background:linear-gradient(90deg,var(--gold),var(--amber));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  line-height:1.15; word-break:break-word;
+}
+
+.pill{
+  display:inline-block; font-size:11px; font-weight:800;
+  letter-spacing:1.4px; text-transform:uppercase;
+  color:var(--faint); border:1px solid var(--line);
+  border-radius:999px; padding:5px 11px;
+}
+.hdr{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.hdr .pill{ flex:0 0 auto; }
+.rules{ font-size:13px; color:var(--dim); line-height:1.55; }
+.rules b{ color:var(--ink); }
+.rules li{ margin-bottom:7px; }
+.rules ol{ padding-left:20px; margin:8px 0 0; }
+.fade{ animation:fade .25s ease; }
+@keyframes fade{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= SETUP ================= -->
+  <section class="screen on" id="s-setup">
+    <h1 class="brand">Hidden Agenda</h1>
+    <p class="tag">Everyone gets a secret mission. Then you all just… talk. Afterwards the room tries to work out who was up to what.</p>
+
+    <div class="panel" style="margin-top:14px">
+      <div class="eyebrow" style="text-align:left">Who's playing</div>
+      <div class="namerow" style="margin-top:10px">
+        <input type="text" id="nameIn" placeholder="Add a name" maxlength="14" autocomplete="off">
+        <button class="add" id="addBtn">+</button>
+      </div>
+      <div class="plist" id="plist"></div>
+      <div class="sub" id="pcount" style="margin-top:10px">3 to 10 players</div>
+    </div>
+
+    <div class="panel" style="margin-top:10px">
+      <div class="eyebrow" style="text-align:left;margin-bottom:4px">Setup</div>
+      <div class="opt">
+        <div>
+          <div class="lbl">Talk time</div>
+          <div class="hint">How long the conversation runs each round</div>
+        </div>
+        <div class="seg" id="segTime">
+          <button data-v="180">3m</button>
+          <button data-v="240" class="sel">4m</button>
+          <button data-v="360">6m</button>
+        </div>
+      </div>
+      <div class="opt">
+        <div>
+          <div class="lbl">Rounds</div>
+          <div class="hint">New missions and a new topic each round</div>
+        </div>
+        <div class="seg" id="segRounds">
+          <button data-v="2">2</button>
+          <button data-v="3" class="sel">3</button>
+          <button data-v="4">4</button>
+        </div>
+      </div>
+      <div class="opt">
+        <div>
+          <div class="lbl">Clean Slate card</div>
+          <div class="hint">One player gets no mission at all — they score by looking guilty anyway. A decoy mission joins the lineup.</div>
+        </div>
+        <button class="tog" id="togClean" aria-label="Clean Slate"></button>
+      </div>
+      <div class="opt">
+        <div>
+          <div class="lbl">Curveballs</div>
+          <div class="hint">A rule change drops on the room halfway through the talk</div>
+        </div>
+        <button class="tog on" id="togCurve" aria-label="Curveballs"></button>
+      </div>
+    </div>
+
+    <div class="stack" style="margin-top:12px;padding-bottom:6px">
+      <button class="btn-main" id="startBtn">Start Briefing</button>
+      <button class="btn-ghost" id="howBtn">How to play</button>
+    </div>
+  </section>
+
+  <!-- ================= HOW TO PLAY ================= -->
+  <section class="screen" id="s-how">
+    <div class="hdr"><span class="pill">How to play</span><span class="pill" id="howClose2">Close</span></div>
+    <div class="panel rules">
+      <ol>
+        <li><b>Briefing.</b> Pass the phone around. Each player privately reads their secret mission — something to pull off during ordinary conversation, like <i>"get somebody to stand up"</i>.</li>
+        <li><b>The talk.</b> An agenda item appears and the clock starts. Everyone discusses it out loud like normal humans, while quietly working their mission. Don't be obvious.</li>
+        <li><b>The lineup.</b> Time's up. Every mission in play is now shown to the room, shuffled and unlabelled. This is when it all clicks — <i>that's</i> why she kept mentioning her knees.</li>
+        <li><b>Accusations.</b> Pass the phone again. Each player secretly names one person and one mission letter: who was running what.</li>
+        <li><b>Debrief.</b> One by one, each mission is revealed. The room decides out loud whether that player actually pulled it off.</li>
+      </ol>
+      <div style="margin-top:14px" class="eyebrow">Scoring</div>
+      <div style="margin-top:8px">
+        <div class="ptline"><span>Mission completed</span><b>+2 to +4</b></div>
+        <div class="ptline"><span>…and nobody matched you to it</span><b>+3 stealth</b></div>
+        <div class="ptline"><span>Correctly matching a mission to its owner</span><b>+3</b></div>
+        <div class="ptline"><span>Clean Slate: each accusation aimed at you</span><b>+2</b></div>
+      </div>
+    </div>
+    <div class="grow"></div>
+    <button class="btn-main" id="howClose" style="margin-top:12px">Got it</button>
+  </section>
+
+  <!-- ================= BRIEFING ================= -->
+  <section class="screen" id="s-brief">
+    <div class="hdr"><span class="pill" id="briefRound">Round 1</span><span class="pill" id="briefProg">1 / 4</span></div>
+    <div class="gate" id="briefGate">
+      <div class="eyebrow">Pass the phone to</div>
+      <div class="who" id="briefWho">—</div>
+      <div class="warn">Everyone else: eyes up. Nobody sees anybody else's mission.</div>
+      <button class="btn-main" id="briefShow">Show my mission</button>
+    </div>
+    <div class="gate" id="briefCard" style="display:none">
+      <div class="card fade">
+        <span class="tier" id="briefTier">EASY</span>
+        <div class="mtext" id="briefText">—</div>
+        <div class="mpts" id="briefPts">Worth 2 points</div>
+      </div>
+      <div class="warn">Memorise it. You can't look again once you tap below.</div>
+      <button class="btn-teal" id="briefNext">Memorised — hide it</button>
+    </div>
+  </section>
+
+  <!-- ================= TALK / TIMER ================= -->
+  <section class="screen" id="s-talk">
+    <div class="hdr"><span class="pill" id="talkRound">Round 1</span><span class="pill">Talk it out</span></div>
+    <div class="topicbox">
+      <div class="eyebrow" style="text-align:left">Agenda item</div>
+      <div class="topictext" id="topicText" style="margin-top:9px">—</div>
+    </div>
+    <div class="grow"></div>
+    <div class="clock" id="clock">4:00</div>
+    <div class="bar" id="bar" style="margin-top:12px"><i id="barFill"></i></div>
+    <div class="sub" id="talkHint" style="margin-top:12px">Discuss it properly. Work your mission in without getting spotted.</div>
+    <div id="curveWrap" style="margin-top:12px"></div>
+    <div class="grow"></div>
+    <div class="stack" style="padding-bottom:6px">
+      <div class="row">
+        <button class="btn-ghost" id="pauseBtn">Pause</button>
+        <button class="btn-ghost" id="plusBtn">+1 min</button>
+      </div>
+      <button class="btn-main" id="endTalk">Time's up — to the lineup</button>
+    </div>
+  </section>
+
+  <!-- ================= LINEUP ================= -->
+  <section class="screen" id="s-lineup">
+    <div class="hdr"><span class="pill" id="luRound">Round 1</span><span class="pill">The lineup</span></div>
+    <div class="eyebrow">Every mission that was in play</div>
+    <p class="sub" style="margin-bottom:12px">Read them out loud. Somebody in this room was running each one.</p>
+    <div class="lu" id="luList"></div>
+    <div class="grow" style="min-height:14px"></div>
+    <button class="btn-main" id="toAccuse" style="margin-top:8px">Start accusations</button>
+  </section>
+
+  <!-- ================= ACCUSE ================= -->
+  <section class="screen" id="s-accuse">
+    <div class="hdr"><span class="pill" id="accRound">Round 1</span><span class="pill" id="accProg">1 / 4</span></div>
+    <div class="gate" id="accGate">
+      <div class="eyebrow">Pass the phone to</div>
+      <div class="who" id="accWho">—</div>
+      <div class="warn">Your accusation is secret. Nobody sees it until the debrief.</div>
+      <button class="btn-main" id="accShow">That's me</button>
+    </div>
+    <div id="accForm" style="display:none;flex:1 1 auto;flex-direction:column">
+      <div class="eyebrow" style="text-align:left">1 — Who was up to something?</div>
+      <div class="pickgrid" id="accPeople" style="margin-top:9px"></div>
+      <div class="eyebrow" style="text-align:left;margin-top:16px">2 — Which mission were they running?</div>
+      <div class="letgrid" id="accLetters" style="margin-top:9px"></div>
+      <div class="miniline" id="accEcho" style="margin-top:11px">Pick a person, then a mission letter.</div>
+      <div class="grow"></div>
+      <div class="stack" style="padding-bottom:6px">
+        <button class="btn-main" id="accLock" disabled>Lock it in</button>
+        <button class="btn-ghost" id="accSkip">No idea — skip my accusation</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DEBRIEF ================= -->
+  <section class="screen" id="s-debrief">
+    <div class="hdr"><span class="pill" id="dbRound">Round 1</span><span class="pill" id="dbProg">1 / 4</span></div>
+
+    <div id="dbAsk" style="flex:1 1 auto;display:flex;flex-direction:column">
+      <div class="eyebrow">Mission belonged to</div>
+      <div class="who" id="dbWho" style="margin:6px 0 12px">—</div>
+      <div class="card">
+        <span class="tier" id="dbTier">EASY</span>
+        <div class="mtext" id="dbText">—</div>
+        <div class="mpts" id="dbPts">Worth 2 points</div>
+      </div>
+      <div class="sub" style="margin-top:14px">Room decides: did they actually pull it off?</div>
+      <div class="grow"></div>
+      <div class="row" style="padding-bottom:6px">
+        <button class="btn-red" id="dbFail">Nope</button>
+        <button class="btn-green" id="dbDone">They did it</button>
+      </div>
+    </div>
+
+    <div id="dbRes" style="display:none;flex:1 1 auto;flex-direction:column">
+      <div class="eyebrow" id="dbResTop">Result</div>
+      <div class="who" id="dbResWho" style="font-size:clamp(24px,7.5vw,34px);margin:6px 0 10px">—</div>
+      <div class="panel">
+        <div class="eyebrow" style="text-align:left">Who called it</div>
+        <div class="verdict" id="dbAcc" style="margin-top:9px"></div>
+      </div>
+      <div class="panel" style="margin-top:10px">
+        <div id="dbPtsList"></div>
+        <div class="totalrow"><span>This mission</span><span id="dbTotal">+0</span></div>
+      </div>
+      <div class="grow"></div>
+      <button class="btn-main" id="dbNext" style="padding-bottom:0;margin-bottom:6px">Next</button>
+    </div>
+  </section>
+
+  <!-- ================= SCORES ================= -->
+  <section class="screen" id="s-scores">
+    <div class="hdr"><span class="pill" id="scRound">Round 1</span><span class="pill">Standings</span></div>
+    <div class="eyebrow">After the debrief</div>
+    <h2 class="h2" id="scTitle">Round 1 done</h2>
+    <div class="sb" id="scList" style="margin-top:14px"></div>
+    <div class="grow" style="min-height:14px"></div>
+    <button class="btn-main" id="scNext">Next round</button>
+  </section>
+
+  <!-- ================= FINAL ================= -->
+  <section class="screen" id="s-final">
+    <div class="grow"></div>
+    <div class="crown">👑</div>
+    <div class="eyebrow" style="margin-top:10px">Most convincing liar in the room</div>
+    <div class="winner" id="fnWho" style="margin-top:6px">—</div>
+    <div class="sub" id="fnLine" style="margin-top:8px">—</div>
+    <div class="sb" id="fnList" style="margin-top:18px"></div>
+    <div class="grow"></div>
+    <div class="stack" style="padding-bottom:6px">
+      <button class="btn-main" id="fnAgain">Play again — same crew</button>
+      <button class="btn-ghost" id="fnNew">New line-up</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ============================================================
+   CONTENT
+   ============================================================ */
+const MISSIONS = [
+  /* --- EASY: 2 pts, things you do yourself --- */
+  {t:"Say the word “banana” out loud.", d:0},
+  {t:"Mention the weather twice.", d:0},
+  {t:"Compliment somebody's shoes.", d:0},
+  {t:"Yawn loudly at least twice.", d:0},
+  {t:"Say “to be honest” three times.", d:0},
+  {t:"Mention a food you can't stand.", d:0},
+  {t:"Use the word “obviously” twice.", d:0},
+  {t:"Say the word “actually” four times.", d:0},
+  {t:"Mention an animal that lives in the sea.", d:0},
+  {t:"Cross and uncross your arms five times.", d:0},
+  {t:"Sigh dramatically twice.", d:0},
+  {t:"Mention three different colours.", d:0},
+  {t:"Work the word “cheese” into a sentence.", d:0},
+  {t:"Complain about being tired.", d:0},
+  {t:"Mention something that happened “last Tuesday”.", d:0},
+  {t:"Refer to yourself in the third person once.", d:0},
+  {t:"Say “no offence, but…” at least once.", d:0},
+  {t:"Mention your knees.", d:0},
+  {t:"Whisper one whole sentence.", d:0},
+  {t:"Ask somebody what the time is.", d:0},
+  {t:"Mention a country nobody has brought up yet.", d:0},
+  {t:"Say “that reminds me” twice.", d:0},
+
+  /* --- TRICKY: 3 pts, steering the conversation --- */
+  {t:"Get somebody else to say “yes” three times.", d:1},
+  {t:"Steer the conversation onto pets.", d:1},
+  {t:"Make somebody laugh at something you said.", d:1},
+  {t:"Ask three questions in a row without answering any.", d:1},
+  {t:"Get somebody to agree with you out loud.", d:1},
+  {t:"Change the subject completely — twice.", d:1},
+  {t:"Get the room talking about food for a whole minute.", d:1},
+  {t:"Make the player on your left repeat something they said.", d:1},
+  {t:"Quote a completely made-up statistic with a percentage in it.", d:1},
+  {t:"Get somebody to ask you a question about your family.", d:1},
+  {t:"Mention the same object three separate times.", d:1},
+  {t:"Speak only in short sentences for the whole round.", d:1},
+  {t:"Get somebody to say “I don't know”.", d:1},
+  {t:"Agree with everything the player on your right says.", d:1},
+  {t:"Get the room arguing about something trivial for 30 seconds.", d:1},
+  {t:"Never say the word “I” for the whole round.", d:1},
+  {t:"Get somebody to say a number bigger than one hundred.", d:1},
+  {t:"Bring up a film, then get somebody else to name a different one.", d:1},
+  {t:"Get somebody to use the word “weird”.", d:1},
+  {t:"Use a word nobody here knows and never explain it.", d:1},
+  {t:"Bring up the same topic three times, no matter what else is happening.", d:1},
+  {t:"Get somebody to mention a family member by name.", d:1},
+
+  /* --- BOLD: 4 pts, making other people do things --- */
+  {t:"Get somebody to stand up.", d:2},
+  {t:"Get somebody else to say the word “pineapple”.", d:2},
+  {t:"Get two other players to high-five.", d:2},
+  {t:"Get somebody to repeat a phrase you invented.", d:2},
+  {t:"Get the whole room to look at the ceiling.", d:2},
+  {t:"Get somebody to move to a different seat.", d:2},
+  {t:"Get somebody to hand you an object.", d:2},
+  {t:"Get two other players to openly disagree with each other.", d:2},
+  {t:"Get somebody else to yawn.", d:2},
+  {t:"Get the room to vote on something by raising hands.", d:2},
+  {t:"Get somebody to say your name.", d:2},
+  {t:"Get somebody to sing or hum something.", d:2},
+  {t:"Get somebody to copy a gesture you made.", d:2},
+  {t:"Get somebody to spell a word out loud.", d:2},
+  {t:"Get somebody to admit they were wrong about something.", d:2},
+  {t:"Get somebody to count out loud.", d:2},
+  {t:"Get another player to compliment you.", d:2},
+  {t:"Get somebody else to whisper.", d:2},
+  {t:"Get the player on your right to talk for 30 seconds uninterrupted.", d:2},
+  {t:"Get somebody to clap.", d:2},
+  {t:"Get two people to say the same word within a few seconds of each other.", d:2},
+  {t:"Get somebody to point at something across the room.", d:2}
+];
+
+const TIERS = [
+  {name:"Easy",   pts:2, cls:"t-easy"},
+  {name:"Tricky", pts:3, cls:"t-tricky"},
+  {name:"Bold",   pts:4, cls:"t-bold"}
+];
+
+const TOPICS = [
+  "What's the worst chore in this house, and why is it that one?",
+  "Best snack of all time. Defend your answer.",
+  "Should school start later in the morning?",
+  "Which animal would make the absolute worst pet?",
+  "Plan the perfect birthday party for somebody in this room.",
+  "Name something everybody loves that is secretly overrated.",
+  "Pineapple on pizza. Settle it once and for all.",
+  "If we all had to move to one country tomorrow, which one?",
+  "What is genuinely the best day of the week?",
+  "Invent a new public holiday and explain who gets it off.",
+  "Which superpower would actually be useless in real life?",
+  "What smell is the single best smell?",
+  "Rank the four seasons, worst to best. Show your reasoning.",
+  "Name one rule in this house that should be scrapped.",
+  "Cats or dogs. No fence-sitting allowed.",
+  "What is the most annoying sound in the world?",
+  "Design the menu for a restaurant this family would run.",
+  "What's the best film ever made? Somebody has to be wrong here.",
+  "Would you rather be extremely tall or extremely small?",
+  "What's one skill absolutely everybody should learn?",
+  "Which board game should be banned from this house?",
+  "What is the worst possible gift to receive?",
+  "You get a whole free day with no plans. What happens?",
+  "Rank breakfast foods. This will end badly.",
+  "Should everybody have to learn how to cook properly?",
+  "What is the most useless invention ever made?",
+  "Where should the next family holiday be, realistically?",
+  "What's the scariest animal? Be honest.",
+  "Best ice cream flavour. Fight about it.",
+  "Name something everybody else likes but you don't.",
+  "Who is the greatest cartoon character of all time?",
+  "Which ordinary household object is secretly amazing?",
+  "Should dogs be allowed in restaurants?",
+  "What's genuinely the best thing about winter?",
+  "What job would you be absolutely terrible at?",
+  "If you could only eat one meal for the rest of your life, what is it?",
+  "What counts as the best possible weather?",
+  "Beach or mountains. Pick a side and hold it.",
+  "What's the most unnecessary thing in this room right now?",
+  "Name a food that should be discontinued entirely."
+];
+
+const CURVEBALLS = [
+  "Everybody must speak at least once in the next minute.",
+  "No questions allowed for the next 30 seconds.",
+  "Whoever is talking right now has to stop for 20 seconds.",
+  "Everybody stand up and stay standing.",
+  "The word “yeah” is banned from here on.",
+  "Talk in whispers only for the next 30 seconds.",
+  "Everybody put one hand on their head until they forget.",
+  "The person on the left of whoever's holding the phone leads the discussion now.",
+  "No names for the rest of the round.",
+  "Everybody has to agree with the next thing that's said.",
+  "Nobody may interrupt anybody for a full minute.",
+  "Swap seats with somebody, right now."
+];
+
+const LETTERS = "ABCDEFGHIJKL".split("");
+const LS_KEY = "cowork-hiddenagenda-roster";
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const S = {
+  players:[],           // [{name, score}]
+  roundSecs:240,
+  totalRounds:3,
+  cleanSlate:false,
+  curveballs:true,
+  round:0,
+  used:new Set(),       // mission texts used this game
+  usedTopics:new Set(),
+  lineup:[],            // [{t,d,owner}]  owner = player index or -1 (decoy)
+  ownerOf:[],           // player index -> lineup index (or -1 if Clean Slate)
+  cleanIdx:-1,
+  topic:"",
+  curve:null,
+  briefIdx:0,
+  accuseIdx:0,
+  accusations:[],       // player index -> {target, letter} | null
+  order:[],             // debrief order (lineup indices)
+  dbIdx:0,
+  roundDelta:[],
+  pickT:-1, pickL:-1,
+  timer:null, endAt:0, remain:0, paused:false, curveShown:false
+};
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const shuffle = a => { for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+function show(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
+  $(id).classList.add("on");
+  $(id).scrollTop = 0;
+}
+
+/* ---- sound ---- */
+let AC=null;
+function ac(){
+  if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+  if(AC && AC.state==="suspended") AC.resume();
+  return AC;
+}
+function tone(freq,dur,type,vol,when){
+  const c=ac(); if(!c) return;
+  const t0=c.currentTime+(when||0);
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type||"sine"; o.frequency.setValueAtTime(freq,t0);
+  g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(vol||0.16,t0+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t0); o.stop(t0+dur+0.03);
+}
+const sTap    = ()=> tone(520,0.05,"triangle",0.07);
+const sReveal = ()=>{ tone(392,0.16,"sine",0.13); tone(587,0.22,"sine",0.11,0.09); };
+const sGood   = ()=>{ tone(523,0.12,"triangle",0.14); tone(784,0.2,"triangle",0.12,0.09); tone(1046,0.26,"sine",0.09,0.19); };
+const sBad    = ()=>{ tone(196,0.28,"sawtooth",0.10); tone(146,0.34,"sawtooth",0.08,0.05); };
+const sCurve  = ()=>{ tone(660,0.1,"square",0.08); tone(880,0.14,"square",0.07,0.08); };
+function sBuzz(){
+  tone(180,0.5,"square",0.11); tone(140,0.55,"square",0.10,0.06);
+  tone(180,0.5,"square",0.11,0.62); tone(140,0.55,"square",0.10,0.68);
+}
+function sWin(){
+  [523,659,784,1046].forEach((f,i)=> tone(f,0.4,"triangle",0.13,i*0.12));
+}
+
+/* ============================================================
+   SETUP SCREEN
+   ============================================================ */
+function loadRoster(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){
+      const a = JSON.parse(raw);
+      if(Array.isArray(a)) a.slice(0,10).forEach(n=>{ if(typeof n==="string" && n.trim()) S.players.push({name:n.trim().slice(0,14), score:0}); });
+    }
+  }catch(e){}
+}
+function saveRoster(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(S.players.map(p=>p.name))); }catch(e){}
+}
+
+function renderPlayers(){
+  const box = $("plist");
+  box.innerHTML = S.players.map((p,i)=>
+    '<div class="pchip"><div class="num">'+(i+1)+'</div><div class="nm">'+esc(p.name)+'</div>'+
+    '<button class="x" data-i="'+i+'">✕</button></div>'
+  ).join("");
+  box.querySelectorAll(".x").forEach(b=> b.onclick = ()=>{
+    sTap(); S.players.splice(+b.dataset.i,1); renderPlayers();
+  });
+  const n = S.players.length;
+  $("pcount").textContent = n<3 ? ("Add "+(3-n)+" more — 3 players minimum") :
+    (n+" player"+(n===1?"":"s")+" · add up to "+(10-n)+" more");
+  $("startBtn").disabled = n<3;
+  $("startBtn").style.opacity = n<3 ? 0.4 : 1;
+}
+
+function addPlayer(){
+  const inp = $("nameIn");
+  const v = inp.value.trim().slice(0,14);
+  if(!v || S.players.length>=10) return;
+  if(S.players.some(p=>p.name.toLowerCase()===v.toLowerCase())){ inp.value=""; return; }
+  S.players.push({name:v, score:0});
+  inp.value=""; inp.focus();
+  sTap(); renderPlayers();
+}
+$("addBtn").onclick = addPlayer;
+$("nameIn").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); addPlayer(); } });
+
+function wireSeg(id, cb){
+  const box = $(id);
+  box.querySelectorAll("button").forEach(b=> b.onclick = ()=>{
+    box.querySelectorAll("button").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel"); sTap(); cb(+b.dataset.v);
+  });
+}
+wireSeg("segTime", v=> S.roundSecs=v);
+wireSeg("segRounds", v=> S.totalRounds=v);
+
+$("togClean").onclick = e=>{ e.currentTarget.classList.toggle("on"); S.cleanSlate = e.currentTarget.classList.contains("on"); sTap(); };
+$("togCurve").onclick = e=>{ e.currentTarget.classList.toggle("on"); S.curveballs = e.currentTarget.classList.contains("on"); sTap(); };
+
+$("howBtn").onclick = ()=>{ sTap(); show("s-how"); };
+$("howClose").onclick = $("howClose2").onclick = ()=>{ sTap(); show("s-setup"); };
+
+$("startBtn").onclick = ()=>{
+  if(S.players.length<3) return;
+  saveRoster();
+  S.players.forEach(p=>p.score=0);
+  S.round = 0;
+  S.used.clear(); S.usedTopics.clear();
+  sReveal();
+  startRound();
+};
+
+/* ============================================================
+   ROUND SETUP
+   ============================================================ */
+function drawMissions(n){
+  let pool = MISSIONS.filter(m=>!S.used.has(m.t));
+  if(pool.length < n){ S.used.clear(); pool = MISSIONS.slice(); }
+  /* spread the difficulty tiers so a round isn't all easy or all bold */
+  const byTier = [0,1,2].map(d=> shuffle(pool.filter(m=>m.d===d)));
+  const out = [];
+  let d = Math.floor(Math.random()*3);
+  while(out.length < n){
+    let placed = false;
+    for(let k=0;k<3 && !placed;k++){
+      const bin = byTier[(d+k)%3];
+      if(bin.length){ out.push(bin.pop()); placed = true; d = (d+k+1)%3; }
+    }
+    if(!placed) break;
+  }
+  out.forEach(m=>S.used.add(m.t));
+  return shuffle(out);
+}
+
+function drawTopic(){
+  let pool = TOPICS.filter(t=>!S.usedTopics.has(t));
+  if(!pool.length){ S.usedTopics.clear(); pool = TOPICS.slice(); }
+  const t = pool[Math.floor(Math.random()*pool.length)];
+  S.usedTopics.add(t);
+  return t;
+}
+
+function startRound(){
+  S.round++;
+  const n = S.players.length;
+  S.cleanIdx = S.cleanSlate ? Math.floor(Math.random()*n) : -1;
+
+  const cards = drawMissions(n);          /* n cards: n-1 real + 1 decoy when Clean Slate is on */
+  const entries = [];
+  let ci = 0;
+  S.ownerOf = new Array(n).fill(-1);
+  for(let i=0;i<n;i++){
+    if(i===S.cleanIdx) continue;
+    entries.push({t:cards[ci].t, d:cards[ci].d, owner:i});
+    ci++;
+  }
+  if(S.cleanIdx>=0 && cards[ci]) entries.push({t:cards[ci].t, d:cards[ci].d, owner:-1});
+
+  S.lineup = shuffle(entries);
+  S.lineup.forEach((e,idx)=>{ if(e.owner>=0) S.ownerOf[e.owner]=idx; });
+
+  S.topic = drawTopic();
+  S.curve = S.curveballs ? CURVEBALLS[Math.floor(Math.random()*CURVEBALLS.length)] : null;
+  S.curveShown = false;
+
+  S.accusations = new Array(n).fill(null);
+  S.roundDelta = new Array(n).fill(0);
+  S.briefIdx = 0;
+  S.accuseIdx = 0;
+  S.dbIdx = 0;
+  S.order = S.lineup.map((_,i)=>i);   /* debrief in lineup order: A, B, C... */
+
+  renderBriefGate();
+  show("s-brief");
+}
+
+/* ============================================================
+   BRIEFING
+   ============================================================ */
+function renderBriefGate(){
+  const n = S.players.length;
+  $("briefRound").textContent = "Round "+S.round+" of "+S.totalRounds;
+  $("briefProg").textContent = (S.briefIdx+1)+" / "+n;
+  $("briefWho").textContent = S.players[S.briefIdx].name;
+  $("briefGate").style.display = "flex";
+  $("briefCard").style.display = "none";
+}
+
+$("briefShow").onclick = ()=>{
+  const i = S.briefIdx;
+  const isClean = (i===S.cleanIdx);
+  const tierEl = $("briefTier");
+  if(isClean){
+    tierEl.className = "tier t-clean";
+    tierEl.textContent = "Clean Slate";
+    $("briefText").textContent = "You have no mission at all. Act like you do.";
+    $("briefPts").textContent = "+2 for every accusation aimed at you tonight";
+  }else{
+    const e = S.lineup[S.ownerOf[i]];
+    const T = TIERS[e.d];
+    tierEl.className = "tier "+T.cls;
+    tierEl.textContent = T.name;
+    $("briefText").textContent = e.t;
+    $("briefPts").textContent = "Worth "+T.pts+" points · +3 more if nobody pins it on you";
+  }
+  sReveal();
+  $("briefGate").style.display = "none";
+  $("briefCard").style.display = "flex";
+};
+
+$("briefNext").onclick = ()=>{
+  sTap();
+  S.briefIdx++;
+  if(S.briefIdx >= S.players.length) startTalk();
+  else renderBriefGate();
+};
+
+/* ============================================================
+   TALK / TIMER
+   ============================================================ */
+function fmt(s){
+  s = Math.max(0, Math.ceil(s));
+  return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+}
+
+function startTalk(){
+  $("talkRound").textContent = "Round "+S.round+" of "+S.totalRounds;
+  $("topicText").textContent = S.topic;
+  $("curveWrap").innerHTML = "";
+  S.remain = S.roundSecs;
+  S.endAt = Date.now() + S.roundSecs*1000;
+  S.paused = false;
+  $("pauseBtn").textContent = "Pause";
+  paintClock();
+  show("s-talk");
+  sReveal();
+  clearInterval(S.timer);
+  S.timer = setInterval(tick, 200);
+}
+
+function paintClock(){
+  const total = Math.max(1, S.roundSecs);
+  const frac = Math.max(0, Math.min(1, S.remain/total));
+  $("clock").textContent = fmt(S.remain);
+  $("barFill").style.width = (frac*100)+"%";
+  const low = S.remain <= 30;
+  $("clock").classList.toggle("low", low);
+  $("bar").classList.toggle("low", low);
+}
+
+function tick(){
+  if(S.paused) return;
+  S.remain = (S.endAt - Date.now())/1000;
+  if(!S.curveShown && S.curve && S.remain <= S.roundSecs/2){
+    S.curveShown = true;
+    $("curveWrap").innerHTML = '<div class="curve fade"><b>CURVEBALL</b>'+esc(S.curve)+'</div>';
+    sCurve();
+  }
+  if(S.remain <= 0){
+    S.remain = 0;
+    paintClock();
+    clearInterval(S.timer); S.timer=null;
+    sBuzz();
+    setTimeout(goLineup, 700);
+    return;
+  }
+  paintClock();
+}
+
+$("pauseBtn").onclick = ()=>{
+  sTap();
+  if(S.paused){
+    S.paused = false;
+    S.endAt = Date.now() + S.remain*1000;
+    $("pauseBtn").textContent = "Pause";
+  }else{
+    S.paused = true;
+    $("pauseBtn").textContent = "Resume";
+  }
+};
+$("plusBtn").onclick = ()=>{
+  sTap();
+  S.roundSecs += 60;
+  S.remain += 60;
+  if(!S.paused) S.endAt = Date.now() + S.remain*1000;
+  paintClock();
+};
+$("endTalk").onclick = ()=>{ sTap(); clearInterval(S.timer); S.timer=null; goLineup(); };
+
+/* ============================================================
+   LINEUP
+   ============================================================ */
+function goLineup(){
+  clearInterval(S.timer); S.timer=null;
+  $("luRound").textContent = "Round "+S.round+" of "+S.totalRounds;
+  $("luList").innerHTML = S.lineup.map((e,i)=>{
+    const T = TIERS[e.d];
+    return '<div class="lurow"><div class="lt">'+LETTERS[i]+'</div><div class="lb">'+esc(e.t)+
+           '<small class="'+T.cls+'">'+T.name+' · '+T.pts+' pts</small></div></div>';
+  }).join("");
+  show("s-lineup");
+  sReveal();
+}
+$("toAccuse").onclick = ()=>{ sTap(); renderAccGate(); show("s-accuse"); };
+
+/* ============================================================
+   ACCUSATIONS
+   ============================================================ */
+function renderAccGate(){
+  $("accRound").textContent = "Round "+S.round+" of "+S.totalRounds;
+  $("accProg").textContent = (S.accuseIdx+1)+" / "+S.players.length;
+  $("accWho").textContent = S.players[S.accuseIdx].name;
+  $("accGate").style.display = "flex";
+  $("accForm").style.display = "none";
+}
+
+$("accShow").onclick = ()=>{
+  sTap();
+  S.pickT = -1; S.pickL = -1;
+  const me = S.accuseIdx;
+  $("accPeople").innerHTML = S.players.map((p,i)=>
+    '<button class="pk" data-i="'+i+'"'+(i===me?" disabled":"")+'>'+esc(p.name)+'</button>'
+  ).join("");
+  $("accLetters").innerHTML = S.lineup.map((_,i)=>
+    '<button class="lk" data-i="'+i+'">'+LETTERS[i]+'</button>'
+  ).join("");
+  $("accPeople").querySelectorAll(".pk").forEach(b=> b.onclick = ()=>{
+    if(b.disabled) return;
+    S.pickT = +b.dataset.i; sTap();
+    $("accPeople").querySelectorAll(".pk").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel"); paintAccEcho();
+  });
+  $("accLetters").querySelectorAll(".lk").forEach(b=> b.onclick = ()=>{
+    S.pickL = +b.dataset.i; sTap();
+    $("accLetters").querySelectorAll(".lk").forEach(x=>x.classList.remove("sel"));
+    b.classList.add("sel"); paintAccEcho();
+  });
+  paintAccEcho();
+  $("accGate").style.display = "none";
+  $("accForm").style.display = "flex";
+};
+
+function paintAccEcho(){
+  const ok = S.pickT>=0 && S.pickL>=0;
+  $("accLock").disabled = !ok;
+  $("accLock").style.opacity = ok ? 1 : 0.4;
+  if(!ok){
+    $("accEcho").textContent = S.pickT<0 ? "Pick a person, then a mission letter." : "Now pick which mission they were running.";
+  }else{
+    $("accEcho").innerHTML = '<b style="color:var(--ink)">'+esc(S.players[S.pickT].name)+'</b> was running <b style="color:var(--teal)">'+
+      LETTERS[S.pickL]+'</b> — “'+esc(S.lineup[S.pickL].t)+'”';
+  }
+}
+
+function nextAccuser(){
+  S.accuseIdx++;
+  if(S.accuseIdx >= S.players.length){ startDebrief(); }
+  else renderAccGate();
+}
+$("accLock").onclick = ()=>{
+  if(S.pickT<0 || S.pickL<0) return;
+  S.accusations[S.accuseIdx] = {target:S.pickT, letter:S.pickL};
+  sGood(); nextAccuser();
+};
+$("accSkip").onclick = ()=>{
+  S.accusations[S.accuseIdx] = null;
+  sTap(); nextAccuser();
+};
+
+/* ============================================================
+   DEBRIEF
+   ============================================================ */
+function startDebrief(){
+  S.dbIdx = 0;
+  renderDbAsk();
+  show("s-debrief");
+  sReveal();
+}
+
+function renderDbAsk(){
+  const li = S.order[S.dbIdx];
+  const e = S.lineup[li];
+  $("dbRound").textContent = "Round "+S.round+" of "+S.totalRounds;
+  $("dbProg").textContent = "Mission "+LETTERS[li]+" · "+(S.dbIdx+1)+" / "+S.lineup.length;
+  $("dbRes").style.display = "none";
+  $("dbAsk").style.display = "flex";
+
+  const T = TIERS[e.d];
+  $("dbTier").className = "tier "+T.cls;
+  $("dbTier").textContent = T.name;
+  $("dbText").textContent = e.t;
+
+  if(e.owner < 0){
+    /* decoy card: nobody had it */
+    $("dbWho").textContent = "Nobody";
+    $("dbPts").textContent = "This was the decoy — it was never in play";
+    resolveEntry(false);   /* jump straight to the result */
+    return;
+  }
+  $("dbWho").textContent = S.players[e.owner].name;
+  $("dbPts").textContent = "Worth "+T.pts+" points";
+}
+
+$("dbDone").onclick = ()=>{ sGood(); resolveEntry(true); };
+$("dbFail").onclick = ()=>{ sBad(); resolveEntry(false); };
+
+function resolveEntry(completed){
+  const li = S.order[S.dbIdx];
+  const e = S.lineup[li];
+  const T = TIERS[e.d];
+  const owner = e.owner;
+  const isDecoy = owner < 0;
+
+  /* every accusation that named this letter */
+  const onLetter = [];
+  S.accusations.forEach((a,ai)=>{ if(a && a.letter===li) onLetter.push({by:ai, target:a.target}); });
+
+  const correct = onLetter.filter(x=> !isDecoy && x.target===owner);
+  const lines = [];
+  const pts = [];
+  let ownerGain = 0;
+
+  if(isDecoy){
+    $("dbResTop").textContent = "The decoy";
+    $("dbResWho").textContent = "Nobody was running this";
+    onLetter.forEach(x=>{
+      lines.push({ok:false, txt:"<b>"+esc(S.players[x.by].name)+"</b> pinned it on <b>"+esc(S.players[x.target].name)+"</b>"});
+    });
+    if(!onLetter.length) lines.push({ok:false, txt:"Nobody fell for it. Respect."});
+    pts.push({who:"Everybody who guessed this", v:0});
+  }else{
+    const oname = S.players[owner].name;
+    $("dbResTop").textContent = completed ? (correct.length ? "Pulled off — but spotted" : "Pulled off, clean") : "Failed";
+    $("dbResWho").textContent = oname;
+
+    onLetter.forEach(x=>{
+      const hit = x.target===owner;
+      lines.push({ok:hit, txt:"<b>"+esc(S.players[x.by].name)+"</b> said <b>"+esc(S.players[x.target].name)+"</b>"+(hit?" — nailed it":"")});
+      if(hit){ S.players[x.by].score += 3; S.roundDelta[x.by] += 3; pts.push({who:S.players[x.by].name+" — correct call", v:3}); }
+    });
+    if(!onLetter.length) lines.push({ok:false, txt:"Nobody even guessed this mission."});
+
+    if(completed){
+      ownerGain += T.pts;
+      pts.push({who:oname+" — mission complete", v:T.pts});
+      if(correct.length===0){
+        ownerGain += 3;
+        pts.push({who:oname+" — stealth bonus", v:3});
+      }else{
+        pts.push({who:oname+" — stealth bonus (spotted)", v:0});
+      }
+    }else{
+      pts.push({who:oname+" — mission failed", v:0});
+    }
+    if(ownerGain){ S.players[owner].score += ownerGain; S.roundDelta[owner] += ownerGain; }
+  }
+
+  /* Clean Slate pay-out happens once, on the decoy card, so it isn't double counted */
+  if(isDecoy && S.cleanIdx>=0){
+    const aimed = S.accusations.filter(a=> a && a.target===S.cleanIdx).length;
+    const cname = S.players[S.cleanIdx].name;
+    if(aimed){
+      const v = aimed*2;
+      S.players[S.cleanIdx].score += v;
+      S.roundDelta[S.cleanIdx] += v;
+      pts.push({who:cname+" — Clean Slate, accused "+aimed+"×", v:v});
+      lines.push({ok:true, txt:"<b>"+esc(cname)+"</b> had no mission at all — and got accused "+aimed+" time"+(aimed===1?"":"s")});
+    }else{
+      pts.push({who:cname+" — Clean Slate, nobody bit", v:0});
+      lines.push({ok:false, txt:"<b>"+esc(cname)+"</b> had no mission — and nobody suspected a thing"});
+    }
+  }
+
+  $("dbAcc").innerHTML = lines.map(l=>
+    '<div class="vr '+(l.ok?"hit":"miss")+'"><div class="ic">'+(l.ok?"✔":"✘")+'</div><div>'+l.txt+'</div></div>'
+  ).join("");
+
+  const total = pts.reduce((a,b)=>a+b.v,0);
+  $("dbPtsList").innerHTML = pts.map(p=>
+    '<div class="ptline"><span>'+esc(p.who)+'</span><b class="'+(p.v?"plus":"zero")+'">'+(p.v?"+"+p.v:"0")+'</b></div>'
+  ).join("");
+  $("dbTotal").textContent = "+"+total;
+
+  $("dbAsk").style.display = "none";
+  $("dbRes").style.display = "flex";
+  $("dbNext").textContent = (S.dbIdx+1 >= S.lineup.length) ? "See the standings" : "Next mission";
+  $("s-debrief").scrollTop = 0;
+}
+
+$("dbNext").onclick = ()=>{
+  sTap();
+  S.dbIdx++;
+  if(S.dbIdx >= S.lineup.length) goScores();
+  else renderDbAsk();
+};
+
+/* ============================================================
+   SCORES
+   ============================================================ */
+function standings(){
+  return S.players.map((p,i)=>({name:p.name, score:p.score, d:S.roundDelta[i]||0}))
+                  .sort((a,b)=> b.score-a.score || a.name.localeCompare(b.name));
+}
+function sbHTML(rows, showDelta){
+  return rows.map((r,i)=>
+    '<div class="sbrow'+(i===0?" lead":"")+'"><div class="rk">'+(i+1)+'</div><div class="nm">'+esc(r.name)+'</div>'+
+    (showDelta && r.d ? '<div class="dl">+'+r.d+'</div>' : '')+
+    '<div class="sc">'+r.score+'</div></div>'
+  ).join("");
+}
+
+function goScores(){
+  $("scRound").textContent = "Round "+S.round+" of "+S.totalRounds;
+  $("scTitle").textContent = "Round "+S.round+" wrapped";
+  $("scList").innerHTML = sbHTML(standings(), true);
+  const last = S.round >= S.totalRounds;
+  $("scNext").textContent = last ? "Final results" : "Round "+(S.round+1)+" — new missions";
+  show("s-scores");
+  sReveal();
+}
+$("scNext").onclick = ()=>{
+  sTap();
+  if(S.round >= S.totalRounds) goFinal();
+  else startRound();
+};
+
+/* ============================================================
+   FINAL
+   ============================================================ */
+function goFinal(){
+  const rows = standings();
+  const top = rows[0].score;
+  const tied = rows.filter(r=>r.score===top);
+  $("fnWho").textContent = tied.length>1 ? tied.map(r=>r.name).join(" & ") : rows[0].name;
+  $("fnLine").textContent = tied.length>1
+    ? ("Dead heat on "+top+" points. Nobody could read any of you.")
+    : (top+" points across "+S.totalRounds+" round"+(S.totalRounds===1?"":"s")+" of quiet manipulation.");
+  $("fnList").innerHTML = sbHTML(rows, false);
+  show("s-final");
+  sWin();
+}
+$("fnAgain").onclick = ()=>{
+  sTap();
+  S.players.forEach(p=>p.score=0);
+  S.round=0; S.used.clear(); S.usedTopics.clear();
+  startRound();
+};
+$("fnNew").onclick = ()=>{ sTap(); renderPlayers(); show("s-setup"); };
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+loadRoster();
+renderPlayers();
+document.addEventListener("touchstart", ()=>ac(), {once:true, passive:true});
+document.addEventListener("mousedown", ()=>ac(), {once:true});
+</script>
+</body>
+</html>

@@ -1,0 +1,1220 @@
+<!-- CONCEPT: WORDPLAY/HEAD-TO-HEAD - "Backronym Brawl": king-of-the-hill acronym invention. Each round two contenders get the SAME random letters and the same absurd brief ("a secret government agency", "a fitness class you'd regret") and secretly type what the letters stand for; both entries are then revealed anonymously side by side on the shared screen and the whole room votes out loud. Winner keeps the belt and defends next round, building a streak bonus, until a double-points Title Fight ends it. 96 briefs, escalating letter counts, Hall of Fame | Players: 2-12 | ~15-25 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Backronym Brawl</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root{
+  --bg:#0a0710;
+  --panel:#170f24;
+  --panel2:#211632;
+  --line:#31234a;
+  --gold:#ffcf5c;
+  --red:#ff4d6d;
+  --blue:#4dd6ff;
+  --green:#5ef2a0;
+  --purple:#b07bff;
+  --text:#f4eeff;
+  --dim:#9d8fbb;
+  --pad: clamp(12px, 3.5vw, 20px);
+  --r: 16px;
+}
+
+html, body {
+  margin:0; padding:0;
+  height:100%;
+  touch-action: manipulation;
+  user-select:none; -webkit-user-select:none;
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+  overflow:hidden;
+}
+
+body::before{
+  content:'';
+  position:fixed; inset:0;
+  background:
+    radial-gradient(70vw 50vh at 15% -5%, rgba(255,77,109,.18), transparent 65%),
+    radial-gradient(70vw 50vh at 85% 105%, rgba(77,214,255,.15), transparent 65%);
+  pointer-events:none;
+  z-index:0;
+}
+
+#app{
+  position:relative;
+  z-index:1;
+  height:100%;
+  max-width:640px;
+  margin:0 auto;
+  display:flex;
+  flex-direction:column;
+}
+
+.screen{
+  display:none;
+  flex-direction:column;
+  height:100%;
+  padding:var(--pad);
+  gap:var(--pad);
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.screen.active{ display:flex; }
+
+/* ---------- shared bits ---------- */
+
+h1.logo{
+  margin:0;
+  font-size:clamp(30px, 9.5vw, 54px);
+  font-weight:900;
+  letter-spacing:-1px;
+  line-height:.95;
+  text-align:center;
+  background:linear-gradient(90deg, var(--red), var(--gold) 55%, var(--blue));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.tagline{
+  margin:0; text-align:center;
+  color:var(--dim);
+  font-size:clamp(12px, 3.3vw, 15px);
+  line-height:1.5;
+}
+
+.panel{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  padding:var(--pad);
+}
+
+button{
+  font-family:inherit;
+  font-size:clamp(15px, 4vw, 18px);
+  font-weight:700;
+  color:var(--text);
+  background:var(--panel2);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:14px 18px;
+  min-height:52px;
+  cursor:pointer;
+  transition:transform .08s ease, filter .15s ease;
+}
+button:active{ transform:scale(.97); }
+button:disabled{ opacity:.35; cursor:default; }
+
+.btn-main{
+  background:linear-gradient(135deg, var(--red), #c93be0);
+  border:none;
+  color:#fff;
+  font-size:clamp(17px, 4.6vw, 21px);
+  min-height:60px;
+  box-shadow:0 6px 20px rgba(255,77,109,.25);
+}
+.btn-gold{
+  background:linear-gradient(135deg, var(--gold), #ff9d3c);
+  border:none; color:#2a1600;
+}
+.btn-ghost{ background:transparent; }
+.btn-row{ display:flex; gap:10px; }
+.btn-row > button{ flex:1; }
+
+.spacer{ flex:1 1 auto; min-height:4px; }
+
+.label{
+  font-size:clamp(10px, 2.9vw, 12px);
+  letter-spacing:2.2px;
+  text-transform:uppercase;
+  color:var(--dim);
+  font-weight:700;
+  text-align:center;
+}
+
+/* ---------- setup ---------- */
+
+#playerList{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+.prow{
+  display:flex; align-items:center; gap:10px;
+  background:var(--panel2);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:8px 10px;
+}
+.dot{ width:14px; height:14px; border-radius:50%; flex:0 0 auto; }
+.prow .nm{ flex:1; font-weight:700; font-size:clamp(15px,4vw,17px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.prow .del{
+  min-height:38px; padding:6px 12px; font-size:18px; line-height:1;
+  background:transparent; border:1px solid var(--line); color:var(--dim);
+}
+
+input[type=text], textarea{
+  font-family:inherit;
+  font-size:16px;
+  color:var(--text);
+  background:var(--panel2);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:14px;
+  width:100%;
+  user-select:text; -webkit-user-select:text;
+  -webkit-appearance:none;
+  outline:none;
+}
+input[type=text]:focus, textarea:focus{ border-color:var(--purple); }
+textarea{ resize:none; line-height:1.4; }
+
+.addrow{ display:flex; gap:8px; }
+.addrow input{ flex:1; }
+.addrow button{ flex:0 0 auto; min-width:64px; padding:14px 16px; }
+
+.optrow{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:10px 0;
+  border-top:1px solid var(--line);
+}
+.optrow:first-child{ border-top:none; }
+.optrow .k{ font-size:clamp(13px,3.6vw,15px); font-weight:600; }
+.optrow .k small{ display:block; color:var(--dim); font-weight:400; font-size:11px; margin-top:2px; }
+.seg{ display:flex; gap:6px; }
+.seg button{
+  min-height:44px; padding:9px 14px; font-size:14px;
+  background:var(--panel2);
+}
+.seg button.on{ background:var(--gold); color:#2a1600; border-color:transparent; }
+
+.hint{ color:var(--dim); font-size:clamp(11px,3.1vw,13px); line-height:1.55; }
+.hint b{ color:var(--gold); }
+
+/* ---------- matchup ---------- */
+
+.vs-wrap{ display:flex; align-items:center; gap:10px; justify-content:center; }
+.fighter{
+  flex:1; text-align:center;
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  padding:14px 8px;
+  min-width:0;
+}
+.fighter .role{
+  font-size:10px; letter-spacing:1.6px; text-transform:uppercase;
+  font-weight:800; color:var(--dim); margin-bottom:6px;
+}
+.fighter.champ{ border-color:var(--gold); box-shadow:0 0 0 1px rgba(255,207,92,.25) inset; }
+.fighter.champ .role{ color:var(--gold); }
+.fighter .fname{
+  font-size:clamp(16px,4.6vw,22px); font-weight:900; line-height:1.15;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.fighter .belt{ font-size:20px; margin-top:4px; }
+.vs{
+  font-size:clamp(18px,5vw,24px); font-weight:900;
+  color:var(--red); flex:0 0 auto;
+}
+
+.tiles{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+.tile{
+  width:clamp(50px, 15vw, 68px);
+  height:clamp(58px, 17vw, 78px);
+  border-radius:14px;
+  background:var(--panel2);
+  border:2px solid var(--line);
+  display:flex; align-items:center; justify-content:center;
+  font-size:clamp(26px, 8vw, 38px);
+  font-weight:900;
+  color:var(--text);
+  animation:pop .35s cubic-bezier(.2,1.4,.4,1) backwards;
+}
+.tile.lit{
+  background:linear-gradient(160deg, var(--gold), #ff9d3c);
+  border-color:transparent;
+  color:#2a1600;
+  box-shadow:0 4px 16px rgba(255,207,92,.3);
+}
+@keyframes pop{ from{ opacity:0; transform:translateY(14px) scale(.7);} }
+
+.brief{
+  text-align:center;
+  font-size:clamp(18px, 5.2vw, 26px);
+  font-weight:800;
+  line-height:1.3;
+  padding:4px 2px;
+}
+.brief .lead{
+  display:block;
+  font-size:clamp(11px,3vw,13px);
+  letter-spacing:2px; text-transform:uppercase;
+  color:var(--blue); font-weight:800; margin-bottom:8px;
+}
+
+.badge{
+  align-self:center;
+  padding:6px 14px; border-radius:999px;
+  font-size:11px; letter-spacing:2px; text-transform:uppercase; font-weight:800;
+  background:rgba(255,77,109,.15); color:var(--red);
+  border:1px solid rgba(255,77,109,.4);
+}
+.badge.title{ background:rgba(255,207,92,.15); color:var(--gold); border-color:rgba(255,207,92,.45); }
+
+/* ---------- pass / write ---------- */
+
+.pass-center{
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:16px; text-align:center;
+}
+.pass-name{
+  font-size:clamp(30px, 9vw, 48px); font-weight:900; line-height:1.05;
+  background:linear-gradient(90deg, var(--blue), var(--purple));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.eyes{ font-size:clamp(40px,12vw,60px); }
+
+#writeScreen{ justify-content:flex-start; }
+.timerbar{
+  height:8px; border-radius:99px; background:var(--panel2); overflow:hidden;
+  border:1px solid var(--line);
+}
+.timerbar > i{
+  display:block; height:100%; width:100%;
+  background:linear-gradient(90deg, var(--green), var(--gold));
+  transition:width .25s linear;
+}
+.timerbar.warn > i{ background:linear-gradient(90deg, var(--gold), var(--red)); }
+
+.slotline{
+  display:flex; gap:6px; justify-content:center; flex-wrap:wrap;
+  font-size:clamp(12px,3.3vw,14px); color:var(--dim);
+}
+.chk{
+  padding:4px 10px; border-radius:99px;
+  border:1px solid var(--line); background:var(--panel2);
+  font-weight:800;
+}
+.chk.ok{ background:rgba(94,242,160,.15); border-color:rgba(94,242,160,.5); color:var(--green); }
+
+/* ---------- showdown ---------- */
+
+.entry{
+  background:var(--panel);
+  border:2px solid var(--line);
+  border-radius:var(--r);
+  padding:16px;
+  display:flex; flex-direction:column; gap:8px;
+}
+.entry .tag{
+  font-size:11px; letter-spacing:2px; text-transform:uppercase; font-weight:800;
+}
+.entry.a .tag{ color:var(--red); }
+.entry.b .tag{ color:var(--blue); }
+.entry.a{ border-color:rgba(255,77,109,.45); }
+.entry.b{ border-color:rgba(77,214,255,.45); }
+.entry .txt{
+  font-size:clamp(17px, 4.8vw, 23px);
+  font-weight:800; line-height:1.35;
+  word-break:break-word;
+}
+.entry .who{
+  font-size:clamp(12px,3.3vw,14px); color:var(--dim); font-weight:700;
+}
+.entry.win{ box-shadow:0 0 0 2px var(--gold) inset, 0 8px 26px rgba(255,207,92,.2); }
+
+/* ---------- scoreboard ---------- */
+
+.srow{
+  display:flex; align-items:center; gap:10px;
+  padding:11px 12px;
+  background:var(--panel2);
+  border:1px solid var(--line);
+  border-radius:12px;
+}
+.srow .rank{ font-weight:900; color:var(--dim); width:22px; flex:0 0 auto; font-size:14px; }
+.srow .nm{ flex:1; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.srow .pts{ font-weight:900; color:var(--gold); font-size:clamp(16px,4.4vw,19px); }
+.srow.lead{ border-color:var(--gold); }
+.scrolly{ overflow-y:auto; display:flex; flex-direction:column; gap:8px; }
+
+.hall-item{
+  border-left:3px solid var(--purple);
+  padding:8px 0 8px 12px;
+  margin-bottom:10px;
+}
+.hall-item .h-t{ font-weight:800; font-size:clamp(14px,3.9vw,16px); line-height:1.3; }
+.hall-item .h-m{ color:var(--dim); font-size:11px; margin-top:3px; letter-spacing:.5px; }
+
+#confetti{
+  position:fixed; inset:0; pointer-events:none; z-index:50;
+  display:none;
+}
+
+.topbar{ display:flex; align-items:center; gap:10px; }
+.topbar .rd{ flex:1; font-size:clamp(11px,3vw,13px); letter-spacing:2px; text-transform:uppercase; color:var(--dim); font-weight:800; }
+.topbar button{
+  min-height:40px; padding:7px 13px; font-size:12px;
+  background:transparent; color:var(--dim);
+}
+
+.win-name{
+  text-align:center;
+  font-size:clamp(28px,8.5vw,44px); font-weight:900; line-height:1.05;
+  background:linear-gradient(90deg, var(--gold), #ff9d3c);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div id="app">
+
+  <!-- ============ SETUP ============ -->
+  <section class="screen active" id="setupScreen">
+    <h1 class="logo">BACKRONYM<br>BRAWL</h1>
+    <p class="tagline">Two contenders. Same letters. One absurd brief.<br>The room decides who walks away with the belt.</p>
+
+    <div class="panel">
+      <div class="label" style="text-align:left;margin-bottom:10px;">Contenders</div>
+      <div id="playerList"></div>
+      <div class="addrow">
+        <input type="text" id="nameInput" placeholder="Add a name" maxlength="14"
+               autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false">
+        <button class="btn-gold" id="addBtn">Add</button>
+      </div>
+      <p class="hint" style="margin:10px 0 0;">Need at least 2. Best with <b>4-8</b> in the room.</p>
+    </div>
+
+    <div class="panel">
+      <div class="optrow">
+        <div class="k">Rounds<small>Last one is a double-points Title Fight</small></div>
+        <div class="seg" id="roundSeg">
+          <button data-v="4">4</button><button data-v="6" class="on">6</button><button data-v="8">8</button>
+        </div>
+      </div>
+      <div class="optrow">
+        <div class="k">Writing clock<small>Auto-submits when it runs out</small></div>
+        <div class="seg" id="timerSeg">
+          <button data-v="0">Off</button><button data-v="60">60s</button><button data-v="90" class="on">90s</button>
+        </div>
+      </div>
+      <div class="optrow">
+        <div class="k">Sound</div>
+        <div class="seg" id="soundSeg">
+          <button data-v="1" class="on">On</button><button data-v="0">Off</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="label" style="text-align:left;margin-bottom:8px;">How it works</div>
+      <p class="hint" style="margin:0;">
+        1. Two contenders are called out and letters are drawn — say, <b>P.B.J.</b><br>
+        2. The phone goes to each of them in turn. Privately, they type what it stands for, fitting the brief.<br>
+        3. Both answers appear anonymously on the shared screen. <b>The room votes out loud</b> and whoever's holding the phone taps the winner.<br>
+        4. The winner keeps the belt and defends it next round. Three straight wins starts stacking <b>streak bonuses</b>.
+      </p>
+    </div>
+
+    <button class="btn-main" id="startBtn" disabled>Add 2 contenders to start</button>
+    <button class="btn-ghost" id="hallBtn">🏆 Hall of Fame</button>
+    <div style="height:4px"></div>
+  </section>
+
+  <!-- ============ MATCHUP ============ -->
+  <section class="screen" id="matchScreen">
+    <div class="topbar">
+      <div class="rd" id="matchRound">Round 1</div>
+      <button id="quitBtn1">Quit</button>
+    </div>
+    <div class="badge" id="matchBadge">Opening Bout</div>
+    <div class="vs-wrap">
+      <div class="fighter" id="fA"><div class="role">Contender</div><div class="fname">—</div></div>
+      <div class="vs">VS</div>
+      <div class="fighter" id="fB"><div class="role">Contender</div><div class="fname">—</div></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="label">Your letters</div>
+    <div class="tiles" id="matchTiles"></div>
+    <div class="brief" id="matchBrief"><span class="lead">It stands for</span>—</div>
+    <div class="spacer"></div>
+    <button class="btn-main" id="toWriteBtn">Start the bout</button>
+  </section>
+
+  <!-- ============ PASS ============ -->
+  <section class="screen" id="passScreen">
+    <div class="pass-center">
+      <div class="eyes">🙈</div>
+      <div class="label">Everyone else look away</div>
+      <div class="pass-name" id="passName">—</div>
+      <p class="tagline" id="passSub">You're up. Tap when you've got the phone to yourself.</p>
+    </div>
+    <button class="btn-main" id="passGoBtn">I'm ready</button>
+  </section>
+
+  <!-- ============ WRITE ============ -->
+  <section class="screen" id="writeScreen">
+    <div class="topbar">
+      <div class="rd" id="writeWho">—</div>
+      <div class="rd" id="writeClock" style="flex:0 0 auto;color:var(--gold)"></div>
+    </div>
+    <div class="timerbar" id="timerBar"><i></i></div>
+    <div class="tiles" id="writeTiles"></div>
+    <div class="brief" id="writeBrief"><span class="lead">It stands for</span>—</div>
+    <textarea id="entryInput" rows="3" placeholder="Type what it stands for…"
+              autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false"
+              enterkeyhint="done" maxlength="120"></textarea>
+    <div class="slotline" id="slotLine"></div>
+    <p class="hint" style="text-align:center;margin:0;">Little words like <i>the, of, and</i> don't need to match a letter.</p>
+    <div class="spacer"></div>
+    <button class="btn-main" id="submitBtn" disabled>Lock it in</button>
+    <div style="height:4px"></div>
+  </section>
+
+  <!-- ============ SHOWDOWN ============ -->
+  <section class="screen" id="showScreen">
+    <div class="topbar">
+      <div class="rd" id="showRound">Round 1</div>
+      <button id="quitBtn2">Quit</button>
+    </div>
+    <div class="tiles" id="showTiles"></div>
+    <div class="brief" id="showBrief"><span class="lead">It stands for</span>—</div>
+    <div class="entry a" id="entryA"><div class="tag">Contender A</div><div class="txt">—</div><div class="who" style="display:none"></div></div>
+    <div class="entry b" id="entryB"><div class="tag">Contender B</div><div class="txt">—</div><div class="who" style="display:none"></div></div>
+    <div class="spacer"></div>
+    <div id="voteBlock">
+      <p class="tagline" style="margin-bottom:10px;">Room votes on three… <b style="color:var(--gold)">3 — 2 — 1 — point!</b></p>
+      <div class="btn-row">
+        <button id="voteA" style="background:linear-gradient(135deg,var(--red),#c93be0);border:none;color:#fff">A wins</button>
+        <button id="voteB" style="background:linear-gradient(135deg,#2f8fd6,var(--blue));border:none;color:#04222f">B wins</button>
+      </div>
+      <button class="btn-ghost" id="voteSplit" style="width:100%;margin-top:8px;">Dead even — split it</button>
+    </div>
+    <button class="btn-main" id="afterVoteBtn" style="display:none">Next</button>
+    <div style="height:4px"></div>
+  </section>
+
+  <!-- ============ SCOREBOARD ============ -->
+  <section class="screen" id="scoreScreen">
+    <div class="topbar">
+      <div class="rd" id="scoreRound">Standings</div>
+      <button id="quitBtn3">Quit</button>
+    </div>
+    <div class="badge" id="scoreBadge">Belt holder</div>
+    <div class="scrolly" id="scoreList"></div>
+    <div class="spacer"></div>
+    <button class="btn-main" id="nextRoundBtn">Next round</button>
+    <div style="height:4px"></div>
+  </section>
+
+  <!-- ============ FINAL ============ -->
+  <section class="screen" id="finalScreen">
+    <div class="label">Undisputed champion</div>
+    <div class="win-name" id="winName">—</div>
+    <p class="tagline" id="winLine">—</p>
+    <div class="scrolly" id="finalList"></div>
+    <div class="panel" id="bestPanel" style="display:none">
+      <div class="label" style="text-align:left;margin-bottom:8px;">Best of the night</div>
+      <div id="bestList"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="btn-row">
+      <button class="btn-gold" id="rematchBtn">Rematch</button>
+      <button id="newBtn">New game</button>
+    </div>
+    <div style="height:4px"></div>
+  </section>
+
+  <!-- ============ HALL OF FAME ============ -->
+  <section class="screen" id="hallScreen">
+    <div class="topbar">
+      <div class="rd">Hall of Fame</div>
+      <button id="hallBack">Back</button>
+    </div>
+    <div class="scrolly" id="hallList"></div>
+    <div class="spacer"></div>
+    <button class="btn-ghost" id="hallClear">Clear the hall</button>
+    <div style="height:4px"></div>
+  </section>
+
+</div>
+
+<script>
+'use strict';
+
+/* ============================ DATA ============================ */
+
+const BRIEFS = [
+  "a secret government agency","a fitness class you'd regret","a boy band from 1998",
+  "a startup that just raised $40 million","someone's Wi-Fi network name","a heavy metal band",
+  "a support group nobody wants to join","a cursed kitchen appliance","a cologne for disappointing men",
+  "a rejected cereal mascot","a hospital drama on cable","a conspiracy theory forum",
+  "a luxury cruise that goes badly","an energy drink banned in three states","a suburban book club",
+  "a robot that only does one thing","a law firm in a strip mall","a dating app for a narrow niche",
+  "a taco truck with one review","a self-help book you'd skim","a haunted amusement park ride",
+  "an airline that lost your bags","a middle school talent show act","a cryptocurrency that crashed",
+  "a spa treatment involving eels","a road that shouldn't exist","a pyramid scheme run by nice people",
+  "an award for the least effort","a video game nobody finished","a lawn ornament with a dark past",
+  "a mandatory workplace training","a very specific phobia","a cheese aged too long",
+  "a subreddit you'd lurk in","a soap opera set in a DMV","a scented candle for bad moods",
+  "a superhero with a useless power","a Nordic furniture line","a smoothie you'd regret",
+  "a chain restaurant in decline","a wrestling move nobody survives","a genre of music invented last week",
+  "a submarine with structural issues","a doomed group project","a diet based on one food",
+  "a small town's annual festival","a knock-off theme park","an app that ruins friendships",
+  "a perfume named after a feeling","a cult with excellent branding","a highway rest stop legend",
+  "a dance craze that hurt people","a public transit incident","an infomercial product at 3am",
+  "a horse with a racing record","a summer camp with rumors","a breakfast that ends marriages",
+  "a shampoo for a specific crisis","a tourist trap off the interstate","a card game with too many rules",
+  "a dog breed invented by mistake","a shipping company you shouldn't trust","a museum with one exhibit",
+  "a podcast with four listeners","a vending machine with opinions","a sandwich named after a person",
+  "a tattoo you'd regret at 40","a hotel with a strange policy","a nature documentary narrator's worst day",
+  "a fantasy tavern's house special","a sitcom cancelled after two episodes","a hardware store's mascot",
+  "a workout invented by accident","a soup that started a feud","a scandal at a county fair",
+  "a font that ruined a wedding","a pet you can't legally own","a holiday nobody celebrates",
+  "an emergency broadcast nobody understood","a hair salon with a theme","a bowling league team",
+  "a candy discontinued for safety","a spaceship crewed by amateurs","a phone plan with hidden fees",
+  "a cheese shop rivalry","a boat named optimistically","a garden gnome's criminal record",
+  "a college course with no textbook","a smell you can't identify","a ferry that runs occasionally",
+  "a bakery with strong opinions","a rideshare driver's playlist","a mattress with a warranty",
+  "a lighthouse keeper's side hustle","a sock brand for pessimists","a knitting circle with secrets"
+];
+
+// Weighted letter pool - common, easy starters appear more often.
+const POOL = "AAABBBCCCCDDDEEFFFGGGHHHIIJKLLLMMMMNNOOPPPPRRRSSSSSTTTTUVWW";
+
+const COLORS = ["#ff4d6d","#4dd6ff","#5ef2a0","#ffcf5c","#b07bff","#ff9d3c",
+                "#6ee7ff","#f472b6","#a3e635","#38bdf8","#fb923c","#c084fc"];
+
+const STOP = new Set(["a","an","the","of","and","for","to","in","on","at","with",
+                      "or","my","your","is","it","by","from","that","this"]);
+
+const LS_HALL = "cowork-backronym-hall";
+const LS_CFG  = "cowork-backronym-config";
+
+/* ============================ STATE ============================ */
+
+const S = {
+  players: [],
+  rounds: 6,
+  clock: 90,
+  sound: true,
+  round: 0,
+  champId: null,
+  streak: 0,
+  queue: [],
+  duel: null,
+  writeIdx: 0,
+  hall: []
+};
+
+let nextId = 1;
+let tickHandle = null;
+let timeLeft = 0;
+
+/* ============================ HELPERS ============================ */
+
+const $ = id => document.getElementById(id);
+const shuffle = arr => { for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; };
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+const byId = id => S.players.find(p => p.id === id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+  $(id).scrollTop = 0;
+}
+
+/* ---- audio ---- */
+let ac = null;
+function beep(freq, dur, type, vol){
+  if(!S.sound) return;
+  try{
+    if(!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+    if(ac.state === 'suspended') ac.resume();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'sine';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0, ac.currentTime);
+    g.gain.linearRampToValueAtTime(vol == null ? .16 : vol, ac.currentTime + .01);
+    g.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + dur);
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + dur + .02);
+  }catch(e){}
+}
+const sTap    = () => beep(520, .07, 'triangle', .1);
+const sBell   = () => { beep(880,.18,'sine',.16); setTimeout(()=>beep(1320,.3,'sine',.13),110); };
+const sWin    = () => { [660,880,1100,1320].forEach((f,i)=>setTimeout(()=>beep(f,.22,'triangle',.14), i*90)); };
+const sBuzz   = () => beep(150, .3, 'sawtooth', .12);
+
+/* ---- letters ---- */
+function drawLetters(n){
+  const out = [];
+  let guard = 0;
+  while(out.length < n && guard++ < 400){
+    const c = POOL[Math.floor(Math.random()*POOL.length)];
+    // allow at most one repeat of any letter
+    if(out.filter(x => x === c).length >= 1 && out.length < n) continue;
+    out.push(c);
+  }
+  while(out.length < n) out.push(POOL[Math.floor(Math.random()*POOL.length)]);
+  return out;
+}
+
+/* ---- soft initial matching ---- */
+function matchLetters(text, letters){
+  const res = letters.map(() => false);
+  const words = String(text).trim().split(/\s+/).filter(Boolean);
+  let li = 0;
+  for(const raw of words){
+    const clean = raw.replace(/[^A-Za-z']/g, '');
+    if(!clean) continue;
+    if(li >= letters.length) break;
+    const c = clean[0].toUpperCase();
+    if(c === letters[li]){ res[li] = true; li++; continue; }
+    if(STOP.has(clean.toLowerCase())) continue;   // filler words are free
+    // a significant word that doesn't match: keep scanning, don't punish
+  }
+  return res;
+}
+
+function renderTiles(host, letters, litMask){
+  host.innerHTML = '';
+  letters.forEach((L, i) => {
+    const d = document.createElement('div');
+    d.className = 'tile' + (litMask && litMask[i] ? ' lit' : '');
+    d.style.animationDelay = (i * 70) + 'ms';
+    d.textContent = L;
+    host.appendChild(d);
+  });
+}
+
+function setBrief(host, txt){
+  host.innerHTML = '<span class="lead">It stands for</span>' + esc(txt);
+}
+
+/* ============================ SETUP ============================ */
+
+function loadCfg(){
+  try{
+    const c = JSON.parse(localStorage.getItem(LS_CFG) || '{}');
+    if(c.rounds) S.rounds = c.rounds;
+    if(typeof c.clock === 'number') S.clock = c.clock;
+    if(typeof c.sound === 'boolean') S.sound = c.sound;
+    if(Array.isArray(c.names)) c.names.forEach(n => addPlayer(n, true));
+  }catch(e){}
+  try{ S.hall = JSON.parse(localStorage.getItem(LS_HALL) || '[]'); }catch(e){ S.hall = []; }
+  syncSeg('roundSeg', S.rounds);
+  syncSeg('timerSeg', S.clock);
+  syncSeg('soundSeg', S.sound ? 1 : 0);
+}
+function saveCfg(){
+  try{
+    localStorage.setItem(LS_CFG, JSON.stringify({
+      rounds:S.rounds, clock:S.clock, sound:S.sound,
+      names:S.players.map(p => p.name)
+    }));
+  }catch(e){}
+}
+function saveHall(){
+  try{ localStorage.setItem(LS_HALL, JSON.stringify(S.hall.slice(0, 30))); }catch(e){}
+}
+
+function syncSeg(segId, val){
+  $(segId).querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', Number(b.dataset.v) === Number(val));
+  });
+}
+
+function addPlayer(name, quiet){
+  name = String(name).trim().slice(0, 14);
+  if(!name) return;
+  if(S.players.length >= 12) return;
+  S.players.push({
+    id: nextId++, name,
+    color: COLORS[S.players.length % COLORS.length],
+    score: 0, wins: 0
+  });
+  if(!quiet) sTap();
+  renderPlayers();
+}
+
+function renderPlayers(){
+  const host = $('playerList');
+  host.innerHTML = '';
+  S.players.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'prow';
+    row.innerHTML =
+      '<span class="dot" style="background:' + p.color + '"></span>' +
+      '<span class="nm">' + esc(p.name) + '</span>';
+    const del = document.createElement('button');
+    del.className = 'del';
+    del.textContent = '✕';
+    del.setAttribute('aria-label', 'Remove ' + p.name);
+    del.onclick = () => {
+      S.players = S.players.filter(x => x.id !== p.id);
+      renderPlayers(); saveCfg(); sTap();
+    };
+    row.appendChild(del);
+    host.appendChild(row);
+  });
+  const ok = S.players.length >= 2;
+  const btn = $('startBtn');
+  btn.disabled = !ok;
+  btn.textContent = ok ? 'Ring the bell' : ('Add ' + (2 - S.players.length) + ' more contender' + (S.players.length === 1 ? '' : 's'));
+  saveCfg();
+}
+
+/* ============================ GAME FLOW ============================ */
+
+function startGame(){
+  S.players.forEach(p => { p.score = 0; p.wins = 0; });
+  S.round = 0;
+  S.champId = null;
+  S.streak = 0;
+  S.beltOnDraw = false;
+  S.queue = shuffle(S.players.map(p => p.id));
+  S.briefDeck = shuffle(BRIEFS.slice());
+  sBell();
+  nextRound();
+}
+
+function takeBrief(){
+  if(!S.briefDeck || !S.briefDeck.length) S.briefDeck = shuffle(BRIEFS.slice());
+  return S.briefDeck.pop();
+}
+
+function refillQueue(exceptId){
+  const ids = S.players.filter(p => p.id !== exceptId).map(p => p.id);
+  S.queue = S.queue.concat(shuffle(ids));
+}
+
+function nextRound(){
+  if(S.round >= S.rounds){ finish(); return; }
+  S.round++;
+
+  const isTitle = S.round === S.rounds;
+  let a, b;
+
+  if(S.champId == null){
+    if(S.queue.length < 2) refillQueue(null);
+    a = S.queue.shift();
+    b = S.queue.shift();
+  } else {
+    a = S.champId;
+    S.queue = S.queue.filter(id => id !== a);
+    if(!S.queue.length) refillQueue(a);
+    b = S.queue.shift();
+  }
+
+  const n = isTitle ? 5 : (S.round <= 2 ? 3 : 4);
+
+  S.duel = {
+    a, b,
+    letters: drawLetters(n),
+    brief: takeBrief(),
+    title: isTitle,
+    entries: {},
+    order: shuffle([a, b])
+  };
+  S.writeIdx = 0;
+
+  renderMatchup();
+  show('matchScreen');
+}
+
+function renderMatchup(){
+  const d = S.duel;
+  $('matchRound').textContent = 'Round ' + S.round + ' of ' + S.rounds;
+
+  const badge = $('matchBadge');
+  badge.classList.toggle('title', !!d.title);
+  if(d.title) badge.textContent = '★ Title Fight — double points ★';
+  else if(S.champId == null) badge.textContent = 'Opening bout';
+  else badge.textContent = 'Belt defense · streak ' + S.streak;
+
+  const pa = byId(d.a), pb = byId(d.b);
+  const isChamp = S.champId != null;
+
+  const fA = $('fA'), fB = $('fB');
+  fA.classList.toggle('champ', isChamp);
+  fB.classList.remove('champ');
+  fA.innerHTML = '<div class="role">' + (isChamp ? 'Belt holder' : 'Contender') + '</div>' +
+                 '<div class="fname" style="color:' + pa.color + '">' + esc(pa.name) + '</div>' +
+                 (isChamp ? '<div class="belt">🏆</div>' : '');
+  fB.innerHTML = '<div class="role">Challenger</div>' +
+                 '<div class="fname" style="color:' + pb.color + '">' + esc(pb.name) + '</div>';
+
+  renderTiles($('matchTiles'), d.letters, null);
+  setBrief($('matchBrief'), d.brief);
+}
+
+/* ---- writing turns ---- */
+
+function goPass(){
+  const d = S.duel;
+  const id = S.writeIdx === 0 ? d.a : d.b;
+  const p = byId(id);
+  $('passName').textContent = p.name;
+  $('passName').style.background = 'none';
+  $('passName').style.webkitBackgroundClip = 'initial';
+  $('passName').style.color = p.color;
+  $('passSub').textContent = S.writeIdx === 0
+    ? "You're first. Tap when the phone is yours alone."
+    : "Your turn. Don't peek at what came before.";
+  show('passScreen');
+}
+
+function goWrite(){
+  const d = S.duel;
+  const id = S.writeIdx === 0 ? d.a : d.b;
+  const p = byId(id);
+
+  $('writeWho').textContent = p.name + " — you're up";
+  $('writeWho').style.color = p.color;
+  renderTiles($('writeTiles'), d.letters, d.letters.map(() => false));
+  setBrief($('writeBrief'), d.brief);
+
+  const inp = $('entryInput');
+  inp.value = '';
+  updateSlots();
+  show('writeScreen');
+  setTimeout(() => inp.focus(), 120);
+
+  startClock();
+}
+
+function startClock(){
+  stopClock();
+  const bar = $('timerBar');
+  if(!S.clock){
+    bar.style.display = 'none';
+    $('writeClock').textContent = '';
+    return;
+  }
+  bar.style.display = 'block';
+  bar.classList.remove('warn');
+  timeLeft = S.clock;
+  paintClock();
+  tickHandle = setInterval(() => {
+    timeLeft--;
+    paintClock();
+    if(timeLeft === 10) sBuzz();
+    if(timeLeft <= 0){ stopClock(); submitEntry(true); }
+  }, 1000);
+}
+function paintClock(){
+  const bar = $('timerBar');
+  bar.querySelector('i').style.width = Math.max(0, (timeLeft / S.clock) * 100) + '%';
+  bar.classList.toggle('warn', timeLeft <= 15);
+  $('writeClock').textContent = timeLeft + 's';
+}
+function stopClock(){
+  if(tickHandle){ clearInterval(tickHandle); tickHandle = null; }
+}
+
+function updateSlots(){
+  const d = S.duel;
+  if(!d) return;
+  const txt = $('entryInput').value;
+  const mask = matchLetters(txt, d.letters);
+  renderTiles($('writeTiles'), d.letters, mask);
+  const hit = mask.filter(Boolean).length;
+
+  const line = $('slotLine');
+  line.innerHTML = '';
+  d.letters.forEach((L, i) => {
+    const s = document.createElement('span');
+    s.className = 'chk' + (mask[i] ? ' ok' : '');
+    s.textContent = (mask[i] ? '✓ ' : '') + L;
+    line.appendChild(s);
+  });
+
+  const btn = $('submitBtn');
+  const has = txt.trim().length > 0;
+  btn.disabled = !has;
+  if(!has) btn.textContent = 'Lock it in';
+  else if(hit === d.letters.length) btn.textContent = '✓ Lock it in';
+  else btn.textContent = 'Lock it in (' + hit + '/' + d.letters.length + ' letters)';
+}
+
+function submitEntry(auto){
+  const d = S.duel;
+  if(!d) return;
+  stopClock();
+  const id = S.writeIdx === 0 ? d.a : d.b;
+  let txt = $('entryInput').value.trim();
+  if(!txt) txt = auto ? '(ran out of time)' : '(no answer)';
+  d.entries[id] = txt;
+  $('entryInput').blur();
+  sTap();
+
+  S.writeIdx++;
+  if(S.writeIdx < 2) goPass();
+  else showdown();
+}
+
+/* ---- showdown ---- */
+
+function showdown(){
+  const d = S.duel;
+  $('showRound').textContent = (d.title ? '★ Title Fight' : 'Round ' + S.round + ' of ' + S.rounds);
+  renderTiles($('showTiles'), d.letters, null);
+  setBrief($('showBrief'), d.brief);
+
+  const eA = $('entryA'), eB = $('entryB');
+  eA.classList.remove('win'); eB.classList.remove('win');
+  eA.querySelector('.txt').textContent = d.entries[d.order[0]];
+  eB.querySelector('.txt').textContent = d.entries[d.order[1]];
+  eA.querySelector('.who').style.display = 'none';
+  eB.querySelector('.who').style.display = 'none';
+
+  $('voteBlock').style.display = 'block';
+  $('afterVoteBtn').style.display = 'none';
+  sBell();
+  show('showScreen');
+}
+
+function verdict(which){
+  const d = S.duel;
+  const mult = d.title ? 2 : 1;
+  const base = 2 * mult;
+  let winnerId = null;
+
+  if(which === 'split'){
+    [d.a, d.b].forEach(id => byId(id).score += 1 * mult);
+    // belt holder keeps it; with no holder yet the belt goes on a coin toss,
+    // which the scoreboard then says out loud so the room isn't guessing
+    S.beltOnDraw = (S.champId == null);
+    winnerId = S.champId != null ? S.champId : pick([d.a, d.b]);
+    S.queue.push(winnerId === d.a ? d.b : d.a);
+  } else {
+    S.beltOnDraw = false;
+    winnerId = which === 'A' ? d.order[0] : d.order[1];
+    const loserId = winnerId === d.a ? d.b : d.a;
+    const w = byId(winnerId);
+    const keeping = (winnerId === S.champId);
+    S.streak = keeping ? S.streak + 1 : 1;
+    const bonus = (S.streak >= 3 ? 1 : 0) * mult;
+    w.score += base + bonus;
+    w.wins++;
+    S.queue.push(loserId);
+    S.hall.unshift({
+      text: d.entries[winnerId],
+      letters: d.letters.join('.'),
+      brief: d.brief,
+      who: w.name
+    });
+    saveHall();
+  }
+
+  S.champId = winnerId;
+
+  // reveal authors
+  const eA = $('entryA'), eB = $('entryB');
+  [[eA, d.order[0]], [eB, d.order[1]]].forEach(([el, id]) => {
+    const p = byId(id);
+    const who = el.querySelector('.who');
+    who.textContent = '— ' + p.name;
+    who.style.color = p.color;
+    who.style.display = 'block';
+  });
+  if(which === 'A') eA.classList.add('win');
+  if(which === 'B') eB.classList.add('win');
+
+  $('voteBlock').style.display = 'none';
+  const btn = $('afterVoteBtn');
+  btn.style.display = 'block';
+  btn.textContent = which === 'split' ? 'Split decision — standings' : (byId(winnerId).name + ' takes it →');
+  sWin();
+}
+
+/* ---- scoreboard ---- */
+
+function renderScores(host, showBelt){
+  const sorted = S.players.slice().sort((x, y) => y.score - x.score || y.wins - x.wins);
+  host.innerHTML = '';
+  sorted.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.className = 'srow' + (i === 0 && p.score > 0 ? ' lead' : '');
+    row.innerHTML =
+      '<span class="rank">' + (i + 1) + '</span>' +
+      '<span class="dot" style="background:' + p.color + '"></span>' +
+      '<span class="nm">' + esc(p.name) + (showBelt && p.id === S.champId ? ' 🏆' : '') + '</span>' +
+      '<span class="pts">' + p.score + '</span>';
+    host.appendChild(row);
+  });
+}
+
+function scoreboard(){
+  const champ = byId(S.champId);
+  $('scoreRound').textContent = 'After round ' + S.round;
+  const b = $('scoreBadge');
+  b.classList.add('title');
+  b.textContent = champ
+    ? (S.beltOnDraw
+        ? ('Dead even — belt to ' + champ.name + ' on the toss')
+        : (champ.name + ' holds the belt' + (S.streak >= 2 ? ' · ' + S.streak + ' straight' : '')))
+    : 'Standings';
+  renderScores($('scoreList'), true);
+  const btn = $('nextRoundBtn');
+  btn.textContent = S.round >= S.rounds ? 'See the champion' : 'Round ' + (S.round + 1) + ' →';
+  show('scoreScreen');
+}
+
+/* ---- finale ---- */
+
+function finish(){
+  const sorted = S.players.slice().sort((x, y) => y.score - x.score || y.wins - x.wins);
+  const top = sorted[0];
+  const tied = sorted.filter(p => p.score === top.score && p.wins === top.wins);
+
+  $('winName').textContent = tied.length > 1
+    ? tied.map(p => p.name).join(' & ')
+    : top.name;
+  $('winLine').textContent = tied.length > 1
+    ? 'A shared title at ' + top.score + ' points. Nobody blinked.'
+    : top.score + ' points · ' + top.wins + ' bout' + (top.wins === 1 ? '' : 's') + ' won';
+
+  renderScores($('finalList'), false);
+
+  const mine = S.hall.slice(0, 3);
+  const bp = $('bestPanel');
+  if(mine.length){
+    bp.style.display = 'block';
+    $('bestList').innerHTML = mine.map(h =>
+      '<div class="hall-item"><div class="h-t">' + esc(h.text) + '</div>' +
+      '<div class="h-m">' + esc(h.letters) + ' · ' + esc(h.brief) + ' · ' + esc(h.who) + '</div></div>'
+    ).join('');
+  } else bp.style.display = 'none';
+
+  show('finalScreen');
+  sWin();
+  confettiBurst();
+}
+
+/* ---- hall of fame ---- */
+
+function renderHall(){
+  const host = $('hallList');
+  if(!S.hall.length){
+    host.innerHTML = '<p class="hint" style="text-align:center;padding:20px 0;">Nothing here yet. Win a bout and your backronym gets immortalised.</p>';
+    return;
+  }
+  host.innerHTML = S.hall.map(h =>
+    '<div class="hall-item"><div class="h-t">' + esc(h.text) + '</div>' +
+    '<div class="h-m">' + esc(h.letters) + ' · ' + esc(h.brief) + ' · ' + esc(h.who) + '</div></div>'
+  ).join('');
+}
+
+/* ---- confetti ---- */
+
+function confettiBurst(){
+  const cv = $('confetti');
+  const ctx = cv.getContext('2d');
+  const W = cv.width = window.innerWidth;
+  const H = cv.height = window.innerHeight;
+  cv.style.display = 'block';
+
+  const bits = [];
+  for(let i = 0; i < 90; i++){
+    bits.push({
+      x: W / 2 + (Math.random() - .5) * W * .5,
+      y: H * .3 + (Math.random() - .5) * 60,
+      vx: (Math.random() - .5) * 9,
+      vy: -6 - Math.random() * 8,
+      s: 4 + Math.random() * 7,
+      c: pick(COLORS),
+      r: Math.random() * Math.PI
+    });
+  }
+  let frames = 0;
+  (function step(){
+    ctx.clearRect(0, 0, W, H);
+    bits.forEach(b => {
+      b.vy += .28; b.x += b.vx; b.y += b.vy; b.r += .12;
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.r);
+      ctx.fillStyle = b.c;
+      ctx.fillRect(-b.s / 2, -b.s / 2, b.s, b.s * .6);
+      ctx.restore();
+    });
+    if(++frames < 170) requestAnimationFrame(step);
+    else { ctx.clearRect(0, 0, W, H); cv.style.display = 'none'; }
+  })();
+}
+
+/* ---- quit ---- */
+
+function quitToSetup(){
+  stopClock();
+  S.duel = null;
+  show('setupScreen');
+}
+
+/* ============================ WIRING ============================ */
+
+$('addBtn').onclick = () => {
+  addPlayer($('nameInput').value);
+  $('nameInput').value = '';
+  $('nameInput').focus();
+};
+$('nameInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); $('addBtn').click(); }
+});
+
+$('roundSeg').onclick = e => {
+  const b = e.target.closest('button'); if(!b) return;
+  S.rounds = Number(b.dataset.v); syncSeg('roundSeg', S.rounds); saveCfg(); sTap();
+};
+$('timerSeg').onclick = e => {
+  const b = e.target.closest('button'); if(!b) return;
+  S.clock = Number(b.dataset.v); syncSeg('timerSeg', S.clock); saveCfg(); sTap();
+};
+$('soundSeg').onclick = e => {
+  const b = e.target.closest('button'); if(!b) return;
+  S.sound = b.dataset.v === '1'; syncSeg('soundSeg', S.sound ? 1 : 0); saveCfg(); sTap();
+};
+
+$('startBtn').onclick = startGame;
+$('toWriteBtn').onclick = () => { sTap(); goPass(); };
+$('passGoBtn').onclick = () => { sTap(); goWrite(); };
+$('submitBtn').onclick = () => submitEntry(false);
+
+$('entryInput').addEventListener('input', updateSlots);
+$('entryInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); if(!$('submitBtn').disabled) submitEntry(false); }
+});
+
+$('voteA').onclick = () => verdict('A');
+$('voteB').onclick = () => verdict('B');
+$('voteSplit').onclick = () => verdict('split');
+$('afterVoteBtn').onclick = () => { sTap(); scoreboard(); };
+$('nextRoundBtn').onclick = () => { sTap(); nextRound(); };
+
+$('rematchBtn').onclick = () => { startGame(); };
+$('newBtn').onclick = () => { show('setupScreen'); };
+
+['quitBtn1','quitBtn2','quitBtn3'].forEach(id => {
+  $(id).onclick = () => { if(confirm('End this game and go back to setup?')) quitToSetup(); };
+});
+
+$('hallBtn').onclick = () => { renderHall(); show('hallScreen'); };
+$('hallBack').onclick = () => show('setupScreen');
+$('hallClear').onclick = () => {
+  if(confirm('Clear every saved backronym?')){ S.hall = []; saveHall(); renderHall(); }
+};
+
+window.addEventListener('resize', () => {
+  const cv = $('confetti');
+  if(cv.style.display === 'block'){ cv.width = window.innerWidth; cv.height = window.innerHeight; }
+});
+
+loadCfg();
+renderPlayers();
+</script>
+</body>
+</html>

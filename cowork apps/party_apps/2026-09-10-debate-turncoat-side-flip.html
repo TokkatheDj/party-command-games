@@ -1,0 +1,1187 @@
+<!-- CONCEPT: TURNCOAT - a same-room debate party game where you argue a side of a silly motion out loud and a klaxon randomly forces you to flip and argue the exact opposite, mid-sentence, two to five times a round. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>TURNCOAT</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+}
+
+:root {
+  --bg: #0d0f18;
+  --panel: #171b2a;
+  --panel-2: #1f2437;
+  --line: #2c3350;
+  --ink: #e8ecff;
+  --dim: #8892b5;
+
+  --for-a: #16e0a3;
+  --for-b: #0ea5e9;
+  --ag-a: #ff3d81;
+  --ag-b: #ff8a3d;
+
+  --gold: #ffd166;
+  --bad: #ff5470;
+
+  --side-a: var(--for-a);
+  --side-b: var(--for-b);
+
+  --pad: clamp(12px, 4vw, 20px);
+  --r: 16px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  position: fixed; inset: 0;
+  height: 100vh; height: 100dvh;   /* dvh keeps the bottom CTA clear of the iOS toolbar */
+}
+
+#app { height: 100%; width: 100%; position: relative; }
+
+.screen {
+  position: absolute; inset: 0;
+  display: none;
+  flex-direction: column;
+  padding: var(--pad);
+  gap: 10px;
+}
+.screen.on { display: flex; }
+.scroller { overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; min-height: 0; padding-top: 2px; }
+
+h1.logo {
+  margin: 0;
+  font-size: clamp(38px, 13vw, 62px);
+  letter-spacing: 2px;
+  font-weight: 900;
+  text-align: center;
+  line-height: 0.95;
+  background: linear-gradient(90deg, var(--for-a), var(--ag-a));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tagline {
+  text-align: center; color: var(--dim);
+  font-size: clamp(12px, 3.4vw, 15px);
+  line-height: 1.45; margin: 0 0 2px;
+}
+.tagline b { color: var(--ag-a); }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 12px;
+}
+.card h2 {
+  margin: 0 0 9px;
+  font-size: clamp(11px, 3vw, 13px);
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--dim); font-weight: 800;
+}
+
+/* ---- buttons ---- */
+button {
+  font-family: inherit; color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-height: 48px;
+  font-size: clamp(14px, 3.8vw, 17px);
+  font-weight: 700;
+  cursor: pointer;
+  padding: 10px 12px;
+}
+button:active { transform: scale(0.975); }
+.big {
+  min-height: 62px;
+  font-size: clamp(17px, 5vw, 22px);
+  font-weight: 900;
+  letter-spacing: 1px;
+  border: none;
+  color: #06121a;
+  background: linear-gradient(90deg, var(--for-a), var(--for-b));
+}
+.big.hot { background: linear-gradient(90deg, var(--ag-a), var(--ag-b)); color: #2a0512; }
+.ghost { background: transparent; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip {
+  flex: 1 1 auto; min-width: 62px;
+  min-height: 46px; font-size: clamp(12px, 3.4vw, 15px);
+  background: var(--panel-2); font-weight: 700;
+}
+.chip.sel {
+  background: linear-gradient(90deg, var(--for-a), var(--for-b));
+  color: #06121a; border-color: transparent;
+}
+.chip.deck.sel { background: linear-gradient(90deg, #7c5cff, #b06cff); color: #fff; }
+
+/* ---- players ---- */
+.prow { display: flex; gap: 7px; margin-bottom: 7px; }
+input[type=text] {
+  flex: 1; min-width: 0;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 12px; color: var(--ink);
+  font-family: inherit; font-size: 16px; font-weight: 600;
+  padding: 12px; min-height: 48px;
+  user-select: text; -webkit-user-select: text;
+}
+input[type=text]::placeholder { color: #5c678f; }
+.plist { display: flex; flex-wrap: wrap; gap: 7px; }
+.ptag {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 8px 8px 8px 14px;
+  font-weight: 700; font-size: clamp(13px, 3.6vw, 15px);
+}
+.ptag .x {
+  width: 30px; height: 30px; min-height: 30px;
+  border-radius: 50%; padding: 0;
+  background: #33203a; color: var(--bad);
+  border: none; font-size: 16px; line-height: 1;
+}
+.hint { color: var(--dim); font-size: clamp(11px, 3vw, 13px); line-height: 1.4; }
+
+/* ---- ready ---- */
+.ready-wrap {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px; text-align: center;
+}
+.upnext { color: var(--dim); letter-spacing: 3px; font-size: 12px; font-weight: 800; }
+.bigname {
+  font-size: clamp(34px, 11vw, 56px); font-weight: 900; line-height: 1;
+  background: linear-gradient(90deg, var(--for-a), var(--ag-a));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  word-break: break-word;
+}
+.motion-preview {
+  font-size: clamp(17px, 5vw, 23px); font-weight: 800; line-height: 1.3;
+  padding: 0 4px;
+}
+.deckname { color: var(--gold); font-size: 12px; font-weight: 800; letter-spacing: 2px; }
+
+/* ---- stage ---- */
+#stage { padding: 10px var(--pad) var(--pad); }
+.stage-top {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: clamp(11px, 3.2vw, 13px); color: var(--dim); font-weight: 700;
+}
+.stage-top .who { color: var(--ink); font-weight: 900; letter-spacing: 0.5px; }
+
+.stance {
+  border-radius: var(--r);
+  padding: 12px 10px;
+  text-align: center;
+  background: linear-gradient(90deg, var(--side-a), var(--side-b));
+  color: #06121a;
+  font-weight: 900;
+  letter-spacing: 2px;
+  font-size: clamp(26px, 9vw, 40px);
+  line-height: 1;
+  transition: background 220ms ease;
+}
+.stance small {
+  display: block; letter-spacing: 3px; font-size: clamp(10px, 2.8vw, 12px);
+  opacity: 0.72; margin-bottom: 4px; font-weight: 800;
+}
+.stance.slam { animation: slam 420ms ease; }
+@keyframes slam {
+  0% { transform: scale(1.14) rotate(-2.5deg); }
+  40% { transform: scale(0.96) rotate(1.5deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+.motion {
+  flex: 1; min-height: 0;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  font-size: clamp(21px, 6.6vw, 34px); font-weight: 800; line-height: 1.26;
+  padding: 4px;
+}
+
+.ringwrap { position: relative; width: 116px; height: 116px; margin: 0 auto; flex: none; }
+.ringwrap svg { transform: rotate(-90deg); display: block; }
+.ring-bg { stroke: #232941; }
+.ring-fg { stroke: var(--side-a); transition: stroke 220ms ease; }
+.secs {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px; font-weight: 900; font-variant-numeric: tabular-nums;
+}
+.secs.low { color: var(--bad); }
+
+.cbanner {
+  background: #3a2a05; border: 1px solid var(--gold); color: var(--gold);
+  border-radius: 12px; padding: 9px; text-align: center;
+  font-weight: 900; font-size: clamp(13px, 3.8vw, 16px);
+}
+.cbanner small { display: block; letter-spacing: 2px; font-size: 10px; opacity: 0.8; }
+
+.stage-btns { display: flex; gap: 8px; }
+.stage-btns button { flex: 1; min-height: 56px; font-size: clamp(12px, 3.4vw, 15px); font-weight: 800; }
+#btnStumble { background: #3a1626; border-color: #642640; color: #ff9ab4; }
+#btnCurve { background: #3a2f05; border-color: #6b5a12; color: var(--gold); }
+button:disabled { opacity: 0.35; }
+.bail { min-height: 44px; font-size: 13px; color: var(--dim); background: transparent; }
+
+/* ---- flip overlay ---- */
+#flipOv {
+  position: absolute; inset: 0; z-index: 40;
+  display: none; align-items: center; justify-content: center;
+  flex-direction: column; gap: 6px; text-align: center;
+  background: linear-gradient(135deg, var(--side-a), var(--side-b));
+  color: #06121a; padding: 20px;
+}
+#flipOv.on { display: flex; animation: pop 260ms ease; }
+@keyframes pop { from { opacity: 0; transform: scale(1.25); } to { opacity: 1; transform: scale(1); } }
+#flipOv .fw { font-size: clamp(52px, 19vw, 96px); font-weight: 900; letter-spacing: 4px; line-height: 0.9; }
+#flipOv .fs { font-size: clamp(16px, 5vw, 24px); font-weight: 900; letter-spacing: 1px; }
+
+/* ---- results ---- */
+.qrow {
+  display: flex; align-items: center; gap: 8px; justify-content: space-between;
+  padding: 9px 0; border-bottom: 1px solid var(--line);
+}
+.qrow:last-child { border-bottom: none; }
+.qrow .q { font-size: clamp(13px, 3.6vw, 15px); font-weight: 700; flex: 1; }
+.yn { display: flex; gap: 6px; flex: none; }
+.yn button { min-width: 54px; min-height: 44px; padding: 6px 10px; font-size: 14px; }
+.yn button.on { background: linear-gradient(90deg, var(--for-a), var(--for-b)); color: #06121a; border-color: transparent; }
+.yn button.on.no { background: #3a1626; color: #ff9ab4; border-color: #642640; }
+
+.tally { display: flex; flex-direction: column; gap: 5px; }
+.tline { display: flex; justify-content: space-between; font-size: clamp(13px, 3.6vw, 15px); }
+.tline span:last-child { font-weight: 900; font-variant-numeric: tabular-nums; }
+.tline.neg span:last-child { color: var(--bad); }
+.tline.tot { border-top: 1px solid var(--line); padding-top: 7px; margin-top: 3px; font-size: clamp(16px, 4.6vw, 19px); font-weight: 900; }
+.tline.tot span:last-child { color: var(--gold); }
+
+/* ---- board ---- */
+.brow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px; border-radius: 12px;
+  background: var(--panel-2); margin-bottom: 7px;
+}
+.brow .rank { width: 26px; font-weight: 900; color: var(--dim); font-size: 15px; }
+.brow .nm { flex: 1; font-weight: 800; font-size: clamp(14px, 4vw, 17px); word-break: break-word; }
+.brow .sc { font-weight: 900; font-size: clamp(16px, 4.6vw, 19px); font-variant-numeric: tabular-nums; color: var(--gold); }
+.brow.lead { background: linear-gradient(90deg, rgba(22,224,163,0.18), rgba(255,61,129,0.18)); border: 1px solid var(--line); }
+.brow.lead .rank { color: var(--gold); }
+
+.podium { text-align: center; }
+.podium .crown { font-size: clamp(46px, 15vw, 70px); line-height: 1; }
+.podium .win {
+  font-size: clamp(28px, 9vw, 44px); font-weight: 900; line-height: 1.05; word-break: break-word;
+  background: linear-gradient(90deg, var(--gold), var(--ag-a));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.podium .sub { color: var(--dim); font-weight: 700; font-size: 14px; }
+
+.foot { display: flex; gap: 8px; flex: none; }
+.foot button { flex: 1; }
+.err { color: var(--bad); font-size: 13px; font-weight: 700; text-align: center; min-height: 16px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= SETUP ================= -->
+  <section class="screen on" id="setup">
+    <h1 class="logo">TURNCOAT</h1>
+    <p class="tagline">Argue your side out loud &mdash; until the klaxon screams and you must <b>flip and argue the opposite</b>, mid&#8209;sentence.</p>
+    <div class="scroller">
+      <div class="card">
+        <h2>Debaters</h2>
+        <div class="prow">
+          <input type="text" id="pname" placeholder="Add a name" maxlength="14" autocomplete="off">
+          <button id="btnAdd" style="min-width:64px;font-weight:900;">ADD</button>
+        </div>
+        <div class="plist" id="plist"></div>
+      </div>
+
+      <div class="card" style="margin-top:10px;">
+        <h2>Speech length</h2>
+        <div class="chips" id="lenChips">
+          <button class="chip" data-len="30">30s<br><small style="opacity:.7">Lightning</small></button>
+          <button class="chip sel" data-len="45">45s</button>
+          <button class="chip" data-len="60">60s</button>
+          <button class="chip" data-len="75">75s<br><small style="opacity:.7">Marathon</small></button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:10px;">
+        <h2>Heat &mdash; how many flips</h2>
+        <div class="chips" id="heatChips">
+          <button class="chip" data-heat="2">MILD<br><small style="opacity:.7">2 flips</small></button>
+          <button class="chip sel" data-heat="3">SPICY<br><small style="opacity:.7">3 flips</small></button>
+          <button class="chip" data-heat="5">INFERNO<br><small style="opacity:.7">4&ndash;5 flips</small></button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:10px;">
+        <h2>Mode</h2>
+        <div class="chips" id="modeChips">
+          <button class="chip sel" data-mode="solo">SOLO SOAPBOX<br><small style="opacity:.7">one speaker holds the whole speech</small></button>
+          <button class="chip" data-mode="relay">TAG RELAY<br><small style="opacity:.7">every flip passes the phone on</small></button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:10px;">
+        <h2>Motion decks</h2>
+        <div class="chips" id="deckChips"></div>
+        <p class="hint" style="margin:9px 0 0;">125 motions. Nothing repeats until the deck runs dry.</p>
+      </div>
+
+      <div class="card" style="margin-top:10px;">
+        <h2>How it runs</h2>
+        <p class="hint" style="margin:0;">
+          One debater stands up. The screen gives them a motion and a side. They argue it out loud &mdash; badly, loudly, whatever works.<br><br>
+          At random moments a klaxon fires and the screen flips to the <b style="color:var(--ag-a)">opposite side</b>. They must keep talking and start arguing against everything they just said. No pause, no restart.<br><br>
+          The room watches. Tap <b style="color:#ff9ab4">STUMBLE</b> when they freeze or contradict themselves, and throw one <b style="color:var(--gold)">CURVEBALL</b> word they have to work in.
+        </p>
+      </div>
+      <div style="height:8px;"></div>
+    </div>
+    <p class="err" id="setupErr"></p>
+    <button class="big" id="btnStart">START THE DEBATE</button>
+  </section>
+
+  <!-- ================= READY ================= -->
+  <section class="screen" id="ready">
+    <div class="stage-top"><span id="rdRound">Round 1</span><span id="rdMode"></span></div>
+    <div class="ready-wrap">
+      <div class="upnext" id="rdLabel">ON THE SOAPBOX</div>
+      <div class="bigname" id="rdName">&mdash;</div>
+      <div class="deckname" id="rdDeck"></div>
+      <div class="motion-preview" id="rdMotion">&mdash;</div>
+      <p class="hint" id="rdHint" style="max-width:300px;">Stand up. Tap GO and start arguing whichever side the screen hands you.</p>
+    </div>
+    <button class="big" id="btnGo">GO &mdash; START TALKING</button>
+  </section>
+
+  <!-- ================= STAGE ================= -->
+  <section class="screen" id="stage">
+    <div class="stage-top">
+      <span class="who" id="stWho">&mdash;</span>
+      <span id="stMeta">flips 0</span>
+    </div>
+    <div class="stance" id="stance"><small>YOU MUST ARGUE</small><span id="stanceWord">FOR</span></div>
+    <div class="motion" id="stMotion">&mdash;</div>
+    <div class="ringwrap">
+      <svg width="116" height="116" viewBox="0 0 116 116">
+        <circle class="ring-bg" cx="58" cy="58" r="50" fill="none" stroke-width="9"></circle>
+        <circle class="ring-fg" id="ringFg" cx="58" cy="58" r="50" fill="none" stroke-width="9"
+                stroke-linecap="round" stroke-dasharray="314.16" stroke-dashoffset="0"></circle>
+      </svg>
+      <div class="secs" id="secs">45</div>
+    </div>
+    <div class="cbanner" id="cbanner" style="display:none;"><small>WORK THIS IN</small><span id="cword">&mdash;</span></div>
+    <div class="stage-btns">
+      <button id="btnStumble">&#128556; STUMBLE<br><small id="stumbLeft" style="opacity:.75;font-weight:700;">3 left</small></button>
+      <button id="btnCurve">&#127919; CURVEBALL<br><small style="opacity:.75;font-weight:700;">throw one</small></button>
+    </div>
+    <button class="bail" id="btnBail">&#127987;&#65039; BAIL OUT &mdash; they've got nothing</button>
+  </section>
+
+  <!-- ================= RESULTS ================= -->
+  <section class="screen" id="results">
+    <h1 class="logo" style="font-size:clamp(26px,8vw,38px);" id="resTitle">SPEECH OVER</h1>
+    <div class="scroller">
+      <div class="card" id="askCard">
+        <h2>The room decides</h2>
+        <div class="qrow" id="qCurve">
+          <span class="q" id="qCurveText">Did they work the curveball in?</span>
+          <span class="yn">
+            <button data-q="curve" data-v="1">YES</button>
+            <button data-q="curve" data-v="0" class="no">NO</button>
+          </span>
+        </div>
+        <div class="qrow">
+          <span class="q">Standing ovation? <span style="color:var(--dim);font-weight:600;">(was it genuinely great?)</span></span>
+          <span class="yn">
+            <button data-q="ov" data-v="1">YES</button>
+            <button data-q="ov" data-v="0" class="no">NO</button>
+          </span>
+        </div>
+      </div>
+      <div class="card" style="margin-top:10px;">
+        <h2 id="tallyHead">Score</h2>
+        <div class="tally" id="tally"></div>
+      </div>
+      <div class="card" style="margin-top:10px;" id="relayCard">
+        <h2>Round earnings</h2>
+        <div class="tally" id="relayTally"></div>
+      </div>
+      <div style="height:8px;"></div>
+    </div>
+    <button class="big" id="btnBank">BANK IT</button>
+  </section>
+
+  <!-- ================= BOARD ================= -->
+  <section class="screen" id="board">
+    <h1 class="logo" style="font-size:clamp(26px,8vw,38px);">SCOREBOARD</h1>
+    <div class="scroller" id="boardList"></div>
+    <div class="foot">
+      <button class="ghost" id="btnEnd" style="flex:0 0 40%;">END GAME</button>
+      <button class="big" id="btnNext" style="flex:1;">NEXT DEBATER</button>
+    </div>
+  </section>
+
+  <!-- ================= FINAL ================= -->
+  <section class="screen" id="final">
+    <div class="scroller">
+      <div class="podium" style="padding:10px 0 4px;">
+        <div class="crown">&#129351;</div>
+        <div class="win" id="winName">&mdash;</div>
+        <div class="sub" id="winSub">&mdash;</div>
+      </div>
+      <div id="finalList" style="margin-top:12px;"></div>
+      <div class="card" style="margin-top:10px;">
+        <h2>Hall of flip-floppers</h2>
+        <div class="tally" id="hof"></div>
+      </div>
+      <div style="height:8px;"></div>
+    </div>
+    <div class="foot">
+      <button class="ghost" id="btnNewGame" style="flex:0 0 40%;">NEW SETUP</button>
+      <button class="big" id="btnAgain" style="flex:1;">PLAY AGAIN</button>
+    </div>
+  </section>
+
+  <div id="flipOv">
+    <div class="fw">FLIP!</div>
+    <div class="fs" id="flipSub">NOW ARGUE AGAINST</div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ============================================================
+   CONTENT
+   ============================================================ */
+const DECKS = {
+  everyday: { name: 'EVERYDAY', motions: [
+    'Socks should be worn to bed',
+    'Cereal should be eaten dry, with no milk',
+    'Making your bed every morning is a waste of a life',
+    'A shower is better in the evening than in the morning',
+    'Toilet paper must hang over the front. There is no debate',
+    'Alarm clock snooze buttons should be illegal',
+    'Sitting on a sofa is more comfortable than any bed',
+    'Umbrellas are worse than simply getting wet',
+    'Talking on the phone is better than texting',
+    'Every house should have a slide instead of stairs',
+    'Shoes indoors is completely fine',
+    'Birthdays should only be celebrated every five years',
+    'Winter is objectively the best season',
+    'Handwriting is better than typing',
+    'The window seat is the worst seat on a plane',
+    'Queuing is the finest thing humans ever invented',
+    'Everyone should be given a two-hour nap at lunchtime',
+    'Small talk should be banned entirely',
+    'It is fine to wear the same outfit every single day',
+    'Photos ruin holidays',
+    'Board games are better than films',
+    'A bath is a soup you sit in, and that is a good thing',
+    'Everyone should have to learn to juggle at school',
+    'Loud chewing should carry a fine',
+    'Mornings are better than evenings'
+  ]},
+  food: { name: 'FOOD FIGHT', motions: [
+    'Pineapple belongs on pizza',
+    'A hot dog is a sandwich',
+    'Cereal is a soup',
+    'Ketchup belongs in the fridge, not the cupboard',
+    'Chocolate is overrated',
+    'Crunchy peanut butter is the only acceptable peanut butter',
+    'A burrito is better than a burger, always',
+    'Cold pizza beats hot pizza',
+    'Ice cream should be eaten with a fork',
+    'Breakfast food should be served at dinner',
+    'Coriander tastes like soap and should be outlawed',
+    'The crust is the best part of the bread',
+    'Pasta is better than rice',
+    'Mushrooms have no business being food',
+    'Sweet popcorn beats salty popcorn',
+    'Cheese should be on absolutely everything',
+    'Fruit does not belong in a savoury meal',
+    'A wrap is just a sad, rolled-up sandwich',
+    'Soup is not a real meal',
+    'Every meal is improved by adding chips',
+    'The best part of a biscuit is dunking it',
+    'Milkshakes should be drunk with a spoon',
+    'Vegetables taste better raw',
+    'Sauce on the side is the mark of a coward',
+    'Leftovers taste better than the original meal'
+  ]},
+  school: { name: 'SCHOOL & WORK', motions: [
+    'Homework should be banned forever',
+    'School should start at eleven in the morning',
+    'Exams should be replaced with a talent show',
+    'Every meeting could have been a note',
+    'Uniforms make everything easier',
+    'Group projects are the worst invention in education',
+    'Everyone should have to learn to cook before they leave school',
+    'Handwriting lessons are a waste of time now',
+    'The four-day week should be the law',
+    'Calculators ruined mathematics',
+    'Recess should be twice as long as any lesson',
+    'Reading a book aloud in class is deeply unfair',
+    'Spelling tests prove nothing about anybody',
+    'Working from home is better than any office',
+    'Teachers should be graded by their students',
+    'Every classroom should have a class pet',
+    'Note-taking by hand beats a laptop every time',
+    'Detention should be replaced with extra art',
+    'School holidays are far too long',
+    'Public speaking should be a compulsory subject',
+    'Sitting still is the hardest skill ever taught',
+    'The best learning happens outside a classroom',
+    'Everyone should have to change job every ten years',
+    'Report cards should include a category for kindness',
+    'Break time should include a compulsory dance'
+  ]},
+  wild: { name: 'WILD WORLD', motions: [
+    'Cats are secretly running the entire planet',
+    'Dogs would be better drivers than most humans',
+    'Penguins are the coolest animal and it is not close',
+    'Every city should have a resident town goat',
+    'Sharks have terrible public relations',
+    'Bees deserve a national holiday',
+    'Dinosaurs would make excellent pets',
+    'Pigeons are underrated geniuses',
+    'The ocean is scarier than outer space',
+    'Snow is better than sunshine',
+    'Wasps serve no purpose whatsoever',
+    'Trees are the most impressive living things on Earth',
+    'Camping is just being homeless on purpose',
+    'Every animal should be able to vote',
+    'Octopuses are proof that aliens already live here',
+    'Rain is the most underrated weather',
+    'Mountains are more beautiful than beaches',
+    'Cows are the friendliest animals alive',
+    'Spiders should be welcomed into the home as guests',
+    'Deserts are more interesting than jungles',
+    'Squirrels are plotting something',
+    'The moon is more interesting than the sun',
+    'Owls are overrated and know it',
+    'Every household should keep chickens',
+    'Volcanoes are showing off'
+  ]},
+  fantasy: { name: 'FANTASY & POWERS', motions: [
+    'Invisibility is a far better superpower than flight',
+    'Time travel would ruin absolutely everything',
+    'Dragons would make terrible neighbours',
+    'Wizards would be useless in the modern world',
+    'Teleporting is not worth the risk',
+    'Robots should never be allowed to cook',
+    'Talking to animals is the best superpower available',
+    'Immortality sounds exhausting',
+    'Every hero is just a villain with better lighting',
+    'Superspeed would be mostly inconvenient',
+    'A magic carpet beats any car',
+    'Ghosts would be excellent housemates',
+    'Mind reading would end friendship as we know it',
+    'Unicorns are less impressive than horses',
+    'Living underwater beats living in space',
+    'A pet dragon is more trouble than it is worth',
+    'Wearing a cape should be socially acceptable',
+    'Being able to pause time is cheating at life',
+    'Shape-shifting would make you forget who you are',
+    'Sidekicks do all the actual work',
+    'A talking sword would be intolerable company',
+    'Elves are unbearably smug',
+    'Any wish granted by a genie will go wrong',
+    'Secret identities are more trouble than fame',
+    'Growing to giant size is the worst power ever offered'
+  ]}
+};
+
+const CURVEBALLS = [
+  'a banana','your grandmother','the moon','penguins','a lawsuit','wet socks','the year 1997',
+  'a haunted toaster','my knees','the postman','glitter','a very small horse','taxes','a trampoline',
+  'seagulls','a locked door','the smell of rain','my old teacher','a broken umbrella','dolphins',
+  'a queue','bubble wrap','the deep sea','a birthday candle','my neighbour Dave','a rubber duck',
+  'the fire brigade','an escalator','soup','a lighthouse','my left shoe','a marching band',
+  'the last biscuit','a wheelbarrow','static electricity','a submarine','my first bicycle',
+  'a garden gnome','the wind','a photocopier','three raccoons','a violin','the Titanic',
+  'a paper cut','my dentist','an empty fridge','a tuba','the ice age','a shopping trolley','clouds',
+  'a padlock','the number eleven','a wet newspaper','my ancestors','a trapdoor','pigeons on a bus',
+  'a very long tunnel','the smell of a library','a broken clock','an angry swan'
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const LS = {
+  players: 'cowork-turncoat-players',
+  settings: 'cowork-turncoat-settings',
+  hof: 'cowork-turncoat-hof'
+};
+
+const S = {
+  players: [],
+  scores: {},          // name -> total
+  len: 45,
+  heat: 3,
+  mode: 'solo',
+  decks: Object.keys(DECKS),
+  pool: [],            // shuffled unseen motions {text, deck}
+  round: 0,
+  startIdx: 0,         // whose turn it is to open the round
+  // live round
+  motion: null,
+  side: 0,             // 0 = FOR, 1 = AGAINST
+  flipTimes: [],
+  flipIdx: 0,
+  holder: 0,           // index into S.players of current speaker
+  chain: [],           // player indexes who held the mic this round
+  earned: {},          // name -> points this round
+  stumbles: 0,
+  stumbleBy: [],
+  curveThrown: false,
+  curveWord: '',
+  curveHolder: null,
+  bailed: false,
+  t0: 0,
+  raf: 0,
+  running: false,
+  ansCurve: null,
+  ansOv: null,
+  lastResult: null
+};
+
+const PTS = { FLIP: 10, START: 10, SURVIVE: 5, CURVE: 8, OVATION: 15, OVATION_RELAY: 8, STUMBLE: -6, BAIL: -5 };
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+}
+
+/* ============================================================
+   AUDIO  (context is created inside the GO tap - iOS needs that)
+   ============================================================ */
+let AC = null;
+function audioOn() {
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+  } catch (e) { AC = null; }
+}
+function tone(freq, dur, type, vol, slideTo) {
+  if (!AC) return;
+  const t = AC.currentTime;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type || 'square';
+  o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol || 0.18, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(AC.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, vol, hp) {
+  if (!AC) return;
+  const t = AC.currentTime, n = Math.floor(AC.sampleRate * dur);
+  const buf = AC.createBuffer(1, n, AC.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = AC.createBufferSource(); src.buffer = buf;
+  const f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp || 900;
+  const g = AC.createGain(); g.gain.value = vol || 0.2;
+  src.connect(f); f.connect(g); g.connect(AC.destination);
+  src.start(t);
+}
+const sfxKlaxon = () => {
+  if (!AC) return;
+  tone(180, 0.22, 'sawtooth', 0.22, 420);
+  setTimeout(() => tone(420, 0.26, 'sawtooth', 0.22, 170), 200);
+  setTimeout(() => tone(180, 0.3, 'square', 0.18, 500), 430);
+};
+const sfxTick = () => tone(1250, 0.05, 'square', 0.09);
+const sfxEnd = () => { tone(140, 0.7, 'sawtooth', 0.24, 70); noise(0.5, 0.1, 500); };
+const sfxTap = () => tone(660, 0.06, 'triangle', 0.1);
+const sfxBad = () => tone(200, 0.2, 'square', 0.16, 120);
+const sfxCheer = () => { noise(0.9, 0.26, 1400); [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.28, 'triangle', 0.13), i * 90)); };
+
+/* ============================================================
+   SETUP
+   ============================================================ */
+function loadPrefs() {
+  try {
+    const p = JSON.parse(localStorage.getItem(LS.players) || 'null');
+    if (Array.isArray(p)) S.players = p.filter(x => typeof x === 'string').slice(0, 12);
+  } catch (e) {}
+  try {
+    const c = JSON.parse(localStorage.getItem(LS.settings) || 'null');
+    if (c) {
+      if ([30, 45, 60, 75].includes(c.len)) S.len = c.len;
+      if ([2, 3, 5].includes(c.heat)) S.heat = c.heat;
+      if (c.mode === 'solo' || c.mode === 'relay') S.mode = c.mode;
+      if (Array.isArray(c.decks) && c.decks.length) {
+        const ok = c.decks.filter(d => DECKS[d]);
+        if (ok.length) S.decks = ok;
+      }
+    }
+  } catch (e) {}
+}
+function savePrefs() {
+  try {
+    localStorage.setItem(LS.players, JSON.stringify(S.players));
+    localStorage.setItem(LS.settings, JSON.stringify({ len: S.len, heat: S.heat, mode: S.mode, decks: S.decks }));
+  } catch (e) {}
+}
+
+function renderPlayers() {
+  const el = $('plist');
+  if (!S.players.length) {
+    el.innerHTML = '<p class="hint" style="margin:0;">Add at least 2 debaters. 3&ndash;8 is the sweet spot.</p>';
+    return;
+  }
+  el.innerHTML = S.players.map((n, i) =>
+    `<span class="ptag">${esc(n)}<button class="x" data-rm="${i}" aria-label="remove">&times;</button></span>`).join('');
+}
+function renderDecks() {
+  $('deckChips').innerHTML = Object.keys(DECKS).map(k =>
+    `<button class="chip deck ${S.decks.includes(k) ? 'sel' : ''}" data-deck="${k}">${DECKS[k].name}</button>`).join('');
+}
+function syncChips() {
+  document.querySelectorAll('#lenChips .chip').forEach(b => b.classList.toggle('sel', +b.dataset.len === S.len));
+  document.querySelectorAll('#heatChips .chip').forEach(b => b.classList.toggle('sel', +b.dataset.heat === S.heat));
+  document.querySelectorAll('#modeChips .chip').forEach(b => b.classList.toggle('sel', b.dataset.mode === S.mode));
+}
+
+function addPlayer() {
+  const inp = $('pname');
+  const n = inp.value.trim().slice(0, 14);
+  if (!n) return;
+  if (S.players.length >= 12) { $('setupErr').textContent = 'Twelve debaters is plenty.'; return; }
+  if (S.players.some(p => p.toLowerCase() === n.toLowerCase())) { $('setupErr').textContent = 'That name is already in.'; return; }
+  S.players.push(n);
+  inp.value = '';
+  $('setupErr').textContent = '';
+  renderPlayers(); savePrefs(); sfxTap();
+}
+
+$('btnAdd').addEventListener('click', addPlayer);
+$('pname').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addPlayer(); } });
+$('plist').addEventListener('click', e => {
+  const b = e.target.closest('[data-rm]');
+  if (!b) return;
+  S.players.splice(+b.dataset.rm, 1);
+  renderPlayers(); savePrefs();
+});
+$('lenChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-len]'); if (!b) return;
+  S.len = +b.dataset.len; syncChips(); savePrefs();
+});
+$('heatChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-heat]'); if (!b) return;
+  S.heat = +b.dataset.heat; syncChips(); savePrefs();
+});
+$('modeChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-mode]'); if (!b) return;
+  S.mode = b.dataset.mode; syncChips(); savePrefs();
+});
+$('deckChips').addEventListener('click', e => {
+  const b = e.target.closest('[data-deck]'); if (!b) return;
+  const k = b.dataset.deck;
+  if (S.decks.includes(k)) {
+    if (S.decks.length === 1) { $('setupErr').textContent = 'Keep at least one deck.'; return; }
+    S.decks = S.decks.filter(d => d !== k);
+  } else S.decks.push(k);
+  $('setupErr').textContent = '';
+  renderDecks(); savePrefs();
+});
+
+/* ============================================================
+   MOTION POOL
+   ============================================================ */
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+function buildPool() {
+  const all = [];
+  S.decks.forEach(k => DECKS[k].motions.forEach(t => all.push({ text: t, deck: DECKS[k].name })));
+  S.pool = shuffle(all);
+}
+function drawMotion() {
+  if (!S.pool.length) buildPool();
+  return S.pool.pop();
+}
+
+/* ============================================================
+   FLIP SCHEDULE
+   ============================================================ */
+const MIN_GAP = 6;      // seconds between flips
+const FIRST_MIN = 7;    // no flip before this
+const END_GUARD = 4;    // no flip in the final stretch
+
+function planFlips(dur, heat) {
+  const first = FIRST_MIN;
+  const last = dur - END_GUARD;
+  const span = last - first;
+  if (span <= 0) return [Math.max(1, dur / 2)];
+
+  let want = heat === 5 ? (3 + Math.floor(Math.random() * 2) + 1) : heat;   // INFERNO -> 4 or 5
+  const fits = Math.floor(span / MIN_GAP) + 1;
+  const n = Math.max(1, Math.min(want, fits));
+
+  if (n === 1) return [first + Math.random() * span];
+
+  const spacing = span / (n - 1);
+  const jitter = Math.max(0, Math.min(2.5, (spacing - MIN_GAP) / 2));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    let t = first + spacing * i + (Math.random() * 2 - 1) * jitter;
+    t = Math.max(first, Math.min(last, t));
+    out.push(t);
+  }
+  out.sort((a, b) => a - b);
+  return out;
+}
+
+/* ============================================================
+   ROUND FLOW
+   ============================================================ */
+function beginGame() {
+  if (S.players.length < 2) { $('setupErr').textContent = 'Need at least 2 debaters.'; sfxBad(); return; }
+  $('setupErr').textContent = '';
+  S.scores = {};
+  S.players.forEach(n => S.scores[n] = 0);
+  S.round = 0;
+  S.startIdx = 0;
+  buildPool();
+  savePrefs();
+  nextRound();
+}
+
+function nextRound() {
+  S.round++;
+  S.motion = drawMotion();
+  S.side = Math.random() < 0.5 ? 0 : 1;
+  S.holder = S.startIdx % S.players.length;
+  S.chain = [S.holder];
+  S.earned = {};
+  S.flipTimes = planFlips(S.len, S.heat);
+  S.flipIdx = 0;
+  S.stumbles = 0;
+  S.stumbleBy = [];
+  S.curveThrown = false;
+  S.curveWord = '';
+  S.curveHolder = null;
+  S.bailed = false;
+  S.ansCurve = null;
+  S.ansOv = null;
+
+  $('rdRound').textContent = 'Round ' + S.round;
+  $('rdMode').textContent = S.mode === 'relay' ? 'TAG RELAY · ' + S.len + 's' : 'SOLO SOAPBOX · ' + S.len + 's';
+  $('rdLabel').textContent = S.mode === 'relay' ? 'STARTS THE RELAY' : 'ON THE SOAPBOX';
+  $('rdName').textContent = S.players[S.holder];
+  $('rdDeck').textContent = S.motion.deck;
+  $('rdMotion').textContent = '“' + S.motion.text + '”';
+  $('rdHint').innerHTML = S.mode === 'relay'
+    ? 'Line up. Every klaxon passes the phone to the next debater, who picks up on the <b>opposite</b> side, mid-sentence.'
+    : 'Stand up. Tap GO and start arguing whichever side the screen hands you &mdash; then keep going when it flips.';
+  show('ready');
+}
+
+function paintSide(anim) {
+  const forSide = S.side === 0;
+  document.documentElement.style.setProperty('--side-a', forSide ? 'var(--for-a)' : 'var(--ag-a)');
+  document.documentElement.style.setProperty('--side-b', forSide ? 'var(--for-b)' : 'var(--ag-b)');
+  $('stanceWord').textContent = forSide ? 'FOR' : 'AGAINST';
+  if (anim) {
+    const s = $('stance');
+    s.classList.remove('slam'); void s.offsetWidth; s.classList.add('slam');
+  }
+}
+
+function startSpeech() {
+  audioOn();
+  $('stWho').textContent = S.players[S.holder];
+  $('stMotion').textContent = '“' + S.motion.text + '”';
+  $('cbanner').style.display = 'none';
+  $('btnCurve').disabled = false;
+  $('btnStumble').disabled = false;
+  $('stumbLeft').textContent = '3 left';
+  $('stMeta').textContent = 'flips 0';
+  $('secs').classList.remove('low');
+  paintSide(false);
+  award(S.players[S.holder], PTS.START);
+  show('stage');
+
+  S.t0 = performance.now();
+  S.running = true;
+  S.lastTick = -1;
+  cancelAnimationFrame(S.raf);
+  S.raf = requestAnimationFrame(tick);
+}
+
+function tick(now) {
+  if (!S.running) return;
+  const el = (now - S.t0) / 1000;
+  const left = Math.max(0, S.len - el);
+
+  const secs = Math.ceil(left);
+  if (secs !== S.lastTick) {
+    S.lastTick = secs;
+    $('secs').textContent = secs;
+    if (secs <= 5 && secs > 0) { $('secs').classList.add('low'); sfxTick(); }
+  }
+  $('ringFg').setAttribute('stroke-dashoffset', String(314.16 * (1 - left / S.len)));
+
+  while (S.flipIdx < S.flipTimes.length && el >= S.flipTimes[S.flipIdx]) {
+    S.flipIdx++;
+    doFlip();
+  }
+
+  if (left <= 0) { endSpeech(false); return; }
+  S.raf = requestAnimationFrame(tick);
+}
+
+function doFlip() {
+  S.side = S.side ? 0 : 1;
+  const nowFor = S.side === 0;
+  let sub = nowFor ? 'NOW ARGUE FOR IT' : 'NOW ARGUE AGAINST IT';
+
+  if (S.mode === 'relay' && S.players.length > 1) {
+    S.holder = (S.holder + 1) % S.players.length;
+    S.chain.push(S.holder);
+    sub = 'PASS TO ' + S.players[S.holder].toUpperCase() + ' — ARGUE ' + (nowFor ? 'FOR' : 'AGAINST');
+    $('stWho').textContent = S.players[S.holder];
+  }
+  award(S.players[S.holder], PTS.FLIP);
+
+  paintSide(true);
+  $('stMeta').textContent = 'flips ' + S.flipIdx;
+  $('flipSub').textContent = sub;
+  const ov = $('flipOv');
+  ov.classList.add('on');
+  sfxKlaxon();
+  clearTimeout(S.ovT);
+  S.ovT = setTimeout(() => ov.classList.remove('on'), 950);
+}
+
+function award(name, pts) {
+  S.earned[name] = (S.earned[name] || 0) + pts;
+}
+
+$('btnStumble').addEventListener('click', () => {
+  if (!S.running || S.stumbles >= 3) return;
+  S.stumbles++;
+  S.stumbleBy.push(S.players[S.holder]);
+  award(S.players[S.holder], PTS.STUMBLE);
+  const left = 3 - S.stumbles;
+  $('stumbLeft').textContent = left + ' left';
+  if (left === 0) $('btnStumble').disabled = true;
+  sfxBad();
+});
+
+$('btnCurve').addEventListener('click', () => {
+  if (!S.running || S.curveThrown) return;
+  S.curveThrown = true;
+  S.curveWord = CURVEBALLS[Math.floor(Math.random() * CURVEBALLS.length)];
+  S.curveHolder = S.players[S.holder];
+  $('cword').textContent = S.curveWord.toUpperCase();
+  $('cbanner').style.display = '';
+  $('btnCurve').disabled = true;
+  tone(880, 0.1, 'triangle', 0.16, 1320);
+});
+
+$('btnBail').addEventListener('click', () => { if (S.running) endSpeech(true); });
+
+function endSpeech(bailed) {
+  S.running = false;
+  S.bailed = bailed;
+  cancelAnimationFrame(S.raf);
+  clearTimeout(S.ovT);
+  $('flipOv').classList.remove('on');
+  sfxEnd();
+  showResults();
+}
+
+/* ============================================================
+   RESULTS
+   ============================================================ */
+function showResults() {
+  $('resTitle').textContent = S.bailed ? 'WHITE FLAG' : 'SPEECH OVER';
+  const ask = $('askCard');
+  if (S.bailed) {
+    ask.style.display = 'none';
+    S.ansCurve = 0; S.ansOv = 0;
+  } else {
+    ask.style.display = '';
+    $('qCurve').style.display = S.curveThrown ? '' : 'none';
+    if (S.curveThrown) {
+      $('qCurveText').innerHTML = 'Did ' + esc(S.curveHolder) + ' work <b style="color:var(--gold)">' + esc(S.curveWord) + '</b> in?';
+      S.ansCurve = null;
+    } else S.ansCurve = 0;
+    S.ansOv = null;
+  }
+  document.querySelectorAll('.yn button').forEach(b => b.classList.remove('on'));
+  renderTally();
+  show('results');
+}
+
+document.querySelectorAll('.yn button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const q = btn.dataset.q, v = +btn.dataset.v;
+    if (q === 'curve') S.ansCurve = v; else S.ansOv = v;
+    document.querySelectorAll(`.yn button[data-q="${q}"]`).forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    sfxTap();
+    if (q === 'ov' && v === 1) sfxCheer();
+    renderTally();
+  });
+});
+
+function bonusMap() {
+  // returns a per-player map of the end-of-round bonuses
+  const m = {};
+  const add = (n, p) => { m[n] = (m[n] || 0) + p; };
+  if (S.bailed) { add(S.players[S.holder], PTS.BAIL); return m; }
+  if (S.mode === 'relay') {
+    [...new Set(S.chain)].forEach(i => add(S.players[i], PTS.SURVIVE));
+    if (S.ansOv === 1) [...new Set(S.chain)].forEach(i => add(S.players[i], PTS.OVATION_RELAY));
+  } else {
+    add(S.players[S.chain[0]], PTS.SURVIVE);
+    if (S.ansOv === 1) add(S.players[S.chain[0]], PTS.OVATION);
+  }
+  if (S.ansCurve === 1 && S.curveHolder) add(S.curveHolder, PTS.CURVE);
+  return m;
+}
+
+function roundTotals() {
+  const b = bonusMap();
+  const tot = {};
+  Object.keys(S.earned).forEach(n => tot[n] = (tot[n] || 0) + S.earned[n]);
+  Object.keys(b).forEach(n => tot[n] = (tot[n] || 0) + b[n]);
+  return tot;
+}
+
+function renderTally() {
+  const b = bonusMap();
+  const flips = S.flipIdx;
+  const rows = [];
+  rows.push(['Took the mic', PTS.START]);
+  rows.push([`Flips survived × ${flips}`, flips * PTS.FLIP]);
+  if (S.stumbles) rows.push([`Stumbles × ${S.stumbles}`, S.stumbles * PTS.STUMBLE]);
+  if (S.bailed) rows.push(['Bailed out', PTS.BAIL]);
+  else {
+    rows.push([S.mode === 'relay' ? 'Chain held to the buzzer' : 'Survived to the buzzer',
+               S.mode === 'relay' ? [...new Set(S.chain)].length * PTS.SURVIVE : PTS.SURVIVE]);
+    if (S.ansCurve === 1) rows.push(['Curveball worked in', PTS.CURVE]);
+    if (S.ansOv === 1) rows.push(['Standing ovation',
+      S.mode === 'relay' ? [...new Set(S.chain)].length * PTS.OVATION_RELAY : PTS.OVATION]);
+  }
+  const tot = roundTotals();
+  const sum = Object.values(tot).reduce((a, c) => a + c, 0);
+
+  $('tallyHead').textContent = S.mode === 'relay' ? 'Round total (' + [...new Set(S.chain)].length + ' debaters)' : 'Score — ' + S.players[S.chain[0]];
+  $('tally').innerHTML = rows.map(r =>
+    `<div class="tline ${r[1] < 0 ? 'neg' : ''}"><span>${esc(r[0])}</span><span>${r[1] > 0 ? '+' : ''}${r[1]}</span></div>`
+  ).join('') + `<div class="tline tot"><span>ROUND</span><span>${sum > 0 ? '+' : ''}${sum}</span></div>`;
+
+  const names = Object.keys(tot);
+  if (S.mode === 'relay' && names.length > 1) {
+    $('relayCard').style.display = '';
+    $('relayTally').innerHTML = names.sort((a, c) => tot[c] - tot[a]).map(n =>
+      `<div class="tline ${tot[n] < 0 ? 'neg' : ''}"><span>${esc(n)}</span><span>${tot[n] > 0 ? '+' : ''}${tot[n]}</span></div>`).join('');
+  } else $('relayCard').style.display = 'none';
+
+  const needAsk = !S.bailed && (S.ansOv === null || (S.curveThrown && S.ansCurve === null));
+  $('btnBank').textContent = needAsk ? 'ANSWER ABOVE TO BANK' : 'BANK IT';
+  $('btnBank').style.opacity = needAsk ? '0.5' : '1';
+}
+
+$('btnBank').addEventListener('click', () => {
+  if (!S.bailed && (S.ansOv === null || (S.curveThrown && S.ansCurve === null))) { sfxBad(); return; }
+  const tot = roundTotals();
+  Object.keys(tot).forEach(n => { S.scores[n] = (S.scores[n] || 0) + tot[n]; });
+  S.lastResult = tot;
+  S.startIdx = (S.startIdx + 1) % S.players.length;
+  sfxTap();
+  renderBoard();
+  show('board');
+});
+
+/* ============================================================
+   BOARD / FINAL
+   ============================================================ */
+function ranked() {
+  return S.players.slice().map(n => ({ n, s: S.scores[n] || 0 })).sort((a, b) => b.s - a.s);
+}
+function renderBoard() {
+  const r = ranked();
+  const gained = S.lastResult || {};
+  $('boardList').innerHTML = r.map((p, i) => {
+    const g = gained[p.n];
+    return `<div class="brow ${i === 0 ? 'lead' : ''}">
+      <span class="rank">${i + 1}</span>
+      <span class="nm">${esc(p.n)}${g ? ` <span style="color:${g < 0 ? 'var(--bad)' : 'var(--for-a)'};font-size:12px;">${g > 0 ? '+' : ''}${g}</span>` : ''}</span>
+      <span class="sc">${p.s}</span></div>`;
+  }).join('') +
+  `<p class="hint" style="text-align:center;margin-top:10px;">Next up: <b style="color:var(--ink)">${esc(S.players[S.startIdx % S.players.length])}</b></p>`;
+}
+
+function loadHof() { try { return JSON.parse(localStorage.getItem(LS.hof) || '[]'); } catch (e) { return []; } }
+function saveHof(name, score) {
+  let h = loadHof();
+  h.push({ n: name, s: score, d: new Date().toISOString().slice(0, 10) });
+  h.sort((a, b) => b.s - a.s);
+  h = h.slice(0, 5);
+  try { localStorage.setItem(LS.hof, JSON.stringify(h)); } catch (e) {}
+  return h;
+}
+
+function endGame() {
+  const r = ranked();
+  const top = r[0];
+  const h = saveHof(top.n, top.s);
+  $('winName').textContent = top.n;
+  $('winSub').textContent = top.s + ' points · ' + S.round + ' round' + (S.round === 1 ? '' : 's') + ' of flip-flopping';
+  $('finalList').innerHTML = r.map((p, i) =>
+    `<div class="brow ${i === 0 ? 'lead' : ''}"><span class="rank">${i + 1}</span><span class="nm">${esc(p.n)}</span><span class="sc">${p.s}</span></div>`).join('');
+  $('hof').innerHTML = h.length
+    ? h.map(x => `<div class="tline"><span>${esc(x.n)} <span style="color:var(--dim);font-size:12px;">${esc(x.d)}</span></span><span>${x.s}</span></div>`).join('')
+    : '<p class="hint" style="margin:0;">Nothing yet.</p>';
+  sfxCheer();
+  show('final');
+}
+
+$('btnGo').addEventListener('click', startSpeech);
+$('btnStart').addEventListener('click', beginGame);
+$('btnNext').addEventListener('click', () => { S.lastResult = null; nextRound(); });
+$('btnEnd').addEventListener('click', endGame);
+$('btnAgain').addEventListener('click', beginGame);
+$('btnNewGame').addEventListener('click', () => { $('setupErr').textContent = ''; show('setup'); });
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+loadPrefs();
+renderPlayers();
+renderDecks();
+syncChips();
+
+// test hook - lets a headless driver inspect the live round
+window.__turncoat = S;
+})();
+</script>
+</body>
+</html>

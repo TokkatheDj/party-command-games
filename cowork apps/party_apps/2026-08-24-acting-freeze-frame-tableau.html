@@ -1,0 +1,1265 @@
+<!-- CONCEPT: ACTING/PHYSICAL - "Freeze Frame": teams build a frozen human photograph of a secret scene. The screen shows the acting team a prompt and counts down a shrinking BUILD phase; at zero a camera shutter fires, the prompt is WIPED from the screen (so the phone is safe to hand over), and the team's Guesser opens their eyes with one shot to name the picture while everyone holds the pose. Teams can UNFREEZE ONE actor for a single gesture at a cost, and a miss opens a steal window for rival teams. 160 tableau prompts across 8 decks | Players: 4-16 in 2-4 teams | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Freeze Frame</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #0b0d16;
+  --bg2: #131729;
+  --panel: #1a1f36;
+  --panel2: #232945;
+  --line: #313a5f;
+  --ink: #f2f4ff;
+  --dim: #97a0c4;
+  --a: #ff2d78;
+  --b: #ffd23f;
+  --c: #22e0c4;
+  --good: #35e08a;
+  --bad: #ff5a5a;
+  --pad: clamp(10px, 3.2vw, 18px);
+  --r: 16px;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  overscroll-behavior: none;
+}
+
+body {
+  background:
+    radial-gradient(1100px 620px at 12% -12%, rgba(255,45,120,0.20), transparent 60%),
+    radial-gradient(950px 560px at 92% 4%, rgba(34,224,196,0.16), transparent 62%),
+    var(--bg);
+}
+
+input, textarea { user-select: text; -webkit-user-select: text; font-family: var(--font); }
+
+#app { position: relative; height: 100%; width: 100%; max-width: 780px; margin: 0 auto; overflow: hidden; }
+
+.screen {
+  position: absolute; inset: 0;
+  display: none;
+  flex-direction: column;
+  padding: var(--pad);
+  gap: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.screen.on { display: flex; }
+
+/* ---------- shared bits ---------- */
+.title {
+  font-size: clamp(28px, 9.5vw, 54px);
+  font-weight: 900;
+  letter-spacing: -1px;
+  line-height: 0.95;
+  background: linear-gradient(96deg, var(--a), var(--b) 55%, var(--c));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-align: center;
+}
+.tagline { text-align: center; color: var(--dim); font-size: clamp(12px, 3.3vw, 15px); line-height: 1.45; }
+
+.card {
+  background: linear-gradient(180deg, var(--panel), var(--bg2));
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: var(--pad);
+}
+
+.lbl {
+  font-size: clamp(10px, 2.7vw, 12px);
+  letter-spacing: 2.2px;
+  text-transform: uppercase;
+  color: var(--dim);
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+button {
+  font-family: var(--font);
+  border: none;
+  border-radius: 13px;
+  color: var(--ink);
+  background: var(--panel2);
+  font-size: clamp(14px, 3.8vw, 17px);
+  font-weight: 800;
+  padding: 15px 16px;
+  min-height: 52px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  transition: transform 0.09s ease, filter 0.15s ease;
+}
+button:active { transform: scale(0.97); filter: brightness(1.15); }
+button:disabled { opacity: 0.4; cursor: default; }
+
+.big {
+  min-height: 62px;
+  font-size: clamp(16px, 4.6vw, 21px);
+  font-weight: 900;
+  letter-spacing: 0.4px;
+}
+.prime { background: linear-gradient(96deg, var(--a), #ff6a3d); border-color: transparent; color: #fff; }
+.mint  { background: linear-gradient(96deg, #14b98d, var(--c)); border-color: transparent; color: #04231d; }
+.gold  { background: linear-gradient(96deg, #e8a415, var(--b)); border-color: transparent; color: #33240a; }
+.ghost { background: transparent; }
+
+.row { display: flex; gap: 9px; }
+.row > * { flex: 1; min-width: 0; }
+
+.seg { display: flex; gap: 7px; flex-wrap: wrap; }
+.seg button {
+  flex: 1 1 0; min-width: 56px; min-height: 46px; padding: 10px 6px;
+  font-size: clamp(12px, 3.3vw, 15px); font-weight: 800;
+  background: #10142a; color: var(--dim);
+}
+.seg button.sel { background: linear-gradient(96deg, rgba(255,45,120,0.3), rgba(34,224,196,0.28)); color: var(--ink); border-color: var(--a); }
+
+.spacer { flex: 1 1 auto; min-height: 4px; }
+
+/* ---------- setup ---------- */
+.teamrow { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; }
+.dot { width: 15px; height: 15px; border-radius: 50%; flex: 0 0 auto; box-shadow: 0 0 12px currentColor; }
+.teamrow input {
+  flex: 1; min-width: 0;
+  background: #0d1124; border: 1px solid var(--line); border-radius: 11px;
+  color: var(--ink); padding: 13px 12px; font-size: clamp(14px, 3.8vw, 16px); font-weight: 700;
+  min-height: 48px;
+}
+.teamrow input:focus { outline: 2px solid var(--c); outline-offset: -2px; }
+.xbtn { flex: 0 0 auto; width: 48px; min-height: 48px; padding: 0; font-size: 18px; background: #0d1124; color: var(--dim); }
+
+.cats { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 7px; }
+.cats button {
+  min-height: 60px; padding: 8px 4px; font-size: clamp(10px, 2.8vw, 12px); font-weight: 800;
+  background: #10142a; color: var(--dim); line-height: 1.25;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+}
+.cats button .em { font-size: 19px; }
+.cats button.sel { background: linear-gradient(180deg, rgba(34,224,196,0.22), rgba(255,45,120,0.16)); color: var(--ink); border-color: var(--c); }
+
+/* ---------- scoreboard strip ---------- */
+#strip { display: flex; gap: 7px; flex-wrap: wrap; }
+.sb {
+  flex: 1 1 0; min-width: 68px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 8px 6px; text-align: center;
+}
+.sb.act { border-color: var(--b); background: linear-gradient(180deg, rgba(255,210,63,0.18), var(--panel)); }
+.sb .n { font-size: clamp(10px, 2.7vw, 12px); font-weight: 800; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb.act .n { color: var(--b); }
+.sb .v { font-size: clamp(18px, 5.4vw, 24px); font-weight: 900; line-height: 1.1; }
+
+/* ---------- act / prompt ---------- */
+.frame {
+  border: 3px solid var(--line);
+  border-radius: 18px;
+  padding: clamp(14px, 4.5vw, 24px) clamp(12px, 3.5vw, 20px);
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(0,0,0,0.28));
+  text-align: center;
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  flex: 1 1 auto;
+  min-height: 150px;
+}
+.frame::before, .frame::after {
+  content: ''; position: absolute; width: 22px; height: 22px; border: 3px solid var(--b); opacity: 0.75;
+}
+.frame::before { top: -3px; left: -3px; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+.frame::after { bottom: -3px; right: -3px; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+
+.chip {
+  display: inline-block;
+  font-size: clamp(10px, 2.8vw, 12px); font-weight: 800; letter-spacing: 1.6px; text-transform: uppercase;
+  color: var(--c); background: rgba(34,224,196,0.12); border: 1px solid rgba(34,224,196,0.4);
+  border-radius: 999px; padding: 6px 13px;
+}
+.prompt { font-size: clamp(23px, 7.4vw, 40px); font-weight: 900; line-height: 1.14; }
+.stars { font-size: clamp(13px, 3.6vw, 16px); letter-spacing: 3px; color: var(--b); }
+.worth { font-size: clamp(11px, 3vw, 13px); color: var(--dim); font-weight: 700; }
+
+.clockwrap { text-align: center; }
+.clock { font-size: clamp(46px, 15vw, 78px); font-weight: 900; line-height: 0.95; font-variant-numeric: tabular-nums; }
+.clock.low { color: var(--a); animation: pulse 0.44s ease-in-out infinite alternate; }
+@keyframes pulse { from { transform: scale(1); } to { transform: scale(1.09); } }
+
+.track { height: 11px; background: #0d1124; border-radius: 99px; overflow: hidden; border: 1px solid var(--line); }
+.fill { height: 100%; width: 100%; background: linear-gradient(90deg, var(--c), var(--b)); border-radius: 99px; }
+.fill.low { background: linear-gradient(90deg, var(--a), #ff7a3d); }
+
+.note {
+  text-align: center; color: var(--dim); font-size: clamp(11px, 3.1vw, 14px); line-height: 1.5;
+}
+.note b { color: var(--ink); }
+
+.hero {
+  text-align: center; font-size: clamp(26px, 8.4vw, 44px); font-weight: 900; line-height: 1.05;
+  background: linear-gradient(96deg, var(--b), var(--c));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.sub { text-align: center; font-size: clamp(15px, 4.4vw, 20px); font-weight: 800; }
+
+.statues {
+  text-align: center;
+  font-size: clamp(38px, 13vw, 66px);
+  line-height: 1.1;
+  letter-spacing: -4px;
+  filter: grayscale(0.55) drop-shadow(0 0 22px rgba(34,224,196,0.35));
+  animation: shiver 2.6s ease-in-out infinite;
+}
+@keyframes shiver {
+  0%, 88%, 100% { transform: rotate(0deg); }
+  91% { transform: rotate(-1.4deg); }
+  94% { transform: rotate(1.4deg); }
+  97% { transform: rotate(-0.6deg); }
+}
+
+/* ---------- flash ---------- */
+#flash {
+  position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 40;
+}
+#flash.go { animation: flash 0.62s ease-out; }
+@keyframes flash {
+  0% { opacity: 0; } 6% { opacity: 0.96; } 26% { opacity: 0.5; } 100% { opacity: 0; }
+}
+
+/* ---------- recap ---------- */
+.shot {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel); border: 1px solid var(--line); border-left-width: 4px;
+  border-radius: 12px; padding: 11px 12px; margin-bottom: 8px;
+}
+.shot.hit { border-left-color: var(--good); }
+.shot.miss { border-left-color: var(--bad); }
+.shot.stolen { border-left-color: var(--a); }
+.shot .t { flex: 1; min-width: 0; font-size: clamp(13px, 3.5vw, 15px); font-weight: 700; line-height: 1.3; }
+.shot .t small { display: block; color: var(--dim); font-weight: 700; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; margin-top: 3px; }
+.shot .p { font-size: clamp(15px, 4.2vw, 19px); font-weight: 900; flex: 0 0 auto; }
+.shot .p.pos { color: var(--good); }
+.shot .p.zero { color: var(--dim); }
+
+.rank { display: flex; align-items: center; gap: 11px; padding: 13px; border-radius: 13px; background: var(--panel); border: 1px solid var(--line); margin-bottom: 9px; }
+.rank.win { border-color: var(--b); background: linear-gradient(96deg, rgba(255,210,63,0.2), var(--panel)); }
+.rank .pos { font-size: clamp(19px, 5.4vw, 24px); font-weight: 900; width: 34px; text-align: center; flex: 0 0 auto; }
+.rank .nm { flex: 1; min-width: 0; font-size: clamp(15px, 4.2vw, 18px); font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank .sc { font-size: clamp(19px, 5.4vw, 25px); font-weight: 900; color: var(--c); flex: 0 0 auto; }
+
+.hr { height: 1px; background: var(--line); margin: 3px 0; border: none; }
+
+.howto p { color: var(--dim); font-size: clamp(13px, 3.5vw, 15px); line-height: 1.6; margin: 0 0 11px; }
+.howto b { color: var(--ink); }
+.howto .step { display: flex; gap: 11px; margin-bottom: 13px; align-items: flex-start; }
+.howto .num {
+  flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(96deg, var(--a), var(--c)); color: #fff;
+  font-weight: 900; font-size: 14px; display: flex; align-items: center; justify-content: center;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ══════════ SETUP ══════════ -->
+<div class="screen on" id="s-setup">
+  <div class="title">FREEZE FRAME</div>
+  <div class="tagline">Build a living photograph. Hold it perfectly still.<br>One teammate gets one look — and one guess.</div>
+
+  <div class="card">
+    <div class="lbl">Teams</div>
+    <div id="teamlist"></div>
+    <button id="addteam" class="ghost" style="width:100%">+ Add team</button>
+  </div>
+
+  <div class="card">
+    <div class="lbl">Photo decks</div>
+    <div class="cats" id="catgrid"></div>
+  </div>
+
+  <div class="card">
+    <div class="lbl">Build time (per shot)</div>
+    <div class="seg" id="seg-build"></div>
+    <div class="lbl" style="margin-top:14px">Guess window</div>
+    <div class="seg" id="seg-guess"></div>
+    <div class="lbl" style="margin-top:14px">Shots per turn</div>
+    <div class="seg" id="seg-shots"></div>
+    <div class="lbl" style="margin-top:14px">Rounds</div>
+    <div class="seg" id="seg-rounds"></div>
+    <div class="lbl" style="margin-top:14px">Extras</div>
+    <div class="seg" id="seg-extra"></div>
+  </div>
+
+  <div class="row">
+    <button class="ghost" id="btn-howto">How to play</button>
+    <button class="big prime" id="btn-start" style="flex:1.5">START</button>
+  </div>
+  <div class="note" id="bestnote"></div>
+  <div class="spacer"></div>
+</div>
+
+<!-- ══════════ HOW TO ══════════ -->
+<div class="screen howto" id="s-howto">
+  <div class="title" style="font-size:clamp(24px,7.5vw,40px)">HOW TO PLAY</div>
+  <div class="card">
+    <div class="step"><div class="num">1</div><p style="margin:0">One team is up. That team picks a <b>Guesser</b> — rotate to a new person every turn. The Guesser <b>turns around and shuts their eyes.</b></p></div>
+    <div class="step"><div class="num">2</div><p style="margin:0">Everyone else on the team reads the secret scene and has a few seconds to arrange themselves into a <b>frozen photograph</b> of it. Bodies only — no talking, no sounds, no pointing at objects in the room.</p></div>
+    <div class="step"><div class="num">3</div><p style="margin:0">The shutter fires. The prompt <b>vanishes from the screen</b>, so the phone is safe to hand straight to the Guesser. They open their eyes and get <b>one guess</b> while the pose is held.</p></div>
+    <div class="step"><div class="num">4</div><p style="margin:0">Stuck? Tap <b>UNFREEZE ONE</b> — a single actor gets two seconds to move, then re-freezes. Costs 2 points.</p></div>
+    <div class="step"><div class="num">5</div><p style="margin:0">Miss it and the pose <b>stays frozen</b> — rival teams get one shot to steal it for 2 points.</p></div>
+    <div class="step"><div class="num">6</div><p style="margin:0">The phone then goes <b>back to the actors</b> for the next shot — the app will tell you when. Same guesser until the turn ends, so they keep turning away.</p></div>
+  </div>
+  <div class="card">
+    <div class="lbl">Scoring</div>
+    <div class="note" style="text-align:left">
+      ★ scene = <b>3</b> &nbsp;·&nbsp; ★★ = <b>4</b> &nbsp;·&nbsp; ★★★ = <b>5</b><br>
+      Unfreeze One: <b>−2</b> &nbsp;·&nbsp; Steal: <b>+2</b> to the rival<br>
+      All shots in a turn correct: <b>+3 perfect set</b>
+    </div>
+  </div>
+  <div class="card">
+    <div class="lbl">House rules</div>
+    <div class="note" style="text-align:left">
+      Statues may not speak, mouth words, or spell letters. Props are allowed but only what's already in the room. Wobbling is legal. Laughing is inevitable.
+    </div>
+  </div>
+  <button class="big prime" id="btn-howback">Back</button>
+  <div class="spacer"></div>
+</div>
+
+<!-- ══════════ TURN INTRO ══════════ -->
+<div class="screen" id="s-intro">
+  <div id="strip"></div>
+  <div class="spacer"></div>
+  <div class="note" id="intro-round"></div>
+  <div class="hero" id="intro-team"></div>
+  <div class="card" style="text-align:center">
+    <div class="lbl" style="margin-bottom:10px">Before you tap</div>
+    <div class="sub" style="color:var(--b)" id="intro-guesser"></div>
+    <div class="note" style="margin-top:9px">turns their back and closes their eyes<br>— everyone else, lean in to see the screen —</div>
+  </div>
+  <div class="spacer"></div>
+  <button class="big prime" id="btn-reveal">SHOW THE SCENE</button>
+  <button class="ghost" id="btn-quit1">End game</button>
+</div>
+
+<!-- ══════════ BUILD / ACT ══════════ -->
+<div class="screen" id="s-act">
+  <div class="note" id="act-hdr"></div>
+  <div class="frame">
+    <div class="chip" id="act-cat"></div>
+    <div class="prompt" id="act-prompt"></div>
+    <div class="stars" id="act-stars"></div>
+    <div class="worth" id="act-worth"></div>
+  </div>
+  <div class="clockwrap">
+    <div class="clock" id="act-clock">0</div>
+    <div class="note" style="margin-bottom:7px">seconds to build the picture</div>
+    <div class="track"><div class="fill" id="act-fill"></div></div>
+  </div>
+  <div class="row">
+    <button id="btn-swap" class="ghost">↻ Swap scene</button>
+    <button id="btn-freeze" class="mint" style="flex:1.4">FREEZE NOW</button>
+  </div>
+</div>
+
+<!-- ══════════ GUESS ══════════ -->
+<div class="screen" id="s-guess">
+  <div class="hero" style="font-size:clamp(22px,6.6vw,34px)">HOLD THE POSE</div>
+  <div class="note" id="guess-hdr"></div>
+  <div class="spacer"></div>
+  <div class="statues" id="guess-statues">🧍‍♀️🧍🧍‍♂️</div>
+  <div class="note" id="guess-shot"></div>
+  <div class="spacer"></div>
+  <div class="clockwrap">
+    <div class="clock" id="guess-clock">0</div>
+    <div class="track"><div class="fill" id="guess-fill"></div></div>
+  </div>
+  <div class="spacer"></div>
+  <button id="btn-unfreeze" class="gold">🤸 UNFREEZE ONE &nbsp;(−2)</button>
+  <div class="row">
+    <button id="btn-miss" class="ghost">✗ Missed it</button>
+    <button id="btn-got" class="mint big" style="flex:1.6">✓ GOT IT</button>
+  </div>
+</div>
+
+<!-- ══════════ UNFREEZE ══════════ -->
+<div class="screen" id="s-unfreeze">
+  <div class="spacer"></div>
+  <div class="hero" style="color:transparent">ONE ACTOR MOVES</div>
+  <div class="note">One statue — chosen by the team — may move freely.<br>Everyone else stays frozen.</div>
+  <div class="clock" id="uf-clock" style="text-align:center; color:var(--b)">2</div>
+  <div class="note">then re-freeze</div>
+  <div class="spacer"></div>
+</div>
+
+<!-- ══════════ STEAL ══════════ -->
+<div class="screen" id="s-steal">
+  <div class="hero" style="background:linear-gradient(96deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;">STEAL!</div>
+  <div class="note">Pose stays frozen. Rival teams — shout it out.</div>
+  <div class="clockwrap">
+    <div class="clock" id="steal-clock">0</div>
+    <div class="track"><div class="fill low" id="steal-fill"></div></div>
+  </div>
+  <div class="note" style="margin-top:4px">Who called it? (+2)</div>
+  <div id="steal-btns" style="display:flex;flex-direction:column;gap:8px"></div>
+  <button class="ghost" id="btn-nosteal">Nobody got it</button>
+  <div class="spacer"></div>
+</div>
+
+<!-- ══════════ REVEAL ══════════ -->
+<div class="screen" id="s-reveal">
+  <div class="spacer"></div>
+  <div class="note">The picture was…</div>
+  <div class="frame" style="flex:0 0 auto">
+    <div class="chip" id="rv-cat"></div>
+    <div class="prompt" id="rv-prompt"></div>
+  </div>
+  <div class="sub" id="rv-result"></div>
+  <div class="spacer"></div>
+  <button class="big prime" id="btn-next">NEXT</button>
+</div>
+
+<!-- ══════════ HAND BACK ══════════ -->
+<div class="screen" id="s-handback">
+  <div class="spacer"></div>
+  <div class="statues" style="animation:none;filter:none">📲</div>
+  <div class="hero" style="font-size:clamp(22px,6.6vw,34px)">PHONE BACK<br>TO THE ACTORS</div>
+  <div class="card" style="text-align:center">
+    <div class="sub" style="color:var(--b)" id="hb-guesser">Guesser — turn around again</div>
+    <div class="note" style="margin-top:9px">Same guesser for the rest of this turn.<br>Don't look at the next scene.</div>
+  </div>
+  <div class="note" id="hb-shot"></div>
+  <div class="spacer"></div>
+  <button class="big prime" id="btn-handback">ACTORS ONLY — SHOW NEXT SCENE</button>
+</div>
+
+<!-- ══════════ TURN RECAP ══════════ -->
+<div class="screen" id="s-recap">
+  <div class="title" style="font-size:clamp(22px,6.6vw,36px)">CONTACT SHEET</div>
+  <div class="note" id="recap-team"></div>
+  <div id="recap-list"></div>
+  <hr class="hr">
+  <div class="hero" id="recap-total" style="font-size:clamp(24px,7vw,38px)"></div>
+  <div id="strip2" style="display:flex;gap:7px;flex-wrap:wrap;margin-top:6px"></div>
+  <div class="spacer"></div>
+  <button class="big prime" id="btn-nextturn">NEXT TEAM</button>
+</div>
+
+<!-- ══════════ FINAL ══════════ -->
+<div class="screen" id="s-final">
+  <div class="title" style="font-size:clamp(26px,8vw,46px)">DEVELOPED</div>
+  <div class="note" id="final-sub"></div>
+  <div id="final-list"></div>
+  <div class="card">
+    <div class="lbl">Gallery notes</div>
+    <div class="note" style="text-align:left" id="final-stats"></div>
+  </div>
+  <div class="spacer"></div>
+  <div class="row">
+    <button class="ghost" id="btn-newteams">New teams</button>
+    <button class="big prime" id="btn-again" style="flex:1.4">PLAY AGAIN</button>
+  </div>
+</div>
+
+<div id="flash"></div>
+</div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════
+   DECKS — 160 tableau prompts. "text|difficulty"
+   ══════════════════════════════════════════════ */
+const DECKS = [
+  { k:'EV', em:'🏠', name:'Everyday Chaos', items:[
+    'Waiting for a very slow elevator|1',
+    'Stuck in a revolving door|2',
+    'Taking a group selfie|1',
+    'Raiding the fridge at midnight|1',
+    'Trying to fold a fitted sheet|2',
+    'Assembling flat-pack furniture|2',
+    'Fighting over the last slice of pizza|1',
+    'Squeezing onto a packed bus|1',
+    'Digging for keys in a huge bag|2',
+    'The dentist waiting room|2',
+    'A family photo where nobody is ready|1',
+    'Carrying far too many grocery bags|1',
+    'Hogging the armrest on a plane|2',
+    'Parallel parking with backseat drivers|2',
+    'One umbrella, four people, heavy rain|1',
+    'The exact moment the wifi dies|3',
+    'A very long coffee shop queue|1',
+    'Untangling a knot of headphones|2',
+    'Trapped by a neighbour who wont stop talking|3',
+    'A silent war over the thermostat|3'
+  ]},
+  { k:'MO', em:'🎬', name:'Movie Moments', items:[
+    'Standing at the bow of a sinking ship|1',
+    'Holding a cub up on a cliff|1',
+    'The superhero landing|1',
+    'Walking away from an explosion in slow motion|2',
+    'A swordfight on a crumbling ledge|2',
+    'Being pulled up in an alien tractor beam|2',
+    'A zombie horde closing in|1',
+    'The heist crew freezing as the alarm goes off|2',
+    'Opening a treasure chest that glows|2',
+    'A courtroom objection|2',
+    'The final dance-off|1',
+    'Pulling a sword from a stone|1',
+    'A spy weaving through laser beams|2',
+    'A near-miss in a car chase|2',
+    'The villain mid evil monologue|3',
+    'Someone objecting at a wedding|2',
+    'A training montage|2',
+    'A spaceship crew bracing for impact|2',
+    'The stare-down before the duel|2',
+    'The credits scene nobody stayed for|3'
+  ]},
+  { k:'AN', em:'🦒', name:'Animal Kingdom', items:[
+    'Giraffes bending down to drink|1',
+    'Penguins huddling in a blizzard|1',
+    'A cat knocking things off a shelf|1',
+    'Monkeys grooming each other|2',
+    'A spider waiting in its web|2',
+    'A flock of birds taking off at once|2',
+    'A tree bending in a hurricane|2',
+    'An octopus tangled in itself|2',
+    'Meerkats on lookout duty|1',
+    'A snake charmer and the snake|2',
+    'Cows standing in a field in the rain|2',
+    'Bees crowding a hive|2',
+    'A turtle flipped on its back|1',
+    'Wolves howling at the moon|1',
+    'A fish on the end of a line|1',
+    'A stampede|2',
+    'A dog chasing its own tail|1',
+    'A crab walking sideways|1',
+    'Bats asleep upside down|2',
+    'An elephant spraying water|2'
+  ]},
+  { k:'JO', em:'👷', name:'On The Job', items:[
+    'Surgeons mid-operation|1',
+    'A construction crew on a high beam|2',
+    'Air traffic control during chaos|3',
+    'A restaurant kitchen at full tilt|2',
+    'Firefighters holding one hose|1',
+    'A courtroom in session|2',
+    'A newsroom at deadline|3',
+    'A conductor and their orchestra|1',
+    'A barber shop mid-haircut|1',
+    'Lifeguards spotting trouble|2',
+    'A factory assembly line|2',
+    'Astronauts on a spacewalk|2',
+    'Harvesting a field by hand|2',
+    'A hotel front desk meltdown|3',
+    'A photographer and unwilling models|2',
+    'Mechanics under a car|2',
+    'A call centre at full volume|3',
+    'A fashion runway|1',
+    'Archaeologists at a dig|2',
+    'Teachers on the last day of school|3'
+  ]},
+  { k:'DI', em:'💥', name:'Slow Motion Disaster', items:[
+    'A wedding cake collapsing|1',
+    'Coffee going all over a laptop|1',
+    'A tent in a windstorm|2',
+    'Burnt dinner and a screaming smoke alarm|2',
+    'A pinata swing gone very wrong|2',
+    'A boat springing a leak|2',
+    'A shopping trolley pile-up|2',
+    'An escalator jam|3',
+    'A ladder about to tip|1',
+    'A chain of dominoes going over|2',
+    'An ice cream falling off the cone|1',
+    'A pipe bursting in the ceiling|2',
+    'A kite stuck up a tree|1',
+    'A flat tyre in the middle of nowhere|2',
+    'A plate-spinning act failing|2',
+    'A suitcase bursting open|2',
+    'A Jenga tower falling|1',
+    'Knocking over a supermarket display|2',
+    'A bookshelf slowly leaning|3',
+    'A paint can tipping off a ladder|2'
+  ]},
+  { k:'SP', em:'🏅', name:'Sporting Glory', items:[
+    'A photo finish at the tape|2',
+    'A rugby scrum|1',
+    'A diving header|1',
+    'A synchronised swimming pose|1',
+    'The Olympic podium|1',
+    'A boxing knockdown count|2',
+    'Tug of war|1',
+    'The moment before the bowling strike|2',
+    'A gymnastics pyramid|1',
+    'A goalkeeper flying sideways|1',
+    'A pile-up in a bike race|2',
+    'Two sumo wrestlers squaring up|1',
+    'Everyone leaning over one putt|2',
+    'A cheerleading lift|1',
+    'An arm wrestling stare-down|1',
+    'A weightlifter at the very top|1',
+    'A hockey face-off|2',
+    'Surfers wiping out|2',
+    'Crawling over the marathon finish line|2',
+    'The bench erupting in celebration|2'
+  ]},
+  { k:'HO', em:'🎉', name:'Big Occasions', items:[
+    'Blowing out birthday candles|1',
+    'Tearing open presents|1',
+    'A haunted house jump scare|1',
+    'The New Year countdown|2',
+    'A parade float|2',
+    'Carving the roast very badly|2',
+    'Trick-or-treating at a door|1',
+    'A snowball ambush|1',
+    'Throwing graduation caps|1',
+    'The moment a surprise party is revealed|2',
+    'A crowd watching fireworks|1',
+    'Decorating a tree that is too tall|2',
+    'A wedding first dance|1',
+    'A baby taking its first steps|2',
+    'Singing carols in freezing cold|2',
+    'A picnic invaded by wasps|2',
+    'The office party nobody wanted|3',
+    'A road trip petrol stop|3',
+    'Blowing up balloons until dizzy|2',
+    'Posing for a beach holiday photo|2'
+  ]},
+  { k:'AB', em:'🌀', name:'Hard Mode: Ideas', items:[
+    'Awkward silence|3',
+    'Jealousy|3',
+    'Hope|3',
+    'Teamwork|2',
+    'Betrayal|3',
+    'Total exhaustion|2',
+    'Suspicion|3',
+    'Pride|3',
+    'Panic|2',
+    'Running out of patience|3',
+    'Curiosity|3',
+    'Relief|3',
+    'Temptation|3',
+    'Regret|3',
+    'Courage|3',
+    'Pure chaos|2',
+    'Gravity|3',
+    'Time passing|3',
+    'A memory fading|3',
+    'Gossip spreading|3'
+  ]}
+];
+
+const COLORS = ['#ff2d78', '#22e0c4', '#ffd23f', '#8b7dff'];
+const LS = 'cowork-freezeframe-';
+
+/* ══════════════════════════════════════════════
+   STATE
+   ══════════════════════════════════════════════ */
+const S = {
+  teams: [],
+  cats: DECKS.map(d => d.k),
+  cfg: { build: 12, guess: 12, shots: 3, rounds: 3, steal: true, sound: true },
+  round: 1,
+  turnIdx: 0,
+  shotIdx: 0,
+  pool: [],
+  poolPos: 0,
+  cur: null,
+  curCost: 0,
+  turnLog: [],
+  turnPts: 0,
+  stats: { hits: 0, misses: 0, steals: 0, unfreezes: 0 }
+};
+
+/* ══════════════════════════════════════════════
+   AUDIO — context is only created/resumed on a
+   real user gesture, otherwise iOS keeps it muted.
+   ══════════════════════════════════════════════ */
+let AC = null;
+function audio() {
+  if (!S.cfg.sound) return null;
+  if (!AC) {
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { return null; }
+  }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+document.addEventListener('pointerdown', () => { audio(); }, { passive: true });
+
+function tone(freq, dur, type, vol, delay) {
+  const ctx = audio(); if (!ctx) return;
+  const t0 = ctx.currentTime + (delay || 0);
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol || 0.18, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(t0); o.stop(t0 + dur + 0.04);
+}
+function sweep(f1, f2, dur, type, vol) {
+  const ctx = audio(); if (!ctx) return;
+  const t0 = ctx.currentTime;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type || 'sawtooth';
+  o.frequency.setValueAtTime(f1, t0);
+  o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+  g.gain.setValueAtTime(vol || 0.16, t0);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(t0); o.stop(t0 + dur + 0.04);
+}
+function noise(dur, vol, hp) {
+  const ctx = audio(); if (!ctx) return;
+  const len = Math.floor(ctx.sampleRate * dur);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp || 900;
+  const g = ctx.createGain(); g.gain.value = vol || 0.3;
+  src.connect(f); f.connect(g); g.connect(ctx.destination);
+  src.start();
+}
+const sfx = {
+  tick:    () => tone(880, 0.05, 'square', 0.09),
+  shutter: () => { noise(0.09, 0.42, 2200); tone(180, 0.07, 'square', 0.16, 0.05); noise(0.13, 0.3, 1400); },
+  good:    () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, 'triangle', 0.19, i * 0.07)); },
+  bad:     () => sweep(300, 90, 0.42, 'sawtooth', 0.15),
+  steal:   () => { tone(740, 0.11, 'square', 0.16); tone(1109, 0.19, 'square', 0.16, 0.11); },
+  unfreeze:() => { tone(400, 0.1, 'sine', 0.15); tone(600, 0.13, 'sine', 0.15, 0.09); },
+  tap:     () => tone(520, 0.05, 'sine', 0.1),
+  win:     () => { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.42, 'triangle', 0.2, i * 0.13)); }
+};
+
+/* ══════════════════════════════════════════════
+   TIMER
+   ══════════════════════════════════════════════ */
+let rafId = null;
+function stopTimer() { if (rafId) cancelAnimationFrame(rafId); rafId = null; }
+function runTimer(secs, numEl, fillEl, onEnd, tickSound) {
+  stopTimer();
+  const total = secs * 1000;
+  const end = performance.now() + total;
+  let lastSec = -1;
+  const step = (now) => {
+    const left = Math.max(0, end - now);
+    if (fillEl) {
+      fillEl.style.width = (left / total * 100) + '%';
+      fillEl.classList.toggle('low', left <= 3200);
+    }
+    const sec = Math.ceil(left / 1000);
+    if (sec !== lastSec) {
+      lastSec = sec;
+      if (numEl) {
+        numEl.textContent = sec;
+        numEl.classList.toggle('low', sec <= 3 && sec > 0);
+      }
+      if (tickSound && sec <= 3 && sec > 0) sfx.tick();
+    }
+    if (left <= 0) { rafId = null; onEnd(); return; }
+    rafId = requestAnimationFrame(step);
+  };
+  rafId = requestAnimationFrame(step);
+}
+
+/* ══════════════════════════════════════════════
+   HELPERS
+   ══════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('on'));
+  $(id).classList.add('on');
+  $(id).scrollTop = 0;
+}
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function pointsFor(d) { return 2 + d; }
+function starStr(d) { return '★'.repeat(d) + '☆'.repeat(3 - d); }
+function flash() {
+  const f = $('flash');
+  f.classList.remove('go');
+  void f.offsetWidth;
+  f.classList.add('go');
+}
+
+/* ══════════════════════════════════════════════
+   PERSISTENCE
+   ══════════════════════════════════════════════ */
+function save() {
+  try {
+    localStorage.setItem(LS + 'teams', JSON.stringify(S.teams.map(t => t.name)));
+    localStorage.setItem(LS + 'cfg', JSON.stringify(S.cfg));
+    localStorage.setItem(LS + 'cats', JSON.stringify(S.cats));
+  } catch (e) {}
+}
+function load() {
+  let names = null;
+  try {
+    const n = JSON.parse(localStorage.getItem(LS + 'teams') || 'null');
+    if (Array.isArray(n) && n.length >= 2) names = n.slice(0, 4);
+    const c = JSON.parse(localStorage.getItem(LS + 'cfg') || 'null');
+    if (c && typeof c === 'object') Object.assign(S.cfg, c);
+    const k = JSON.parse(localStorage.getItem(LS + 'cats') || 'null');
+    if (Array.isArray(k) && k.length) {
+      const valid = k.filter(x => DECKS.some(d => d.k === x));
+      if (valid.length) S.cats = valid;
+    }
+  } catch (e) {}
+  const defaults = ['The Statues', 'Still Life', 'Frame Rate', 'Long Exposure'];
+  S.teams = (names || defaults.slice(0, 2)).map((n, i) => mkTeam(n, i));
+}
+function mkTeam(name, i) {
+  return { name: name, score: 0, color: COLORS[i % COLORS.length], turns: 0 };
+}
+function best() {
+  const v = parseInt(localStorage.getItem(LS + 'best') || '0', 10);
+  return isNaN(v) ? 0 : v;
+}
+
+/* ══════════════════════════════════════════════
+   SETUP UI
+   ══════════════════════════════════════════════ */
+function renderTeams() {
+  const box = $('teamlist');
+  box.innerHTML = '';
+  S.teams.forEach((t, i) => {
+    const row = document.createElement('div');
+    row.className = 'teamrow';
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    dot.style.background = t.color;
+    dot.style.color = t.color;
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.value = t.name;
+    inp.maxLength = 18;
+    inp.setAttribute('aria-label', 'Team name');
+    inp.addEventListener('input', () => { t.name = inp.value; });
+    row.appendChild(dot);
+    row.appendChild(inp);
+    if (S.teams.length > 2) {
+      const x = document.createElement('button');
+      x.className = 'xbtn';
+      x.textContent = '✕';
+      x.addEventListener('click', () => {
+        S.teams.splice(i, 1);
+        S.teams.forEach((tt, k) => { tt.color = COLORS[k % COLORS.length]; });
+        sfx.tap();
+        renderTeams();
+      });
+      row.appendChild(x);
+    }
+    box.appendChild(row);
+  });
+  $('addteam').style.display = S.teams.length >= 4 ? 'none' : 'block';
+}
+
+function renderCats() {
+  const g = $('catgrid');
+  g.innerHTML = '';
+  DECKS.forEach(d => {
+    const b = document.createElement('button');
+    b.innerHTML = '<span class="em">' + d.em + '</span><span>' + esc(d.name) + '</span>';
+    if (S.cats.includes(d.k)) b.classList.add('sel');
+    b.addEventListener('click', () => {
+      const i = S.cats.indexOf(d.k);
+      if (i >= 0) {
+        if (S.cats.length === 1) { sfx.bad(); return; }
+        S.cats.splice(i, 1);
+      } else S.cats.push(d.k);
+      sfx.tap();
+      renderCats();
+    });
+    g.appendChild(b);
+  });
+}
+
+function seg(elId, values, labels, key) {
+  const box = $(elId);
+  box.innerHTML = '';
+  values.forEach((v, i) => {
+    const b = document.createElement('button');
+    b.textContent = labels[i];
+    if (S.cfg[key] === v) b.classList.add('sel');
+    b.addEventListener('click', () => { S.cfg[key] = v; sfx.tap(); renderSegs(); });
+    box.appendChild(b);
+  });
+}
+function renderSegs() {
+  seg('seg-build', [8, 12, 16], ['8s', '12s', '16s'], 'build');
+  seg('seg-guess', [8, 12, 16], ['8s', '12s', '16s'], 'guess');
+  seg('seg-shots', [2, 3, 4], ['2', '3', '4'], 'shots');
+  seg('seg-rounds', [2, 3, 4], ['2', '3', '4'], 'rounds');
+  const box = $('seg-extra');
+  box.innerHTML = '';
+  [['steal', 'Steals'], ['sound', 'Sound']].forEach(([k, label]) => {
+    const b = document.createElement('button');
+    b.textContent = label + ': ' + (S.cfg[k] ? 'ON' : 'OFF');
+    if (S.cfg[k]) b.classList.add('sel');
+    b.addEventListener('click', () => { S.cfg[k] = !S.cfg[k]; sfx.tap(); renderSegs(); });
+    box.appendChild(b);
+  });
+}
+
+/* ══════════════════════════════════════════════
+   SCOREBOARD
+   ══════════════════════════════════════════════ */
+function renderStrip(elId) {
+  const box = $(elId);
+  box.innerHTML = '';
+  S.teams.forEach((t, i) => {
+    const d = document.createElement('div');
+    d.className = 'sb' + (i === S.turnIdx ? ' act' : '');
+    d.innerHTML = '<div class="n">' + esc(t.name) + '</div><div class="v" style="color:' + t.color + '">' + t.score + '</div>';
+    box.appendChild(d);
+  });
+}
+
+/* ══════════════════════════════════════════════
+   PROMPT POOL
+   ══════════════════════════════════════════════ */
+function buildPool() {
+  const out = [];
+  DECKS.forEach(d => {
+    if (!S.cats.includes(d.k)) return;
+    d.items.forEach(raw => {
+      const p = raw.split('|');
+      out.push({ text: p[0], diff: parseInt(p[1], 10) || 1, cat: d.name, em: d.em });
+    });
+  });
+  S.pool = shuffle(out);
+  S.poolPos = 0;
+}
+function draw() {
+  if (S.poolPos >= S.pool.length) { shuffle(S.pool); S.poolPos = 0; }
+  return S.pool[S.poolPos++];
+}
+
+/* ══════════════════════════════════════════════
+   GAME FLOW
+   ══════════════════════════════════════════════ */
+function startGame() {
+  S.teams.forEach((t, i) => {
+    t.score = 0; t.turns = 0;
+    if (!t.name.trim()) t.name = 'Team ' + (i + 1);
+  });
+  S.round = 1;
+  S.turnIdx = 0;
+  S.stats = { hits: 0, misses: 0, steals: 0, unfreezes: 0 };
+  buildPool();
+  save();
+  turnIntro();
+}
+
+function turnIntro() {
+  stopTimer();
+  S.shotIdx = 0;
+  S.turnLog = [];
+  S.turnPts = 0;
+  const t = S.teams[S.turnIdx];
+  renderStrip('strip');
+  $('intro-round').textContent = 'Round ' + S.round + ' of ' + S.cfg.rounds + ' · ' + S.cfg.shots + ' shots';
+  $('intro-team').textContent = t.name;
+  $('intro-team').style.background = 'linear-gradient(96deg,' + t.color + ',var(--b))';
+  $('intro-team').style.webkitBackgroundClip = 'text';
+  $('intro-team').style.backgroundClip = 'text';
+  $('intro-guesser').textContent = 'Guesser #' + (t.turns + 1) + ' — rotate to someone new';
+  show('s-intro');
+}
+
+function nextShot() {
+  stopTimer();
+  S.cur = draw();
+  S.curCost = 0;
+  const p = S.cur;
+  $('act-hdr').innerHTML = '<b>' + esc(S.teams[S.turnIdx].name) + '</b> · shot ' + (S.shotIdx + 1) + ' of ' + S.cfg.shots + ' · guesser: eyes shut';
+  $('act-cat').textContent = p.em + ' ' + p.cat;
+  $('act-prompt').textContent = p.text;
+  $('act-stars').textContent = starStr(p.diff);
+  $('act-worth').textContent = 'worth ' + pointsFor(p.diff) + ' points';
+  $('btn-swap').disabled = false;
+  show('s-act');
+  // Build time shrinks with each shot in the turn — later pictures get frantic.
+  const secs = Math.max(6, S.cfg.build - S.shotIdx * 2);
+  $('act-clock').textContent = secs;
+  $('act-fill').style.width = '100%';
+  runTimer(secs, $('act-clock'), $('act-fill'), doFreeze, true);
+}
+
+function doFreeze() {
+  stopTimer();
+  sfx.shutter();
+  flash();
+  // The prompt leaves the screen here — this is what makes it safe to
+  // hand the phone straight to the guesser.
+  $('guess-hdr').innerHTML = '<b>' + esc(S.teams[S.turnIdx].name) + '</b> — pass the phone to your guesser.<br>Open your eyes. One guess.';
+  $('guess-shot').textContent = 'shot ' + (S.shotIdx + 1) + ' of ' + S.cfg.shots + ' · ' + S.cur.em + ' ' + S.cur.cat;
+  $('btn-unfreeze').disabled = false;
+  $('btn-unfreeze').textContent = '🤸 UNFREEZE ONE  (−2)';
+  $('guess-clock').textContent = S.cfg.guess;
+  $('guess-fill').style.width = '100%';
+  show('s-guess');
+  runTimer(S.cfg.guess, $('guess-clock'), $('guess-fill'), () => { resolveShot(false); }, true);
+}
+
+function doUnfreeze() {
+  if ($('btn-unfreeze').disabled) return;
+  stopTimer();
+  S.curCost += 2;
+  S.stats.unfreezes++;
+  sfx.unfreeze();
+  const remaining = parseInt($('guess-clock').textContent, 10) || S.cfg.guess;
+  show('s-unfreeze');
+  $('uf-clock').textContent = 2;
+  runTimer(2, $('uf-clock'), null, () => {
+    sfx.tick();
+    $('btn-unfreeze').disabled = true;
+    $('btn-unfreeze').textContent = '🤸 ALREADY UNFROZEN';
+    show('s-guess');
+    // Give back whatever guess time was left, plus a couple of seconds grace.
+    const give = Math.max(4, remaining);
+    $('guess-clock').textContent = give;
+    runTimer(give, $('guess-clock'), $('guess-fill'), () => { resolveShot(false); }, true);
+  }, false);
+}
+
+function resolveShot(got) {
+  stopTimer();
+  if (got) {
+    sfx.good();
+    const pts = Math.max(0, pointsFor(S.cur.diff) - S.curCost);
+    S.teams[S.turnIdx].score += pts;
+    S.turnPts += pts;
+    S.stats.hits++;
+    S.turnLog.push({ p: S.cur, kind: 'hit', pts: pts, cost: S.curCost });
+    reveal('hit', pts, null);
+  } else {
+    sfx.bad();
+    S.stats.misses++;
+    if (S.cfg.steal && S.teams.length > 1) stealPhase();
+    else {
+      S.turnLog.push({ p: S.cur, kind: 'miss', pts: 0, cost: S.curCost });
+      reveal('miss', 0, null);
+    }
+  }
+}
+
+function stealPhase() {
+  stopTimer();
+  const box = $('steal-btns');
+  box.innerHTML = '';
+  S.teams.forEach((t, i) => {
+    if (i === S.turnIdx) return;
+    const b = document.createElement('button');
+    b.textContent = t.name;
+    b.style.borderColor = t.color;
+    b.addEventListener('click', () => {
+      stopTimer();
+      t.score += 2;
+      S.stats.steals++;
+      sfx.steal();
+      S.turnLog.push({ p: S.cur, kind: 'stolen', pts: 0, cost: S.curCost, by: t.name });
+      reveal('stolen', 0, t.name);
+    });
+    box.appendChild(b);
+  });
+  $('steal-clock').textContent = 8;
+  $('steal-fill').style.width = '100%';
+  show('s-steal');
+  runTimer(8, $('steal-clock'), $('steal-fill'), () => {
+    S.turnLog.push({ p: S.cur, kind: 'miss', pts: 0, cost: S.curCost });
+    reveal('miss', 0, null);
+  }, true);
+}
+
+function noSteal() {
+  stopTimer();
+  S.turnLog.push({ p: S.cur, kind: 'miss', pts: 0, cost: S.curCost });
+  reveal('miss', 0, null);
+}
+
+function reveal(kind, pts, by) {
+  stopTimer();
+  $('rv-cat').textContent = S.cur.em + ' ' + S.cur.cat;
+  $('rv-prompt').textContent = S.cur.text;
+  const r = $('rv-result');
+  if (kind === 'hit') {
+    r.innerHTML = '<span style="color:var(--good)">📸 Nailed it — +' + pts + '</span>' +
+      (S.curCost ? '<br><span style="color:var(--dim);font-size:0.75em">(−' + S.curCost + ' for unfreezing)</span>' : '');
+  } else if (kind === 'stolen') {
+    r.innerHTML = '<span style="color:var(--a)">🥷 ' + esc(by) + ' stole it — +2</span>';
+  } else {
+    r.innerHTML = '<span style="color:var(--bad)">Nobody saw it. 0 points.</span>';
+  }
+  show('s-reveal');
+}
+
+function afterReveal() {
+  S.shotIdx++;
+  if (S.shotIdx >= S.cfg.shots) { turnRecap(); return; }
+  // The guesser has been holding the phone since the shutter fired. Gate the
+  // next prompt behind an explicit hand-back so they don't read it off the screen.
+  $('hb-shot').textContent = 'next up: shot ' + (S.shotIdx + 1) + ' of ' + S.cfg.shots;
+  show('s-handback');
+}
+
+function turnRecap() {
+  stopTimer();
+  const t = S.teams[S.turnIdx];
+  t.turns++;
+  const allHit = S.turnLog.length > 0 && S.turnLog.every(l => l.kind === 'hit');
+  let bonus = 0;
+  if (allHit && S.cfg.shots >= 2) { bonus = 3; t.score += 3; S.turnPts += 3; sfx.win(); }
+
+  $('recap-team').innerHTML = '<b>' + esc(t.name) + '</b> · round ' + S.round;
+  const list = $('recap-list');
+  list.innerHTML = '';
+  S.turnLog.forEach(l => {
+    const d = document.createElement('div');
+    d.className = 'shot ' + l.kind;
+    let tag = l.kind === 'hit' ? 'guessed' : (l.kind === 'stolen' ? 'stolen by ' + l.by : 'missed');
+    if (l.cost) tag += ' · unfroze';
+    const val = l.kind === 'hit' ? '+' + l.pts : '0';
+    d.innerHTML = '<div class="t">' + esc(l.p.text) + '<small>' + esc(tag) + '</small></div>' +
+      '<div class="p ' + (l.kind === 'hit' ? 'pos' : 'zero') + '">' + val + '</div>';
+    list.appendChild(d);
+  });
+  if (bonus) {
+    const d = document.createElement('div');
+    d.className = 'shot hit';
+    d.innerHTML = '<div class="t">PERFECT SET<small>every shot guessed</small></div><div class="p pos">+3</div>';
+    list.appendChild(d);
+  }
+  $('recap-total').textContent = '+' + S.turnPts + ' this turn';
+  renderStrip('strip2');
+  show('s-recap');
+}
+
+function advanceTurn() {
+  S.turnIdx++;
+  if (S.turnIdx >= S.teams.length) {
+    S.turnIdx = 0;
+    S.round++;
+    if (S.round > S.cfg.rounds) { finish(); return; }
+  }
+  turnIntro();
+}
+
+function finish() {
+  stopTimer();
+  sfx.win();
+  const ranked = S.teams.slice().sort((a, b) => b.score - a.score);
+  const top = ranked[0].score;
+  const winners = ranked.filter(t => t.score === top);
+  $('final-sub').textContent = winners.length > 1
+    ? 'A dead heat at ' + top + ' points.'
+    : winners[0].name + ' takes the gallery.';
+  const list = $('final-list');
+  list.innerHTML = '';
+  ranked.forEach((t, i) => {
+    const d = document.createElement('div');
+    d.className = 'rank' + (t.score === top ? ' win' : '');
+    const medal = t.score === top ? '🏆' : (i === 1 ? '🥈' : (i === 2 ? '🥉' : '·'));
+    d.innerHTML = '<div class="pos">' + medal + '</div>' +
+      '<div class="nm" style="color:' + t.color + '">' + esc(t.name) + '</div>' +
+      '<div class="sc">' + t.score + '</div>';
+    list.appendChild(d);
+  });
+  const st = S.stats;
+  const total = st.hits + st.misses;
+  const rate = total ? Math.round(st.hits / total * 100) : 0;
+  $('final-stats').innerHTML =
+    'Pictures taken: <b>' + total + '</b><br>' +
+    'Read correctly: <b>' + st.hits + '</b> (' + rate + '%)<br>' +
+    'Stolen off a rival: <b>' + st.steals + '</b><br>' +
+    'Statues unfrozen: <b>' + st.unfreezes + '</b>';
+  try {
+    if (top > best()) localStorage.setItem(LS + 'best', String(top));
+  } catch (e) {}
+  show('s-final');
+}
+
+function toSetup() {
+  stopTimer();
+  renderTeams();
+  renderCats();
+  renderSegs();
+  const b = best();
+  $('bestnote').textContent = b ? 'Best team score so far: ' + b : 'Players 4–16 · 2–4 teams · 20–30 min';
+  show('s-setup');
+}
+
+/* ══════════════════════════════════════════════
+   WIRING
+   ══════════════════════════════════════════════ */
+$('addteam').addEventListener('click', () => {
+  if (S.teams.length >= 4) return;
+  const pool = ['The Statues', 'Still Life', 'Frame Rate', 'Long Exposure', 'Wide Angle', 'The Tripods'];
+  const used = S.teams.map(t => t.name);
+  const name = pool.find(n => !used.includes(n)) || 'Team ' + (S.teams.length + 1);
+  S.teams.push(mkTeam(name, S.teams.length));
+  sfx.tap();
+  renderTeams();
+});
+$('btn-howto').addEventListener('click', () => { sfx.tap(); show('s-howto'); });
+$('btn-howback').addEventListener('click', () => { sfx.tap(); show('s-setup'); });
+$('btn-start').addEventListener('click', () => { sfx.tap(); startGame(); });
+$('btn-reveal').addEventListener('click', () => { sfx.tap(); nextShot(); });
+$('btn-quit1').addEventListener('click', () => { sfx.tap(); toSetup(); });
+$('btn-freeze').addEventListener('click', () => { doFreeze(); });
+$('btn-swap').addEventListener('click', () => {
+  // One free re-deal per shot — swapping restarts the build clock.
+  $('btn-swap').disabled = true;
+  sfx.tap();
+  const keepDisabled = true;
+  stopTimer();
+  S.cur = draw();
+  const p = S.cur;
+  $('act-cat').textContent = p.em + ' ' + p.cat;
+  $('act-prompt').textContent = p.text;
+  $('act-stars').textContent = starStr(p.diff);
+  $('act-worth').textContent = 'worth ' + pointsFor(p.diff) + ' points';
+  const secs = Math.max(6, S.cfg.build - S.shotIdx * 2);
+  $('act-clock').textContent = secs;
+  $('act-fill').style.width = '100%';
+  runTimer(secs, $('act-clock'), $('act-fill'), doFreeze, true);
+  if (keepDisabled) $('btn-swap').disabled = true;
+});
+$('btn-got').addEventListener('click', () => { resolveShot(true); });
+$('btn-miss').addEventListener('click', () => { resolveShot(false); });
+$('btn-unfreeze').addEventListener('click', doUnfreeze);
+$('btn-nosteal').addEventListener('click', noSteal);
+$('btn-next').addEventListener('click', () => { sfx.tap(); afterReveal(); });
+$('btn-handback').addEventListener('click', () => { sfx.tap(); nextShot(); });
+$('btn-nextturn').addEventListener('click', () => { sfx.tap(); advanceTurn(); });
+$('btn-again').addEventListener('click', () => { sfx.tap(); startGame(); });
+$('btn-newteams').addEventListener('click', () => { sfx.tap(); toSetup(); });
+
+load();
+toSetup();
+</script>
+</body>
+</html>

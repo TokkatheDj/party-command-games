@@ -1,0 +1,1341 @@
+<!-- CONCEPT: AUCTION/BIDDING - "Going Once": teams bid each other up over how many answers they can name for a category ("we can name 7 breakfast cereals") until everyone else drops out; the winning bidder then has 45 flat seconds to deliver, or the team they outbid takes the points instead. Mystery Lots make you bid before the category is revealed, and any rival can DOUBLE to put the whole contract at 2x. 95 lots | Players: 4-12 in 2-4 teams | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Going Once</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+}
+
+:root {
+  --bg: #0c0f18;
+  --bg2: #11151f;
+  --panel: #171d2b;
+  --panel2: #1f2637;
+  --line: #2b3448;
+  --ink: #eef2fb;
+  --dim: #8d99b4;
+  --gold: #f0b537;
+  --gold2: #ffd977;
+  --emerald: #3ddc97;
+  --rose: #ff6b8a;
+  --violet: #a78bfa;
+  --teal: #4dd6e6;
+  --danger: #ff5470;
+  --pad: clamp(12px, 3.5vw, 20px);
+  --rad: 16px;
+}
+
+body {
+  background:
+    radial-gradient(120% 60% at 50% 0%, #1a2032 0%, var(--bg) 60%),
+    var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+#app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ---------- shared bits ---------- */
+
+.screen {
+  display: none;
+  flex: 1;
+  flex-direction: column;
+  padding: var(--pad);
+  gap: clamp(10px, 2.5vw, 16px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.screen.on { display: flex; }
+
+.title {
+  font-size: clamp(30px, 10vw, 54px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+  text-align: center;
+  background: linear-gradient(95deg, var(--gold2), var(--gold) 40%, var(--rose));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin: 0;
+}
+
+.tag {
+  text-align: center;
+  color: var(--dim);
+  font-size: clamp(12px, 3.2vw, 15px);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.card {
+  background: linear-gradient(180deg, var(--panel), var(--bg2));
+  border: 1px solid var(--line);
+  border-radius: var(--rad);
+  padding: var(--pad);
+}
+
+.btn {
+  border: none;
+  border-radius: 14px;
+  padding: 16px 18px;
+  min-height: 56px;
+  font-size: clamp(15px, 4.2vw, 19px);
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  color: #10131c;
+  background: linear-gradient(180deg, var(--gold2), var(--gold));
+  box-shadow: 0 4px 0 rgba(0,0,0,.35);
+  width: 100%;
+  letter-spacing: 0.02em;
+}
+.btn:active { transform: translateY(2px); box-shadow: 0 2px 0 rgba(0,0,0,.35); }
+.btn.ghost {
+  background: var(--panel2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+.btn.ghost:active { transform: translateY(1px); }
+.btn.danger { background: linear-gradient(180deg, #ff819a, var(--danger)); color: #fff; }
+.btn.go { background: linear-gradient(180deg, #6ff0b8, var(--emerald)); }
+.btn:disabled { opacity: .35; cursor: default; }
+
+.row { display: flex; gap: 10px; }
+.row > * { flex: 1; }
+
+.spacer { flex: 1; min-height: 4px; }
+
+/* ---------- scoreboard strip ---------- */
+
+#board {
+  display: none;
+  gap: 6px;
+  padding: 8px var(--pad) 0;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+#board.on { display: flex; }
+.chip {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--tc, var(--gold));
+  border-radius: 10px;
+  padding: 6px 4px;
+  text-align: center;
+  min-width: 0;
+}
+.chip .nm {
+  font-size: clamp(9px, 2.6vw, 12px);
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chip .sc {
+  font-size: clamp(18px, 5.5vw, 24px);
+  font-weight: 900;
+  color: var(--tc, var(--gold));
+  line-height: 1.1;
+}
+
+/* ---------- setup ---------- */
+
+.lbl {
+  font-size: clamp(11px, 3vw, 13px);
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  margin-bottom: 8px;
+}
+.seg { display: flex; gap: 8px; }
+.seg button {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--dim);
+  font-family: inherit;
+  font-size: clamp(14px, 4vw, 17px);
+  font-weight: 800;
+  cursor: pointer;
+}
+.seg button.sel {
+  background: linear-gradient(180deg, var(--gold2), var(--gold));
+  color: #10131c;
+  border-color: transparent;
+}
+.tname {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; }
+.tname input {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: clamp(15px, 4.2vw, 18px);
+  font-weight: 700;
+  padding: 0 14px;
+  min-width: 0;
+  user-select: text; -webkit-user-select: text;
+}
+.tname input:focus { outline: 2px solid var(--gold); }
+
+.rules { color: var(--dim); font-size: clamp(12px, 3.4vw, 15px); line-height: 1.55; }
+.rules b { color: var(--ink); }
+.rules li { margin-bottom: 6px; }
+.rules ul { padding-left: 18px; margin: 6px 0 0; }
+
+/* ---------- lot card ---------- */
+
+.lotbox {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  background:
+    repeating-linear-gradient(135deg, rgba(240,181,55,.045) 0 12px, transparent 12px 24px),
+    linear-gradient(180deg, var(--panel), var(--bg2));
+  border: 1px solid var(--line);
+  border-radius: var(--rad);
+  padding: var(--pad);
+  min-height: 180px;
+}
+.lotno {
+  font-size: clamp(10px, 3vw, 13px);
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 800;
+}
+.lottext {
+  font-size: clamp(24px, 7.6vw, 40px);
+  font-weight: 900;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+}
+.lotsub { color: var(--dim); font-size: clamp(12px, 3.4vw, 15px); }
+.mystery .lottext { color: var(--violet); }
+
+/* ---------- auction ---------- */
+
+.bidnow {
+  text-align: center;
+}
+.bidnow .k {
+  font-size: clamp(10px, 3vw, 13px);
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.bidnow .v {
+  font-size: clamp(40px, 13vw, 68px);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--gold);
+}
+.bidnow .who { font-size: clamp(13px, 3.8vw, 17px); font-weight: 800; }
+.bidnow .v.open { font-size: clamp(26px, 8vw, 40px); color: var(--dim); letter-spacing: .1em; }
+
+.hint {
+  text-align: center;
+  color: var(--dim);
+  font-size: clamp(11px, 3.2vw, 14px);
+  line-height: 1.45;
+  padding: 0 4px;
+}
+
+.turnbar {
+  text-align: center;
+  font-size: clamp(16px, 5vw, 24px);
+  font-weight: 900;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--tc, var(--gold));
+  border-right: 5px solid var(--tc, var(--gold));
+}
+
+.stepper {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+.stepper button {
+  width: 68px;
+  flex: 0 0 68px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--ink);
+  font-size: 30px;
+  font-weight: 900;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 72px;
+}
+.stepper button:active { background: var(--panel); }
+.stepper button:disabled { opacity: .3; }
+.stepper .val {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.stepper .val b {
+  font-size: clamp(34px, 11vw, 52px);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--gold2);
+}
+.stepper .val span {
+  font-size: clamp(9px, 2.8vw, 12px);
+  color: var(--dim);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.statuses { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.st {
+  font-size: clamp(10px, 3vw, 13px);
+  font-weight: 800;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--dim);
+}
+.st.in { color: var(--tc); border-color: var(--tc); }
+.st.high { background: var(--tc); color: #10131c; border-color: var(--tc); }
+.st.out { opacity: .45; text-decoration: line-through; }
+
+/* ---------- deliver ---------- */
+
+.clock {
+  text-align: center;
+  font-size: clamp(46px, 15vw, 78px);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--emerald);
+}
+.clock.warn { color: var(--gold); }
+.clock.hot { color: var(--danger); animation: pulse .5s infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+
+.bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--panel2);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.bar > i {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--emerald), var(--gold));
+  transition: width .12s linear;
+}
+
+.tally {
+  text-align: center;
+  font-size: clamp(38px, 12vw, 60px);
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.tally small { color: var(--dim); font-size: .5em; font-weight: 800; }
+
+.pips { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; }
+.pip {
+  width: clamp(20px, 6vw, 28px);
+  height: clamp(20px, 6vw, 28px);
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--bg2);
+}
+.pip.got { background: var(--emerald); border-color: var(--emerald); }
+
+.bigtap {
+  flex: 1;
+  min-height: 120px;
+  border-radius: 20px;
+  border: none;
+  background: linear-gradient(180deg, #6ff0b8, var(--emerald));
+  color: #08110c;
+  font-family: inherit;
+  font-size: clamp(22px, 7vw, 34px);
+  font-weight: 900;
+  letter-spacing: .04em;
+  cursor: pointer;
+  box-shadow: 0 6px 0 rgba(0,0,0,.4);
+}
+.bigtap:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,.4); }
+
+/* ---------- result ---------- */
+
+.verdict {
+  text-align: center;
+  font-size: clamp(30px, 10vw, 48px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.verdict.won { color: var(--emerald); }
+.verdict.lost { color: var(--danger); }
+.verdict.nosale { color: var(--dim); }
+
+.payline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-size: clamp(13px, 3.8vw, 16px);
+  font-weight: 700;
+}
+.payline .pts { font-weight: 900; font-size: clamp(17px, 5vw, 22px); }
+
+.exbox {
+  font-size: clamp(12px, 3.4vw, 15px);
+  color: var(--dim);
+  line-height: 1.5;
+}
+.exbox b { color: var(--gold); display: block; margin-bottom: 4px; letter-spacing: .12em; font-size: .82em; text-transform: uppercase; }
+
+/* ---------- winner ---------- */
+
+.crown { text-align: center; font-size: clamp(56px, 18vw, 92px); line-height: 1; }
+.wname {
+  text-align: center;
+  font-size: clamp(28px, 9vw, 46px);
+  font-weight: 900;
+  color: var(--gold2);
+  line-height: 1.05;
+}
+.final { display: flex; flex-direction: column; gap: 8px; }
+.final .fr {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 14px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-left: 5px solid var(--tc);
+  font-weight: 800; font-size: clamp(14px, 4vw, 18px);
+}
+.final .fr b { color: var(--tc); font-size: 1.15em; }
+</style>
+</head>
+<body>
+
+<div id="board"></div>
+<div id="app">
+
+  <!-- ============ SETUP ============ -->
+  <section class="screen on" id="s-setup">
+    <div style="text-align:center">
+      <div style="font-size:clamp(38px,12vw,60px);line-height:1">&#128142;</div>
+      <h1 class="title">GOING ONCE</h1>
+      <p class="tag">Bid it. Own it. Name it.</p>
+    </div>
+
+    <div class="card">
+      <div class="lbl">Teams</div>
+      <div class="seg" id="teamcount">
+        <button data-n="2">2</button>
+        <button data-n="3" class="sel">3</button>
+        <button data-n="4">4</button>
+      </div>
+      <div style="height:14px"></div>
+      <div class="lbl">Team names</div>
+      <div id="namelist"></div>
+      <div style="height:6px"></div>
+      <div class="lbl">Play to</div>
+      <div class="seg" id="targetsel">
+        <button data-t="20">20 pts</button>
+        <button data-t="30" class="sel">30 pts</button>
+        <button data-t="45">45 pts</button>
+      </div>
+    </div>
+
+    <div class="card rules">
+      <b>How it runs</b>
+      <ul>
+        <li>A <b>lot</b> is a category. Teams take turns bidding how many answers they can name &mdash; opening bid is <b>3</b>.</li>
+        <li>Raise or <b>pass</b>. Pass and you're out of this lot. Last team still bidding wins the contract.</li>
+        <li>Any rival may <b>DOUBLE</b> before delivery &mdash; the whole contract is now worth 2&times;.</li>
+        <li><b>45 seconds flat</b>, no matter how big the bid. Hit your number and you bank it.</li>
+        <li>Fall short and the points go to the team you <b>outbid last</b> (or to the doubler).</li>
+      </ul>
+    </div>
+
+    <button class="btn" id="start">OPEN THE FLOOR</button>
+  </section>
+
+  <!-- ============ LOT REVEAL ============ -->
+  <section class="screen" id="s-lot">
+    <div class="lotbox" id="lotcard">
+      <div class="lotno" id="lotno">LOT 1</div>
+      <div class="lottext" id="lottext">&mdash;</div>
+      <div class="lotsub" id="lotsub"></div>
+    </div>
+    <button class="btn" id="openbid">OPEN THE BIDDING</button>
+  </section>
+
+  <!-- ============ AUCTION ============ -->
+  <section class="screen" id="s-auction">
+    <div class="lotbox" id="auctionlot" style="min-height:0;flex:0 0 auto;padding:12px">
+      <div class="lotno" id="a-lotno">LOT 1</div>
+      <div class="lottext" id="a-lottext" style="font-size:clamp(18px,5.4vw,28px)">&mdash;</div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="bidnow">
+      <div class="k">Standing bid</div>
+      <div class="v" id="standing">OPEN</div>
+      <div class="who" id="standingwho">no bids yet</div>
+    </div>
+
+    <div class="statuses" id="statuses"></div>
+
+    <div class="spacer"></div>
+    <div class="hint" id="hint">Raise it or let them have it.</div>
+
+    <div class="turnbar" id="turnbar">TEAM</div>
+    <div class="stepper">
+      <button id="minus">&minus;</button>
+      <div class="val"><b id="pend">3</b><span>your bid</span></div>
+      <button id="plus">+</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="pass">PASS</button>
+      <button class="btn" id="bid">BID</button>
+    </div>
+  </section>
+
+  <!-- ============ DOUBLE ============ -->
+  <section class="screen" id="s-double">
+    <div style="text-align:center">
+      <div style="font-size:clamp(34px,11vw,52px);line-height:1">&#9878;&#65039;</div>
+      <h2 class="title" style="font-size:clamp(24px,8vw,38px)">DOUBLE?</h2>
+    </div>
+    <div class="card" style="text-align:center">
+      <div id="dblsummary" style="font-size:clamp(15px,4.4vw,20px);font-weight:800;line-height:1.35"></div>
+      <div style="height:10px"></div>
+      <div class="rules">Any other team can double the contract. Worth <b>2&times;</b> either way &mdash; to them if it's delivered, to <b>you</b> if it isn't.</div>
+    </div>
+    <div class="spacer"></div>
+    <div id="dblbtns" style="display:flex;flex-direction:column;gap:10px"></div>
+    <button class="btn ghost" id="nodouble">NO DOUBLE &mdash; PLAY IT</button>
+  </section>
+
+  <!-- ============ CONTRACT ============ -->
+  <section class="screen" id="s-contract">
+    <div class="spacer"></div>
+    <div style="text-align:center">
+      <div class="lotno" id="c-lotno">THE CONTRACT</div>
+      <div style="height:8px"></div>
+      <div id="c-team" style="font-size:clamp(20px,6.4vw,30px);font-weight:900"></div>
+      <div style="height:6px"></div>
+      <div style="font-size:clamp(13px,3.8vw,16px);color:var(--dim)">must name</div>
+      <div style="height:6px"></div>
+      <div style="font-size:clamp(58px,19vw,96px);font-weight:900;line-height:1;color:var(--gold)" id="c-num">7</div>
+      <div style="height:6px"></div>
+      <div style="font-size:clamp(19px,6vw,28px);font-weight:900;line-height:1.15" id="c-cat"></div>
+      <div style="height:12px"></div>
+      <div id="c-stake" style="font-size:clamp(13px,3.8vw,16px);color:var(--dim)"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="card rules" style="text-align:center">Everyone else judges. Repeats and rubbish don't count. <b>45 seconds</b> from the tap.</div>
+    <button class="btn go" id="startdeliver">START THE CLOCK</button>
+  </section>
+
+  <!-- ============ DELIVER ============ -->
+  <section class="screen" id="s-deliver">
+    <div class="clock" id="clock">45</div>
+    <div class="bar"><i id="barfill"></i></div>
+    <div class="tally" id="tally">0<small>/7</small></div>
+    <div class="pips" id="pips"></div>
+    <div style="text-align:center;font-size:clamp(14px,4.2vw,18px);font-weight:800" id="d-cat"></div>
+    <button class="bigtap" id="tapgood">GOOD ONE &nbsp;+1</button>
+    <div class="row">
+      <button class="btn ghost" id="undo">UNDO</button>
+      <button class="btn danger" id="giveup">GIVE UP</button>
+    </div>
+  </section>
+
+  <!-- ============ RESULT ============ -->
+  <section class="screen" id="s-result">
+    <div class="spacer"></div>
+    <div style="text-align:center;font-size:clamp(44px,14vw,72px);line-height:1" id="r-icon">&#127881;</div>
+    <div class="verdict" id="r-verdict">DELIVERED</div>
+    <div style="text-align:center;color:var(--dim);font-size:clamp(13px,3.8vw,16px)" id="r-detail"></div>
+    <div style="height:4px"></div>
+    <div id="r-pay" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div class="card exbox" id="r-ex" style="display:none"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="nextlot">NEXT LOT</button>
+    <button class="btn ghost" id="endearly" style="min-height:48px;font-size:14px">END GAME NOW</button>
+  </section>
+
+  <!-- ============ WINNER ============ -->
+  <section class="screen" id="s-over">
+    <div class="spacer"></div>
+    <div class="crown">&#127942;</div>
+    <div class="tag">Highest bidder standing</div>
+    <div class="wname" id="w-name">&mdash;</div>
+    <div style="height:8px"></div>
+    <div class="final" id="w-final"></div>
+    <div style="height:8px"></div>
+    <div style="text-align:center;color:var(--dim);font-size:clamp(12px,3.4vw,15px)" id="w-stats"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="rematch">REMATCH</button>
+    <button class="btn ghost" id="newteams">NEW TEAMS</button>
+  </section>
+
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ============================================================
+   LOTS  ->  [ text, deepEnoughForMysteryLot, examplesOrEmpty ]
+   ============================================================ */
+const LOTS = [
+  ["Things you'd find in a kitchen", 1, ""],
+  ["Four-legged animals", 1, ""],
+  ["Things that are cold", 1, ""],
+  ["Words that rhyme with SAY", 1, ""],
+  ["Boys' names starting with J", 1, ""],
+  ["Girls' names starting with M", 1, ""],
+  ["Things you buy at a supermarket", 1, ""],
+  ["Colours", 1, ""],
+  ["Items of clothing", 1, ""],
+  ["Things with wheels", 1, ""],
+  ["Fruits", 1, ""],
+  ["Vegetables", 1, ""],
+  ["Things you pack for a holiday", 1, ""],
+  ["Things you'd find in a hospital", 1, ""],
+  ["Jobs people do", 1, ""],
+  ["Things that are round", 1, ""],
+  ["Sports", 1, ""],
+  ["Musical instruments", 1, ""],
+  ["Things in a classroom", 1, ""],
+  ["Things that can fly", 1, ""],
+  ["Parts of the body", 1, ""],
+  ["Breakfast foods", 1, ""],
+  ["Things in a bathroom", 1, ""],
+  ["Board games", 1, ""],
+  ["Pizza toppings", 1, ""],
+  ["Ice cream flavours", 1, ""],
+  ["Things that make a noise", 1, ""],
+  ["Things you plug in", 1, ""],
+  ["Types of shoe", 1, ""],
+  ["Cartoon characters", 1, ""],
+  ["Superheroes", 1, ""],
+  ["Countries in Europe", 1, "France, Spain, Italy, Germany, Poland, Greece, Norway, Sweden, Portugal, Ireland, Austria, Croatia, Hungary, Belgium, Denmark, Finland, Switzerland, Netherlands, Romania, Serbia"],
+  ["US states", 1, "There are 50. Texas, Ohio, Utah, Maine, Iowa, Kansas, Nevada, Oregon, Alaska, Hawaii, Florida, Georgia, Montana, Vermont, Arizona, Idaho..."],
+  ["Things in a toolbox", 1, ""],
+  ["Farm animals", 1, ""],
+  ["Things that live in the ocean", 1, ""],
+  ["Things you'd find in a garden", 1, ""],
+  ["Things inside a car", 1, ""],
+  ["Sandwich fillings", 1, ""],
+  ["Things that are sticky", 1, ""],
+  ["Zoo animals", 1, ""],
+  ["Things you do before bed", 1, ""],
+  ["Words starting with SN", 1, "Snake, snail, snow, sneeze, snore, snack, snap, sniff, snug, sneak, snarl, snorkel, snout, snob, snip"],
+  ["Things people carry in a bag", 1, ""],
+  ["Things at a birthday party", 1, ""],
+  ["Kinds of weather", 1, ""],
+  ["Things in a hotel room", 1, ""],
+  ["Car brands", 1, "Ford, Toyota, Honda, Kia, Audi, BMW, Fiat, Volvo, Mazda, Nissan, Subaru, Renault, Hyundai, Jaguar, Tesla, Peugeot, Skoda, Jeep"],
+  ["Dog breeds", 1, "Labrador, poodle, beagle, pug, husky, collie, dachshund, boxer, terrier, spaniel, dalmatian, chihuahua, greyhound, corgi, bulldog"],
+  ["Things you find at the beach", 1, ""],
+  ["Card games", 0, "Poker, rummy, snap, go fish, blackjack, solitaire, hearts, spades, bridge, whist, crazy eights, war, cribbage, uno"],
+  ["Things you'd see in space", 1, "Stars, planets, moons, comets, asteroids, galaxies, black holes, nebulae, satellites, meteors, the sun, space stations"],
+  ["Things that are yellow", 1, ""],
+  ["Things you wear on your head", 1, ""],
+  ["Types of berry", 0, "Strawberry, blueberry, raspberry, blackberry, cranberry, gooseberry, elderberry, boysenberry, mulberry, loganberry"],
+  ["Things in a freezer", 1, ""],
+  ["Things a baby needs", 1, ""],
+  ["Types of bread", 0, "Sourdough, rye, pita, naan, baguette, ciabatta, brioche, focaccia, bagel, tortilla, cornbread, wholemeal"],
+  ["Films with a number in the title", 0, ""],
+  ["Things that come in pairs", 1, ""],
+  ["Striped or spotted animals", 0, ""],
+  ["Things you'd find in a shed", 1, ""],
+  ["Words that mean HAPPY", 0, "Glad, joyful, cheerful, merry, delighted, content, pleased, thrilled, elated, upbeat, chuffed, gleeful"],
+  ["Countries in Africa", 1, "Egypt, Kenya, Nigeria, Ghana, Morocco, Chad, Mali, Libya, Sudan, Uganda, Zambia, Angola, Tunisia, Senegal, Somalia, Ethiopia, Tanzania, Namibia"],
+  ["Things at a funfair", 1, ""],
+  ["Things people collect", 1, ""],
+  ["Things that grow", 1, ""],
+  ["Instruments in an orchestra", 0, "Violin, viola, cello, double bass, flute, oboe, clarinet, bassoon, trumpet, trombone, French horn, tuba, harp, timpani, percussion"],
+  ["Types of cheese", 0, "Cheddar, brie, feta, gouda, edam, stilton, mozzarella, parmesan, camembert, halloumi, ricotta, gruyere, manchego"],
+  ["Words that mean SMALL", 0, "Tiny, little, mini, petite, minute, wee, compact, miniature, slight, microscopic, dinky, teeny"],
+  ["Things in a first aid kit", 0, ""],
+  ["Things you can do with a ball", 1, ""],
+  ["Flowers", 1, ""],
+  ["Things in your pocket", 0, ""],
+  ["Trees", 0, "Oak, pine, birch, willow, maple, elm, ash, beech, cedar, palm, spruce, sycamore, chestnut, poplar, redwood"],
+  ["Things that are square or rectangular", 1, ""],
+  ["Fizzy drinks and juices", 0, ""],
+  ["Things you'd rescue from a fire", 0, ""],
+  ["Planets in our solar system", 0, "Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune. That's 8 - bid carefully."],
+  ["Days of the week", 0, "There are exactly 7."],
+  ["The continents", 0, "Africa, Antarctica, Asia, Europe, North America, South America, Oceania. That's 7."],
+  ["Colours of the rainbow", 0, "Red, orange, yellow, green, blue, indigo, violet. That's 7."],
+  ["The Great Lakes", 0, "Huron, Ontario, Michigan, Erie, Superior. Only 5 - HOMES."],
+  ["Santa's reindeer", 0, "Dasher, Dancer, Prancer, Vixen, Comet, Cupid, Donner, Blitzen - plus Rudolph. 9 at most."],
+  ["The seven dwarfs", 0, "Doc, Grumpy, Happy, Sleepy, Bashful, Sneezy, Dopey. Exactly 7."],
+  ["Chess pieces", 0, "King, queen, rook, bishop, knight, pawn. Only 6 kinds."],
+  ["The Beatles", 0, "John, Paul, George, Ringo. Four. Good luck."],
+  ["The world's oceans", 0, "Pacific, Atlantic, Indian, Southern, Arctic. Just 5."],
+  ["Months of the year", 0, "Exactly 12."],
+  ["Signs of the zodiac", 0, "Aries, Taurus, Gemini, Cancer, Leo, Virgo, Libra, Scorpio, Sagittarius, Capricorn, Aquarius, Pisces. 12."],
+  ["Ways to cook an egg", 0, "Boiled, fried, poached, scrambled, omelette, baked, coddled, pickled, soft-boiled, in a quiche"],
+  ["Types of pasta", 0, "Spaghetti, penne, fusilli, macaroni, lasagne, ravioli, tagliatelle, linguine, farfalle, rigatoni, orzo, gnocchi"],
+  ["Named shapes", 0, "Circle, square, triangle, rectangle, oval, hexagon, pentagon, octagon, rhombus, trapezoid, star, cube, sphere, cone, cylinder"],
+  ["Olympic sports", 1, "Swimming, athletics, gymnastics, rowing, judo, fencing, archery, cycling, boxing, sailing, hockey, diving, weightlifting"],
+  ["Things on a Monopoly board", 0, "Go, Jail, Free Parking, Chance, Community Chest, houses, hotels, the dog, the boot, the hat, railroads, utilities"]
+];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const MIN_BID   = 3;
+const MAX_BID   = 25;
+const DELIVER_S = 45;
+const LSKEY     = 'cowork-goingonce-setup';
+
+const COLORS = ['#f0b537', '#4dd6e6', '#ff6b8a', '#a78bfa'];
+const DEFAULTS = ['Gavel Gang', 'Paddle Pushers', 'The Hammers', 'Lot Lizards'];
+
+const S = {
+  teams: [],
+  target: 30,
+  lotNo: 0,
+  deck: [],
+  lot: null,
+  mystery: false,
+  active: [],
+  turn: 0,
+  bid: 0,
+  high: null,
+  runner: null,
+  doubler: null,
+  pending: MIN_BID,
+  count: 0,
+  msLeft: 0,
+  timer: null,
+  contractsWon: 0,
+  contractsMade: 0
+};
+
+/* ============================================================
+   DOM HELPERS
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function show(name) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('on'));
+  $('s-' + name).classList.add('on');
+  $('board').classList.toggle('on', name !== 'setup' && name !== 'over');
+  $('app').scrollTop = 0;
+  const sc = $('s-' + name);
+  if (sc) sc.scrollTop = 0;
+}
+
+/* ============================================================
+   SOUND
+   ============================================================ */
+let AC = null;
+function ac() {
+  if (!AC) {
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { return null; }
+  }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type, vol, delay) {
+  const c = ac(); if (!c) return;
+  const t0 = c.currentTime + (delay || 0);
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const SFX = {
+  tap:    () => tone(880, 0.09, 'triangle', 0.16),
+  bid:    () => { tone(520, 0.1, 'square', 0.12); tone(780, 0.14, 'square', 0.1, 0.07); },
+  pass:   () => tone(240, 0.16, 'sine', 0.14),
+  gavel:  () => { tone(180, 0.13, 'square', 0.24); tone(110, 0.22, 'sine', 0.22, 0.09); },
+  good:   () => { tone(660, 0.08, 'triangle', 0.2); tone(990, 0.1, 'triangle', 0.16, 0.05); },
+  tick:   () => tone(1400, 0.04, 'square', 0.09),
+  win:    () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.28, 'triangle', 0.2, i * 0.1)),
+  fail:   () => { tone(200, 0.4, 'sawtooth', 0.18); tone(140, 0.5, 'sawtooth', 0.16, 0.1); },
+  fanfare:() => [523, 523, 659, 784, 1046, 1318].forEach((f, i) => tone(f, 0.34, 'square', 0.16, i * 0.13))
+};
+
+/* ============================================================
+   SETUP SCREEN
+   ============================================================ */
+let nTeams = 3;
+
+function buildNames() {
+  const saved = loadSetup();
+  const list = $('namelist');
+  const prev = [...list.querySelectorAll('input')].map(i => i.value);
+  list.innerHTML = '';
+  for (let i = 0; i < nTeams; i++) {
+    const val = prev[i] || (saved.names && saved.names[i]) || DEFAULTS[i];
+    const row = document.createElement('div');
+    row.className = 'tname';
+    row.innerHTML =
+      '<span class="dot" style="background:' + COLORS[i] + '"></span>' +
+      '<input type="text" maxlength="16" value="' + esc(val) + '">';
+    list.appendChild(row);
+  }
+}
+
+function loadSetup() {
+  try { return JSON.parse(localStorage.getItem(LSKEY)) || {}; }
+  catch (e) { return {}; }
+}
+function saveSetup() {
+  try {
+    localStorage.setItem(LSKEY, JSON.stringify({
+      n: nTeams,
+      target: S.target,
+      names: S.teams.map(t => t.name)
+    }));
+  } catch (e) {}
+}
+
+(function initSetup() {
+  const saved = loadSetup();
+  if (saved.n) nTeams = saved.n;
+  if (saved.target) S.target = saved.target;
+
+  $('teamcount').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('sel', +b.dataset.n === nTeams);
+    b.addEventListener('click', () => {
+      nTeams = +b.dataset.n;
+      $('teamcount').querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b));
+      buildNames();
+      SFX.tap();
+    });
+  });
+  $('targetsel').querySelectorAll('button').forEach(b => {
+    b.classList.toggle('sel', +b.dataset.t === S.target);
+    b.addEventListener('click', () => {
+      S.target = +b.dataset.t;
+      $('targetsel').querySelectorAll('button').forEach(x => x.classList.toggle('sel', x === b));
+      SFX.tap();
+    });
+  });
+  buildNames();
+})();
+
+$('start').addEventListener('click', () => {
+  const inputs = [...$('namelist').querySelectorAll('input')];
+  S.teams = inputs.map((inp, i) => ({
+    name: (inp.value.trim() || DEFAULTS[i]).slice(0, 16),
+    color: COLORS[i],
+    score: 0
+  }));
+  saveSetup();
+  newGame();
+});
+
+/* ============================================================
+   GAME FLOW
+   ============================================================ */
+function shuffled(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function newGame() {
+  S.teams.forEach(t => t.score = 0);
+  S.lotNo = 0;
+  S.contractsWon = 0;
+  S.contractsMade = 0;
+  S.deck = shuffled(LOTS.map((_, i) => i));
+  SFX.gavel();
+  nextLot();
+}
+
+function drawLot(mystery) {
+  // Mystery Lots must come from the deep pool - blind-bidding a capped
+  // category (8 planets) is an unplayable contract.
+  let idx = S.deck.findIndex(i => !mystery || LOTS[i][1] === 1);
+  if (idx === -1) {
+    S.deck = shuffled(LOTS.map((_, i) => i));
+    idx = S.deck.findIndex(i => !mystery || LOTS[i][1] === 1);
+  }
+  const lotIndex = S.deck[idx];
+  S.deck.splice(idx, 1);
+  if (S.deck.length === 0) S.deck = shuffled(LOTS.map((_, i) => i));
+  return LOTS[lotIndex];
+}
+
+function nextLot() {
+  S.lotNo++;
+  // Every 4th lot goes under the sheet.
+  S.mystery = (S.lotNo % 4 === 0);
+  S.lot = drawLot(S.mystery);
+  S.doubler = null;
+  S.count = 0;
+  renderBoard();
+
+  $('lotno').textContent = 'LOT ' + S.lotNo + (S.mystery ? ' — MYSTERY' : '');
+  $('lotcard').classList.toggle('mystery', S.mystery);
+  if (S.mystery) {
+    $('lottext').innerHTML = '&#10068;&#65039; SEALED LOT';
+    $('lotsub').textContent = 'Bid blind. The category is revealed only after the hammer falls.';
+  } else {
+    $('lottext').textContent = S.lot[0];
+    $('lotsub').textContent = 'How many can you name in 45 seconds?';
+  }
+  show('lot');
+}
+
+$('openbid').addEventListener('click', () => { SFX.gavel(); openAuction(); });
+
+/* ============================================================
+   AUCTION
+   ============================================================ */
+function openAuction() {
+  S.active = S.teams.map((_, i) => i);
+  // Rotate who speaks first each lot so nobody is permanently last to act.
+  const offset = (S.lotNo - 1) % S.teams.length;
+  S.active = S.active.slice(offset).concat(S.active.slice(0, offset));
+  S.turn = 0;
+  S.bid = 0;
+  S.high = null;
+  S.runner = null;
+  S.pending = MIN_BID;
+  renderAuction();
+  show('auction');
+}
+
+function renderAuction() {
+  $('a-lotno').textContent = 'LOT ' + S.lotNo + (S.mystery ? ' — MYSTERY' : '');
+  $('a-lottext').textContent = S.mystery ? 'SEALED — category hidden' : S.lot[0];
+
+  const st0 = $('standing');
+  st0.textContent = S.bid || 'OPEN';
+  st0.className = 'v' + (S.bid ? '' : ' open');
+  $('standingwho').textContent = S.high === null
+    ? 'no bids yet — opening bid is ' + MIN_BID
+    : 'held by ' + S.teams[S.high].name;
+  $('standingwho').style.color = S.high === null ? 'var(--dim)' : S.teams[S.high].color;
+
+  // status pills for every team
+  const st = $('statuses');
+  st.innerHTML = '';
+  S.teams.forEach((t, i) => {
+    const el = document.createElement('span');
+    const isIn = S.active.indexOf(i) !== -1;
+    el.className = 'st ' + (i === S.high ? 'high' : (isIn ? 'in' : 'out'));
+    el.style.setProperty('--tc', t.color);
+    el.textContent = t.name + (i === S.high ? ' · ' + S.bid : '');
+    st.appendChild(el);
+  });
+
+  const who = S.active[S.turn];
+  const t = S.teams[who];
+  const tb = $('turnbar');
+  tb.textContent = t.name + ' — your call';
+  tb.style.setProperty('--tc', t.color);
+
+  const minAllowed = Math.max(MIN_BID, S.bid + 1);
+  if (S.pending < minAllowed) S.pending = minAllowed;
+  if (S.pending > MAX_BID) S.pending = MAX_BID;
+  $('pend').textContent = S.pending;
+  $('minus').disabled = S.pending <= minAllowed;
+  $('plus').disabled  = S.pending >= MAX_BID;
+  $('bid').textContent = 'BID ' + S.pending;
+  $('bid').disabled = S.pending < minAllowed;
+
+  const lastIn = S.high === null && S.active.length === 1;
+  $('pass').textContent = lastIn ? 'PASS — NO SALE' : 'PASS';
+  // Who collects on a miss is decided by who was outbid LAST - not by who passes.
+  $('hint').textContent = lastIn
+    ? 'Last team standing. Take it at ' + MIN_BID + '+ or the lot is withdrawn and nobody scores.'
+    : (S.high === null
+        ? (S.mystery ? 'Sealed lot — you are bidding blind. 45 seconds either way.' : 'You get 45 seconds, however high the bidding goes.')
+        : (S.runner === null
+            ? 'If ' + S.teams[S.high].name + ' misses, nobody collects. Raise to get in line for it.'
+            : 'If ' + S.teams[S.high].name + ' misses, ' + S.teams[S.runner].name + ' collects ' + S.bid + '. Raise and that becomes you.'));
+}
+
+$('minus').addEventListener('click', () => {
+  S.pending = Math.max(Math.max(MIN_BID, S.bid + 1), S.pending - 1);
+  SFX.tap(); renderAuction();
+});
+$('plus').addEventListener('click', () => {
+  S.pending = Math.min(MAX_BID, S.pending + 1);
+  SFX.tap(); renderAuction();
+});
+
+$('bid').addEventListener('click', () => {
+  const minAllowed = Math.max(MIN_BID, S.bid + 1);
+  if (S.pending < minAllowed) return;
+  S.runner = S.high;              // the team we just outbid - they collect if this fails
+  S.high = S.active[S.turn];
+  S.bid = S.pending;
+  SFX.bid();
+  advance(S.turn + 1);
+});
+
+$('pass').addEventListener('click', () => {
+  S.active.splice(S.turn, 1);
+  SFX.pass();
+  advance(S.turn);                // splice shifted the next team into this slot
+});
+
+function advance(from) {
+  if (S.active.length === 0) return noSale();
+
+  // Nobody bids against themselves: skip past the standing high bidder.
+  const start = ((from % S.active.length) + S.active.length) % S.active.length;
+  let found = -1;
+  for (let n = 0; n < S.active.length; n++) {
+    const j = (start + n) % S.active.length;
+    if (S.active[j] !== S.high) { found = j; break; }
+  }
+  if (found === -1) {
+    // Only the high bidder is left standing.
+    return S.high === null ? noSale() : hammerDown();
+  }
+  S.turn = found;
+  S.pending = Math.max(MIN_BID, S.bid + 1);
+  renderAuction();
+}
+
+function noSale() {
+  SFX.fail();
+  showResult('nosale');
+}
+
+function hammerDown() {
+  SFX.gavel();
+  S.contractsWon++;
+  if (S.teams.length >= 2) {
+    renderDouble();
+    show('double');
+  } else {
+    goContract();
+  }
+}
+
+/* ============================================================
+   DOUBLE
+   ============================================================ */
+function renderDouble() {
+  const h = S.teams[S.high];
+  $('dblsummary').innerHTML =
+    '<span style="color:' + h.color + '">' + esc(h.name) + '</span> took it at <b style="color:var(--gold)">' + S.bid + '</b>';
+  const box = $('dblbtns');
+  box.innerHTML = '';
+  S.teams.forEach((t, i) => {
+    if (i === S.high) return;
+    const b = document.createElement('button');
+    b.className = 'btn danger';
+    b.textContent = esc(t.name).toUpperCase() + ' DOUBLES → ' + (S.bid * 2);
+    b.addEventListener('click', () => {
+      S.doubler = i;
+      SFX.gavel();
+      goContract();
+    });
+    box.appendChild(b);
+  });
+}
+$('nodouble').addEventListener('click', () => { S.doubler = null; SFX.tap(); goContract(); });
+
+/* ============================================================
+   CONTRACT
+   ============================================================ */
+function stake() { return S.bid * (S.doubler === null ? 1 : 2); }
+
+function goContract() {
+  const h = S.teams[S.high];
+  $('c-lotno').textContent = 'LOT ' + S.lotNo + (S.doubler === null ? '' : ' — DOUBLED');
+  $('c-team').textContent = h.name;
+  $('c-team').style.color = h.color;
+  $('c-num').textContent = S.bid;
+  $('c-cat').textContent = S.lot[0];
+
+  const parts = [stake() + ' points on the line'];
+  if (S.doubler !== null) parts.push('doubled by ' + S.teams[S.doubler].name);
+  else if (S.runner !== null) parts.push(S.teams[S.runner].name + ' collects if they miss');
+  else parts.push('nobody was outbid — miss it and the points go nowhere');
+  $('c-stake').textContent = parts.join(' · ');
+
+  show('contract');
+}
+
+$('startdeliver').addEventListener('click', () => { SFX.good(); startDeliver(); });
+
+/* ============================================================
+   DELIVER
+   ============================================================ */
+function startDeliver() {
+  S.count = 0;
+  S.msLeft = DELIVER_S * 1000;
+  $('d-cat').textContent = S.lot[0];
+  $('d-cat').style.color = S.teams[S.high].color;
+  renderDeliver();
+  show('deliver');
+
+  let last = Date.now();
+  let lastWhole = DELIVER_S;
+  clearInterval(S.timer);
+  S.timer = setInterval(() => {
+    const now = Date.now();
+    S.msLeft -= (now - last);
+    last = now;
+    if (S.msLeft <= 0) {
+      S.msLeft = 0;
+      renderDeliver();
+      finish(false);
+      return;
+    }
+    const whole = Math.ceil(S.msLeft / 1000);
+    if (whole !== lastWhole) {
+      lastWhole = whole;
+      if (whole <= 10) SFX.tick();
+    }
+    renderDeliver();
+  }, 100);
+}
+
+function renderDeliver() {
+  const secs = Math.ceil(S.msLeft / 1000);
+  const clk = $('clock');
+  clk.textContent = secs;
+  clk.className = 'clock' + (secs <= 5 ? ' hot' : (secs <= 15 ? ' warn' : ''));
+  $('barfill').style.width = (S.msLeft / (DELIVER_S * 1000) * 100) + '%';
+  $('tally').innerHTML = S.count + '<small>/' + S.bid + '</small>';
+
+  const pips = $('pips');
+  if (pips.childElementCount !== S.bid) {
+    pips.innerHTML = '';
+    for (let i = 0; i < S.bid; i++) {
+      const p = document.createElement('span');
+      p.className = 'pip';
+      pips.appendChild(p);
+    }
+  }
+  [...pips.children].forEach((p, i) => p.classList.toggle('got', i < S.count));
+  $('undo').disabled = S.count === 0;
+}
+
+$('tapgood').addEventListener('click', () => {
+  if (S.msLeft <= 0) return;
+  S.count++;
+  SFX.good();
+  renderDeliver();
+  if (S.count >= S.bid) finish(true);
+});
+$('undo').addEventListener('click', () => {
+  if (S.count > 0) { S.count--; SFX.pass(); renderDeliver(); }
+});
+$('giveup').addEventListener('click', () => { finish(false); });
+
+function finish(made) {
+  clearInterval(S.timer);
+  S.timer = null;
+  if (made) { S.contractsMade++; SFX.win(); } else { SFX.fail(); }
+  showResult(made ? 'made' : 'missed');
+}
+
+/* ============================================================
+   RESULT
+   ============================================================ */
+function showResult(kind) {
+  const pay = $('r-pay');
+  pay.innerHTML = '';
+  const v = $('r-verdict');
+  const ex = $('r-ex');
+  ex.style.display = 'none';
+
+  if (kind === 'nosale') {
+    $('r-icon').innerHTML = '&#129318;';
+    v.textContent = 'NO SALE';
+    v.className = 'verdict nosale';
+    $('r-detail').textContent = 'Everybody passed. The lot is withdrawn and nobody scores.';
+  } else {
+    const amount = stake();
+    const h = S.teams[S.high];
+    if (kind === 'made') {
+      $('r-icon').innerHTML = '&#127881;';
+      v.textContent = 'DELIVERED';
+      v.className = 'verdict won';
+      $('r-detail').textContent = h.name + ' named all ' + S.bid + ' with ' + Math.ceil(S.msLeft / 1000) + 's on the clock'
+        + (S.doubler === null ? '' : ' — and the double backfired');
+      h.score += amount;
+      pay.appendChild(payRow(h, '+' + amount, true));
+    } else {
+      $('r-icon').innerHTML = '&#128165;';
+      v.textContent = 'CONTRACT MISSED';
+      v.className = 'verdict lost';
+      $('r-detail').textContent = h.name + ' promised ' + S.bid + ' and managed ' + S.count + '.';
+      pay.appendChild(payRow(h, '0', false));
+      const benef = S.doubler !== null ? S.doubler : S.runner;
+      if (benef !== null) {
+        S.teams[benef].score += amount;
+        pay.appendChild(payRow(S.teams[benef], '+' + amount, true,
+          S.doubler !== null ? 'doubled' : 'outbid last'));
+      } else {
+        const row = document.createElement('div');
+        row.className = 'payline';
+        row.innerHTML = '<span style="color:var(--dim)">Nobody was outbid</span><span class="pts" style="color:var(--dim)">no payout</span>';
+        pay.appendChild(row);
+      }
+    }
+    if (S.lot[2]) {
+      ex.style.display = '';
+      ex.innerHTML = '<b>For the record</b>' + esc(S.lot[2]);
+    }
+  }
+
+  renderBoard();
+  const leader = S.teams.reduce((a, b) => b.score > a.score ? b : a, S.teams[0]);
+  $('nextlot').textContent = leader.score >= S.target ? 'SEE THE RESULT' : 'NEXT LOT';
+  show('result');
+}
+
+function payRow(team, pts, good, note) {
+  const row = document.createElement('div');
+  row.className = 'payline';
+  row.style.borderLeft = '5px solid ' + team.color;
+  row.innerHTML =
+    '<span>' + esc(team.name) + (note ? ' <span style="color:var(--dim);font-weight:600">(' + note + ')</span>' : '') + '</span>' +
+    '<span class="pts" style="color:' + (good ? 'var(--emerald)' : 'var(--dim)') + '">' + pts + '</span>';
+  return row;
+}
+
+$('nextlot').addEventListener('click', () => {
+  SFX.tap();
+  const top = Math.max(...S.teams.map(t => t.score));
+  if (top >= S.target) gameOver(); else nextLot();
+});
+$('endearly').addEventListener('click', () => { SFX.tap(); gameOver(); });
+
+/* ============================================================
+   SCOREBOARD
+   ============================================================ */
+function renderBoard() {
+  const b = $('board');
+  b.innerHTML = '';
+  S.teams.forEach(t => {
+    const c = document.createElement('div');
+    c.className = 'chip';
+    c.style.setProperty('--tc', t.color);
+    c.innerHTML = '<div class="nm">' + esc(t.name) + '</div><div class="sc">' + t.score + '</div>';
+    b.appendChild(c);
+  });
+}
+
+/* ============================================================
+   GAME OVER
+   ============================================================ */
+function gameOver() {
+  clearInterval(S.timer);
+  const sorted = S.teams.slice().sort((a, b) => b.score - a.score);
+  const top = sorted[0].score;
+  const winners = sorted.filter(t => t.score === top);
+  $('w-name').textContent = winners.length > 1
+    ? winners.map(t => t.name).join(' & ') + ' — TIED'
+    : sorted[0].name;
+  $('w-name').style.color = winners.length > 1 ? 'var(--gold2)' : sorted[0].color;
+
+  const box = $('w-final');
+  box.innerHTML = '';
+  sorted.forEach(t => {
+    const r = document.createElement('div');
+    r.className = 'fr';
+    r.style.setProperty('--tc', t.color);
+    r.innerHTML = '<span>' + esc(t.name) + '</span><b>' + t.score + '</b>';
+    box.appendChild(r);
+  });
+
+  const rate = S.contractsWon ? Math.round(S.contractsMade / S.contractsWon * 100) : 0;
+  $('w-stats').textContent = S.lotNo + ' lots · ' + S.contractsWon + ' contracts sold · '
+    + S.contractsMade + ' delivered (' + rate + '%)';
+  SFX.fanfare();
+  show('over');
+}
+
+$('rematch').addEventListener('click', () => { SFX.tap(); newGame(); });
+$('newteams').addEventListener('click', () => {
+  SFX.tap();
+  buildNames();
+  show('setup');
+});
+
+})();
+</script>
+</body>
+</html>

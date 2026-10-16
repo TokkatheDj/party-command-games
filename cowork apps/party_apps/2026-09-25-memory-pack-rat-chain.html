@@ -1,0 +1,622 @@
+<!-- CONCEPT: MEMORY/CUMULATIVE CHAIN - "Pack Rat": the classic "I packed my suitcase..." game with the phone as referee. A trip is dealt ("a pirate voyage"), each player recites the WHOLE packing list from memory out loud and then adds one new item; the phone always sits with the previous packer, who judges the recital item-by-item against a shrinking per-item timer, then hands it over so the reciter can type their new item and judge the next person. Rule cards bend what you may pack (Alphabet order, Letter Link, Two Words, Colour It - checked by the app), optional Moves give every item a gesture you must perform as you say it, and surprise Customs events force a BACKWARDS recital, confiscate a bag mid-list (Lost Luggage) or halve the clock. 64 trips, 150+ idea items | Players: 3-10 | ~15-25 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pack Rat</title>
+<style>
+:root{
+  --bg:#12122a; --bg2:#1c1b3f; --panel:#25244f; --panel2:#2f2d63; --line:#403e80;
+  --ink:#f6f3ff; --muted:#aaa6d6; --a:#ffcf3f; --b:#ff6fa8; --c:#4fd8c4; --good:#4fe07a; --bad:#ff5a5f; --warn:#ffa53f;
+  --r:18px; --gap:clamp(10px,2.6vw,16px);
+  --font:'Trebuchet MS','Segoe UI',system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(circle at 20% 0%,#2c2270 0%,transparent 55%),radial-gradient(circle at 100% 100%,#3b1747 0%,transparent 50%),var(--bg);
+  color:var(--ink);font-family:var(--font)}
+button{font-family:inherit;cursor:pointer;border:0;color:inherit}
+input{font-family:inherit;user-select:text;-webkit-user-select:text}
+#app{height:100dvh;display:flex;flex-direction:column;max-width:760px;margin:0 auto}
+.top{display:flex;align-items:center;gap:8px;padding:10px 14px;flex:0 0 auto}
+.top .logo{font-weight:900;font-size:clamp(18px,4.6vw,24px);letter-spacing:.5px}
+.top .sp{flex:1}
+.ghost{background:var(--panel);border:1px solid var(--line);border-radius:12px;min-height:44px;min-width:44px;padding:0 12px;font-size:15px;font-weight:700}
+#stage{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:0 14px 16px;display:flex;flex-direction:column;gap:var(--gap)}
+.grad{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+h1{margin:6px 0 0;font-size:clamp(40px,12vw,72px);line-height:1;text-align:center;font-weight:900}
+.emojiHead{font-size:clamp(44px,12vw,70px);text-align:center;line-height:1;margin-top:8px}
+.tag{text-align:center;color:var(--muted);font-size:clamp(15px,3.8vw,18px);margin:0 6px}
+.meta{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:14px;font-weight:700;color:var(--ink)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:clamp(12px,3.5vw,18px)}
+.card h2{margin:0 0 8px;font-size:clamp(17px,4.4vw,21px)}
+.card p{margin:6px 0;line-height:1.4;color:var(--muted);font-size:clamp(14px,3.6vw,16px)}
+.card p b{color:var(--ink)}
+.row{display:flex;gap:8px;align-items:center}
+.plist{display:flex;flex-direction:column;gap:6px}
+.pl{display:flex;gap:6px}
+.pl input,.bigInput{flex:1;min-width:0;min-height:48px;border-radius:12px;border:2px solid var(--line);background:var(--bg2);color:var(--ink);padding:0 12px;font-size:17px;outline:none}
+.pl input:focus,.bigInput:focus{border-color:var(--c)}
+.x{width:48px;min-height:48px;border-radius:12px;background:var(--panel2);font-size:20px}
+.opts{display:grid;grid-template-columns:1fr;gap:10px}
+.opt .lab{font-size:14px;color:var(--muted);margin-bottom:6px;font-weight:700}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{flex:1;min-height:44px;border-radius:12px;background:var(--bg2);border:2px solid var(--line);font-weight:800;font-size:15px;padding:0 8px}
+.seg button.on{background:linear-gradient(135deg,var(--c),#3a8fe0);border-color:transparent;color:#0b1330}
+.btn{min-height:58px;border-radius:16px;font-size:clamp(18px,4.8vw,22px);font-weight:900;padding:0 18px;width:100%;
+  background:linear-gradient(135deg,var(--a),var(--b));color:#2a0b2e;box-shadow:0 6px 0 #0006}
+.btn:active{transform:translateY(3px);box-shadow:0 3px 0 #0006}
+.btn.alt{background:var(--panel2);color:var(--ink);border:2px solid var(--line)}
+.btn.good{background:linear-gradient(135deg,#6ff29a,#27b865);color:#062a14}
+.btn.bad{background:linear-gradient(135deg,#ff8a8d,#e0343a);color:#330406}
+.btn:disabled{opacity:.45}
+.err{color:var(--bad);font-weight:800;min-height:1.3em;font-size:15px;text-align:center}
+.center{text-align:center}
+.kicker{text-align:center;color:var(--muted);font-weight:800;letter-spacing:2px;text-transform:uppercase;font-size:13px;margin-top:4px}
+.trip{font-size:clamp(26px,7.5vw,40px);font-weight:900;text-align:center;line-height:1.1;margin:2px 0}
+.rule{display:flex;gap:10px;align-items:center;background:linear-gradient(135deg,#3a2b0f,#4a2338);border:2px solid var(--a);border-radius:var(--r);padding:12px 14px}
+.rule .ic{font-size:30px}
+.rule .t{font-weight:900;font-size:17px;color:var(--a)}
+.rule .d{font-size:14px;color:#ffe9c9}
+.big{font-size:clamp(20px,5.4vw,26px);font-weight:900;text-align:center;line-height:1.25}
+.who{color:var(--a)}
+.who2{color:var(--c)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:0 14px 8px;flex:0 0 auto;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:14px;font-weight:800;white-space:nowrap}
+.chip.me{border-color:var(--a);background:#3a3322}
+.chip.jd{border-color:var(--c)}
+.progress{display:flex;justify-content:space-between;font-weight:800;color:var(--muted);font-size:15px}
+.expect{background:var(--bg2);border:3px solid var(--c);border-radius:22px;padding:18px 14px;text-align:center}
+.expect .n{color:var(--muted);font-weight:800;font-size:14px;letter-spacing:1px}
+.expect .it{font-size:clamp(28px,8.5vw,46px);font-weight:900;line-height:1.1;margin:6px 0;word-break:break-word}
+.expect .mv{font-size:clamp(16px,4.4vw,20px);font-weight:800;color:var(--a)}
+.tbar{height:14px;border-radius:999px;background:var(--bg2);overflow:hidden;border:1px solid var(--line)}
+.tbar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--good),var(--a));border-radius:999px}
+.tbar i.low{background:linear-gradient(90deg,var(--bad),var(--warn))}
+.judgeBtns{display:grid;grid-template-columns:1fr;gap:10px}
+.judgeBtns .btn.good{min-height:96px;font-size:clamp(24px,7vw,32px)}
+.chain{display:flex;flex-wrap:wrap;gap:6px}
+.bag{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:6px 10px;font-weight:800;font-size:15px}
+.bag small{color:var(--muted);font-weight:700;margin-right:4px}
+.bag.hit{border-color:var(--bad);background:#4a1f2e}
+.bag.gone{text-decoration:line-through;opacity:.5}
+.event{background:linear-gradient(135deg,#0f3b44,#2a1b55);border:3px dashed var(--c);border-radius:22px;padding:18px;text-align:center}
+.event .ic{font-size:56px;line-height:1}
+.event .t{font-size:clamp(26px,7.5vw,38px);font-weight:900;color:var(--c);margin:6px 0}
+.event .d{font-size:clamp(16px,4.2vw,19px);line-height:1.35}
+.board{display:flex;flex-direction:column;gap:6px}
+.brow{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-weight:800;font-size:17px}
+.brow .rk{width:30px;text-align:center;font-size:20px}
+.brow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .dr{color:var(--muted);font-size:14px}
+.brow .sc{font-size:22px;color:var(--a);min-width:44px;text-align:right}
+.brow .dl{font-size:14px;color:var(--good);min-width:40px;text-align:right}
+.brow .dl.neg{color:var(--bad)}
+.brow.win{border-color:var(--a);background:#3a3322}
+.tiny{font-size:13px;color:var(--muted);text-align:center}
+.flash{animation:fl .5s ease}
+@keyframes fl{0%{transform:scale(.9);opacity:.3}100%{transform:scale(1);opacity:1}}
+.shake{animation:sh .45s}
+@keyframes sh{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+#overlay{position:fixed;inset:0;background:#08081ccc;display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+#overlay.show{display:flex}
+#overlay .card{width:min(520px,100%);max-height:90dvh;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:5}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <div class="logo"><span>🧳</span> <span class="grad">Pack Rat</span></div>
+    <div class="sp"></div>
+    <button class="ghost hidden-home" id="scoresBtn" aria-label="Scores">🏆 Scores</button>
+    <button class="ghost hidden-home" id="quitBtn" aria-label="Quit">✕</button>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div id="stage"></div>
+</div>
+<div id="overlay"><div class="card" id="ovCard"></div></div>
+<canvas class="confetti" id="confetti"></canvas>
+<script>
+'use strict';
+// ---------- content ----------
+const TRIPS = [
+  ['🌕','a holiday on the Moon'],['🏴‍☠️','a pirate voyage'],['🏰','a sleepover in a haunted castle'],['🦕','a dinosaur safari'],
+  ['🐠','a week in an underwater hotel'],['🎅','a trip to the North Pole'],['🏝️','getting stranded on a desert island'],['🌴','a jungle expedition'],
+  ['🧙','the first day at wizard school'],['🛰️','a month on a space station'],['🎪','touring with the circus'],['🐉','visiting a dragon’s cave'],
+  ['🏺','time-travelling to Ancient Egypt'],['👑','a royal ball at the palace'],['⛺','camping in the woods'],['🔴','the first trip to Mars'],
+  ['🌊','a submarine dive'],['🌋','a picnic next to a volcano'],['🦸','superhero training camp'],['❄️','the great snowball war'],
+  ['👵','a weekend at Grandma’s house'],['🤖','a tour of a robot factory'],['🌳','living in a treehouse'],['🎈','a hot-air balloon ride'],
+  ['🤠','a trip to the Wild West'],['🕶️','a top-secret spy mission'],['🏖️','a day at the beach'],['👾','hiding in a monster-proof bunker'],
+  ['🦄','a unicorn ranch'],['🚐','a road trip across the country'],['🦁','a school trip to the zoo'],['🥷','a week at ninja school'],
+  ['☁️','a visit to the cloud kingdom'],['🍳','cooking in a giant’s kitchen'],['🐜','shrinking to the size of an ant'],['👽','an alien planet exchange trip'],
+  ['🛡️','a knight’s quest'],['🧊','a night in an igloo'],['🦜','a rainforest canopy sleepover'],['🔺','exploring a lost pyramid'],
+  ['🍕','a trip to Pizza Planet'],['🍫','a chocolate factory tour'],['🦑','a sea monster hunt'],['⛵','sailing with the Vikings'],
+  ['🧞','a magic carpet ride'],['🏅','competing in the Olympics'],['🎸','going on tour with a rock band'],['🎤','the school talent show'],
+  ['🐶','a birthday party for a dog'],['👻','a night on a ghost ship'],['🍭','a trip to the Candy Kingdom'],['🐧','visiting a penguin colony'],
+  ['🎩','a fancy secret-agent gala'],['🌍','a journey to the centre of the Earth'],['🗼','a night in a lighthouse'],['🐄','a cowboy cattle drive'],
+  ['🏛️','a sleepover in a museum'],['🚂','a train ride across the mountains'],['🧜','a mermaid lagoon'],['🎮','getting sucked into a video game'],
+  ['🥚','rescuing a dragon egg'],['🎃','the spookiest Halloween party'],['🚀','a rocket race around the Sun'],['🏕️','summer camp on a haunted lake']
+];
+const RULES = [
+  {id:'free',ic:'🎒',t:'Free Pack',d:'Pack anything at all - as long as the room agrees it fits the trip.'},
+  {id:'abc',ic:'🔤',t:'Alphabet Order',d:'Each new item starts with the next letter: A, then B, then C…'},
+  {id:'link',ic:'🔗',t:'Letter Link',d:'Each new item must start with the LAST letter of the item before it.'},
+  {id:'two',ic:'✌️',t:'Two Words',d:'Every item must be exactly two words - “purple socks”, “rubber duck”.'},
+  {id:'one',ic:'☝️',t:'One Word Only',d:'Every item is a single word. No “a”, no “the”, just the thing.'},
+  {id:'col',ic:'🎨',t:'Colour It',d:'Every item must include a colour - “green slime”, “a golden ticket”.'}
+];
+const COLOURS = ['red','orange','yellow','green','blue','purple','pink','black','white','gold','golden','silver','brown','grey','gray','rainbow','violet','turquoise','crimson','navy','teal','lime','scarlet','beige','bronze','indigo','maroon','tan','cream','ruby','emerald'];
+const MOVES = [['👏','clap'],['🙌','hands up'],['👃','touch your nose'],['🦶','stomp'],['🫡','salute'],['😉','wink'],['🤷','shrug'],['👍','thumbs up'],['🙆','hands on head'],['👉','point at someone'],['💃','wiggle'],['🐔','flap your elbows']];
+const EVENTS = [
+  {id:'back',ic:'🔄',t:'Backwards Check!',d:'Customs wants it in reverse. Recite the list from the NEWEST item back to the FIRST. Every item scores double.'},
+  {id:'lost',ic:'🧦',t:'Lost Luggage!',d:''},
+  {id:'fast',ic:'⚡',t:'Speed Check!',d:'The clock runs twice as fast this turn. Every item scores double.'}
+];
+const IDEAS = ('apple,accordion,alarm clock,anchor,astronaut helmet,avocado,backpack,banana,balloon,beach ball,binoculars,blanket,boots,bubble wrap,bucket,cactus,camera,candle,canoe,cape,carrot,castle,cheese,chopsticks,compass,cookies,crown,cupcake,dice,dinosaur egg,disco ball,dog bone,donut,drum,duck,earmuffs,egg,elephant,envelope,eraser,fan,feather,fishing rod,flag,flashlight,flute,football,fork,frog,frying pan,garden gnome,giraffe,glitter,glove,goggles,guitar,hairbrush,hammock,harmonica,hat,helmet,honey,hula hoop,ice cream,ice skates,igloo kit,inflatable shark,ink,jacket,jam,jellybeans,jetpack,jigsaw,juice box,jumper,kazoo,kettle,key,kite,kiwi,koala,ladder,lamp,lemon,lollipop,lunchbox,magnet,map,marbles,marshmallows,mittens,mop,muffin,nachos,napkin,necklace,net,noodles,notebook,octopus,onion,orange,oven mitt,owl,paddle,pancakes,parrot,peanuts,pencil,pickle,pillow,pineapple,pizza,popcorn,potato,pumpkin,puppet,quilt,queen’s crown,quiche,rabbit,radio,raincoat,rope,rubber duck,ruler,sandwich,scarf,shovel,skateboard,sleeping bag,snorkel,socks,spoon,sunglasses,sunscreen,sword,teapot,teddy bear,telescope,tent,toaster,toothbrush,torch,trampoline,trumpet,tuba,umbrella,unicycle,ukulele,vacuum,violin,volcano,waffle,wagon,walrus,watermelon,whistle,wig,xylophone,x-ray goggles,yak,yo-yo,yoghurt,zebra,zipper,zucchini,red balloon,blue jeans,golden ticket,pink flamingo,green slime,purple crayon,silver spoon,yellow raincoat,orange cone,black top hat,white slippers,rainbow wig,brown bear,grey pillow,gold coins,teal teapot,navy socks').split(',');
+
+// ---------- state ----------
+const LS = 'cowork-packrat-';
+const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(LS + k)); return v ?? d; } catch (e) { return d; } };
+const save = (k, v) => { try { localStorage.setItem(LS + k, JSON.stringify(v)); } catch (e) {} };
+let names = load('players', ['Alex', 'Sam', 'Jo', 'Riley']);
+if (!Array.isArray(names) || names.length < 3) names = ['Alex', 'Sam', 'Jo', 'Riley'];
+const settings = Object.assign({ pace: 'normal', moves: true, rules: true, events: true, trips: 3 }, load('settings', {}));
+const PACE = { relaxed: 8, normal: 5, frantic: 3 };
+const MAX_CHAIN = 25;
+
+let G = null;        // game
+let phase = 'home';
+let rafId = 0;
+const $ = id => document.getElementById(id);
+const stage = $('stage');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+// ---------- audio ----------
+let AC = null;
+function ac() { if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } } if (AC.state === 'suspended') AC.resume(); return AC; }
+function tone(f, d = 0.12, type = 'sine', vol = 0.18, when = 0, slide = 0) {
+  const a = ac(); if (!a) return;
+  const t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + d);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + d + 0.05);
+}
+const sfx = {
+  tick: i => tone(440 * Math.pow(2, Math.min(i, 24) / 12), 0.1, 'triangle', 0.2),
+  add: () => { tone(660, 0.1, 'triangle'); tone(990, 0.16, 'triangle', 0.18, 0.08); },
+  bust: () => { tone(220, 0.5, 'sawtooth', 0.2, 0, 70); tone(160, 0.5, 'square', 0.08, 0.05, 60); },
+  event: () => { tone(300, 0.25, 'sine', 0.2, 0, 900); tone(900, 0.25, 'sine', 0.15, 0.2, 300); },
+  warn: () => tone(1200, 0.05, 'square', 0.06),
+  fan: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, 'triangle', 0.2, i * 0.12)),
+  tap: () => tone(600, 0.05, 'sine', 0.08)
+};
+
+// ---------- game flow ----------
+function newGame() {
+  G = {
+    players: names.map(n => ({ name: n, score: 0, drops: 0, best: 0 })),
+    tripNo: 0, trips: settings.trips,
+    deck: shuffle(TRIPS.slice()),
+    trip: null, turn: null, lastEvent: false, history: []
+  };
+  startTrip();
+}
+function startTrip() {
+  const n = G.players.length;
+  const theme = G.deck[G.tripNo % G.deck.length];
+  let rule = RULES[0];
+  if (settings.rules) {
+    // first trip is always Free Pack so new groups learn the loop; after that deal a random rule card
+    rule = G.tripNo === 0 ? RULES[0] : pick(RULES.slice(1).concat(RULES[0]));
+  }
+  G.trip = { ic: theme[0], name: theme[1], rule, list: [], lost: [], starter: G.tripNo % n, adder: G.tripNo % n, judge: -1, reciter: -1, abc: 0, delta: G.players.map(() => 0) };
+  G.lastEvent = false;
+  go('tripIntro');
+}
+function nextIdx(i) { return (i + 1) % G.players.length; }
+function neededLetter() {
+  const T = G.trip;
+  if (T.rule.id === 'abc') return String.fromCharCode(65 + (T.abc % 26));
+  if (T.rule.id === 'link' && T.list.length) {
+    const letters = T.list[T.list.length - 1].text.toUpperCase().replace(/[^A-Z]/g, '');
+    return letters ? letters[letters.length - 1] : null;
+  }
+  return null;
+}
+function wordsOf(s) { return s.trim().split(/\s+/).filter(Boolean); }
+function checkItem(raw) {
+  const T = G.trip, s = raw.trim().replace(/\s+/g, ' ');
+  if (!s) return 'Type the item you just said out loud.';
+  if (s.length > 28) return 'Keep it short - 28 letters max.';
+  const norm = x => x.toLowerCase().replace(/^(a|an|the|some)\s+/, '').replace(/[^a-z0-9]/g, '');
+  if (T.list.some(it => norm(it.text) === norm(s)) || T.lost.some(it => norm(it.text) === norm(s))) return 'That’s already been packed! Pick something new.';
+  const L = neededLetter();
+  if (L) {
+    const first = s.replace(/^(a|an|the|some)\s+/i, '').toUpperCase().replace(/[^A-Z]/g, '')[0];
+    if (first !== L) return `Rule card: it has to start with the letter ${L}.`;
+  }
+  const w = wordsOf(s.replace(/^(a|an|the|some)\s+/i, '')).length;
+  if (T.rule.id === 'two' && w !== 2) return 'Rule card: exactly TWO words.';
+  if (T.rule.id === 'one' && w !== 1) return 'Rule card: ONE word only.';
+  if (T.rule.id === 'col' && !wordsOf(s.toLowerCase()).some(x => COLOURS.includes(x.replace(/[^a-z]/g, '')))) return 'Rule card: include a colour (red, blue, gold…).';
+  return null;
+}
+function idea() {
+  const T = G.trip, L = neededLetter();
+  const packed = new Set(T.list.concat(T.lost).map(i => i.text.toLowerCase()));
+  let pool = IDEAS.filter(x => !packed.has(x));
+  const strip = x => x.replace(/^(a|an|the|some)\s+/i, '');
+  if (L) pool = pool.filter(x => strip(x)[0].toUpperCase() === L);
+  if (T.rule.id === 'two') pool = pool.filter(x => wordsOf(x).length === 2);
+  if (T.rule.id === 'one') pool = pool.filter(x => wordsOf(x).length === 1);
+  if (T.rule.id === 'col') pool = pool.filter(x => wordsOf(x).some(w => COLOURS.includes(w)));
+  return pool.length ? pick(pool) : null;
+}
+function packItem(text) {
+  const T = G.trip;
+  const item = { text: text.trim().replace(/\s+/g, ' '), by: T.adder, move: settings.moves ? pick(MOVES) : null };
+  T.list.push(item); T.abc++;
+  sfx.add();
+  go('added');
+}
+function afterAdded() {
+  const T = G.trip;
+  if (T.list.length >= MAX_CHAIN) { perfectTrip(); return; }
+  T.judge = T.adder;
+  T.reciter = nextIdx(T.adder);
+  // customs event?
+  let ev = null;
+  if (settings.events && !G.lastEvent && T.list.length >= 4 && Math.random() < 0.3) {
+    ev = pick(EVENTS);
+    if (ev.id === 'lost' && T.list.length < 5) ev = EVENTS[0];
+  }
+  G.lastEvent = !!ev;
+  G.turn = { ev: ev ? Object.assign({}, ev) : null, order: [], pos: 0, mult: 1, per: PACE[settings.pace], deadline: 0, lostItem: null, reason: '' };
+  if (ev) {
+    if (ev.id === 'lost') {
+      const i = Math.floor(Math.random() * (T.list.length - 1));
+      const gone = T.list.splice(i, 1)[0];
+      T.lost.push(gone);
+      G.turn.lostItem = gone;
+      G.turn.ev.d = `Customs confiscated the <b>${esc(gone.text)}</b>! It’s gone for good - skip it from now on. Say it and you’re busted.`;
+    }
+    if (ev.id === 'back' || ev.id === 'fast') G.turn.mult = 2;
+    if (ev.id === 'fast') G.turn.per = Math.max(1.5, G.turn.per / 2);
+    sfx.event();
+    go('event');
+  } else go('handoff');
+}
+function startRecital() {
+  const T = G.trip, t = G.turn;
+  t.order = T.list.map((_, i) => i);
+  if (t.ev && t.ev.id === 'back') t.order.reverse();
+  t.pos = 0;
+  t.deadline = performance.now() + t.per * 1000;
+  go('recite');
+}
+function said() {
+  const t = G.turn;
+  if (phase !== 'recite') return;
+  sfx.tick(t.pos);
+  t.pos++;
+  if (t.pos >= t.order.length) {
+    const T = G.trip, pts = t.order.length * t.mult;
+    const P = G.players[T.reciter];
+    P.score += pts; T.delta[T.reciter] += pts; P.best = Math.max(P.best, t.order.length);
+    t.earned = pts;
+    T.adder = T.reciter;
+    go('add');
+  } else {
+    t.deadline = performance.now() + t.per * 1000;
+    renderRecite();
+  }
+}
+function fumble(reason) {
+  if (phase !== 'recite') return;
+  G.turn.reason = reason;
+  G.turn.left = Math.max(0, G.turn.deadline - performance.now());
+  sfx.bust();
+  go('fumble');
+}
+function undoFumble() {
+  G.turn.deadline = performance.now() + Math.max(G.turn.left, 2500);
+  go('recite');
+}
+function confirmFumble() {
+  const T = G.trip, P = G.players[T.reciter];
+  P.score -= 2; P.drops++; T.delta[T.reciter] -= 2;
+  T.bust = { who: T.reciter, at: G.turn.order[G.turn.pos] };
+  endTrip(false);
+}
+function perfectTrip() {
+  const T = G.trip;
+  G.players.forEach((p, i) => { p.score += 5; T.delta[i] += 5; });
+  T.bust = null; T.perfect = true;
+  endTrip(true);
+}
+function endTrip() {
+  G.history.push({ name: G.trip.name, len: G.trip.list.length });
+  go('tripEnd');
+}
+function nextTrip() {
+  G.tripNo++;
+  if (G.tripNo >= G.trips) { go('final'); return; }
+  startTrip();
+}
+
+// ---------- rendering ----------
+function go(p) {
+  phase = p;
+  cancelAnimationFrame(rafId);
+  render();
+  stage.scrollTop = 0;
+}
+function chipsHTML() {
+  if (!G || phase === 'home') return '';
+  const T = G.trip;
+  return G.players.map((p, i) => {
+    const cls = T && (phase === 'recite' || phase === 'handoff') ? (i === T.reciter ? ' me' : i === T.judge ? ' jd' : '') : (T && (phase === 'add' || phase === 'added') && i === T.adder ? ' me' : '');
+    return `<span class="chip${cls}">${esc(p.name)} <span style="color:var(--a)">${p.score}</span></span>`;
+  }).join('');
+}
+function ruleHTML(r) { return `<div class="rule"><div class="ic">${r.ic}</div><div><div class="t">${r.t}</div><div class="d">${r.d}</div></div></div>`; }
+function render() {
+  document.querySelectorAll('.hidden-home').forEach(b => b.style.display = phase === 'home' ? 'none' : '');
+  $('chips').innerHTML = chipsHTML();
+  $('chips').style.display = phase === 'home' ? 'none' : '';
+  const f = R[phase];
+  f();
+}
+const R = {};
+R.home = () => {
+  stage.innerHTML = `
+  <div class="emojiHead">🧳</div>
+  <h1 class="grad">Pack Rat</h1>
+  <p class="tag">The “I packed my suitcase…” memory game - with the phone as the referee.</p>
+  <div class="meta"><span class="pill">👥 3–10 players</span><span class="pill">⏱ ~15–25 min</span><span class="pill">📱 one phone, passed left</span></div>
+  <div class="card">
+    <h2>How to play</h2>
+    <p><b>On your turn, recite the whole packing list from memory, in order, then add one new item.</b></p>
+    <p>The phone sits with the person who went before you - they're the <b>Judge</b>. They tap ✓ for each item you get right before the timer runs out. Get one wrong, skip one, or freeze and you <b>drop the bag</b> (-2) and the trip ends.</p>
+    <p>Each item you recite is worth 1 point, so the longer the list gets, the more a turn is worth.</p>
+  </div>
+  <div class="card">
+    <h2>Packers</h2>
+    <div class="plist" id="plist"></div>
+    <div class="row" style="margin-top:8px"><button class="btn alt" id="addP" style="min-height:48px;font-size:17px">＋ Add player</button></div>
+  </div>
+  <div class="card opts">
+    <div class="opt"><div class="lab">Trips (rounds)</div><div class="seg" data-k="trips"><button data-v="3">3</button><button data-v="5">5</button><button data-v="7">7</button></div></div>
+    <div class="opt"><div class="lab">Judge's timer per item</div><div class="seg" data-k="pace"><button data-v="relaxed">Relaxed 8s</button><button data-v="normal">Normal 5s</button><button data-v="frantic">Frantic 3s</button></div></div>
+    <div class="opt"><div class="lab">🙌 Moves - every item gets a gesture you must do as you say it</div><div class="seg" data-k="moves"><button data-v="true">On</button><button data-v="false">Off</button></div></div>
+    <div class="opt"><div class="lab">🔤 Rule cards (Alphabet, Letter Link, Two Words…)</div><div class="seg" data-k="rules"><button data-v="true">On</button><button data-v="false">Off</button></div></div>
+    <div class="opt"><div class="lab">🛃 Customs surprises (Backwards, Lost Luggage, Speed)</div><div class="seg" data-k="events"><button data-v="true">On</button><button data-v="false">Off</button></div></div>
+  </div>
+  <div class="err" id="homeErr"></div>
+  <button class="btn" id="startBtn">🧳 Start packing</button>
+  <p class="tiny">${TRIPS.length} trips · ${RULES.length} rule cards · ${IDEAS.length} idea items · family-friendly</p>`;
+  const drawPlayers = () => {
+    $('plist').innerHTML = names.map((n, i) => `<div class="pl"><input maxlength="14" value="${esc(n)}" data-i="${i}" aria-label="Player ${i + 1} name"><button class="x" data-del="${i}" aria-label="Remove">✕</button></div>`).join('');
+    $('plist').querySelectorAll('input').forEach(inp => inp.addEventListener('input', () => { names[+inp.dataset.i] = inp.value; save('players', names); }));
+    $('plist').querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+      if (names.length <= 3) { $('homeErr').textContent = 'Pack Rat needs at least 3 packers.'; return; }
+      names.splice(+b.dataset.del, 1); save('players', names); drawPlayers();
+    }));
+    $('addP').disabled = names.length >= 10;
+  };
+  drawPlayers();
+  $('addP').addEventListener('click', () => { if (names.length < 10) { names.push('Player ' + (names.length + 1)); save('players', names); drawPlayers(); const ins = $('plist').querySelectorAll('input'); ins[ins.length - 1].select(); } });
+  stage.querySelectorAll('.seg').forEach(seg => {
+    const k = seg.dataset.k;
+    const mark = () => seg.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(settings[k]) === b.dataset.v));
+    seg.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      const v = b.dataset.v; settings[k] = v === 'true' ? true : v === 'false' ? false : (isNaN(+v) ? v : +v);
+      save('settings', settings); mark(); sfx.tap();
+    }));
+    mark();
+  });
+  $('startBtn').addEventListener('click', () => {
+    names = names.map((n, i) => n.trim() || 'Player ' + (i + 1));
+    const low = names.map(n => n.toLowerCase());
+    if (low.some((n, i) => low.indexOf(n) !== i)) { $('homeErr').textContent = 'Two packers have the same name - make them different.'; return; }
+    save('players', names); ac(); newGame();
+  });
+};
+R.tripIntro = () => {
+  const T = G.trip;
+  stage.innerHTML = `
+  <div class="kicker">Trip ${G.tripNo + 1} of ${G.trips}</div>
+  <div class="emojiHead flash">${T.ic}</div>
+  <div class="kicker" style="margin-top:0">We're packing for…</div>
+  <div class="trip grad">${esc(T.name)}</div>
+  ${ruleHTML(T.rule)}
+  ${settings.moves ? `<div class="card"><p>🙌 <b>Moves are on.</b> Every item gets a gesture. When you recite the list, do each item's move as you say it - the Judge can bust you for a missing move.</p></div>` : ''}
+  <div class="card"><p class="big">First packer: <span class="who">${esc(G.players[T.starter].name)}</span></p><p class="center">You start the list - no reciting yet, just add the first item.</p></div>
+  <button class="btn" id="goBtn">Let's pack! ➜</button>`;
+  $('goBtn').addEventListener('click', () => go('add'));
+};
+R.add = () => {
+  const T = G.trip, t = G.turn, P = G.players[T.adder], first = T.list.length === 0;
+  const L = neededLetter();
+  stage.innerHTML = `
+  ${!first && t && t.earned ? `<div class="card center flash"><p class="big" style="color:var(--good)">✓ Perfect recital! +${t.earned}${t.mult > 1 ? ' (double!)' : ''}</p></div>` : ''}
+  <div class="kicker">${T.ic} ${esc(T.name)}</div>
+  <p class="big">${first && G.tripNo === 0 ? '' : 'Pass the phone to '}<span class="who">${esc(P.name)}</span>${first ? (G.tripNo === 0 ? ', you go first!' : ' - you start this trip!') : ''}</p>
+  <div class="card"><p class="center">Say your new item <b>out loud</b> for the whole room - <br>“I packed ${first ? '…' : 'all that, plus…'}” - then type it here.</p></div>
+  ${T.rule.id !== 'free' ? ruleHTML(T.rule) : ''}
+  ${L ? `<p class="big">Your item must start with <span class="who" style="font-size:1.4em">${L}</span></p>` : ''}
+  <input class="bigInput" id="itemIn" maxlength="28" placeholder="e.g. ${esc(idea() || 'a rubber duck')}" autocomplete="off" autocapitalize="none" spellcheck="false" style="font-size:20px;min-height:58px">
+  <div class="err" id="addErr"></div>
+  <div class="row"><button class="btn alt" id="ideaBtn" style="flex:0 0 auto;width:auto;font-size:17px">🎲 Idea</button><button class="btn" id="packBtn">Pack it! 🧳</button></div>
+  <p class="tiny">Items packed so far: ${T.list.length}</p>`;
+  const inp = $('itemIn');
+  const submit = () => {
+    const e = checkItem(inp.value);
+    if (e) { $('addErr').textContent = e; inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake'); return; }
+    packItem(inp.value);
+  };
+  $('packBtn').addEventListener('click', submit);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  $('ideaBtn').addEventListener('click', () => { const x = idea(); if (x) { inp.value = x; $('addErr').textContent = ''; } else $('addErr').textContent = 'Out of ideas - you’re on your own!'; });
+};
+R.added = () => {
+  const T = G.trip, it = T.list[T.list.length - 1], nx = nextIdx(T.adder);
+  stage.innerHTML = `
+  <div class="kicker">Packed! Item #${T.list.length}</div>
+  <div class="expect flash">
+    <div class="it">${esc(it.text)}</div>
+    ${it.move ? `<div class="mv">${it.move[0]} Move: ${it.move[1]}</div>` : ''}
+  </div>
+  <div class="card"><p class="center">${it.move ? `<b>Show the room!</b> Say “${esc(it.text)}” and do the <b>${it.move[1]}</b> so everyone learns the move.` : `Make sure everyone heard it: “${esc(it.text)}”.`}</p></div>
+  <div class="card"><p class="big">Now <span class="who2">${esc(G.players[T.adder].name)}</span> keeps the phone and judges <span class="who">${esc(G.players[nx].name)}</span>.</p></div>
+  <button class="btn" id="goBtn">Next turn ➜</button>`;
+  $('goBtn').addEventListener('click', afterAdded);
+};
+R.event = () => {
+  const e = G.turn.ev;
+  stage.innerHTML = `
+  <div class="kicker">🛃 Customs surprise - show everyone!</div>
+  <div class="event flash"><div class="ic">${e.ic}</div><div class="t">${e.t}</div><div class="d">${e.d}</div></div>
+  <button class="btn" id="goBtn">Got it ➜</button>`;
+  $('goBtn').addEventListener('click', () => go('handoff'));
+};
+R.handoff = () => {
+  const T = G.trip, t = G.turn, n = T.list.length;
+  stage.innerHTML = `
+  <div class="kicker">${T.ic} ${esc(T.name)}</div>
+  <p class="big"><span class="who2">${esc(G.players[T.judge].name)}</span> is the Judge 🧑‍⚖️<br><small style="color:var(--muted);font-size:.7em">Keep this screen to yourself!</small></p>
+  <div class="card center"><p class="big"><span class="who">${esc(G.players[T.reciter].name)}</span>, recite all <span class="who">${n}</span> item${n === 1 ? '' : 's'}${t.ev && t.ev.id === 'back' ? ' <u>BACKWARDS</u>' : ''}!</p>
+  <p>Worth <b>${n * t.mult} points</b>${t.mult > 1 ? ' (double)' : ''}. Timer: <b>${t.per}s per item</b>${settings.moves ? ' - don’t forget the moves' : ''}.</p></div>
+  <div class="card"><p><b>Judge:</b> the screen shows only the next item. Tap <b>✓ SAID IT</b> each time they say it (${settings.moves ? 'and do the move ' : ''}in the right order). Wrong item, skipped item, wrong move or silence → tap <b>✗ BUST</b>.</p></div>
+  <button class="btn" id="goBtn">▶ Start the clock</button>`;
+  $('goBtn').addEventListener('click', startRecital);
+};
+R.recite = () => {
+  const T = G.trip;
+  stage.innerHTML = `
+  <div class="progress"><span>🧑‍⚖️ ${esc(G.players[T.judge].name)} judging</span><span id="prog"></span></div>
+  <div class="expect" id="expect"></div>
+  <div class="tbar"><i id="tbar"></i></div>
+  <div class="judgeBtns">
+    <button class="btn good" id="saidBtn">✓ SAID IT</button>
+    <button class="btn bad" id="bustBtn">✗ BUST</button>
+  </div>
+  <p class="tiny">Only the Judge should see this screen.</p>`;
+  $('saidBtn').addEventListener('click', said);
+  $('bustBtn').addEventListener('click', () => fumble('judge'));
+  renderRecite();
+  let lastWarn = -1, lastT = performance.now();
+  const loop = () => {
+    if (phase !== 'recite') return;
+    const now = performance.now();
+    // the clock freezes while the Scores / Quit overlay is open
+    if ($('overlay').classList.contains('show')) G.turn.deadline += now - lastT;
+    lastT = now;
+    const left = G.turn.deadline - performance.now(), frac = Math.max(0, left / (G.turn.per * 1000));
+    const bar = $('tbar');
+    if (bar) { bar.style.width = (frac * 100) + '%'; bar.classList.toggle('low', frac < 0.35); }
+    const sec = Math.ceil(left / 1000);
+    if (frac < 0.35 && sec !== lastWarn && left > 0) { lastWarn = sec; sfx.warn(); }
+    if (left <= 0) { fumble('time'); return; }
+    rafId = requestAnimationFrame(loop);
+  };
+  rafId = requestAnimationFrame(loop);
+};
+function renderRecite() {
+  const T = G.trip, t = G.turn, it = T.list[t.order[t.pos]];
+  $('prog').textContent = `Item ${t.pos + 1} of ${t.order.length}${t.mult > 1 ? ' · x2' : ''}`;
+  const ex = $('expect');
+  ex.innerHTML = `<div class="n">${t.ev && t.ev.id === 'back' ? '🔄 BACKWARDS - ' : ''}THEY SHOULD SAY</div><div class="it">${esc(it.text)}</div>${it.move ? `<div class="mv">${it.move[0]} + ${it.move[1]}</div>` : ''}`;
+  ex.classList.remove('flash'); void ex.offsetWidth; ex.classList.add('flash');
+}
+R.fumble = () => {
+  const T = G.trip, t = G.turn, it = T.list[t.order[t.pos]];
+  stage.innerHTML = `
+  <div class="emojiHead shake">💥</div>
+  <p class="big"><span class="who">${esc(G.players[T.reciter].name)}</span> dropped the bag!</p>
+  <div class="card center"><p>${t.reason === 'time' ? '⏰ The clock ran out' : '🧑‍⚖️ The Judge called it'} on item ${t.pos + 1} of ${t.order.length}. It was:</p>
+  <p class="big" style="color:var(--a)">${esc(it.text)}${it.move ? ` ${it.move[0]}` : ''}</p></div>
+  <button class="btn bad" id="okBtn">Bag dropped (-2) · end the trip</button>
+  <button class="btn alt" id="undoBtn">↩ Oops - they actually said it</button>`;
+  $('okBtn').addEventListener('click', confirmFumble);
+  $('undoBtn').addEventListener('click', undoFumble);
+};
+R.tripEnd = () => {
+  const T = G.trip, last = G.tripNo + 1 >= G.trips;
+  const bags = T.list.map((it, i) => `<span class="bag${T.bust && T.bust.at === i ? ' hit' : ''}"><small>${i + 1}</small>${esc(it.text)}${it.move ? ' ' + it.move[0] : ''}</span>`).join('')
+    + T.lost.map(it => `<span class="bag gone">${esc(it.text)}</span>`).join('');
+  const order = G.players.map((p, i) => ({ p, i })).sort((a, b) => b.p.score - a.p.score);
+  stage.innerHTML = `
+  <div class="kicker">Trip ${G.tripNo + 1} of ${G.trips} - complete</div>
+  <div class="trip">${T.perfect ? '🏆' : T.ic} <span class="grad">${T.perfect ? 'Perfect Pack!' : `${T.list.length} items packed`}</span></div>
+  <p class="center" style="color:var(--muted);margin:0">${T.perfect ? `The whole room packed ${MAX_CHAIN} items without a slip - everyone +5!` : `${esc(G.players[T.bust.who].name)} dropped the bag packing for ${esc(T.name)} (-2).`}</p>
+  <div class="card"><h2>The suitcase</h2><div class="chain">${bags}</div></div>
+  <div class="board">${order.map(({ p, i }, r) => `<div class="brow"><span class="rk">${r + 1}</span><span class="nm">${esc(p.name)}</span><span class="dl${T.delta[i] < 0 ? ' neg' : ''}">${T.delta[i] > 0 ? '+' : ''}${T.delta[i] || ''}</span><span class="sc">${p.score}</span></div>`).join('')}</div>
+  <button class="btn" id="goBtn">${last ? '🏁 Final results' : 'Next trip ➜'}</button>`;
+  $('goBtn').addEventListener('click', nextTrip);
+};
+R.final = () => {
+  const order = G.players.slice().sort((a, b) => b.score - a.score || a.drops - b.drops);
+  const top = order[0].score, winners = order.filter(p => p.score === top && p.drops === order[0].drops);
+  const memory = G.players.slice().sort((a, b) => b.best - a.best)[0];
+  const longest = G.history.slice().sort((a, b) => b.len - a.len)[0];
+  stage.innerHTML = `
+  <div class="emojiHead">🏆</div>
+  <div class="kicker">Chief Pack Rat</div>
+  <div class="trip" style="color:var(--a)">${winners.map(w => esc(w.name)).join(' & ')}</div>
+  <div class="board">${order.map((p, r) => `<div class="brow${p.score === top && p.drops === order[0].drops ? ' win' : ''}"><span class="rk">${['🥇', '🥈', '🥉'][r] || r + 1}</span><span class="nm">${esc(p.name)}</span><span class="dr">${p.drops ? '💼'.repeat(Math.min(p.drops, 4)) : ''}</span><span class="sc">${p.score}</span></div>`).join('')}</div>
+  <div class="card"><p>🧠 <b>Longest recital:</b> ${esc(memory.name)} - ${memory.best} item${memory.best === 1 ? '' : 's'} in a row</p><p>🧳 <b>Biggest suitcase:</b> ${esc(longest.name)} (${longest.len} items)</p></div>
+  <button class="btn" id="againBtn">🔁 Play again - same packers</button>
+  <button class="btn alt" id="homeBtn">⚙ New game / change players</button>`;
+  $('againBtn').addEventListener('click', () => { stopConfetti(); newGame(); });
+  $('homeBtn').addEventListener('click', () => { stopConfetti(); G = null; go('home'); });
+  sfx.fan(); confetti();
+};
+
+// ---------- scores overlay / quit ----------
+function overlay(html) { $('ovCard').innerHTML = html; $('overlay').classList.add('show'); }
+function closeOverlay() { $('overlay').classList.remove('show'); }
+$('overlay').addEventListener('click', e => { if (e.target.id === 'overlay') closeOverlay(); });
+$('scoresBtn').addEventListener('click', () => {
+  if (!G) return;
+  const order = G.players.slice().sort((a, b) => b.score - a.score);
+  overlay(`<h2 style="margin:0">🏆 Scores - trip ${Math.min(G.tripNo + 1, G.trips)} of ${G.trips}</h2>
+    <div class="board">${order.map((p, r) => `<div class="brow"><span class="rk">${r + 1}</span><span class="nm">${esc(p.name)}</span><span class="dr">${p.drops ? p.drops + ' 💼' : ''}</span><span class="sc">${p.score}</span></div>`).join('')}</div>
+    <p style="color:var(--muted);margin:0;font-size:14px">+1 per item recited (x2 on Backwards/Speed) · -2 for dropping the bag · +5 each for a ${MAX_CHAIN}-item Perfect Pack</p>
+    <button class="btn alt" id="ovClose">Close</button>`);
+  $('ovClose').addEventListener('click', closeOverlay);
+});
+$('quitBtn').addEventListener('click', () => {
+  overlay(`<h2 style="margin:0">End this game?</h2><p style="color:var(--muted);margin:0">Scores will be lost. The Judge's clock is paused while this is open.</p>
+    <button class="btn bad" id="ovQuit">End game</button><button class="btn alt" id="ovClose">Keep playing</button>`);
+  $('ovQuit').addEventListener('click', () => { closeOverlay(); stopConfetti(); G = null; go('home'); });
+  $('ovClose').addEventListener('click', closeOverlay);
+});
+
+// ---------- confetti ----------
+let cfRaf = 0;
+function confetti() {
+  const cv = $('confetti'), cx = cv.getContext('2d');
+  cv.width = innerWidth; cv.height = innerHeight;
+  const cols = ['#ffcf3f', '#ff6fa8', '#4fd8c4', '#4fe07a', '#a98bff'];
+  const ps = Array.from({ length: 140 }, () => ({ x: Math.random() * cv.width, y: -20 - Math.random() * cv.height, vx: (Math.random() - .5) * 2, vy: 2 + Math.random() * 3, r: Math.random() * 6, c: pick(cols), s: 4 + Math.random() * 6 }));
+  const t0 = performance.now();
+  const step = now => {
+    cx.clearRect(0, 0, cv.width, cv.height);
+    ps.forEach(p => { p.x += p.vx; p.y += p.vy; p.r += 0.1; cx.save(); cx.translate(p.x, p.y); cx.rotate(p.r); cx.fillStyle = p.c; cx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); cx.restore(); });
+    if (now - t0 < 4500) cfRaf = requestAnimationFrame(step); else cx.clearRect(0, 0, cv.width, cv.height);
+  };
+  cancelAnimationFrame(cfRaf); cfRaf = requestAnimationFrame(step);
+}
+function stopConfetti() { cancelAnimationFrame(cfRaf); const cv = $('confetti'); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); }
+
+go('home');
+</script>
+</body>
+</html>

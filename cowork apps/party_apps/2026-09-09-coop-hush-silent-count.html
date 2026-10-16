@@ -1,0 +1,855 @@
+<!-- CONCEPT: COOPERATIVE - "HUSH": the whole room plays as one mind against the app - everyone secretly memorises a hand of hidden numbers from 1-100, then the group must play every card in ascending order across the entire table with NO talking, no counting, no hints; you tap your own badge when your gut says go, and the app knows every hand so it judges instantly - play too soon and every lower card in the room burns and the group loses a shard. Shared lives, a FOCUS token that makes everyone drop their lowest card at once, and a rising tone mapped to each card's value so the room hears the ladder climb. | Players: 2-8 | ~15-25 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>HUSH — The Silent Count</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root{
+  --bg:#06070d;
+  --bg2:#0d1020;
+  --panel:#141a2e;
+  --panel2:#1c2440;
+  --line:#2a3352;
+  --ink:#eaf0ff;
+  --dim:#8d9ac4;
+  --cyan:#3ee8d8;
+  --violet:#a970ff;
+  --gold:#ffd66b;
+  --red:#ff5a7a;
+  --green:#4de08a;
+  --pad: clamp(10px, 3.4vw, 18px);
+  --r: 16px;
+}
+
+html, body{
+  margin:0; padding:0;
+  height:100%;
+  touch-action: manipulation;
+  user-select:none; -webkit-user-select:none;
+  overflow:hidden;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+#app{
+  position:fixed; inset:0;
+  background:
+    radial-gradient(120% 70% at 50% -10%, #1b2247 0%, transparent 60%),
+    radial-gradient(90% 60% at 50% 110%, #1a1030 0%, transparent 60%),
+    var(--bg);
+}
+
+.screen{
+  position:absolute; inset:0;
+  display:none;
+  flex-direction:column;
+  padding:var(--pad);
+  gap:var(--pad);
+}
+.screen.on{ display:flex; }
+.scroll{ overflow-y:auto; -webkit-overflow-scrolling:touch; }
+
+.grad{
+  background:linear-gradient(90deg, var(--cyan), var(--violet));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+
+/* ---------- HOME ---------- */
+.hero{ text-align:center; padding-top:2vh; }
+.hero h1{
+  font-size:clamp(50px, 19vw, 108px);
+  font-weight:900; letter-spacing:.14em; margin:0 0 2px 0; line-height:1;
+  background:linear-gradient(90deg, var(--cyan), var(--violet));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.hero .sub{
+  font-size:clamp(11px, 3.2vw, 15px);
+  letter-spacing:.34em; color:var(--dim); text-transform:uppercase;
+}
+.hero .co{
+  margin-top:10px; display:inline-block;
+  font-size:clamp(11px, 3vw, 14px); letter-spacing:.16em;
+  color:var(--gold); border:1px solid rgba(255,214,107,.35);
+  border-radius:999px; padding:5px 14px;
+}
+
+.card{
+  background:linear-gradient(180deg, var(--panel), var(--bg2));
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  padding:var(--pad);
+}
+.rules{ font-size:clamp(13px, 3.6vw, 16px); line-height:1.55; color:#c6d0ee; }
+.rules b{ color:var(--cyan); font-weight:700; }
+.rules .no{ color:var(--red); font-weight:700; }
+.rules ol{ margin:0; padding-left:20px; }
+.rules li{ margin-bottom:7px; }
+
+.btn{
+  display:flex; align-items:center; justify-content:center;
+  min-height:56px; width:100%;
+  border:none; border-radius:14px;
+  font-size:clamp(15px, 4.4vw, 19px); font-weight:800; letter-spacing:.08em;
+  font-family:inherit; cursor:pointer;
+  background:linear-gradient(135deg, var(--cyan), var(--violet));
+  color:#05070f;
+  text-transform:uppercase;
+}
+.btn:active{ transform:translateY(1px); }
+.btn.ghost{
+  background:transparent; border:1px solid var(--line); color:var(--ink);
+  min-height:48px; font-size:clamp(12px, 3.6vw, 15px);
+}
+.btn.gold{ background:linear-gradient(135deg, var(--gold), #ff9d5c); }
+.btn:disabled{ opacity:.35; }
+
+.seg{ display:flex; gap:8px; }
+.seg button{
+  flex:1; min-height:56px; cursor:pointer;
+  background:var(--panel2); border:1px solid var(--line); color:var(--dim);
+  border-radius:12px; font-family:inherit; font-weight:700;
+  font-size:clamp(11px, 3.2vw, 14px); letter-spacing:.06em;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+}
+.seg button .tag{ font-size:10px; letter-spacing:.1em; opacity:.7; font-weight:600; }
+.seg button.sel{ border-color:var(--cyan); color:var(--ink); background:rgba(62,232,216,.12); }
+
+.label{ font-size:11px; letter-spacing:.24em; color:var(--dim); text-transform:uppercase; margin-bottom:8px; }
+.best{ text-align:center; font-size:12px; letter-spacing:.16em; color:var(--dim); }
+.best b{ color:var(--gold); }
+
+/* ---------- SETUP ---------- */
+.prow{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.pdot{ width:12px; height:12px; border-radius:50%; flex:0 0 auto; }
+.prow input{
+  flex:1; min-height:50px;
+  background:var(--panel2); border:1px solid var(--line); border-radius:12px;
+  color:var(--ink); font-family:inherit; font-size:16px; padding:0 14px;
+  user-select:text; -webkit-user-select:text;
+}
+.prow input:focus{ outline:none; border-color:var(--cyan); }
+.prow .del{
+  width:50px; height:50px; flex:0 0 auto; cursor:pointer;
+  background:transparent; border:1px solid var(--line); border-radius:12px;
+  color:var(--red); font-size:20px; font-family:inherit;
+}
+
+/* ---------- DEAL ---------- */
+.dealwrap{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; text-align:center; min-height:0; }
+.passname{ font-size:clamp(30px, 10vw, 54px); font-weight:900; letter-spacing:.02em; }
+.passhint{ font-size:clamp(12px, 3.6vw, 15px); color:var(--dim); letter-spacing:.1em; max-width:22em; line-height:1.5; }
+.shield{ font-size:clamp(52px, 17vw, 92px); }
+
+.handgrid{
+  display:flex; flex-wrap:wrap; gap:10px; justify-content:center; align-content:center;
+}
+.numcard{
+  min-width:clamp(66px, 21vw, 100px);
+  padding:clamp(10px,3vw,18px) clamp(6px,2vw,10px);
+  border-radius:14px;
+  background:linear-gradient(180deg,#fdfdff,#c9d4f5);
+  color:#0a0e1c;
+  font-size:clamp(30px, 10vw, 48px); font-weight:900;
+  text-align:center;
+  box-shadow:0 8px 24px rgba(62,232,216,.18);
+}
+
+/* ---------- PLAY ---------- */
+.top{
+  display:flex; align-items:center; gap:6px; flex:0 0 auto;
+}
+.pill{
+  background:var(--panel); border:1px solid var(--line); border-radius:999px;
+  padding:7px 12px; font-size:clamp(10px, 3vw, 13px); font-weight:800; letter-spacing:.1em;
+  white-space:nowrap;
+}
+.pill.lv{ color:var(--cyan); }
+.pill.hearts{ color:var(--red); letter-spacing:.02em; }
+.pill.stars{ color:var(--gold); letter-spacing:.02em; }
+.iconbtn{
+  width:44px; height:44px; flex:0 0 auto; cursor:pointer;
+  background:var(--panel); border:1px solid var(--line); border-radius:12px;
+  color:var(--ink); font-size:17px; font-family:inherit;
+  display:flex; align-items:center; justify-content:center;
+}
+.iconbtn:disabled{ opacity:.28; }
+.spacer{ flex:1; }
+
+.stage{
+  flex:0 0 auto;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px; padding:clamp(6px,2vw,14px) 0;
+}
+.lastnum{
+  font-size:clamp(56px, 20vw, 110px); font-weight:900; line-height:1;
+  background:linear-gradient(180deg,#fff,var(--cyan));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.lastnum.bad{ background:linear-gradient(180deg,#fff,var(--red)); -webkit-background-clip:text; background-clip:text; }
+.stagelbl{ font-size:11px; letter-spacing:.24em; color:var(--dim); text-transform:uppercase; }
+.trail{ display:flex; gap:5px; flex-wrap:wrap; justify-content:center; min-height:24px; }
+.chip{
+  background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+  padding:3px 8px; font-size:12px; font-weight:700; color:var(--dim);
+}
+.chip.burn{ color:var(--red); border-color:rgba(255,90,122,.4); text-decoration:line-through; }
+
+.badges{
+  flex:1 1 auto; min-height:0;
+  display:grid; gap:8px;
+  grid-template-columns:repeat(2, 1fr);
+  grid-auto-rows:1fr;
+}
+.badges.one{ grid-template-columns:1fr; }
+.badge{
+  position:relative;
+  min-height:60px;
+  border-radius:14px; cursor:pointer;
+  border:1px solid var(--line);
+  background:linear-gradient(180deg, var(--panel), var(--bg2));
+  color:var(--ink); font-family:inherit;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  padding:6px 40px 6px 8px;
+  overflow:hidden;
+}
+.badge::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:5px;
+  background:var(--pc);
+}
+.badge .bn{
+  font-size:clamp(14px, 4.2vw, 20px); font-weight:800;
+  max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.badge .bc{ font-size:11px; letter-spacing:.14em; color:var(--dim); }
+.badge.empty{ opacity:.34; }
+.badge.empty .bc{ color:var(--green); }
+.badge:active{ transform:scale(.98); }
+.badge .eye{
+  position:absolute; right:4px; top:50%; transform:translateY(-50%);
+  width:36px; height:44px; cursor:pointer;
+  background:transparent; border:none; color:var(--dim); font-size:16px;
+  display:flex; align-items:center; justify-content:center;
+}
+.badge.flash{ animation:flash .5s ease; }
+@keyframes flash{ 0%{ background:rgba(62,232,216,.5);} 100%{ background:var(--panel);} }
+.badge.err{ animation:err .5s ease; }
+@keyframes err{ 0%,60%{ background:rgba(255,90,122,.45);} 100%{ background:var(--panel);} }
+
+.bottom{ flex:0 0 auto; display:flex; gap:8px; }
+
+/* ---------- OVERLAY ---------- */
+.ov{
+  position:absolute; inset:0; z-index:20;
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  gap:16px; padding:var(--pad);
+  background:rgba(4,6,13,.94);
+  text-align:center;
+}
+.ov.on{ display:flex; }
+.ov h2{
+  font-size:clamp(28px, 9vw, 46px); font-weight:900; margin:0; letter-spacing:.04em;
+}
+.ov p{ font-size:clamp(13px, 3.8vw, 16px); color:#c6d0ee; margin:0; line-height:1.55; max-width:24em; }
+.ov .big{ font-size:clamp(56px, 18vw, 96px); }
+.burnlist{ display:flex; flex-direction:column; gap:6px; width:100%; max-width:340px; max-height:34vh; overflow-y:auto; }
+.burnrow{
+  display:flex; align-items:center; gap:10px;
+  background:var(--panel); border:1px solid var(--line); border-radius:12px;
+  padding:9px 12px; font-size:14px;
+}
+.burnrow .nm{ flex:1; text-align:left; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.burnrow .vals{ color:var(--red); font-weight:800; letter-spacing:.06em; }
+.burnrow .vals.ok{ color:var(--gold); }
+.ovbtns{ width:100%; max-width:360px; display:flex; flex-direction:column; gap:8px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= HOME ================= -->
+  <section class="screen on scroll" id="s-home">
+    <div class="hero">
+      <h1>HUSH</h1>
+      <div class="sub">The Silent Count</div>
+      <div class="co">◈ CO-OP — THE WHOLE ROOM VS THE APP</div>
+    </div>
+
+    <div class="card rules">
+      <ol>
+        <li>The phone deals everyone a secret hand of numbers from <b>1&ndash;100</b>. Memorise yours, then pass it on.</li>
+        <li>Together you must play <b>every card in the room in ascending order</b> &mdash; lowest first, all the way up.</li>
+        <li><span class="no">No talking. No counting. No hints.</span> No &ldquo;mine's high&rdquo;. Just breathe and feel it.</li>
+        <li>When your gut says go, <b>tap your own badge</b>. Every card lower than yours burns and the group loses a shard.</li>
+        <li>Clear the level, everyone gets one more card. Survive to the last level and the room wins together.</li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <div class="label">Difficulty</div>
+      <div class="seg" id="diffseg">
+        <button data-d="chill" class="sel">CHILL<span class="tag">4 shards · peek ok</span></button>
+        <button data-d="classic">CLASSIC<span class="tag">3 shards · peek ok</span></button>
+        <button data-d="silent">SILENT<span class="tag">2 shards · no peek</span></button>
+      </div>
+    </div>
+
+    <button class="btn" id="toSetup">Gather the room</button>
+    <div class="best" id="bestLine"></div>
+  </section>
+
+  <!-- ================= SETUP ================= -->
+  <section class="screen scroll" id="s-setup">
+    <div>
+      <div class="label" style="text-align:center">Who is playing? (2&ndash;8)</div>
+      <div id="plist"></div>
+      <button class="btn ghost" id="addP">+ Add player</button>
+    </div>
+    <div class="spacer" style="flex:1"></div>
+    <div class="card rules" style="padding:12px 14px; font-size:13px">
+      Sit in a circle with the phone flat in the middle where everyone can reach it.
+    </div>
+    <button class="btn" id="toDeal">Deal level 1</button>
+    <button class="btn ghost" id="backHome">Back</button>
+  </section>
+
+  <!-- ================= DEAL ================= -->
+  <section class="screen" id="s-deal">
+    <div class="top">
+      <div class="pill lv" id="dealLevel">LEVEL 1</div>
+      <div class="spacer"></div>
+      <div class="pill" id="dealCount"></div>
+    </div>
+    <div class="dealwrap" id="dealBody"></div>
+    <button class="btn" id="dealBtn">Show my cards</button>
+  </section>
+
+  <!-- ================= PLAY ================= -->
+  <section class="screen" id="s-play">
+    <div class="top">
+      <div class="pill lv" id="pLevel">LV 1</div>
+      <div class="pill hearts" id="pLives"></div>
+      <div class="pill stars" id="pFocus"></div>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="btnUndo" title="Undo last play">↺</button>
+      <button class="iconbtn" id="btnMute" title="Sound">🔊</button>
+      <button class="iconbtn" id="btnQuit" title="Quit">✕</button>
+    </div>
+
+    <div class="stage">
+      <div class="stagelbl">Last played</div>
+      <div class="lastnum" id="lastNum">—</div>
+      <div class="trail" id="trail"></div>
+    </div>
+
+    <div class="badges" id="badges"></div>
+
+    <div class="bottom">
+      <button class="btn gold" id="btnFocus">◈ Use Focus</button>
+    </div>
+  </section>
+
+  <!-- ================= OVERLAYS ================= -->
+  <div class="ov" id="ov-peek">
+    <div class="stagelbl" id="peekName"></div>
+    <div class="handgrid" id="peekCards"></div>
+    <p>Keep holding. Release to hide.</p>
+  </div>
+
+  <div class="ov" id="ov-burn">
+    <div class="big">💥</div>
+    <h2 style="color:var(--red)">TOO SOON</h2>
+    <p id="burnMsg"></p>
+    <div class="burnlist" id="burnList"></div>
+    <div class="ovbtns"><button class="btn" id="burnOk">Keep going</button></div>
+  </div>
+
+  <div class="ov" id="ov-focus">
+    <div class="big">◈</div>
+    <h2 style="color:var(--gold)">FOCUS</h2>
+    <p id="focusMsg">Everyone close your eyes and hold up a thumb. When every thumb is up, drop your lowest card.</p>
+    <div class="burnlist" id="focusList"></div>
+    <div class="ovbtns">
+      <button class="btn gold" id="focusGo">Everyone's ready — drop</button>
+      <button class="btn ghost" id="focusCancel">Cancel</button>
+    </div>
+  </div>
+
+  <div class="ov" id="ov-level">
+    <div class="big" id="lvIcon">✓</div>
+    <h2 id="lvTitle" class="grad">LEVEL CLEARED</h2>
+    <p id="lvMsg"></p>
+    <div class="ovbtns"><button class="btn" id="lvNext">Deal next level</button></div>
+  </div>
+
+  <div class="ov" id="ov-end">
+    <div class="big" id="endIcon">🏆</div>
+    <h2 id="endTitle" class="grad">THE ROOM WINS</h2>
+    <p id="endMsg"></p>
+    <div class="ovbtns">
+      <button class="btn" id="endAgain">Play again</button>
+      <button class="btn ghost" id="endHome">Main menu</button>
+    </div>
+  </div>
+
+  <div class="ov" id="ov-quit">
+    <h2>Leave the round?</h2>
+    <p>The level and your shards will be lost.</p>
+    <div class="ovbtns">
+      <button class="btn" id="quitYes">Yes, back to menu</button>
+      <button class="btn ghost" id="quitNo">Keep playing</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+/* ============================ CONSTANTS ============================ */
+const COLORS = ['#3ee8d8','#ff8ac4','#ffd66b','#7cc4ff','#a970ff','#4de08a','#ff9d5c','#ff5a7a'];
+const DIFFS = {
+  chill:   { lives:4, peek:true,  label:'CHILL'   },
+  classic: { lives:3, peek:true,  label:'CLASSIC' },
+  silent:  { lives:2, peek:false, label:'SILENT'  }
+};
+const LIFE_AT  = [2,5,8,11];
+const FOCUS_AT = [3,6,9,12];
+const BEST_KEY = 'cowork-hush-best';
+
+/* ============================ STATE ============================ */
+const S = {
+  diff:'chill',
+  names:['','',''],
+  players:[],        // {name, color, cards:[asc]}
+  level:1, maxLevel:8,
+  lives:4, maxLives:4, focus:1,
+  played:[],         // {v, bad}
+  dealIdx:0, dealShown:false,
+  snapshot:null,
+  muted:false,
+  running:false
+};
+
+const $  = id => document.getElementById(id);
+const el = (t,c) => { const n=document.createElement(t); if(c) n.className=c; return n; };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+}
+function ov(id,on){ $(id).classList.toggle('on', on); }
+function closeAllOv(){ document.querySelectorAll('.ov').forEach(o => o.classList.remove('on')); }
+
+/* ============================ AUDIO ============================ */
+let AC = null;
+function ac(){
+  if(!AC){
+    const C = window.AudioContext || window.webkitAudioContext;
+    if(C) AC = new C();
+  }
+  if(AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type, vol, delay){
+  if(S.muted) return;
+  const c = ac(); if(!c) return;
+  const t0 = c.currentTime + (delay || 0);
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(vol == null ? 0.22 : vol, t0 + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+// Card value 1-100 maps across ~2 octaves so the room HEARS the ladder climb.
+function cardTone(v){
+  tone(196 * Math.pow(2, (v - 1) / 45), 0.5, 'triangle', 0.24, 0);
+  tone(392 * Math.pow(2, (v - 1) / 45), 0.35, 'sine', 0.07, 0.01);
+}
+function sfxBad(){
+  tone(110, 0.5, 'sawtooth', 0.2, 0);
+  tone(78,  0.7, 'square',   0.14, 0.04);
+}
+function sfxGood(){ [523,659,784,1046].forEach((f,i) => tone(f, 0.4, 'sine', 0.18, i * 0.09)); }
+function sfxWin(){ [523,659,784,1046,1318].forEach((f,i) => tone(f, 0.7, 'triangle', 0.2, i * 0.13)); }
+function sfxLose(){ [392,330,262,196].forEach((f,i) => tone(f, 0.6, 'sawtooth', 0.16, i * 0.16)); }
+function sfxTap(){ tone(660, 0.08, 'sine', 0.1, 0); }
+
+/* ============================ HOME ============================ */
+function renderBest(){
+  const b = localStorage.getItem(BEST_KEY);
+  $('bestLine').innerHTML = b ? ('BEST RUN — LEVEL <b>' + b + '</b>') : 'NO RUN RECORDED YET';
+}
+$('diffseg').addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  S.diff = b.dataset.d;
+  [...$('diffseg').children].forEach(x => x.classList.toggle('sel', x === b));
+  sfxTap();
+});
+$('toSetup').addEventListener('click', () => { ac(); renderPlayers(); show('s-setup'); });
+$('backHome').addEventListener('click', () => show('s-home'));
+
+/* ============================ SETUP ============================ */
+function renderPlayers(){
+  const box = $('plist');
+  box.innerHTML = '';
+  S.names.forEach((n, i) => {
+    const row = el('div','prow');
+    const dot = el('div','pdot'); dot.style.background = COLORS[i % COLORS.length];
+    const inp = el('input');
+    inp.type = 'text'; inp.value = n; inp.maxLength = 12;
+    inp.placeholder = 'Player ' + (i + 1);
+    inp.addEventListener('input', () => { S.names[i] = inp.value; });
+    row.appendChild(dot); row.appendChild(inp);
+    if(S.names.length > 2){
+      const d = el('button','del'); d.textContent = '×';
+      d.addEventListener('click', () => { S.names.splice(i,1); renderPlayers(); });
+      row.appendChild(d);
+    }
+    box.appendChild(row);
+  });
+  $('addP').disabled = S.names.length >= 8;
+}
+$('addP').addEventListener('click', () => {
+  if(S.names.length < 8){ S.names.push(''); renderPlayers(); sfxTap(); }
+});
+$('toDeal').addEventListener('click', () => { startGame(); });
+
+/* ============================ GAME START ============================ */
+function maxLevelFor(n){
+  const base = n <= 2 ? 12 : n === 3 ? 10 : n <= 5 ? 8 : 7;
+  return Math.max(4, Math.min(base, Math.floor(90 / n)));
+}
+function startGame(){
+  ac();
+  const d = DIFFS[S.diff];
+  S.players = S.names.map((n, i) => ({
+    name: (n || '').trim() || ('Player ' + (i + 1)),
+    color: COLORS[i % COLORS.length],
+    cards: []
+  }));
+  S.maxLevel = maxLevelFor(S.players.length);
+  S.level = 1;
+  S.lives = d.lives; S.maxLives = d.lives;
+  S.focus = 1;
+  S.running = true;
+  closeAllOv();
+  dealLevel();
+}
+
+/* ============================ DEALING ============================ */
+function dealLevel(){
+  const n = S.players.length, per = S.level;
+  const pool = [];
+  for(let i = 1; i <= 100; i++) pool.push(i);
+  for(let i = pool.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+  }
+  let k = 0;
+  S.players.forEach(p => {
+    p.cards = pool.slice(k, k + per).sort((a,b) => a - b);
+    k += per;
+  });
+  S.played = [];
+  S.snapshot = null;
+  S.dealIdx = 0; S.dealShown = false;
+  renderDeal();
+  show('s-deal');
+}
+
+function renderDeal(){
+  const p = S.players[S.dealIdx];
+  $('dealLevel').textContent = 'LEVEL ' + S.level;
+  $('dealCount').textContent = (S.dealIdx + 1) + ' / ' + S.players.length;
+  const body = $('dealBody');
+  body.innerHTML = '';
+
+  if(!S.dealShown){
+    const ic = el('div','shield'); ic.textContent = '🤫';
+    const nm = el('div','passname'); nm.textContent = p.name; nm.style.color = p.color;
+    const h  = el('div','passhint');
+    h.textContent = S.dealIdx === 0
+      ? 'Pass the phone to ' + p.name + '. Everyone else, look away.'
+      : 'Pass the phone on to ' + p.name + '. Nobody else looks.';
+    body.appendChild(ic); body.appendChild(nm); body.appendChild(h);
+    $('dealBtn').textContent = "I'm " + p.name + ' — show my cards';
+  } else {
+    const nm = el('div','stagelbl');
+    nm.textContent = p.name + ' — memorise these';
+    const grid = el('div','handgrid');
+    p.cards.forEach(v => { const c = el('div','numcard'); c.textContent = v; grid.appendChild(c); });
+    const h = el('div','passhint');
+    h.textContent = S.level === 1
+      ? 'One card. Easy. It gets worse.'
+      : 'Lock in all ' + S.level + '. You play them lowest first.';
+    body.appendChild(nm); body.appendChild(grid); body.appendChild(h);
+    $('dealBtn').textContent = (S.dealIdx === S.players.length - 1) ? 'Hide & begin the count' : 'Hide & pass on';
+  }
+}
+
+$('dealBtn').addEventListener('click', () => {
+  sfxTap();
+  if(!S.dealShown){
+    S.dealShown = true;
+    renderDeal();
+  } else {
+    if(S.dealIdx === S.players.length - 1){
+      show('s-play');
+      renderPlay();
+    } else {
+      S.dealIdx++; S.dealShown = false;
+      renderDeal();
+    }
+  }
+});
+
+/* ============================ PLAY ============================ */
+function cardsLeft(){ return S.players.reduce((a,p) => a + p.cards.length, 0); }
+
+function renderPlay(){
+  $('pLevel').textContent = 'LV ' + S.level + '/' + S.maxLevel;
+  $('pLives').textContent = S.lives > 0 ? '♥'.repeat(S.lives) : '—';
+  $('pFocus').textContent = S.focus > 0 ? '◈'.repeat(S.focus) : '◇';
+  $('btnUndo').disabled = !S.snapshot;
+  $('btnFocus').disabled = S.focus < 1 || cardsLeft() === 0;
+  $('btnMute').textContent = S.muted ? '🔇' : '🔊';
+
+  const last = S.played.length ? S.played[S.played.length - 1] : null;
+  const ln = $('lastNum');
+  ln.textContent = last ? last.v : '·';
+  ln.classList.toggle('bad', !!(last && last.bad));
+
+  const tr = $('trail');
+  tr.innerHTML = '';
+  S.played.slice(-8).forEach(x => {
+    const c = el('div','chip' + (x.bad ? ' burn' : ''));
+    c.textContent = x.v;
+    tr.appendChild(c);
+  });
+  if(!S.played.length){
+    const c = el('div','chip'); c.textContent = cardsLeft() + ' cards in the room';
+    tr.appendChild(c);
+  }
+
+  const box = $('badges');
+  box.innerHTML = '';
+  box.classList.toggle('one', S.players.length <= 3);
+  const allowPeek = DIFFS[S.diff].peek;
+  S.players.forEach((p, i) => {
+    const b = el('button','badge' + (p.cards.length ? '' : ' empty'));
+    b.style.setProperty('--pc', p.color);
+    b.dataset.i = i;
+    const nm = el('div','bn'); nm.textContent = p.name; nm.style.color = p.color;
+    const ct = el('div','bc');
+    ct.textContent = p.cards.length ? (p.cards.length + (p.cards.length === 1 ? ' CARD' : ' CARDS')) : 'DONE';
+    b.appendChild(nm); b.appendChild(ct);
+    if(allowPeek && p.cards.length){
+      const eye = el('button','eye'); eye.textContent = '👁'; eye.dataset.peek = i;
+      b.appendChild(eye);
+    }
+    box.appendChild(b);
+  });
+}
+
+$('badges').addEventListener('click', e => {
+  if(e.target.dataset.peek !== undefined) return;   // eye handled separately
+  const b = e.target.closest('.badge'); if(!b) return;
+  playCard(parseInt(b.dataset.i, 10), b);
+});
+
+/* --- hold-to-peek --- */
+let peeking = false;
+function startPeek(e){
+  const eye = e.target.closest('[data-peek]'); if(!eye) return;
+  e.preventDefault(); e.stopPropagation();
+  const p = S.players[parseInt(eye.dataset.peek, 10)];
+  if(!p || !p.cards.length) return;
+  peeking = true;
+  $('peekName').textContent = p.name + " — YOUR CARDS";
+  const g = $('peekCards'); g.innerHTML = '';
+  p.cards.forEach(v => { const c = el('div','numcard'); c.textContent = v; g.appendChild(c); });
+  ov('ov-peek', true);
+}
+function endPeek(){ if(peeking){ peeking = false; ov('ov-peek', false); } }
+$('badges').addEventListener('pointerdown', startPeek);
+document.addEventListener('pointerup', endPeek);
+document.addEventListener('pointercancel', endPeek);
+
+/* --- the core move --- */
+function snap(){
+  S.snapshot = {
+    hands: S.players.map(p => p.cards.slice()),
+    played: S.played.map(x => ({ v:x.v, bad:x.bad })),
+    lives: S.lives, focus: S.focus
+  };
+}
+function playCard(i, node){
+  const p = S.players[i];
+  if(!S.running || !p || !p.cards.length) return;
+  snap();
+  const v = p.cards.shift();
+
+  // every card still in the room that is lower than v
+  const lower = [];
+  S.players.forEach(q => {
+    const keep = [];
+    q.cards.forEach(c => {
+      if(c < v) lower.push({ name:q.name, v:c }); else keep.push(c);
+    });
+    q.cards = keep;
+  });
+
+  S.played.push({ v, bad: lower.length > 0 });
+
+  if(lower.length){
+    S.lives--;
+    sfxBad();
+    if(node) { node.classList.add('err'); setTimeout(() => node.classList.remove('err'), 500); }
+    showBurn(v, lower);
+  } else {
+    cardTone(v);
+    if(node) { node.classList.add('flash'); setTimeout(() => node.classList.remove('flash'), 500); }
+    renderPlay();
+    checkLevel();
+  }
+}
+
+function showBurn(v, lower){
+  const byName = {};
+  lower.forEach(x => { (byName[x.name] = byName[x.name] || []).push(x.v); });
+  $('burnMsg').textContent = lower.length + (lower.length === 1 ? ' card was' : ' cards were')
+    + ' still below ' + v + '. They burn — and a shard cracks.';
+  const list = $('burnList'); list.innerHTML = '';
+  Object.keys(byName).forEach(n => {
+    const row = el('div','burnrow');
+    const nm = el('div','nm'); nm.textContent = n;
+    const vs = el('div','vals'); vs.textContent = byName[n].sort((a,b)=>a-b).join('  ');
+    row.appendChild(nm); row.appendChild(vs);
+    list.appendChild(row);
+  });
+  renderPlay();
+  ov('ov-burn', true);
+}
+$('burnOk').addEventListener('click', () => {
+  ov('ov-burn', false);
+  if(S.lives <= 0) return endGame(false);
+  checkLevel();
+});
+
+/* --- focus token --- */
+$('btnFocus').addEventListener('click', () => {
+  if(S.focus < 1 || cardsLeft() === 0) return;
+  $('focusList').innerHTML = '';
+  $('focusGo').style.display = '';
+  $('focusCancel').textContent = 'Cancel';
+  $('focusMsg').textContent = 'Everyone close your eyes and raise a thumb. When every thumb is up, each player drops their lowest card at once.';
+  ov('ov-focus', true);
+});
+$('focusCancel').addEventListener('click', () => { ov('ov-focus', false); renderPlay(); if(S.running) checkLevel(); });
+$('focusGo').addEventListener('click', () => {
+  if(S.focus < 1) return;
+  snap();
+  S.focus--;
+  const dropped = [];
+  S.players.forEach(p => { if(p.cards.length) dropped.push({ name:p.name, v:p.cards.shift(), color:p.color }); });
+  dropped.sort((a,b) => a.v - b.v);
+  dropped.forEach(d => S.played.push({ v:d.v, bad:false }));
+  dropped.forEach((d,i) => setTimeout(() => cardTone(d.v), i * 160));
+
+  const list = $('focusList'); list.innerHTML = '';
+  dropped.forEach(d => {
+    const row = el('div','burnrow');
+    const nm = el('div','nm'); nm.textContent = d.name; nm.style.color = d.color;
+    const vs = el('div','vals ok'); vs.textContent = d.v;
+    row.appendChild(nm); row.appendChild(vs);
+    list.appendChild(row);
+  });
+  $('focusMsg').textContent = 'Dropped, lowest first. Everyone can breathe now.';
+  $('focusGo').style.display = 'none';
+  $('focusCancel').textContent = 'Back to the count';
+  renderPlay();
+});
+
+/* --- undo --- */
+$('btnUndo').addEventListener('click', () => {
+  if(!S.snapshot) return;
+  const s = S.snapshot;
+  S.players.forEach((p, i) => { p.cards = s.hands[i].slice(); });
+  S.played = s.played.map(x => ({ v:x.v, bad:x.bad }));
+  S.lives = s.lives; S.focus = s.focus;
+  S.snapshot = null;
+  closeAllOv();
+  sfxTap();
+  renderPlay();
+});
+
+$('btnMute').addEventListener('click', () => { S.muted = !S.muted; renderPlay(); if(!S.muted) sfxTap(); });
+$('btnQuit').addEventListener('click', () => ov('ov-quit', true));
+$('quitNo').addEventListener('click', () => ov('ov-quit', false));
+$('quitYes').addEventListener('click', () => { S.running = false; closeAllOv(); renderBest(); show('s-home'); });
+
+/* ============================ LEVEL FLOW ============================ */
+function checkLevel(){
+  if(S.lives <= 0) return endGame(false);
+  if(cardsLeft() > 0) return;
+
+  saveBest(S.level);
+  if(S.level >= S.maxLevel) return endGame(true);
+
+  const rewards = [];
+  const next = S.level + 1;
+  if(LIFE_AT.indexOf(next) !== -1){ S.lives++; S.maxLives = Math.max(S.maxLives, S.lives); rewards.push('a fresh ♥ shard'); }
+  if(FOCUS_AT.indexOf(next) !== -1){ S.focus++; rewards.push('a ◈ focus token'); }
+
+  sfxGood();
+  $('lvIcon').textContent = '✓';
+  $('lvTitle').textContent = 'LEVEL ' + S.level + ' CLEARED';
+  $('lvMsg').textContent = 'Level ' + next + ': everyone holds ' + next + ' cards.'
+    + (rewards.length ? ' The room earns ' + rewards.join(' and ') + '.' : '');
+  $('lvNext').textContent = 'Deal level ' + next;
+  ov('ov-level', true);
+}
+$('lvNext').addEventListener('click', () => {
+  ov('ov-level', false);
+  S.level++;
+  dealLevel();
+});
+
+function saveBest(lv){
+  const b = parseInt(localStorage.getItem(BEST_KEY) || '0', 10);
+  if(lv > b){ try { localStorage.setItem(BEST_KEY, String(lv)); } catch(e){} }
+}
+
+function endGame(won){
+  S.running = false;
+  closeAllOv();
+  if(won){
+    sfxWin();
+    $('endIcon').textContent = '🏆';
+    $('endTitle').textContent = 'THE ROOM WINS';
+    $('endMsg').textContent = 'All ' + S.maxLevel + ' levels, one mind, not a word spoken. That is the hardest thing this app has.';
+  } else {
+    sfxLose();
+    saveBest(S.level - 1);
+    $('endIcon').textContent = '💔';
+    $('endTitle').textContent = 'SILENCE BROKEN';
+    $('endMsg').textContent = 'The last shard cracked on level ' + S.level + ' of ' + S.maxLevel + '. So close. Go again — you were nearly in sync.';
+  }
+  renderBest();
+  ov('ov-end', true);
+}
+$('endAgain').addEventListener('click', () => { closeAllOv(); startGame(); });
+$('endHome').addEventListener('click', () => { closeAllOv(); renderBest(); show('s-home'); });
+
+/* ============================ BOOT ============================ */
+renderBest();
+</script>
+</body>
+</html>

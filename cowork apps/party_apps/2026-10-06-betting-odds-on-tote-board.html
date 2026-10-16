@@ -1,0 +1,818 @@
+<!-- CONCEPT: BETTING/BOOKIE - "Odds On": a pass-the-phone party betting game where one player at a time takes on a quick skill event the phone runs and judges itself (Tap Frenzy, Blind Stop, Digit Flash, Reflex, Odd One Out, Quick Sums, Colour Clash, Dot Count). The performer publicly picks how hard to go - Safe, Bold or Long Shot targets for bigger rewards and bigger falls - then everyone else stakes chips to BACK them or LAY them on a live tote board where all bets pool and the winning side splits the pot, so going against the crowd pays best; an unbacked winning side rolls the whole pot into a jackpot. Form guide per player, house-seeded pots that double on the final lap, void-and-rerun, awards for Sharpest Punter, Star Turn and Biggest Upset | Players: 3-8 | ~15-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Odds On — The Party Tote Board</title>
+<style>
+:root{
+  --bg:#0c1016; --bg2:#121924; --panel:#18212e; --panel2:#212c3d; --line:#2c3a50;
+  --ink:#eef2f8; --mute:#8e9ab0; --gold:#ffc94d; --pink:#ff5e8a; --vio:#8f7bff;
+  --back:#3ddc97; --lay:#ff5b6b; --r:16px; --gap:clamp(10px,2.8vw,16px);
+  --font:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(120% 80% at 50% 0%,#17243a 0%,var(--bg) 60%);color:var(--ink);font-family:var(--font)}
+button{font-family:inherit;cursor:pointer;border:0;color:inherit}
+input{font-family:inherit;user-select:text;-webkit-user-select:text}
+#app{position:fixed;inset:0;display:flex;flex-direction:column;max-width:640px;margin:0 auto}
+.grad{background:linear-gradient(90deg,var(--gold),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+#bar{display:none;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:rgba(12,16,22,.88)}
+#bar.on{display:flex}
+#bar .t{font-weight:900;font-size:20px;letter-spacing:.5px}
+#barInfo{flex:1;text-align:center;font-size:13px;color:var(--mute);font-weight:700}
+.iconbtn{min-width:44px;min-height:44px;border-radius:12px;background:var(--panel);font-size:18px}
+
+.screen{display:none;flex:1;flex-direction:column;gap:var(--gap);padding:clamp(14px,4vw,24px);overflow-y:auto;overflow-x:hidden}
+.screen.on{display:flex}
+.center{justify-content:flex-start;align-items:center;text-align:center}
+.center::before{content:"";margin-top:auto}
+.center::after{content:"";margin-bottom:auto}
+h1{margin:0;font-size:clamp(50px,16vw,88px);font-weight:900;letter-spacing:1px;line-height:1}
+h2{margin:0;font-size:clamp(20px,5.5vw,28px)}
+.sub{color:var(--mute);font-size:clamp(14px,3.8vw,17px);margin:0;line-height:1.4}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:clamp(12px,3.5vw,18px)}
+.lbl{font-size:12px;text-transform:uppercase;letter-spacing:1.5px;color:var(--mute);font-weight:700;margin-bottom:8px}
+.btn{min-height:52px;border-radius:14px;padding:12px 18px;font-size:clamp(16px,4.4vw,19px);font-weight:800;background:var(--panel2);border:1px solid var(--line)}
+.btn.main{background:linear-gradient(90deg,var(--gold),#ff9a6a 55%,var(--pink));color:#1d1208;border:0;box-shadow:0 6px 22px rgba(255,140,90,.25)}
+.btn.ghost{background:transparent}
+.btn.backb{background:var(--back);color:#062a1b;border:0}
+.btn.layb{background:var(--lay);color:#2d070c;border:0}
+.btn:disabled{opacity:.35;cursor:default}
+.row{display:flex;gap:10px}
+.row>.btn{flex:1}
+.small{font-size:13px;color:var(--mute)}
+.wide{width:100%}
+
+/* setup */
+#plist{display:flex;flex-direction:column;gap:8px}
+.prow{display:flex;gap:8px;align-items:center}
+.prow .num{width:26px;text-align:center;color:var(--mute);font-weight:800}
+.prow input{flex:1;min-width:0;min-height:46px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--ink);padding:0 12px;font-size:17px}
+.prow button{width:46px;height:46px;border-radius:12px;background:var(--bg2);font-size:18px;color:var(--mute)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:44px;padding:8px 14px;border-radius:999px;background:var(--bg2);border:1px solid var(--line);font-size:15px;font-weight:700;color:var(--mute)}
+.chip.on{background:rgba(255,201,77,.15);border-color:var(--gold);color:var(--ink)}
+
+/* event card */
+.ev{display:flex;gap:12px;align-items:center;text-align:left}
+.ev .ico{font-size:clamp(42px,13vw,60px);line-height:1;flex:0 0 auto}
+.ev .nm{font-size:clamp(22px,6.5vw,32px);font-weight:900}
+.ev .ds{color:var(--mute);font-size:clamp(13px,3.6vw,15px);line-height:1.35;margin-top:2px}
+.spin .ico{animation:spin .12s linear infinite}
+@keyframes spin{0%{transform:translateY(-6px)}50%{transform:translateY(6px)}100%{transform:translateY(-6px)}}
+.tiers{display:flex;flex-direction:column;gap:8px}
+.tier{display:flex;align-items:center;gap:10px;min-height:54px;border-radius:14px;padding:8px 12px;background:var(--bg2);border:2px solid var(--line);text-align:left;width:100%}
+.tier .tn{font-weight:900;font-size:16px;width:86px;flex:0 0 auto}
+.tier .tt{flex:1;font-size:14px;color:var(--ink);line-height:1.3}
+.tier .tr{font-weight:900;font-size:14px;text-align:right;flex:0 0 auto;line-height:1.25}
+.tier .tr .w{color:var(--back)} .tier .tr .l{color:var(--lay)}
+.tier.t0{border-color:#2f6b55} .tier.t1{border-color:#8a6b2a} .tier.t2{border-color:#8a2f4a}
+.tier.t0 .tn{color:var(--back)} .tier.t1 .tn{color:var(--gold)} .tier.t2 .tn{color:var(--pink)}
+.form{display:flex;gap:4px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--mute)}
+.fdot{width:22px;height:22px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:900}
+.fdot.w{background:rgba(61,220,151,.2);color:var(--back)} .fdot.l{background:rgba(255,91,107,.2);color:var(--lay)}
+.standings{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.stand{background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:5px 10px;font-size:13px;font-weight:700}
+.stand b{color:var(--gold)}
+.stand.me{border-color:var(--gold)}
+
+/* tote */
+.tote{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.side{border-radius:14px;padding:10px;text-align:center;border:2px solid}
+.side.b{border-color:var(--back);background:rgba(61,220,151,.08)}
+.side.l{border-color:var(--lay);background:rgba(255,91,107,.08)}
+.side .h{font-size:12px;font-weight:900;letter-spacing:1.5px}
+.side.b .h{color:var(--back)} .side.l .h{color:var(--lay)}
+.side .v{font-size:clamp(26px,8vw,36px);font-weight:900;line-height:1.1}
+.side .p{font-size:12px;color:var(--mute)}
+.jack{text-align:center;font-weight:800;color:var(--gold);font-size:14px}
+.blist{display:flex;flex-direction:column;gap:6px}
+.brow{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:var(--bg2);border:1px solid var(--line);font-size:15px}
+.brow .n{flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow.cur{border-color:var(--gold);background:rgba(255,201,77,.08)}
+.tag{font-weight:900;font-size:13px;border-radius:8px;padding:3px 8px}
+.tag.b{background:rgba(61,220,151,.18);color:var(--back)} .tag.l{background:rgba(255,91,107,.18);color:var(--lay)} .tag.p{color:var(--mute)}
+.bettor{text-align:center}
+.bettor .who{font-size:clamp(26px,8vw,38px);font-weight:900;word-break:break-word}
+.stakes{display:flex;gap:8px;justify-content:center;margin:10px 0}
+.stake{width:clamp(56px,17vw,72px);height:clamp(56px,17vw,72px);border-radius:50%;font-size:22px;font-weight:900;background:var(--bg2);border:3px dashed var(--line);color:var(--mute)}
+.stake.on{border:3px solid var(--gold);color:#1d1208;background:var(--gold)}
+
+/* perform */
+#perform{padding:0}
+#hud{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;font-weight:800;font-size:clamp(15px,4.4vw,19px);border-bottom:1px solid var(--line);background:var(--bg2);min-height:48px}
+#hud .goal{color:var(--gold)}
+#stage{flex:1;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:14px;touch-action:none;overflow:hidden}
+.count{font-size:clamp(90px,30vw,160px);font-weight:900;color:var(--gold)}
+.bigtap{width:min(72vw,300px);height:min(72vw,300px);border-radius:50%;font-size:clamp(34px,10vw,48px);font-weight:900;background:radial-gradient(circle at 40% 35%,#ffe08a,var(--gold) 45%,#d9892a);color:#3a2000;box-shadow:0 10px 0 #9a5c14,0 14px 30px rgba(0,0,0,.5)}
+.bigtap.pop{animation:pop .09s}
+@keyframes pop{50%{transform:translateY(6px) scale(.97);box-shadow:0 4px 0 #9a5c14}}
+.clock{font-size:clamp(64px,22vw,120px);font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:2px}
+.clock.fog{filter:blur(14px);opacity:.5}
+.flash{font-size:clamp(40px,13vw,70px);font-weight:900;letter-spacing:6px;font-variant-numeric:tabular-nums;word-break:break-all;text-align:center}
+.disp{min-height:60px;min-width:min(80vw,320px);border-radius:14px;background:var(--bg2);border:2px solid var(--line);font-size:clamp(28px,9vw,40px);font-weight:900;letter-spacing:5px;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:min(80vw,320px)}
+.pad button{min-height:52px;border-radius:12px;background:var(--panel2);font-size:24px;font-weight:800}
+.pad button.ok{background:var(--gold);color:#1d1208}
+.light{width:min(80vw,330px);height:min(60vh,330px);border-radius:24px;display:flex;align-items:center;justify-content:center;font-size:clamp(30px,9vw,44px);font-weight:900;background:#5a1b25;color:#ffb3bb}
+.light.go{background:var(--back);color:#062a1b}
+.grid{display:grid;gap:6px;width:min(88vw,360px)}
+.grid button{aspect-ratio:1;border-radius:10px;background:var(--bg2);font-size:clamp(22px,7vw,32px);line-height:1;padding:0}
+.q{font-size:clamp(40px,13vw,64px);font-weight:900;font-variant-numeric:tabular-nums}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:min(86vw,340px)}
+.opts button{min-height:64px;border-radius:14px;background:var(--panel2);font-size:26px;font-weight:900}
+.word{font-size:clamp(44px,14vw,72px);font-weight:900;letter-spacing:2px;background:#fff1;border-radius:16px;padding:10px 22px}
+.dots{width:min(86vw,340px);height:min(86vw,340px);border-radius:20px;background:var(--bg2);border:1px solid var(--line)}
+.stepper{display:flex;gap:6px;align-items:center}
+.stepper button{min-width:52px;min-height:52px;border-radius:12px;background:var(--panel2);font-size:18px;font-weight:900}
+.stepper .v{min-width:90px;text-align:center;font-size:44px;font-weight:900}
+.shake{animation:shake .25s}
+@keyframes shake{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.dock{position:sticky;bottom:calc(-1 * clamp(14px,4vw,24px));margin-top:auto;padding:10px 0 clamp(14px,4vw,24px);background:linear-gradient(transparent,var(--bg) 30%)}
+.verdict{font-size:clamp(38px,11vw,72px);font-weight:900;line-height:1}
+.verdict.w{color:var(--back)} .verdict.l{color:var(--lay)}
+
+/* settle */
+.srow{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:var(--bg2);border:1px solid var(--line)}
+.srow .n{flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.delta{font-weight:900;min-width:52px;text-align:right}
+.delta.pos{color:var(--back)} .delta.neg{color:var(--lay)} .delta.z{color:var(--mute)}
+.lb .srow .n b{color:var(--gold)}
+.award{display:flex;gap:12px;align-items:center;text-align:left}
+.award .i{font-size:34px}
+.award .t{font-weight:900}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}
+.modal.on{display:flex}
+.modal .card{max-width:380px;width:100%;text-align:center;display:flex;flex-direction:column;gap:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar"><span class="t grad">Odds On</span><span id="barInfo"></span><button class="iconbtn" id="menuBtn" aria-label="Menu">☰</button></div>
+
+  <!-- TITLE / SETUP -->
+  <section class="screen on" id="setup">
+    <div style="text-align:center;margin-top:6px">
+      <h1 class="grad">Odds On</h1>
+      <p class="sub" style="margin-top:8px">One player takes a skill test on the phone. Everyone else bets on them — or against them. Back the crowd for crumbs, or go against it for the whole pot.</p>
+    </div>
+    <div class="card">
+      <div class="lbl">Players (3–8)</div>
+      <div id="plist"></div>
+      <button class="btn ghost wide" id="addP" style="margin-top:8px">+ Add player</button>
+    </div>
+    <div class="card">
+      <div class="lbl">Laps — times each player performs</div>
+      <div class="chips" id="lapChips"></div>
+      <div class="lbl" style="margin-top:14px">Starting chips</div>
+      <div class="chips" id="chipChips"></div>
+      <div class="lbl" style="margin-top:14px">Sound</div>
+      <div class="chips" id="sndChips"></div>
+    </div>
+    <details class="card">
+      <summary style="cursor:pointer;font-weight:800;min-height:28px">How it works</summary>
+      <p class="sub" style="margin-top:8px">1. The phone draws an event and the <b>performer</b> picks a target: <b style="color:var(--back)">Safe</b>, <b style="color:var(--gold)">Bold</b> or <b style="color:var(--pink)">Long Shot</b>. Harder targets win more but cost chips if missed.</p>
+      <p class="sub">2. Everyone else stakes 1–3 chips to <b style="color:var(--back)">BACK</b> (they'll do it) or <b style="color:var(--lay)">LAY</b> (they won't), or passes. Every stake goes into one pot. The house adds a seed to each side.</p>
+      <p class="sub">3. The performer plays. The phone times it and judges it, so there's no arguing.</p>
+      <p class="sub">4. The winning side splits the <b>whole pot</b> by stake. If you're alone on the right side, you take it all. If nobody backed the winning side, the pot rolls into a <b style="color:var(--gold)">jackpot</b> for the next event.</p>
+      <p class="sub">Out of chips? You still get a free 1-chip “pity stake” each event. Most chips after the last lap wins.</p>
+    </details>
+    <button class="btn main" id="startBtn">Open the Book</button>
+  </section>
+
+  <!-- EVENT DRAW + TIER -->
+  <section class="screen" id="draw">
+    <div class="standings" id="drawStand"></div>
+    <div class="card" style="text-align:center;padding:10px 14px">
+      <div class="lbl" id="drawLap" style="margin-bottom:2px">Event</div>
+      <div style="font-size:clamp(26px,8vw,38px);font-weight:900;word-break:break-word;line-height:1.15" id="drawWho">—</div>
+      <div class="form" id="formLine" style="justify-content:center;margin-top:6px"></div>
+    </div>
+    <div class="card ev" id="evCard"><div class="ico" id="evIco">🎲</div><div><div class="nm" id="evName">Drawing…</div><div class="ds" id="evDesc"></div></div></div>
+    <div class="card" id="tierCard" style="display:none">
+      <div class="lbl" id="tierLbl">Performer — pick your target</div>
+      <div class="tiers" id="tiers"></div>
+    </div>
+  </section>
+
+  <!-- BETTING -->
+  <section class="screen" id="bet">
+    <div class="card" style="padding:10px 14px"><div class="ev"><div class="ico" style="font-size:36px" id="betIco"></div><div><div style="font-weight:900;font-size:17px" id="betTitle"></div><div class="ds" id="betGoal"></div></div></div></div>
+    <div class="tote">
+      <div class="side b"><div class="h">BACK ✔</div><div class="v" id="totB">0</div><div class="p" id="payB"></div></div>
+      <div class="side l"><div class="h">LAY ✘</div><div class="v" id="totL">0</div><div class="p" id="payL"></div></div>
+    </div>
+    <div class="jack" id="jackLine"></div>
+    <div class="card bettor" id="bettorCard">
+      <div class="small">Betting now</div>
+      <div class="who" id="bWho"></div>
+      <div class="small" id="bChips"></div>
+      <div class="stakes" id="stakes"></div>
+      <div class="row"><button class="btn backb" id="bBack">BACK ✔</button><button class="btn layb" id="bLay">LAY ✘</button></div>
+      <button class="btn ghost wide" id="bPass" style="margin-top:8px;min-height:44px">Pass — no bet</button>
+    </div>
+    <div class="card" id="closedCard" style="display:none;text-align:center">
+      <h2>Bets closed</h2>
+      <p class="sub" id="closedSub" style="margin:8px 0 12px"></p>
+      <button class="btn main wide" id="toPerform">Hand over the phone</button>
+    </div>
+    <div class="blist" id="blist"></div>
+    <button class="btn ghost" id="bUndo" style="min-height:44px">↶ Undo last bet</button>
+  </section>
+
+  <!-- READY -->
+  <section class="screen center" id="ready">
+    <div class="small">Hand the phone to</div>
+    <div style="font-size:clamp(36px,11vw,60px);font-weight:900;word-break:break-word" id="rWho"></div>
+    <div class="card ev" style="max-width:460px;width:100%"><div class="ico" id="rIco"></div><div><div class="nm" id="rName"></div><div class="ds" id="rGoal"></div></div></div>
+    <p class="sub" id="rHow" style="max-width:460px"></p>
+    <p class="small">Everyone else, hands off. The phone is the judge.</p>
+    <button class="btn main" id="goBtn" style="min-width:240px">I'm ready — go!</button>
+  </section>
+
+  <!-- PERFORM -->
+  <section class="screen" id="perform">
+    <div id="hud"><span id="hudL"></span><span class="goal" id="hudR"></span></div>
+    <div id="stage"></div>
+  </section>
+
+  <!-- SETTLE -->
+  <section class="screen" id="settle">
+    <div class="card" style="text-align:center">
+      <div class="verdict" id="sVerdict"></div>
+      <div class="sub" id="sDetail" style="margin-top:6px"></div>
+    </div>
+    <div class="card"><div class="lbl">Payouts</div><div class="blist" id="sRows"></div><div class="jack" id="sJack" style="margin-top:10px"></div></div>
+    <div class="card lb"><div class="lbl">Chip count</div><div class="blist" id="sBoard"></div></div>
+    <div class="row dock"><button class="btn ghost" id="voidBtn" style="flex:0 0 auto;min-height:52px">Void &amp; rerun</button><button class="btn main" id="nextBtn">Next event</button></div>
+  </section>
+
+  <!-- FINAL -->
+  <section class="screen" id="final">
+    <div style="text-align:center"><div class="small">Book closed</div><h1 class="grad" style="font-size:clamp(40px,13vw,70px)">Final Tote</h1></div>
+    <div class="card" style="text-align:center"><div style="font-size:54px;line-height:1">🏆</div><div style="font-size:clamp(28px,9vw,44px);font-weight:900;word-break:break-word" id="fWin"></div><div class="sub" id="fWinSub"></div></div>
+    <div class="card lb"><div class="lbl">Standings</div><div class="blist" id="fBoard"></div></div>
+    <div class="card"><div class="lbl">Awards</div><div class="blist" id="fAwards"></div></div>
+    <div class="row dock"><button class="btn" id="newSetup">New setup</button><button class="btn main" id="again">Rematch</button></div>
+  </section>
+</div>
+
+<div class="modal" id="modal"><div class="card"><h2 id="mTitle"></h2><p class="sub" id="mText"></p><div class="row"><button class="btn" id="mNo">Cancel</button><button class="btn main" id="mYes">Yes</button></div></div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const rand = n => Math.floor(Math.random() * n);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const KEY = 'cowork-oddson-setup';
+
+/* ---------- sound ---------- */
+let AC = null;
+function beep(f = 600, d = .08, type = 'sine', v = .14) {
+  if (!S.sound) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime;
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+    o.connect(g).connect(AC.destination); o.start(t); o.stop(t + d + .02);
+  } catch (e) {}
+}
+const fanfare = ok => (ok ? [523, 659, 784, 1047] : [392, 330, 262, 196]).forEach((f, i) => setTimeout(() => beep(f, .16, ok ? 'triangle' : 'sawtooth', .12), i * 120));
+
+/* ---------- state ---------- */
+const S = { names: ['', '', '', ''], laps: 2, chips: 12, sound: true };
+try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+const TIERS = [
+  { name: 'Safe', win: 2, lose: 0 },
+  { name: 'Bold', win: 4, lose: 1 },
+  { name: 'Long Shot', win: 7, lose: 2 },
+];
+let P = [];          // players {name, chips, betNet, perfNet, form:[]}
+let turn = 0, totalTurns = 0, rollover = 0, deck = [], lastEv = null;
+let T = null;        // current turn {perf, ev, param, tier, bets:[], order:[], cur, result}
+let upset = null;    // biggest single net win {name, amt, ev}
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  $('#bar').classList.toggle('on', id !== 'setup');
+  const sc = $('#' + id); if (sc) sc.scrollTop = 0;
+}
+function confirmBox(title, text, yes) {
+  $('#mTitle').textContent = title; $('#mText').textContent = text;
+  $('#modal').classList.add('on');
+  $('#mYes').onclick = () => { $('#modal').classList.remove('on'); yes(); };
+  $('#mNo').onclick = () => $('#modal').classList.remove('on');
+}
+
+/* ---------- setup ---------- */
+function renderSetup() {
+  const pl = $('#plist'); pl.innerHTML = '';
+  S.names.forEach((nm, i) => {
+    const r = document.createElement('div'); r.className = 'prow';
+    r.innerHTML = `<span class="num">${i + 1}</span><input maxlength="14" placeholder="Player ${i + 1}" value="${esc(nm)}"><button aria-label="Remove">✕</button>`;
+    r.querySelector('input').oninput = e => { S.names[i] = e.target.value; save(); };
+    const rm = r.querySelector('button');
+    rm.disabled = S.names.length <= 3; rm.style.opacity = S.names.length <= 3 ? .3 : 1;
+    rm.onclick = () => { if (S.names.length > 3) { S.names.splice(i, 1); save(); renderSetup(); } };
+    pl.appendChild(r);
+  });
+  $('#addP').disabled = S.names.length >= 8;
+  const chipRow = (box, opts, key, fmt) => {
+    box.innerHTML = '';
+    opts.forEach(v => {
+      const b = document.createElement('button'); b.className = 'chip' + (S[key] === v ? ' on' : '');
+      b.textContent = fmt(v); b.onclick = () => { S[key] = v; save(); renderSetup(); };
+      box.appendChild(b);
+    });
+  };
+  chipRow($('#lapChips'), [1, 2, 3], 'laps', v => v + (v === 1 ? ' lap' : ' laps'));
+  chipRow($('#chipChips'), [8, 12, 20], 'chips', v => v + ' chips');
+  chipRow($('#sndChips'), [true, false], 'sound', v => v ? 'On' : 'Off');
+}
+$('#addP').onclick = () => { if (S.names.length < 8) { S.names.push(''); save(); renderSetup(); const ins = document.querySelectorAll('#plist input'); ins[ins.length - 1].focus(); } };
+
+function cleanNames() {
+  const used = new Set();
+  return S.names.map((n, i) => {
+    let nm = String(n || '').replace(/\s+/g, ' ').trim().slice(0, 14) || `Player ${i + 1}`;
+    let base = nm, k = 2;
+    while (used.has(nm.toLowerCase())) nm = `${base.slice(0, 11)} ${k++}`;
+    used.add(nm.toLowerCase()); return nm;
+  });
+}
+function startGame() {
+  P = cleanNames().map(name => ({ name, chips: S.chips, betNet: 0, perfNet: 0, form: [] }));
+  turn = 0; totalTurns = P.length * S.laps; rollover = 0; deck = []; lastEv = null; upset = null;
+  newTurn();
+}
+$('#startBtn').onclick = () => { beep(660, .1, 'triangle'); startGame(); };
+
+/* ---------- turn flow ---------- */
+const lapOf = t => Math.floor(t / P.length) + 1;
+const isFinalLap = () => lapOf(turn) === S.laps;
+const seed = () => isFinalLap() ? 4 : 2;
+function drawEvent() {
+  if (!deck.length) { deck = shuffle(EVENTS.map((_, i) => i)); if (deck[deck.length - 1] === lastEv && deck.length > 1) deck.unshift(deck.pop()); }
+  lastEv = deck.pop(); return EVENTS[lastEv];
+}
+function barInfo() {
+  $('#barInfo').textContent = `Lap ${lapOf(turn)}/${S.laps} · Event ${turn + 1}/${totalTurns}` + (isFinalLap() ? ' · FINAL LAP' : '');
+}
+function standingsHTML(meIdx) {
+  return P.map((p, i) => ({ p, i })).sort((a, b) => b.p.chips - a.p.chips)
+    .map(({ p, i }) => `<span class="stand${i === meIdx ? ' me' : ''}">${esc(p.name)} <b>${p.chips}</b></span>`).join('');
+}
+function newTurn() {
+  const perf = turn % P.length;
+  const ev = drawEvent();
+  T = { perf, ev, param: ev.param ? ev.param() : null, tier: null, bets: [], order: [], cur: 0, result: null };
+  for (let k = 1; k < P.length; k++) T.order.push((perf + k) % P.length);
+  barInfo(); show('draw');
+  $('#drawStand').innerHTML = standingsHTML(perf);
+  $('#drawLap').textContent = isFinalLap() ? 'Final lap · house seed doubled' : `Lap ${lapOf(turn)}`;
+  $('#drawWho').textContent = P[perf].name;
+  const f = P[perf].form;
+  $('#formLine').innerHTML = f.length ? f.map(r => `<span class="fdot ${r.ok ? 'w' : 'l'}" title="${esc(r.ev)}">${r.ok ? '✔' : '✘'}</span>`).join('') + `<span style="margin-left:6px">${f.filter(r => r.ok).length}/${f.length} hit</span>` : 'up next · no form yet, a dark horse';
+  $('#tierCard').style.display = 'none';
+  // slot-machine shuffle
+  const card = $('#evCard'); card.classList.add('spin');
+  let n = 0; const roll = setInterval(() => {
+    const e = EVENTS[rand(EVENTS.length)];
+    $('#evIco').textContent = e.icon; $('#evName').textContent = e.name; $('#evDesc').textContent = '';
+    beep(300 + rand(400), .03, 'square', .04);
+    if (++n > 10) { clearInterval(roll); card.classList.remove('spin'); revealEvent(); }
+  }, 70);
+}
+function revealEvent() {
+  const ev = T.ev;
+  $('#evIco').textContent = ev.icon; $('#evName').textContent = ev.name; $('#evDesc').textContent = ev.desc(T.param);
+  beep(880, .12, 'triangle');
+  const box = $('#tiers'); box.innerHTML = '';
+  TIERS.forEach((t, i) => {
+    const b = document.createElement('button'); b.className = 'tier t' + i;
+    b.innerHTML = `<span class="tn">${t.name}</span><span class="tt">${esc(ev.goal(ev.tiers[i], T.param))}</span><span class="tr"><span class="w">+${t.win}</span><br><span class="l">${t.lose ? '−' + t.lose : '±0'}</span></span>`;
+    b.onclick = () => { T.tier = i; beep(700 + i * 150, .1, 'triangle'); startBetting(); };
+    box.appendChild(b);
+  });
+  $('#tierLbl').textContent = `${P[T.perf].name}, pick your target`;
+  $('#tierCard').style.display = '';
+}
+const goalText = () => T.ev.goal(T.ev.tiers[T.tier], T.param);
+
+/* ---------- betting ---------- */
+function startBetting() {
+  T.bets = []; T.cur = 0;
+  $('#betIco').textContent = T.ev.icon;
+  $('#betTitle').textContent = `${P[T.perf].name} · ${T.ev.name} · ${TIERS[T.tier].name}`;
+  $('#betGoal').textContent = goalText();
+  show('bet'); renderBet();
+}
+function sideTotal(side) { return T.bets.filter(b => b.side === side).reduce((a, b) => a + b.stake, 0); }
+function potTotal() { return seed() * 2 + rollover + T.bets.filter(b => b.side !== 'pass' && !b.pity).reduce((a, b) => a + b.stake, 0); }
+let pickStake = 1;
+function renderBet() {
+  const tb = sideTotal('back'), tl = sideTotal('lay'), pot = potTotal();
+  $('#totB').textContent = tb; $('#totL').textContent = tl;
+  $('#payB').textContent = tb ? `pays ×${(pot / tb).toFixed(1)} per chip` : 'empty: take the lot';
+  $('#payL').textContent = tl ? `pays ×${(pot / tl).toFixed(1)} per chip` : 'empty: take the lot';
+  $('#jackLine').textContent = `Pot ${pot} chips (house seed ${seed()}+${seed()}${rollover ? ` · jackpot +${rollover}` : ''})`;
+  const done = T.cur >= T.order.length;
+  $('#bettorCard').style.display = done ? 'none' : '';
+  $('#closedCard').style.display = done ? '' : 'none';
+  $('#bUndo').disabled = !T.bets.length;
+  if (done) {
+    $('#closedSub').textContent = `${P[T.perf].name} must ${goalText().replace(/^./, c => c.toLowerCase())}`;
+  } else {
+    const p = P[T.order[T.cur]], pity = p.chips <= 0;
+    $('#bWho').textContent = p.name;
+    $('#bChips').textContent = pity ? 'Broke! You get a free 1-chip pity stake.' : `${p.chips} chip${p.chips === 1 ? '' : 's'} in hand`;
+    const max = pity ? 1 : Math.min(3, p.chips);
+    if (pickStake > max) pickStake = max;
+    const st = $('#stakes'); st.innerHTML = '';
+    [1, 2, 3].forEach(v => {
+      const b = document.createElement('button'); b.className = 'stake' + (v === pickStake ? ' on' : '');
+      b.textContent = v; b.disabled = v > max; if (v > max) b.style.opacity = .25;
+      b.onclick = () => { pickStake = v; beep(500 + v * 100, .05); renderBet(); };
+      st.appendChild(b);
+    });
+  }
+  $('#blist').innerHTML = T.order.map((pi, k) => {
+    const b = T.bets[k], p = P[pi];
+    const tag = !b ? (k === T.cur ? '<span class="tag p">betting…</span>' : '<span class="tag p">waiting</span>')
+      : b.side === 'pass' ? '<span class="tag p">pass</span>'
+      : `<span class="tag ${b.side === 'back' ? 'b' : 'l'}">${b.side === 'back' ? 'BACK' : 'LAY'} ${b.stake}${b.pity ? ' (pity)' : ''}</span>`;
+    return `<div class="brow${k === T.cur ? ' cur' : ''}"><span class="n">${esc(p.name)}</span><span class="small">${p.chips}</span>${tag}</div>`;
+  }).join('');
+}
+function placeBet(side) {
+  if (T.cur >= T.order.length) return;
+  const pi = T.order[T.cur], p = P[pi];
+  if (side === 'pass') { T.bets.push({ pi, side, stake: 0 }); beep(300, .06); }
+  else {
+    const pity = p.chips <= 0, stake = pity ? 1 : Math.min(pickStake, p.chips, 3);
+    if (!pity) p.chips -= stake;
+    T.bets.push({ pi, side, stake, pity });
+    beep(side === 'back' ? 880 : 330, .1, 'triangle');
+  }
+  T.cur++; pickStake = 1; renderBet();
+}
+$('#bBack').onclick = () => placeBet('back');
+$('#bLay').onclick = () => placeBet('lay');
+$('#bPass').onclick = () => placeBet('pass');
+$('#bUndo').onclick = () => {
+  const b = T.bets.pop(); if (!b) return;
+  if (b.side !== 'pass' && !b.pity) P[b.pi].chips += b.stake;
+  T.cur--; renderBet();
+};
+$('#toPerform').onclick = () => toReady();
+
+/* ---------- ready / perform ---------- */
+function toReady() {
+  $('#rWho').textContent = P[T.perf].name;
+  $('#rIco').textContent = T.ev.icon; $('#rName').textContent = T.ev.name; $('#rGoal').textContent = goalText();
+  $('#rHow').textContent = T.ev.how;
+  show('ready');
+}
+const G = { gen: 0, over: true, timers: [] };
+function stopGame() { G.gen++; G.over = true; G.timers.forEach(clearTimeout); G.timers = []; }
+function later(fn, ms) { const g = G.gen; G.timers.push(setTimeout(() => { if (g === G.gen) fn(); }, ms)); }
+function frame(fn) { const g = G.gen; requestAnimationFrame(t => { if (g === G.gen && !G.over) fn(t); }); }
+function hud(l, r) { if (l != null) $('#hudL').innerHTML = l; if (r != null) $('#hudR').innerHTML = r; }
+$('#goBtn').onclick = () => {
+  stopGame(); G.over = false; show('perform');
+  const st = $('#stage'); hud(`${esc(P[T.perf].name)} · ${T.ev.name}`, esc(goalText()));
+  let c = 3;
+  const tick = () => {
+    if (c === 0) { beep(1046, .18, 'triangle'); st.innerHTML = ''; T.ev.run(st, T.ev.tiers[T.tier], T.param, finish); return; }
+    st.innerHTML = `<div class="count">${c}</div>`; beep(523, .1, 'triangle'); c--; later(tick, 700);
+  };
+  tick();
+};
+function finish(ok, detail) {
+  if (G.over) return;
+  stopGame();
+  T.result = { ok, detail };
+  fanfare(ok);
+  const st = $('#stage');
+  st.innerHTML = `<div class="verdict ${ok ? 'w' : 'l'}">${ok ? 'NAILED IT' : 'MISSED'}</div><div class="sub" style="text-align:center">${esc(detail)}</div><button class="btn main" id="toSettle" style="min-width:220px">Settle the bets</button>`;
+  $('#toSettle').onclick = settle;
+}
+
+/* ---------- settle ---------- */
+function settle() {
+  // snapshot taken after betting, before payouts, so Void can rewind to it
+  T.undo = { chips: P.map(p => p.chips), betNet: P.map(p => p.betNet), perfNet: P.map(p => p.perfNet), roll: rollover, upset };
+  const ok = T.result.ok, win = ok ? 'back' : 'lay';
+  const pot = potTotal();
+  const winners = T.bets.filter(b => b.side === win), W = winners.reduce((a, b) => a + b.stake, 0);
+  const rows = [];
+  let paid = 0;
+  T.bets.forEach(b => {
+    const p = P[b.pi]; let net = 0;
+    if (b.side === 'pass') { rows.push({ name: p.name, txt: 'passed', net: 0 }); return; }
+    if (b.side === win && W > 0) {
+      const pay = Math.floor(pot * b.stake / W); paid += pay; p.chips += pay;
+      net = pay - (b.pity ? 0 : b.stake);
+    } else net = b.pity ? 0 : -b.stake;
+    p.betNet += net;
+    rows.push({ name: p.name, txt: `${b.side === 'back' ? 'backed' : 'laid'} ${b.stake}${b.pity ? ' (pity)' : ''}`, net });
+    if (net > 0 && (!upset || net > upset.amt)) upset = { name: p.name, amt: net, ev: `${T.ev.name} vs ${P[T.perf].name}` };
+  });
+  const oldRoll = rollover;
+  rollover = W > 0 ? pot - paid : pot;
+  const pf = P[T.perf], tier = TIERS[T.tier];
+  const pnet = ok ? tier.win : -Math.min(tier.lose, pf.chips);
+  pf.chips += pnet; pf.perfNet += pnet;
+  pf.form.push({ ok, ev: T.ev.name });
+
+  $('#sVerdict').className = 'verdict ' + (ok ? 'w' : 'l');
+  $('#sVerdict').textContent = ok ? 'BACKERS WIN' : 'LAYERS WIN';
+  $('#sDetail').textContent = `${pf.name}: ${T.result.detail}`;
+  const dl = n => `<span class="delta ${n > 0 ? 'pos' : n < 0 ? 'neg' : 'z'}">${n > 0 ? '+' : ''}${n}</span>`;
+  $('#sRows').innerHTML = `<div class="srow"><span class="n">${esc(pf.name)} <span class="small">performer · ${tier.name}</span></span>${dl(pnet)}</div>` +
+    rows.map(r => `<div class="srow"><span class="n">${esc(r.name)} <span class="small">${r.txt}</span></span>${dl(r.net)}</div>`).join('');
+  $('#sJack').textContent = W === 0
+    ? `Nobody called it! The whole ${pot}-chip pot rolls into the jackpot.`
+    : rollover ? `${rollover} odd chip${rollover === 1 ? '' : 's'} carried to the next pot.` : '';
+  $('#sBoard').innerHTML = P.map(p => p).sort((a, b) => b.chips - a.chips).map((p, i) => `<div class="srow"><span class="n">${i + 1}. ${esc(p.name)}</span><b style="color:var(--gold)">${p.chips}</b></div>`).join('');
+  $('#nextBtn').textContent = turn + 1 >= totalTurns ? 'Close the book' : 'Next event';
+  show('settle');
+}
+$('#voidBtn').onclick = () => confirmBox('Void this attempt?', 'Use this if the phone got bumped or someone interfered. Payouts are undone, bets stay on, and the performer goes again.', () => {
+  const u = T.undo;
+  P.forEach((p, i) => { p.chips = u.chips[i]; p.betNet = u.betNet[i]; p.perfNet = u.perfNet[i]; });
+  P[T.perf].form.pop(); rollover = u.roll; upset = u.upset;
+  T.result = null; T.undo = null; toReady();
+});
+$('#nextBtn').onclick = () => { turn++; if (turn >= totalTurns) finalScreen(); else newTurn(); };
+
+/* ---------- final ---------- */
+function finalScreen() {
+  barInfo(); $('#barInfo').textContent = 'Book closed';
+  const sorted = P.map(p => p).sort((a, b) => b.chips - a.chips);
+  const top = sorted[0].chips, champs = sorted.filter(p => p.chips === top);
+  $('#fWin').textContent = champs.map(p => p.name).join(' & ');
+  $('#fWinSub').textContent = `${top} chips${champs.length > 1 ? ' — a dead heat!' : ''}${rollover ? ` · ${rollover} chips left unclaimed in the jackpot` : ''}`;
+  let rank = 0, prev = null;
+  $('#fBoard').innerHTML = sorted.map((p, i) => { if (p.chips !== prev) { rank = i + 1; prev = p.chips; } return `<div class="srow"><span class="n">${rank}. ${esc(p.name)}</span><b style="color:var(--gold)">${p.chips}</b></div>`; }).join('');
+  const best = key => { const m = Math.max(...P.map(p => p[key])); return { m, who: P.filter(p => p[key] === m).map(p => p.name).join(' & ') }; };
+  const punter = best('betNet'), star = best('perfNet');
+  const hits = P.map(p => ({ p, h: p.form.filter(r => r.ok).length })).sort((a, b) => b.h - a.h)[0];
+  const aw = [
+    ['🎯', 'Sharpest Punter', punter.m > 0 ? `${punter.who} · ${punter.m > 0 ? '+' : ''}${punter.m} from betting` : 'Nobody beat the bookie'],
+    ['🌟', 'Star Turn', star.m > 0 ? `${star.who} · +${star.m} from performing` : 'No performer finished ahead'],
+    ['💥', 'Biggest Upset', upset ? `${upset.name} · +${upset.amt} on ${upset.ev}` : 'No upsets. A boring race'],
+    ['🐎', 'Most Reliable', `${hits.p.name} · hit ${hits.h} of ${hits.p.form.length}`],
+  ];
+  $('#fAwards').innerHTML = aw.map(a => `<div class="srow award"><span class="i">${a[0]}</span><span><div class="t">${a[1]}</div><div class="small">${esc(a[2])}</div></span></div>`).join('');
+  fanfare(true); show('final');
+}
+$('#again').onclick = () => startGame();
+$('#newSetup').onclick = () => { stopGame(); renderSetup(); show('setup'); };
+$('#menuBtn').onclick = () => confirmBox('Quit this game?', 'The book will be closed and all chips lost.', () => { stopGame(); renderSetup(); show('setup'); });
+/* ---------- events: the phone runs and judges each one ---------- */
+// shared countdown timer for timed events; calls onEnd when time runs out
+function timer(secs, onEnd, label = 's left') {
+  const t0 = performance.now(); let pen = 0;
+  const api = { left: () => Math.max(0, secs - pen - (performance.now() - t0) / 1000), penalty: s => { pen += s; } };
+  const loop = () => { const l = api.left(); hud(`<span style="font-variant-numeric:tabular-nums">${l.toFixed(1)}</span> ${label}`); if (l <= 0) onEnd(); else frame(loop); };
+  frame(loop); return api;
+}
+const flashBad = el => { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); beep(160, .15, 'sawtooth', .1); };
+
+const EVENTS = [
+  {
+    icon: '👆', name: 'Tap Frenzy', tiers: [26, 34, 42],
+    desc: () => 'Pure finger speed. Five seconds, one big button.',
+    goal: t => `Tap ${t}+ times in 5 seconds`,
+    how: 'Hammer the big gold button as fast as you can. The clock starts on GO.',
+    run(st, t, _, done) {
+      let n = 0;
+      st.innerHTML = `<div class="q" id="tN">0</div><button class="bigtap" id="tB">TAP!</button>`;
+      const b = $('#tB');
+      b.addEventListener('pointerdown', e => {
+        e.preventDefault(); if (G.over || !e.isPrimary) return; n++; // one finger only $('#tN').textContent = n;
+        $('#tN').style.color = n >= t ? 'var(--back)' : '';
+        beep(400 + Math.min(n, 60) * 10, .03, 'square', .04);
+        b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
+      });
+      timer(5, () => done(n >= t, `${n} taps (needed ${t})`));
+    }
+  },
+  {
+    icon: '⏱️', name: 'Blind Stop', tiers: [0.5, 0.25, 0.1],
+    param: () => 5 + rand(5),
+    desc: p => `A stopwatch starts, then fogs over after 2 seconds. Stop it at exactly ${p}.00 s.`,
+    goal: (t, p) => `Stop the fogged clock within ±${t.toFixed(2)} s of ${p}.00`,
+    how: 'Count in your head. Tap STOP when you think the hidden clock reads the target.',
+    run(st, t, p, done) {
+      st.innerHTML = `<div class="small">target ${p}.00 s</div><div class="clock" id="cK">0.00</div><button class="btn main" id="cS" style="min-width:min(70vw,280px);min-height:90px;font-size:30px">STOP</button>`;
+      hud('Counting…');
+      const t0 = performance.now(), k = $('#cK');
+      const loop = () => {
+        const s = (performance.now() - t0) / 1000;
+        if (s < 2) k.textContent = s.toFixed(2); else { k.textContent = '?.??'; k.classList.add('fog'); }
+        if (s > p + 4) done(false, `Never stopped. Clock ran past ${p + 4} s`); else frame(loop);
+      };
+      frame(loop);
+      $('#cS').addEventListener('pointerdown', e => {
+        e.preventDefault(); if (G.over) return;
+        const s = (performance.now() - t0) / 1000, off = s - p;
+        k.classList.remove('fog'); k.textContent = s.toFixed(2);
+        done(Math.abs(off) <= t, `Stopped at ${s.toFixed(2)} s, ${off >= 0 ? '+' : ''}${off.toFixed(2)} off (allowed ±${t.toFixed(2)})`);
+      });
+    }
+  },
+  {
+    icon: '🔢', name: 'Digit Flash', tiers: [5, 7, 9],
+    desc: () => 'A number flashes up for a moment. Type it back exactly.',
+    goal: t => `Recall a ${t}-digit number`,
+    how: 'Memorise the number while it shows, then type it on the keypad and press ✔. You have 15 seconds to type.',
+    run(st, t, _, done) {
+      let num = String(1 + rand(9)); while (num.length < t) num += rand(10);
+      const showMs = 2000 + (t - 5) * 250;
+      st.innerHTML = `<div class="small">memorise!</div><div class="flash">${num.replace(/(\d{3})(?=\d)/g, '$1 ')}</div>`;
+      hud('Look!');
+      later(() => {
+        let typed = '';
+        st.innerHTML = `<div class="disp" id="dD">&nbsp;</div><div class="pad" id="dP"></div>`;
+        const pad = $('#dP'), disp = $('#dD');
+        ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', '✔'].forEach(k => {
+          const b = document.createElement('button'); b.textContent = k; if (k === '✔') b.className = 'ok';
+          b.addEventListener('pointerdown', e => {
+            e.preventDefault(); if (G.over) return;
+            if (k === '⌫') typed = typed.slice(0, -1);
+            else if (k === '✔') { done(typed === num, `Typed ${typed || '(nothing)'}, was ${num}`); return; }
+            else if (typed.length < 12) typed += k;
+            disp.innerHTML = typed || '&nbsp;'; beep(600, .03, 'square', .04);
+          });
+          pad.appendChild(b);
+        });
+        timer(15, () => done(typed === num, `Time up. Typed ${typed || '(nothing)'}, was ${num}`), 's to type');
+      }, showMs);
+    }
+  },
+  {
+    icon: '⚡', name: 'Reflex', tiers: [420, 340, 285],
+    desc: () => 'Three rounds of wait-for-green. Your average reaction time counts.',
+    goal: t => `Average under ${t} ms over 3 tries`,
+    how: 'Wait while the panel is red. The instant it turns green, tap it. Tapping early counts as a 1000 ms try.',
+    run(st, t, _, done) {
+      const times = [];
+      st.innerHTML = `<div class="light" id="rL">wait…</div><div class="small" id="rS">try 1 of 3</div>`;
+      const L = $('#rL'); let goAt = 0, armed = false, gone = false;
+      const next = () => {
+        if (times.length >= 3) {
+          const avg = Math.round(times.reduce((a, b) => a + b, 0) / 3);
+          done(avg < t, `Average ${avg} ms (${times.join(', ')}). Needed under ${t}`); return;
+        }
+        hud(`Try ${times.length + 1} of 3`);
+        $('#rS').textContent = times.length ? 'last: ' + times[times.length - 1] + ' ms' : 'try 1 of 3';
+        L.className = 'light'; L.textContent = 'wait…'; armed = true; gone = false;
+        later(() => { gone = true; goAt = performance.now(); L.className = 'light go'; L.textContent = 'TAP!'; beep(1200, .05, 'square', .06);
+          later(() => { if (armed && gone) { armed = false; times.push(1000); L.textContent = 'too slow'; later(next, 700); } }, 1000);
+        }, 1200 + rand(2300));
+      };
+      L.addEventListener('pointerdown', e => {
+        e.preventDefault(); if (G.over || !armed) return;
+        armed = false;
+        if (!gone) { stopGameTimersKeep(); times.push(1000); L.className = 'light'; L.textContent = 'TOO EARLY'; flashBad(L); later(next, 900); }
+        else { const ms = Math.round(performance.now() - goAt); times.push(ms); L.textContent = ms + ' ms'; beep(900, .06); later(next, 800); }
+      });
+      next();
+    }
+  },
+  {
+    icon: '🔍', name: 'Odd One Out', tiers: [3, 5, 7],
+    desc: () => 'A grid of lookalikes hides one impostor. Find impostors against the clock.',
+    goal: t => `Find ${t} odd ones in 12 seconds`,
+    how: 'Tap the one emoji that is different. A wrong tap costs 1 second.',
+    run(st, t, _, done) {
+      const PAIRS = [['🐶', '🐺'], ['😐', '😑'], ['🍎', '🍅'], ['⭐', '🌟'], ['🍋', '🍈'], ['💙', '💜'], ['🐝', '🪲'], ['🌑', '🌚'], ['🐟', '🐠'], ['🔵', '🟣'], ['🙂', '🙃'], ['🦆', '🐤'], ['🧡', '💛'], ['🍪', '🥯'], ['🐢', '🦎'], ['🌲', '🌳']];
+      let found = 0;
+      st.innerHTML = `<div class="q" id="oN" style="font-size:28px">0 / ${t}</div><div class="grid" id="oG"></div>`;
+      const g = $('#oG');
+      const build = () => {
+        const size = found < 3 ? 5 : 6, pr = PAIRS[rand(PAIRS.length)], flip = rand(2), odd = rand(size * size);
+        g.style.gridTemplateColumns = `repeat(${size},1fr)`; g.innerHTML = '';
+        for (let i = 0; i < size * size; i++) {
+          const b = document.createElement('button'); b.textContent = pr[(i === odd) ^ flip ? 1 : 0];
+          b.addEventListener('pointerdown', e => {
+            e.preventDefault(); if (G.over) return;
+            if (i === odd) { found++; $('#oN').textContent = `${found} / ${t}`; beep(700 + found * 60, .07, 'triangle'); if (found >= t) done(true, `Found ${found} in time`); else build(); }
+            else { clk.penalty(1); flashBad(g); }
+          });
+          g.appendChild(b);
+        }
+      };
+      const clk = timer(12, () => done(found >= t, `Found ${found} (needed ${t})`));
+      build();
+    }
+  },
+  {
+    icon: '➕', name: 'Quick Sums', tiers: [5, 7, 9],
+    desc: () => 'Two-digit adding and taking away, multiple choice, against the clock.',
+    goal: t => `Get ${t} sums right in 20 seconds`,
+    how: 'Tap the right answer. A wrong answer costs 2 seconds.',
+    run(st, t, _, done) {
+      let right = 0;
+      st.innerHTML = `<div class="small" id="sN">0 / ${t}</div><div class="q" id="sQ"></div><div class="opts" id="sO"></div>`;
+      const ask = () => {
+        let a = 10 + rand(80), b = 10 + rand(60), plus = rand(2) === 0;
+        if (!plus && b > a) [a, b] = [b, a];
+        const ans = plus ? a + b : a - b;
+        const opts = new Set([ans]);
+        for (const d of shuffle([1, -1, 10, -10, 2, -2, 11, -9])) { if (opts.size >= 4) break; if (ans + d >= 0) opts.add(ans + d); }
+        $('#sQ').textContent = `${a} ${plus ? '+' : '−'} ${b}`;
+        const O = $('#sO'); O.innerHTML = '';
+        shuffle([...opts]).forEach(v => {
+          const btn = document.createElement('button'); btn.textContent = v;
+          btn.addEventListener('pointerdown', e => {
+            e.preventDefault(); if (G.over) return;
+            if (v === ans) { right++; $('#sN').textContent = `${right} / ${t}`; beep(800, .06, 'triangle'); if (right >= t) done(true, `${right} right in time`); else ask(); }
+            else { clk.penalty(2); flashBad(O); }
+          });
+          O.appendChild(btn);
+        });
+      };
+      const clk = timer(20, () => done(right >= t, `${right} right (needed ${t})`));
+      ask();
+    }
+  },
+  {
+    icon: '🎨', name: 'Colour Clash', tiers: [6, 9, 12],
+    desc: () => 'Colour words printed in the wrong ink. Name the INK, not the word.',
+    goal: t => `${t} correct ink colours in 12 s, no mistakes`,
+    how: 'Tap the button matching the colour of the ink, not what the word says. One mistake ends your run.',
+    run(st, t, _, done) {
+      const C = [['RED', '#ff4d5e'], ['BLUE', '#4d8bff'], ['GREEN', '#33d17a'], ['YELLOW', '#ffd23f']];
+      let right = 0;
+      st.innerHTML = `<div class="small" id="kN">0 / ${t}</div><div class="word" id="kW"></div><div class="opts" id="kO"></div>`;
+      const O = $('#kO');
+      C.forEach((c, i) => {
+        const b = document.createElement('button'); b.textContent = c[0]; b.style.background = c[1]; b.style.color = '#111'; b.style.fontSize = '20px';
+        b.addEventListener('pointerdown', e => {
+          e.preventDefault(); if (G.over) return;
+          if (i === ink) { right++; $('#kN').textContent = `${right} / ${t}`; beep(820, .05, 'triangle'); if (right >= t) done(true, `${right} in a row`); else ask(); }
+          else { flashBad($('#kW')); done(false, `Slipped on ${right + 1}: the word said ${C[word][0]}, the ink was ${C[ink][0]}`); }
+        });
+        O.appendChild(b);
+      });
+      let ink = 0, word = 0;
+      const ask = () => {
+        let ni; do { ni = rand(4); } while (ni === ink && right > 0);
+        ink = ni; do { word = rand(4); } while (word === ink);
+        const w = $('#kW'); w.textContent = C[word][0]; w.style.color = C[ink][1];
+        shuffle([...O.children]).forEach(b => O.appendChild(b));
+      };
+      timer(12, () => done(right >= t, `${right} correct (needed ${t})`));
+      ask();
+    }
+  },
+  {
+    icon: '🫧', name: 'Dot Count', tiers: [3, 1, 0],
+    desc: () => 'A cloud of dots appears for 1.5 seconds. How many were there?',
+    goal: t => t ? `Guess the dots within ±${t}` : 'Guess the exact number of dots',
+    how: 'Watch the dots, then dial in your count and lock it in. 20 seconds to answer.',
+    run(st, t, _, done) {
+      const n = 14 + rand(20);
+      st.innerHTML = `<canvas class="dots" id="dC" width="340" height="340"></canvas>`;
+      const cv = $('#dC'), x = cv.getContext('2d'), pts = [];
+      let guard = 0;
+      while (pts.length < n && guard++ < 5000) {
+        const p = { x: 22 + Math.random() * 296, y: 22 + Math.random() * 296, r: 8 + Math.random() * 6 };
+        if (pts.every(q => Math.hypot(q.x - p.x, q.y - p.y) > q.r + p.r + 4)) pts.push(p);
+      }
+      const real = pts.length;
+      const cols = ['#ffc94d', '#ff5e8a', '#8f7bff', '#3ddc97', '#4dc3ff'];
+      pts.forEach(p => { x.fillStyle = cols[rand(cols.length)]; x.beginPath(); x.arc(p.x, p.y, p.r, 0, Math.PI * 2); x.fill(); });
+      hud('Count!');
+      later(() => {
+        let g = 20;
+        st.innerHTML = `<div class="small">how many dots?</div><div class="stepper"><button data-d="-5">−5</button><button data-d="-1">−1</button><span class="v" id="dV">20</span><button data-d="1">+1</button><button data-d="5">+5</button></div><button class="btn main" id="dL" style="min-width:220px">Lock it in</button>`;
+        st.querySelectorAll('.stepper button').forEach(b => b.addEventListener('pointerdown', e => {
+          e.preventDefault(); if (G.over) return; g = Math.max(1, Math.min(60, g + +b.dataset.d)); $('#dV').textContent = g; beep(500 + g * 10, .03, 'square', .04);
+        }));
+        const judge = pre => done(Math.abs(g - real) <= t, `${pre}Guessed ${g}, there were ${real}${t ? ` (allowed ±${t})` : ''}`);
+        $('#dL').addEventListener('pointerdown', e => { e.preventDefault(); if (!G.over) judge(''); });
+        timer(20, () => done(false, `Time up, never locked in. There were ${real}`), 's to answer');
+      }, 1500);
+    }
+  },
+];
+// Reflex: an early tap must cancel the pending "turn green" timer without ending the event
+function stopGameTimersKeep() { G.timers.forEach(clearTimeout); G.timers = []; }
+
+/* ---------- boot ---------- */
+renderSetup();
+</script>
+</body>
+</html>

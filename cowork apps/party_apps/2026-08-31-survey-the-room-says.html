@@ -1,0 +1,1081 @@
+<!-- CONCEPT: SURVEY/GAME SHOW - "The Room Says": two teams battle over a hidden board of ranked survey answers - "we asked 100 people, name something you always lose". Teams shout answers at one shared screen; the host taps the tile that matches to flip it and bank its points, or taps STRIKE when the room guesses air. Three strikes hands the rival team a single STEAL guess for the whole pot. Clear the board for a sweep bonus, survive a double-points final round, then a four-question TOP ANSWER RUSH decides it. 32 survey boards across 4 decks, live pot, full host undo | Players: 4-16 in 2 teams | ~20-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>The Room Says</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #0b0a1e;
+  --bg2: #141033;
+  --panel: #1c1740;
+  --panel2: #262058;
+  --line: #3a3170;
+  --ink: #f2eeff;
+  --dim: #9d95c8;
+  --gold: #ffc94d;
+  --gold2: #ff9d2e;
+  --a1: #35e0d0;
+  --a2: #12a3c9;
+  --b1: #ff7bc8;
+  --b2: #d3479a;
+  --bad: #ff5a6e;
+  --good: #4ce09a;
+  --r: 14px;
+  --pad: 12px;
+}
+
+html, body {
+  margin: 0; padding: 0;
+  height: 100%;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(900px 500px at 50% -12%, rgba(255,201,77,.16), transparent 62%),
+    radial-gradient(700px 500px at 8% 108%, rgba(53,224,208,.12), transparent 60%),
+    radial-gradient(700px 500px at 96% 106%, rgba(255,123,200,.12), transparent 60%);
+}
+
+#app {
+  position: relative; z-index: 1;
+  height: 100%; width: 100%;
+  max-width: 720px; margin: 0 auto;
+  display: flex; flex-direction: column;
+  padding: max(8px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom));
+}
+
+.screen { display: none; flex: 1; min-height: 0; flex-direction: column; }
+.screen.on { display: flex; }
+
+/* ---------- generic controls ---------- */
+button {
+  font-family: inherit; color: inherit; border: none; background: none;
+  cursor: pointer; font-size: 100%;
+}
+.btn {
+  min-height: 52px; border-radius: var(--r); padding: 10px 16px;
+  background: var(--panel2); border: 1px solid var(--line);
+  font-weight: 700; font-size: clamp(14px, 3.8vw, 17px);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  transition: transform .08s ease, filter .12s ease;
+}
+.btn:active { transform: scale(.97); filter: brightness(1.15); }
+.btn.big { min-height: 62px; font-size: clamp(16px, 4.6vw, 21px); }
+.btn.gold {
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  color: #2a1a00; border-color: #ffd97a;
+  box-shadow: 0 6px 20px rgba(255,157,46,.28);
+}
+.btn.ghost { background: rgba(255,255,255,.05); }
+.btn.danger { background: linear-gradient(135deg, #ff5a6e, #c9294a); border-color: #ff8a97; color: #fff; }
+.btn.teamA { background: linear-gradient(135deg, var(--a1), var(--a2)); color: #04262a; border-color: #7ff0e6; }
+.btn.teamB { background: linear-gradient(135deg, var(--b1), var(--b2)); color: #390725; border-color: #ffb2dd; }
+.btn.small { min-height: 44px; font-size: clamp(12px, 3.2vw, 14px); padding: 8px 12px; }
+.btn[disabled] { opacity: .35; pointer-events: none; }
+
+.title-gradient {
+  background: linear-gradient(90deg, var(--gold), var(--b1) 55%, var(--a1));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* ---------- setup ---------- */
+.setup-scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+.hero { text-align: center; padding: 18px 4px 10px; }
+.hero h1 {
+  margin: 0; font-size: clamp(34px, 11vw, 58px); font-weight: 900;
+  letter-spacing: -1.5px; line-height: .95;
+}
+.hero .sub { color: var(--dim); font-size: clamp(12px, 3.4vw, 15px); margin-top: 10px; line-height: 1.5; }
+.hero .tag {
+  display: inline-block; margin-top: 12px; padding: 6px 14px; border-radius: 999px;
+  background: rgba(255,201,77,.12); border: 1px solid rgba(255,201,77,.35);
+  color: var(--gold); font-size: clamp(11px, 3vw, 13px); font-weight: 700; letter-spacing: .5px;
+}
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--r);
+  padding: var(--pad); margin-top: 12px;
+}
+.card h2 {
+  margin: 0 0 10px; font-size: clamp(12px, 3.2vw, 14px); text-transform: uppercase;
+  letter-spacing: 1.4px; color: var(--dim); font-weight: 800;
+}
+.team-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.team-row:last-child { margin-bottom: 0; }
+.dot { width: 16px; height: 16px; border-radius: 50%; flex: 0 0 auto; }
+.dot.a { background: linear-gradient(135deg, var(--a1), var(--a2)); }
+.dot.b { background: linear-gradient(135deg, var(--b1), var(--b2)); }
+input[type=text] {
+  flex: 1; min-width: 0; min-height: 48px; border-radius: 10px;
+  background: var(--bg2); border: 1px solid var(--line); color: var(--ink);
+  padding: 0 12px; font-family: inherit; font-size: clamp(15px, 4vw, 17px); font-weight: 700;
+  user-select: text; -webkit-user-select: text;
+}
+input[type=text]:focus { outline: 2px solid var(--gold); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  min-height: 46px; padding: 8px 14px; border-radius: 999px;
+  background: var(--bg2); border: 1px solid var(--line); color: var(--dim);
+  font-weight: 700; font-size: clamp(13px, 3.5vw, 15px);
+  display: flex; align-items: center; gap: 6px;
+}
+.chip.on { background: rgba(255,201,77,.16); border-color: var(--gold); color: var(--gold); }
+.chip:active { transform: scale(.96); }
+
+/* ---------- game header ---------- */
+.hdr { display: flex; gap: 8px; align-items: stretch; margin-bottom: 8px; }
+.score {
+  flex: 1; min-width: 0; border-radius: 12px; padding: 7px 10px;
+  background: var(--panel); border: 1px solid var(--line);
+  display: flex; flex-direction: column; justify-content: center;
+  transition: box-shadow .2s ease, border-color .2s ease;
+}
+.score .nm {
+  font-size: clamp(10px, 2.9vw, 12px); font-weight: 800; letter-spacing: .6px;
+  color: var(--dim); text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.score .pts { font-size: clamp(22px, 6.4vw, 30px); font-weight: 900; line-height: 1.05; }
+.score.a .pts { color: var(--a1); }
+.score.b .pts { color: var(--b1); }
+.score.ctrl.a { border-color: var(--a1); box-shadow: 0 0 0 2px rgba(53,224,208,.3) inset; }
+.score.ctrl.b { border-color: var(--b1); box-shadow: 0 0 0 2px rgba(255,123,200,.3) inset; }
+.score .badge {
+  font-size: 10px; font-weight: 800; letter-spacing: .8px; color: var(--gold);
+  height: 12px; overflow: hidden;
+}
+.hdr .mid {
+  flex: 0 0 auto; width: 62px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.hdr .mid .rn { font-size: 9px; letter-spacing: 1px; color: var(--dim); font-weight: 800; }
+.hdr .mid .rv { font-size: clamp(14px, 4vw, 17px); font-weight: 900; color: var(--gold); line-height: 1.1; }
+
+/* ---------- question band ---------- */
+.qband {
+  flex: 0 0 auto;
+  background: linear-gradient(135deg, var(--panel2), var(--panel));
+  border: 1px solid var(--line); border-radius: var(--r);
+  padding: 9px 12px; text-align: center; margin-bottom: 7px;
+}
+.qband .lead {
+  font-size: clamp(9px, 2.6vw, 11px); letter-spacing: 1.4px; color: var(--gold);
+  font-weight: 800; text-transform: uppercase; margin-bottom: 4px;
+}
+.qband .q {
+  font-size: clamp(15px, 4.4vw, 21px); font-weight: 800; line-height: 1.25;
+}
+
+/* ---------- board ---------- */
+.board { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 5px; }
+.tile {
+  flex: 1 1 0; min-height: 44px;
+  display: flex; align-items: center; gap: 10px;
+  border-radius: 11px; padding: 6px 10px;
+  background: linear-gradient(135deg, #241d52, #1a1540);
+  border: 1px solid var(--line);
+  text-align: left; overflow: hidden; position: relative;
+  transition: transform .1s ease;
+}
+.tile:active { transform: scale(.985); }
+.tile .rank {
+  flex: 0 0 auto; width: 26px; height: 26px; border-radius: 7px;
+  background: rgba(255,255,255,.07); color: var(--dim);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 13px;
+}
+.tile .atext {
+  flex: 1; min-width: 0; font-weight: 800;
+  font-size: clamp(14px, 4vw, 19px); letter-spacing: .3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--dim);
+}
+.tile .pts {
+  flex: 0 0 auto; min-width: 40px; text-align: right;
+  font-weight: 900; font-size: clamp(15px, 4.4vw, 20px); color: var(--dim);
+}
+.tile.hidden .atext { letter-spacing: 6px; }
+.tile.shown {
+  background: linear-gradient(135deg, var(--gold), var(--gold2));
+  border-color: #ffe0a0;
+  animation: flip .42s ease;
+  box-shadow: 0 4px 16px rgba(255,157,46,.25);
+}
+.tile.shown .atext, .tile.shown .pts { color: #2a1a00; }
+.tile.shown .rank { background: rgba(0,0,0,.18); color: #2a1a00; }
+.tile.shown .atext { letter-spacing: .3px; }
+.tile.top.shown { background: linear-gradient(135deg, #fff0b8, var(--gold)); }
+@keyframes flip {
+  0%   { transform: rotateX(90deg) scale(.94); opacity: .2; }
+  60%  { transform: rotateX(-12deg) scale(1.02); opacity: 1; }
+  100% { transform: rotateX(0) scale(1); }
+}
+.tile.dead { opacity: .45; }
+.board.locked .tile { pointer-events: none; }
+
+/* ---------- strikes + pot ---------- */
+.statusbar { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; margin: 7px 0; }
+.strikes { display: flex; gap: 5px; }
+.x {
+  width: 32px; height: 32px; border-radius: 9px;
+  border: 2px solid var(--line); color: transparent;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 19px; background: rgba(255,255,255,.03);
+}
+.x.on {
+  color: #fff; border-color: var(--bad);
+  background: linear-gradient(135deg, #ff5a6e, #b81f3c);
+  animation: pop .3s ease;
+}
+@keyframes pop { 0% { transform: scale(.3) rotate(-25deg); } 60% { transform: scale(1.25) rotate(6deg); } 100% { transform: scale(1); } }
+.pot {
+  flex: 1; text-align: right; border-radius: 11px; padding: 5px 12px;
+  background: var(--panel); border: 1px solid var(--line);
+  display: flex; align-items: baseline; justify-content: flex-end; gap: 8px;
+}
+.pot .lbl { font-size: 10px; letter-spacing: 1.2px; color: var(--dim); font-weight: 800; }
+.pot .v { font-size: clamp(22px, 6.4vw, 30px); font-weight: 900; color: var(--gold); line-height: 1; }
+
+/* ---------- prompt + action zone ---------- */
+.prompt {
+  flex: 0 0 auto;
+  text-align: center; font-size: clamp(12.5px, 3.5vw, 16px); font-weight: 700;
+  color: var(--dim); padding: 3px 4px 7px; line-height: 1.3;
+}
+.prompt b { color: var(--ink); }
+.prompt .hl { color: var(--gold); }
+.acts { flex: 0 0 auto; display: flex; flex-direction: column; gap: 7px; }
+.acts .row { display: flex; gap: 8px; }
+.acts .row > * { flex: 1; }
+.acts .row > .shrink { flex: 0 0 auto; width: 92px; }
+
+/* ---------- banner / award ---------- */
+.banner {
+  position: absolute; inset: 0; z-index: 20;
+  background: rgba(9,7,26,.9); backdrop-filter: blur(6px);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 22px; text-align: center; animation: fade .25s ease;
+}
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+.banner .kicker {
+  font-size: clamp(11px, 3.2vw, 14px); letter-spacing: 3px; font-weight: 900;
+  color: var(--gold); text-transform: uppercase;
+}
+.banner .who { font-size: clamp(26px, 8.5vw, 42px); font-weight: 900; margin: 8px 0 2px; line-height: 1.05; }
+.banner .amt { font-size: clamp(46px, 16vw, 82px); font-weight: 900; line-height: 1; }
+.banner .note { color: var(--dim); font-size: clamp(13px, 3.6vw, 16px); margin-top: 10px; max-width: 300px; line-height: 1.4; }
+.banner .btn { margin-top: 22px; min-width: 220px; }
+.wrap-rel { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+/* ---------- game over ---------- */
+.final-scores { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; width: 100%; max-width: 340px; }
+.fs-row {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  border-radius: 12px; background: var(--panel); border: 1px solid var(--line);
+}
+.fs-row .nm { flex: 1; text-align: left; font-weight: 800; font-size: clamp(15px, 4.2vw, 18px); }
+.fs-row .sc { font-weight: 900; font-size: clamp(20px, 5.6vw, 26px); }
+.fs-row.win { border-color: var(--gold); box-shadow: 0 0 24px rgba(255,201,77,.2); }
+
+.foot { text-align: center; color: var(--dim); font-size: 11px; padding-top: 8px; }
+.linkish { color: var(--dim); text-decoration: underline; font-size: 12px; padding: 8px; min-height: 44px; }
+
+/* Short viewports: the board needs 6 x 44px rows, so claw the space back
+   from fixed chrome rather than from the tap targets. */
+@media (max-height: 700px) {
+  .qband { padding: 6px 10px; margin-bottom: 5px; }
+  .qband .q { font-size: clamp(14px, 4vw, 19px); }
+  .qband .lead { margin-bottom: 2px; }
+  .score { padding: 4px 9px; }
+  .score .pts { font-size: clamp(19px, 5.6vw, 26px); }
+  .x { width: 29px; height: 29px; font-size: 17px; }
+  .pot .v { font-size: clamp(19px, 5.6vw, 26px); }
+  .statusbar { margin: 5px 0; }
+  .prompt { padding: 2px 4px 5px; font-size: clamp(12px, 3.3vw, 15px); }
+  .board { gap: 4px; }
+  .btn.big { min-height: 54px; }
+  .acts { gap: 6px; }
+}
+@media (max-height: 620px) {
+  #app { padding-left: 8px; padding-right: 8px; }
+  .hdr { margin-bottom: 5px; }
+  .qband { padding: 4px 9px; }
+  .qband .q { font-size: clamp(13px, 3.7vw, 17px); line-height: 1.2; }
+  .score .nm { font-size: 10px; }
+  .score .pts { font-size: 18px; }
+  .score .badge { height: 10px; font-size: 9px; }
+  .x { width: 26px; height: 26px; font-size: 15px; }
+  .pot { padding: 3px 10px; }
+  .pot .v { font-size: 18px; }
+  .statusbar { margin: 4px 0; }
+  .prompt { padding: 0 4px 2px; font-size: 12px; line-height: 1.25; }
+  .board { gap: 3px; }
+  .btn.big { min-height: 48px; font-size: 16px; }
+  .acts { gap: 4px; }
+  .hdr { margin-bottom: 4px; }
+  /* Below the 375x667 baseline a 6-row board plus chrome cannot hold 44px rows;
+     full-width 38px rows stay comfortably tappable and nothing clips. */
+  .tile { min-height: 38px; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ SETUP ============ -->
+  <section class="screen on" id="scSetup">
+    <div class="setup-scroll">
+      <div class="hero">
+        <h1 class="title-gradient">The Room<br>Says</h1>
+        <div class="tag">WE ASKED 100 PEOPLE</div>
+        <div class="sub">Two teams. One hidden board of the most popular answers.<br>Shout them out — the host flips what you hit.</div>
+      </div>
+
+      <div class="card">
+        <h2>Teams</h2>
+        <div class="team-row">
+          <span class="dot a"></span>
+          <input type="text" id="nameA" maxlength="16" placeholder="Team A">
+        </div>
+        <div class="team-row">
+          <span class="dot b"></span>
+          <input type="text" id="nameB" maxlength="16" placeholder="Team B">
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Question decks</h2>
+        <div class="chips" id="deckChips"></div>
+      </div>
+
+      <div class="card">
+        <h2>Main rounds</h2>
+        <div class="chips" id="roundChips"></div>
+        <div class="sub" style="color:var(--dim);font-size:12px;margin-top:10px;line-height:1.5">
+          Last main round scores <b style="color:var(--gold)">double</b>. Then a 4-question
+          <b style="color:var(--gold)">Top Answer Rush</b> decides the game.
+        </div>
+      </div>
+
+      <button class="btn gold big" id="btnStart" style="margin-top:14px">START THE SHOW</button>
+
+      <div class="card" style="margin-top:14px">
+        <h2>How to host</h2>
+        <div style="color:var(--dim);font-size:13px;line-height:1.65">
+          <b style="color:var(--ink)">1.</b> Read the question aloud. Both teams shout answers.<br>
+          <b style="color:var(--ink)">2.</b> Tap the team that landed a real answer first — they take control.<br>
+          <b style="color:var(--ink)">3.</b> Tap any tile the controlling team names to flip it. Tap <b style="color:var(--bad)">STRIKE</b> when they miss.<br>
+          <b style="color:var(--ink)">4.</b> Three strikes and the rival team gets <b style="color:var(--gold)">one steal guess</b> for the whole pot.<br>
+          <b style="color:var(--ink)">5.</b> Mis-tapped? <b style="color:var(--ink)">UNDO</b> takes it back.
+        </div>
+      </div>
+      <div class="foot">Everything runs on one screen. Pass nothing, pinch nothing.</div>
+    </div>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section class="screen" id="scGame">
+    <div class="hdr">
+      <div class="score a" id="scoreA">
+        <div class="nm" id="hdrNameA">Team A</div>
+        <div class="pts" id="hdrPtsA">0</div>
+        <div class="badge" id="hdrBadgeA"></div>
+      </div>
+      <div class="mid">
+        <div class="rn">ROUND</div>
+        <div class="rv" id="hdrRound">1/3</div>
+      </div>
+      <div class="score b" id="scoreB">
+        <div class="nm" id="hdrNameB">Team B</div>
+        <div class="pts" id="hdrPtsB">0</div>
+        <div class="badge" id="hdrBadgeB"></div>
+      </div>
+    </div>
+
+    <div class="wrap-rel">
+      <div class="qband">
+        <div class="lead" id="qLead">SURVEY SAYS</div>
+        <div class="q" id="qText">&nbsp;</div>
+      </div>
+
+      <div class="board" id="board"></div>
+
+      <div class="statusbar">
+        <div class="strikes" id="strikes">
+          <div class="x">✕</div><div class="x">✕</div><div class="x">✕</div>
+        </div>
+        <div class="pot">
+          <span class="lbl">POT</span>
+          <span class="v" id="potVal">0</span>
+        </div>
+      </div>
+
+      <div class="prompt" id="prompt">&nbsp;</div>
+      <div class="acts" id="acts"></div>
+
+      <div class="banner" id="banner" style="display:none">
+        <div class="kicker" id="bnKicker">ROUND OVER</div>
+        <div class="who" id="bnWho">Team A</div>
+        <div class="amt" id="bnAmt">+0</div>
+        <div class="note" id="bnNote"></div>
+        <button class="btn gold big" id="bnNext">NEXT ROUND</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GAME OVER ============ -->
+  <section class="screen" id="scOver">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;text-align:center">
+      <div class="kicker" style="letter-spacing:3px;font-weight:900;color:var(--gold);font-size:13px">FINAL SURVEY</div>
+      <div id="overTitle" style="font-size:clamp(30px,10vw,52px);font-weight:900;line-height:1.05;margin-top:6px" class="title-gradient">WINNER</div>
+      <div id="overSub" style="color:var(--dim);font-size:clamp(13px,3.6vw,16px);margin-top:8px"></div>
+      <div class="final-scores" id="overScores"></div>
+      <button class="btn gold big" id="btnAgain" style="margin-top:24px;min-width:240px">PLAY AGAIN</button>
+      <button class="linkish" id="btnMenu">Back to setup</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =========================================================
+   SURVEY DATA — every board's answers sum to exactly 100
+   ========================================================= */
+const DECKS = [
+  { id:'life', name:'Everyday Life', icon:'🏠', boards:[
+    { q:'Name something people do the moment they wake up.',
+      a:[['Check their phone',34],['Hit snooze',22],['Go to the bathroom',18],['Stretch',12],['Make coffee',9],['Turn off the alarm',5]] },
+    { q:'Name a room people are embarrassed to show guests.',
+      a:[['The bedroom',30],['The garage',24],['The basement',16],['The bathroom',14],['The kitchen',10],['A closet',6]] },
+    { q:'Name something you are always losing.',
+      a:[['Keys',31],['Your phone',22],['The TV remote',17],['Socks',13],['Chargers',10],['Sunglasses',7]] },
+    { q:'Name something people do while stuck in traffic.',
+      a:[['Sing along to music',28],['Honk',20],['Check their phone',18],['Talk to themselves',14],['Eat snacks',12],['Call someone',8]] },
+    { q:'Name the chore people put off the longest.',
+      a:[['Folding laundry',27],['The dishes',21],['Cleaning the bathroom',18],['Vacuuming',14],['Taking out the trash',12],['Mowing the lawn',8]] },
+    { q:'Name something in everybody’s junk drawer.',
+      a:[['Batteries',26],['Old keys',20],['Rubber bands',16],['Takeout menus',14],['Dead pens',13],['Spare change',11]] },
+    { q:'Name something people pretend to enjoy.',
+      a:[['Small talk',26],['Exercise',21],['Someone’s cooking',18],['A boring party',15],['Opening a bad gift',12],['Meetings',8]] },
+    { q:'Name something people take way too many photos of.',
+      a:[['Their pet',32],['Food',24],['Sunsets',16],['Themselves',14],['Their kids',9],['The sky',5]] },
+  ]},
+  { id:'food', name:'Food & Kitchen', icon:'🍕', boards:[
+    { q:'Name a food people eat straight out of the container.',
+      a:[['Ice cream',30],['Peanut butter',20],['Yogurt',16],['Cereal',14],['Leftover pasta',12],['Pickles',8]] },
+    { q:'Name a pizza topping people argue about.',
+      a:[['Pineapple',42],['Anchovies',20],['Olives',13],['Mushrooms',10],['Onions',8],['Jalapeños',7]] },
+    { q:'Name something lurking at the back of the fridge.',
+      a:[['Old condiments',28],['Leftovers',24],['Wilted vegetables',18],['Expired milk',14],['A mystery container',10],['Half a lemon',6]] },
+    { q:'Name a breakfast people happily eat for dinner.',
+      a:[['Pancakes',28],['Eggs',24],['Cereal',18],['Bacon',14],['Waffles',10],['Toast',6]] },
+    { q:'Name something people burn while cooking.',
+      a:[['Toast',30],['Rice',18],['Garlic',16],['Cookies',14],['Popcorn',12],['Themselves',10]] },
+    { q:'Name a snack you cannot stop eating once you start.',
+      a:[['Chips',32],['Cookies',20],['Popcorn',16],['Chocolate',14],['Nuts',10],['Crackers',8]] },
+    { q:'Name something people put in their coffee.',
+      a:[['Milk',30],['Sugar',26],['Cream',18],['Nothing at all',12],['Syrup',8],['Cinnamon',6]] },
+    { q:'Name a food kids flat-out refuse to eat.',
+      a:[['Broccoli',30],['Brussels sprouts',20],['Mushrooms',16],['Onions',13],['Fish',12],['Tomatoes',9]] },
+  ]},
+  { id:'kids', name:'School & Kids', icon:'🎒', boards:[
+    { q:'Name something kids need right after bedtime.',
+      a:[['A glass of water',34],['The bathroom',24],['One more story',16],['A hug',12],['A stuffed animal',9],['The light left on',5]] },
+    { q:'Name an excuse for not doing your homework.',
+      a:[['The dog ate it',26],['Left it at home',24],['Didn’t understand it',18],['I was sick',14],['It’s in my locker',10],['The Wi-Fi died',8]] },
+    { q:'Name the best part of a school day.',
+      a:[['Recess',38],['Lunch',26],['Going home',14],['Gym class',10],['Art class',7],['Seeing friends',5]] },
+    { q:'Name something always found in a kid’s backpack.',
+      a:[['Crumpled papers',28],['Snacks',22],['Pencils',18],['A water bottle',14],['A lost jacket',10],['Old homework',8]] },
+    { q:'Name a job every kid wants when they grow up.',
+      a:[['Astronaut',24],['Vet',20],['YouTuber',18],['Firefighter',14],['Pro athlete',13],['Teacher',11]] },
+    { q:'Name something teachers say every single day.',
+      a:[['Quiet down',30],['Sit down',20],['Line up',16],['Eyes on me',14],['Any questions?',12],['Hands to yourself',8]] },
+    { q:'Name something kids fight over in the car.',
+      a:[['Who sits in front',32],['The music',20],['Someone touching them',18],['The window',14],['The phone',10],['Whose turn it is',6]] },
+    { q:'Name something a kid would trade their lunch for.',
+      a:[['Candy',30],['Chips',22],['A cookie',18],['Pizza',14],['A toy',10],['A juice box',6]] },
+  ]},
+  { id:'wild', name:'Silly & Wild', icon:'🛸', boards:[
+    { q:'Name something you’d hate to find in your shoe.',
+      a:[['A spider',32],['A rock',22],['Water',16],['Gum',14],['Another sock',9],['A LEGO brick',7]] },
+    { q:'Name a truly terrible superpower.',
+      a:[['Smelling everything',26],['Talking to fish',22],['Invisible only when alone',18],['Super slow speed',14],['Reading minds',12],['Fast-growing hair',8]] },
+    { q:'Name something you’d find in a wizard’s pocket.',
+      a:[['A wand',30],['A frog',20],['Potions',18],['A spare beard',12],['Crumbs',11],['A tiny dragon',9]] },
+    { q:'Name a terrible name for a boat.',
+      a:[['Titanic II',30],['The Sinker',24],['Leaky Larry',16],['Shark Bait',14],['Oops',10],['Goodbye',6]] },
+    { q:'Name something aliens would find confusing about Earth.',
+      a:[['Money',26],['Small talk',20],['Traffic',18],['Pets',16],['Socks',12],['Talking about weather',8]] },
+    { q:'Name something you should never microwave.',
+      a:[['Metal',34],['Eggs',22],['Fish',16],['Grapes',12],['A phone',10],['Foil',6]] },
+    { q:'Name a chore a robot would refuse to do.',
+      a:[['Clean the toilet',30],['Fold laundry',22],['Take out the trash',16],['The dishes',14],['The litter box',12],['Mow the lawn',6]] },
+    { q:'Name what people grab first in a house fire.',
+      a:[['Their phone',28],['The pets',26],['Photos',16],['Their wallet',14],['A laptop',10],['Keys',6]] },
+  ]},
+];
+
+const SWEEP_BONUS = 25;
+const FINAL_QS = 4;
+const LS_TEAMS = 'cowork-theroomsays-teams';
+const LS_DECKS = 'cowork-theroomsays-decks';
+const LS_SEEN  = 'cowork-theroomsays-seen';
+
+/* =========================================================
+   AUDIO — created lazily on the first real touch
+   ========================================================= */
+let AC = null;
+function audio() {
+  if (!AC) {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    try { AC = new Ctx(); } catch (e) { return null; }
+  }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type, vol, delay, glideTo) {
+  const ac = audio(); if (!ac) return;
+  const t0 = ac.currentTime + (delay || 0);
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol || 0.18, t0 + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(ac.destination);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const SFX = {
+  ding()  { tone(880, .16, 'triangle', .2, 0); tone(1320, .28, 'triangle', .14, .07); },
+  strike() { tone(190, .38, 'sawtooth', .16, 0, 90); tone(96, .42, 'square', .1, 0); },
+  sweep() { [523,659,784,1046,1318].forEach((f,i) => tone(f, .3, 'triangle', .16, i*.09)); },
+  steal() { tone(300, .18, 'square', .14, 0); tone(500, .18, 'square', .14, .12); tone(760, .34, 'triangle', .16, .24); },
+  bank()  { tone(660, .16, 'triangle', .16, 0); tone(990, .3, 'triangle', .14, .1); },
+  tick()  { tone(520, .05, 'square', .07, 0); },
+  win()   { [392,523,659,784,1046,1318].forEach((f,i) => tone(f, .42, 'triangle', .17, i*.11)); },
+};
+
+/* =========================================================
+   STATE
+   ========================================================= */
+const S = {
+  teams: [{ name:'Team A', score:0 }, { name:'Team B', score:0 }],
+  decks: DECKS.map(d => d.id),
+  totalRounds: 3,
+  round: 0,
+  mode: 'main',        // main | final
+  finalIdx: 0,
+  phase: 'faceoff',    // faceoff | faceoffTile | play | steal | final
+  board: null,
+  revealed: [],
+  faceoffTeam: null,
+  control: null,
+  strikes: 0,
+  queue: [],
+  seen: [],
+  awarding: false,     // round settled: board is revealing, host taps are locked
+};
+let undoStack = [];
+let bannerTimer = null;
+
+const $ = id => document.getElementById(id);
+const EL = {};
+['scSetup','scGame','scOver','deckChips','roundChips','nameA','nameB','btnStart',
+ 'hdrNameA','hdrNameB','hdrPtsA','hdrPtsB','hdrRound','hdrBadgeA','hdrBadgeB',
+ 'scoreA','scoreB','qLead','qText','board','strikes','potVal','prompt','acts',
+ 'banner','bnKicker','bnWho','bnAmt','bnNote','bnNext',
+ 'overTitle','overSub','overScores','btnAgain','btnMenu'].forEach(k => EL[k] = $(k));
+
+/* ---------- helpers ---------- */
+const other = t => t === 0 ? 1 : 0;
+const teamClass = t => t === 0 ? 'teamA' : 'teamB';
+function multiplier() {
+  if (S.mode === 'final') return 1;
+  return S.round === S.totalRounds ? 2 : 1;
+}
+function potValue() {
+  if (!S.board) return 0;
+  let sum = 0;
+  S.board.a.forEach((ans, i) => { if (S.revealed[i]) sum += ans[1]; });
+  return sum * multiplier();
+}
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function load(key, fallback) {
+  try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
+  catch (e) { return fallback; }
+}
+function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
+
+/* ---------- undo ---------- */
+function snapshot() {
+  undoStack.push(JSON.stringify({
+    scores: S.teams.map(t => t.score),
+    revealed: S.revealed.slice(),
+    control: S.control,
+    faceoffTeam: S.faceoffTeam,
+    strikes: S.strikes,
+    phase: S.phase,
+  }));
+  if (undoStack.length > 40) undoStack.shift();
+}
+function undo() {
+  if (!undoStack.length) return;
+  const p = JSON.parse(undoStack.pop());
+  p.scores.forEach((v, i) => S.teams[i].score = v);
+  S.revealed = p.revealed;
+  S.control = p.control;
+  S.faceoffTeam = p.faceoffTeam;
+  S.strikes = p.strikes;
+  S.phase = p.phase;
+  hideBanner();
+  paintBoard(true);
+  render();
+}
+
+/* =========================================================
+   SETUP SCREEN
+   ========================================================= */
+function buildSetup() {
+  const savedTeams = load(LS_TEAMS, null);
+  if (savedTeams && savedTeams.length === 2) {
+    EL.nameA.value = savedTeams[0]; EL.nameB.value = savedTeams[1];
+  }
+  const savedDecks = load(LS_DECKS, null);
+  if (Array.isArray(savedDecks) && savedDecks.length) S.decks = savedDecks.filter(d => DECKS.some(x => x.id === d));
+  if (!S.decks.length) S.decks = DECKS.map(d => d.id);
+  S.seen = load(LS_SEEN, []);
+
+  EL.deckChips.innerHTML = '';
+  DECKS.forEach(d => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (S.decks.includes(d.id) ? ' on' : '');
+    b.innerHTML = '<span>' + d.icon + '</span><span>' + d.name + '</span>';
+    b.addEventListener('click', () => {
+      SFX.tick();
+      const i = S.decks.indexOf(d.id);
+      if (i >= 0) { if (S.decks.length === 1) return; S.decks.splice(i, 1); }
+      else S.decks.push(d.id);
+      b.classList.toggle('on', S.decks.includes(d.id));
+      save(LS_DECKS, S.decks);
+    });
+    EL.deckChips.appendChild(b);
+  });
+
+  EL.roundChips.innerHTML = '';
+  [3, 5, 7].forEach(n => {
+    const b = document.createElement('button');
+    b.className = 'chip' + (S.totalRounds === n ? ' on' : '');
+    b.textContent = n + ' rounds';
+    b.addEventListener('click', () => {
+      SFX.tick();
+      S.totalRounds = n;
+      [...EL.roundChips.children].forEach(c => c.classList.remove('on'));
+      b.classList.add('on');
+    });
+    EL.roundChips.appendChild(b);
+  });
+}
+
+/* =========================================================
+   QUESTION QUEUE
+   ========================================================= */
+function buildQueue() {
+  const pool = [];
+  DECKS.forEach(d => {
+    if (!S.decks.includes(d.id)) return;
+    d.boards.forEach((b, i) => pool.push({ key: d.id + ':' + i, board: b }));
+  });
+  const fresh = pool.filter(p => !S.seen.includes(p.key));
+  const stale = pool.filter(p => S.seen.includes(p.key));
+  S.queue = shuffle(fresh).concat(shuffle(stale));
+  const need = S.totalRounds + FINAL_QS;
+  while (S.queue.length < need) S.queue = S.queue.concat(shuffle(pool));
+}
+function nextBoard() {
+  const item = S.queue.shift();
+  S.seen.push(item.key);
+  const pool = DECKS.reduce((n, d) => n + (S.decks.includes(d.id) ? d.boards.length : 0), 0);
+  if (S.seen.length > pool - 4) S.seen = S.seen.slice(-Math.max(0, Math.floor(pool / 2)));
+  save(LS_SEEN, S.seen);
+  return item.board;
+}
+
+/* =========================================================
+   GAME FLOW
+   ========================================================= */
+function startGame() {
+  S.teams[0].name = (EL.nameA.value.trim() || 'Team A').slice(0, 16);
+  S.teams[1].name = (EL.nameB.value.trim() || 'Team B').slice(0, 16);
+  save(LS_TEAMS, [S.teams[0].name, S.teams[1].name]);
+  S.teams[0].score = 0; S.teams[1].score = 0;
+  S.round = 0; S.mode = 'main'; S.finalIdx = 0;
+  buildQueue();
+  show('scGame');
+  nextRound();
+}
+
+function nextRound() {
+  undoStack = [];
+  hideBanner();
+  if (S.mode === 'main') {
+    S.round++;
+    if (S.round > S.totalRounds) { S.mode = 'final'; S.finalIdx = 0; return nextRound(); }
+    S.board = nextBoard();
+    S.revealed = S.board.a.map(() => false);
+    S.strikes = 0;
+    S.control = null;
+    S.faceoffTeam = null;
+    S.phase = 'faceoff';
+  } else {
+    S.finalIdx++;
+    if (S.finalIdx > FINAL_QS) return gameOver();
+    S.board = nextBoard();
+    S.revealed = S.board.a.map(() => false);
+    S.strikes = 0;
+    // snake order so neither team gets the last word twice: A B B A
+    const order = [0, 1, 1, 0];
+    S.control = order[(S.finalIdx - 1) % order.length];
+    S.faceoffTeam = null;
+    S.phase = 'final';
+  }
+  paintBoard(true);
+  render();
+}
+
+function takeControl(team, tileIdx) {
+  S.control = team;
+  revealTile(tileIdx);
+  S.phase = 'play';
+  if (S.revealed.every(Boolean)) return finishSweep();
+  render();
+}
+
+function revealTile(i) {
+  S.revealed[i] = true;
+  const el = EL.board.children[i];
+  if (el) {
+    el.classList.remove('hidden');
+    el.classList.add('shown');
+    el.querySelector('.atext').textContent = S.board.a[i][0];
+    el.querySelector('.pts').textContent = S.board.a[i][1];
+  }
+  SFX.ding();
+}
+
+function addStrike() {
+  snapshot();
+  S.strikes++;
+  SFX.strike();
+  if (S.strikes >= 3) {
+    S.phase = 'steal';
+  }
+  render();
+}
+
+function finishSweep() {
+  const pts = potValue() + SWEEP_BONUS;
+  S.teams[S.control].score += pts;
+  SFX.sweep();
+  revealRest();
+  showBanner('CLEAN SWEEP', S.teams[S.control].name, '+' + pts,
+    'The whole board — plus a ' + SWEEP_BONUS + ' point sweep bonus.');
+}
+
+function bankToControl(note) {
+  const pts = potValue();
+  S.teams[S.control].score += pts;
+  SFX.bank();
+  revealRest();
+  showBanner('POT BANKED', S.teams[S.control].name, '+' + pts, note);
+}
+
+function stealSuccess(tileIdx) {
+  snapshot();
+  const thief = other(S.control);
+  revealTile(tileIdx);
+  const pts = potValue();
+  S.teams[thief].score += pts;
+  SFX.steal();
+  revealRest();
+  showBanner('STOLEN!', S.teams[thief].name, '+' + pts,
+    'One guess, whole pot. Brutal.');
+}
+
+function stealFail() {
+  snapshot();
+  bankToControl('The steal missed — ' + S.teams[S.control].name + ' keeps every point.');
+}
+
+function finalAnswer(tileIdx) {
+  snapshot();
+  const team = S.control;
+  let pts = 0, kicker = 'NOT ON THE BOARD', note = 'Zero points. Ouch.';
+  if (tileIdx !== null) {
+    revealTile(tileIdx);
+    const base = S.board.a[tileIdx][1];
+    if (tileIdx === 0) {
+      pts = base * 2;
+      kicker = 'TOP ANSWER — DOUBLED';
+      note = 'The number one answer. ' + base + ' × 2.';
+    } else {
+      pts = base;
+      kicker = 'ON THE BOARD';
+      note = 'Number ' + (tileIdx + 1) + ' on the board. Only the top answer doubles.';
+    }
+    SFX.ding();
+  } else {
+    SFX.strike();
+  }
+  S.teams[team].score += pts;
+  revealRest();
+  showBanner(kicker, S.teams[team].name, (pts > 0 ? '+' : '') + pts, note);
+}
+
+function revealRest() {
+  S.board.a.forEach((ans, i) => {
+    if (S.revealed[i]) return;
+    const el = EL.board.children[i];
+    if (!el) return;
+    setTimeout(() => {
+      el.classList.remove('hidden');
+      el.classList.add('shown', 'dead');
+      el.querySelector('.atext').textContent = ans[0];
+      el.querySelector('.pts').textContent = ans[1];
+    }, 140 + i * 90);
+  });
+  EL.board.classList.add('locked');
+}
+
+function gameOver() {
+  const [a, b] = S.teams;
+  const tie = a.score === b.score;
+  const win = a.score > b.score ? a : b;
+  EL.overTitle.textContent = tie ? 'DEAD HEAT' : win.name;
+  EL.overSub.textContent = tie
+    ? 'Both teams read the room exactly the same. Run it back.'
+    : 'takes the board with ' + win.score + ' points.';
+  EL.overScores.innerHTML = '';
+  S.teams.slice().sort((x, y) => y.score - x.score).forEach(t => {
+    const row = document.createElement('div');
+    const isWin = !tie && t === win;
+    row.className = 'fs-row' + (isWin ? ' win' : '');
+    const isA = t === S.teams[0];
+    row.innerHTML = '<span class="dot ' + (isA ? 'a' : 'b') + '"></span>' +
+      '<span class="nm"></span>' +
+      '<span class="sc" style="color:' + (isA ? 'var(--a1)' : 'var(--b1)') + '"></span>';
+    row.querySelector('.nm').textContent = t.name + (isWin ? ' 👑' : '');
+    row.querySelector('.sc').textContent = t.score;
+    EL.overScores.appendChild(row);
+  });
+  SFX.win();
+  show('scOver');
+}
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+function show(id) {
+  ['scSetup', 'scGame', 'scOver'].forEach(s => EL[s].classList.toggle('on', s === id));
+}
+
+function paintBoard(rebuild) {
+  if (rebuild) {
+    EL.board.classList.remove('locked');
+    EL.board.innerHTML = '';
+    S.board.a.forEach((ans, i) => {
+      const t = document.createElement('button');
+      t.className = 'tile hidden' + (i === 0 ? ' top' : '');
+      t.innerHTML = '<span class="rank"></span><span class="atext">• • •</span><span class="pts">--</span>';
+      t.querySelector('.rank').textContent = i + 1;
+      t.addEventListener('click', () => onTile(i));
+      EL.board.appendChild(t);
+    });
+  }
+  // sync (used after undo)
+  S.board.a.forEach((ans, i) => {
+    const el = EL.board.children[i];
+    if (!el) return;
+    const on = S.revealed[i];
+    el.classList.toggle('shown', on);
+    el.classList.toggle('hidden', !on);
+    el.classList.remove('dead');
+    el.querySelector('.atext').textContent = on ? ans[0] : '• • •';
+    el.querySelector('.pts').textContent = on ? ans[1] : '--';
+  });
+  EL.board.classList.toggle('locked', false);
+}
+
+function onTile(i) {
+  if (S.revealed[i]) return;
+  if (S.phase === 'faceoffTile') {
+    snapshot();
+    takeControl(S.faceoffTeam, i);
+  } else if (S.phase === 'play') {
+    snapshot();
+    revealTile(i);
+    if (S.revealed.every(Boolean)) return finishSweep();
+    render();
+  } else if (S.phase === 'steal') {
+    stealSuccess(i);
+  } else if (S.phase === 'final') {
+    finalAnswer(i);
+  }
+}
+
+function render() {
+  // header
+  EL.hdrNameA.textContent = S.teams[0].name;
+  EL.hdrNameB.textContent = S.teams[1].name;
+  EL.hdrPtsA.textContent = S.teams[0].score;
+  EL.hdrPtsB.textContent = S.teams[1].score;
+  EL.hdrRound.innerHTML = S.mode === 'final'
+    ? 'RUSH<br>' + S.finalIdx + '/' + FINAL_QS
+    : S.round + '/' + S.totalRounds;
+  const ctrlA = S.control === 0 && S.phase !== 'faceoff';
+  const ctrlB = S.control === 1 && S.phase !== 'faceoff';
+  const badge = S.mode === 'final' ? 'ON THE SPOT' : 'CONTROL';
+  EL.scoreA.classList.toggle('ctrl', ctrlA);
+  EL.scoreB.classList.toggle('ctrl', ctrlB);
+  EL.hdrBadgeA.textContent = ctrlA ? badge : '';
+  EL.hdrBadgeB.textContent = ctrlB ? badge : '';
+
+  // question band
+  const mult = multiplier();
+  EL.qLead.textContent = S.mode === 'final'
+    ? 'TOP ANSWER RUSH — #1 SCORES DOUBLE'
+    : (mult > 1 ? 'FINAL MAIN ROUND — DOUBLE POINTS' : 'WE ASKED 100 PEOPLE');
+  EL.qText.textContent = S.board.q;
+
+  // strikes + pot
+  [...EL.strikes.children].forEach((x, i) => x.classList.toggle('on', i < S.strikes));
+  EL.strikes.style.visibility = S.mode === 'final' ? 'hidden' : 'visible';
+  EL.potVal.textContent = potValue();
+
+  // prompt + actions
+  const A = S.teams[0].name, B = S.teams[1].name;
+  EL.acts.innerHTML = '';
+
+  if (S.awarding) {
+    EL.prompt.innerHTML = '<b class="hl">Survey says…</b>';
+    return;
+  }
+
+  const rowOf = (...els) => {
+    const r = document.createElement('div'); r.className = 'row';
+    els.forEach(e => r.appendChild(e)); EL.acts.appendChild(r); return r;
+  };
+  const mk = (label, cls, fn, extraClass) => {
+    const b = document.createElement('button');
+    b.className = 'btn ' + cls + (extraClass ? ' ' + extraClass : '');
+    b.textContent = label;
+    b.addEventListener('click', fn);
+    return b;
+  };
+
+  const restart = () => mk('Restart', 'ghost small', () => {
+    if (confirm('Restart the whole game? Scores are lost.')) { hideBanner(); show('scSetup'); }
+  });
+
+  if (S.phase === 'faceoff') {
+    EL.prompt.innerHTML = 'Read it out. <b>Both teams shout.</b> Who landed a real answer first?';
+    rowOf(
+      mk(A, 'teamA big', () => { S.faceoffTeam = 0; S.phase = 'faceoffTile'; render(); }),
+      mk(B, 'teamB big', () => { S.faceoffTeam = 1; S.phase = 'faceoffTile'; render(); })
+    );
+    rowOf(
+      mk('Skip this question', 'ghost small', () => { S.round--; nextRound(); }),
+      restart()
+    );
+
+  } else if (S.phase === 'faceoffTile') {
+    EL.prompt.innerHTML = '<b class="hl">' + S.teams[S.faceoffTeam].name + '</b> answered — now tap the tile they said.';
+    rowOf(mk('They missed — ' + S.teams[other(S.faceoffTeam)].name + ' shouts', 'ghost', () => {
+      S.faceoffTeam = other(S.faceoffTeam); render();
+    }));
+    rowOf(
+      mk('← Wrong team', 'ghost small', () => { S.phase = 'faceoff'; S.faceoffTeam = null; render(); }),
+      restart()
+    );
+
+  } else if (S.phase === 'play') {
+    EL.prompt.innerHTML = '<b class="hl">' + S.teams[S.control].name + '</b> has control. Tap what they name — or hit STRIKE.';
+    rowOf(mk('STRIKE  ✕', 'danger big', addStrike));
+    rowOf(
+      mk('UNDO', 'ghost small', undo),
+      mk('Give up board', 'ghost small', () => { snapshot(); S.strikes = 3; S.phase = 'steal'; SFX.strike(); render(); }),
+      restart()
+    );
+
+  } else if (S.phase === 'steal') {
+    const thief = other(S.control);
+    EL.prompt.innerHTML = 'Three strikes! <b class="hl">' + S.teams[thief].name + '</b> gets <b>one guess</b> for all ' + potValue() + ' points.';
+    rowOf(mk('NOT ON THE BOARD', 'danger big', stealFail));
+    rowOf(mk('UNDO', 'ghost small', undo), restart());
+
+  } else if (S.phase === 'final') {
+    EL.prompt.innerHTML = '<b class="hl">' + S.teams[S.control].name + '</b> — one shot at the <b>#1 answer</b>. Tap what they said.';
+    rowOf(mk('NOT ON THE BOARD', 'danger big', () => finalAnswer(null)));
+    rowOf(mk('UNDO', 'ghost small', undo), restart());
+  }
+}
+
+/* ---------- banner ---------- */
+function showBanner(kicker, who, amt, note) {
+  EL.bnKicker.textContent = kicker;
+  EL.bnWho.textContent = who;
+  EL.bnAmt.textContent = amt;
+  EL.bnAmt.style.color = amt.startsWith('+0') || amt === '0' ? 'var(--dim)' : 'var(--gold)';
+  EL.bnNote.textContent = note || '';
+  const last = S.mode === 'final' && S.finalIdx >= FINAL_QS;
+  const toFinal = S.mode === 'main' && S.round >= S.totalRounds;
+  EL.bnNext.textContent = last ? 'SEE THE WINNER' : (toFinal ? 'TOP ANSWER RUSH →' : 'NEXT ROUND →');
+  // let the room watch the rest of the board flip up before the score lands
+  S.awarding = true;
+  render();
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => { EL.banner.style.display = 'flex'; }, 950);
+}
+function hideBanner() {
+  clearTimeout(bannerTimer);
+  S.awarding = false;
+  EL.banner.style.display = 'none';
+}
+
+/* =========================================================
+   WIRING
+   ========================================================= */
+EL.btnStart.addEventListener('click', () => { audio(); SFX.bank(); startGame(); });
+EL.bnNext.addEventListener('click', () => { SFX.tick(); nextRound(); });
+EL.btnAgain.addEventListener('click', () => { SFX.tick(); startGame(); });
+EL.btnMenu.addEventListener('click', () => { SFX.tick(); show('scSetup'); });
+document.addEventListener('pointerdown', () => audio(), { once: true });
+
+buildSetup();
+})();
+</script>
+</body>
+</html>

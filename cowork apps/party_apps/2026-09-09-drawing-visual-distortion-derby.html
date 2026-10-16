@@ -1,0 +1,602 @@
+<!-- CONCEPT: drawing-visual - Distortion Derby: pass-the-device drawing game where every artist gets a secret word AND a random handicap (mirrored ink, laggy pen, invisible ink, closing walls) that wrecks their drawing; the room shouts guesses at the reveal and both guesser and artist score. 3-10 players, 15-25 min. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Distortion Derby — Party Drawing Game</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%;overflow:hidden}
+  body{
+    font-family:"Trebuchet MS","Segoe UI",Verdana,sans-serif;
+    background:radial-gradient(circle at 20% 10%,#3a1560 0%,#160a2b 45%,#07030f 100%);
+    color:#fff;user-select:none;touch-action:manipulation;
+  }
+  #app{position:absolute;inset:0;display:flex;flex-direction:column}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column;padding:2.2vmin;overflow:auto}
+  .screen.on{display:flex}
+  h1{font-size:clamp(34px,7.5vmin,86px);margin:.1em 0 0;letter-spacing:.02em;line-height:1;
+     background:linear-gradient(92deg,#ffd54a,#ff5fb0 45%,#5ce1ff);-webkit-background-clip:text;background-clip:text;color:transparent;text-align:center;font-weight:900}
+  .tag{text-align:center;font-size:clamp(13px,2.1vmin,22px);color:#c9b8e8;margin:.5em 0 .2em;line-height:1.45}
+  .meta{text-align:center;font-size:clamp(12px,1.7vmin,18px);color:#7d6ba3;letter-spacing:.14em;text-transform:uppercase;margin-bottom:1.4vmin}
+  button{font-family:inherit;font-weight:800;border:none;border-radius:16px;cursor:pointer;transition:transform .08s ease,filter .15s ease}
+  button:active{transform:scale(.96)}
+  .big{font-size:clamp(19px,3.4vmin,34px);padding:.72em 1.5em;background:linear-gradient(180deg,#ffd54a,#ff9d2e);color:#2a1400;box-shadow:0 7px 0 #a75f00}
+  .big:active{box-shadow:0 3px 0 #a75f00}
+  .ghost{font-size:clamp(15px,2.3vmin,22px);padding:.62em 1.3em;background:rgba(255,255,255,.11);color:#e8ddff;border:2px solid rgba(255,255,255,.24)}
+  .center{margin:auto;width:100%;max-width:1050px;text-align:center}
+  .row{display:flex;gap:1.4vmin;flex-wrap:wrap;justify-content:center;align-items:center}
+  input[type=text]{font-family:inherit;font-size:clamp(16px,2.6vmin,26px);font-weight:700;padding:.55em .8em;border-radius:14px;border:2px solid rgba(255,255,255,.25);background:rgba(0,0,0,.35);color:#fff;width:100%}
+  input[type=text]:focus{outline:none;border-color:#ffd54a}
+  .plist{display:flex;flex-direction:column;gap:1vmin;margin:1.6vmin 0;max-width:520px;margin-inline:auto}
+  .prow{display:flex;gap:1vmin;align-items:center}
+  .prow .num{width:2.2em;font-weight:900;color:#ffd54a;font-size:clamp(15px,2.4vmin,24px)}
+  .del{background:rgba(255,90,120,.22);color:#ffb3c4;border:2px solid rgba(255,90,120,.4);font-size:clamp(15px,2.3vmin,22px);padding:.45em .75em;border-radius:12px}
+  .card{background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.16);border-radius:22px;padding:2.4vmin}
+  .word{font-size:clamp(40px,11vmin,120px);font-weight:900;letter-spacing:.01em;color:#fff;text-shadow:0 0 26px rgba(255,213,74,.55);line-height:1.05;margin:.15em 0}
+  .rulename{font-size:clamp(24px,5.2vmin,58px);font-weight:900;color:#5ce1ff;letter-spacing:.05em;margin:.1em 0}
+  .ruledesc{font-size:clamp(15px,2.6vmin,28px);color:#ffd54a;line-height:1.4;margin-bottom:.4em}
+  .who{font-size:clamp(28px,6.5vmin,74px);font-weight:900;color:#ffd54a;line-height:1.1}
+  /* draw screen */
+  #drawScreen{padding:1.2vmin;display:none}
+  #drawScreen.on{display:flex}
+  .topbar{display:flex;align-items:center;gap:1.4vmin;padding:0 .6vmin .9vmin}
+  .rulechip{flex:1;min-width:0;background:rgba(92,225,255,.13);border:2px solid rgba(92,225,255,.5);border-radius:14px;padding:.5em .8em;overflow:hidden}
+  .rulechip b{display:block;font-size:clamp(13px,2.1vmin,22px);color:#5ce1ff;letter-spacing:.05em}
+  .rulechip span{display:block;font-size:clamp(11px,1.7vmin,17px);color:#cfe9f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .secret{background:rgba(255,213,74,.14);border:2px solid rgba(255,213,74,.55);border-radius:14px;padding:.5em .9em;font-weight:900;font-size:clamp(16px,3vmin,32px);color:#ffd54a;max-width:38vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #clock{font-size:clamp(26px,5.4vmin,56px);font-weight:900;min-width:2.3em;text-align:center}
+  #clock.warn{color:#ff6b8b;animation:pulse .5s infinite alternate}
+  @keyframes pulse{to{transform:scale(1.13)}}
+  .bar{height:1.5vmin;min-height:9px;background:rgba(255,255,255,.12);border-radius:99px;overflow:hidden;margin:0 .6vmin .9vmin}
+  #barFill{height:100%;width:100%;background:linear-gradient(90deg,#5ce1ff,#ffd54a,#ff5fb0);transition:width .15s linear}
+  .canwrap{flex:1;position:relative;border-radius:20px;overflow:hidden;background:#fdfaf2;box-shadow:0 0 0 3px rgba(255,255,255,.25)}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:clamp(18px,4vmin,44px);font-weight:900;color:rgba(40,20,70,.22);text-align:center;padding:6vmin;line-height:1.3}
+  .botbar{display:flex;gap:1.2vmin;justify-content:center;padding-top:1vmin;align-items:center}
+  .strokes{font-size:clamp(13px,2.1vmin,20px);color:#c9b8e8;font-weight:800}
+  /* reveal */
+  .guessgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1.2vmin;max-width:900px;margin:1.4vmin auto 0;width:100%}
+  .gbtn{font-size:clamp(16px,2.6vmin,26px);padding:.75em .5em;background:linear-gradient(180deg,#7d5cff,#5433cc);color:#fff;box-shadow:0 5px 0 #34208a}
+  .gbtn:active{box-shadow:0 2px 0 #34208a}
+  .nobody{background:linear-gradient(180deg,#6b6b7d,#42424f)!important;box-shadow:0 5px 0 #2a2a33!important}
+  #revealCanWrap{flex:1;min-height:28vh;position:relative;border-radius:18px;overflow:hidden;background:#fdfaf2;box-shadow:0 0 0 3px rgba(255,255,255,.25);margin-bottom:1.2vmin}
+  /* scores */
+  table{border-collapse:collapse;width:100%;max-width:640px;margin:1.4vmin auto}
+  td{padding:.55em .7em;font-size:clamp(17px,3vmin,30px);font-weight:800;border-bottom:2px solid rgba(255,255,255,.1)}
+  td.pts{text-align:right;color:#ffd54a}
+  tr.lead td{color:#ffd54a}
+  .rank{color:#7d6ba3;width:2.2em}
+  .pop{font-size:clamp(22px,4.6vmin,48px);font-weight:900;color:#7cffa8;margin:.3em 0}
+  .miss{color:#ff8fa6}
+  .err{color:#ff8fa6;font-weight:800;font-size:clamp(14px,2.2vmin,20px);min-height:1.4em}
+  .foot{text-align:center;color:#6b5c8c;font-size:clamp(11px,1.6vmin,15px);padding-top:1vmin}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ============ SETUP ============ -->
+<section class="screen on" id="setup">
+  <div class="center">
+    <h1>DISTORTION DERBY</h1>
+    <p class="tag">Draw the secret word — but your pen is <b>sabotaged</b>.<br>Mirrored, laggy, invisible, or shaking like a leaf. The room shouts guesses at the reveal.</p>
+    <p class="meta">3–10 players &nbsp;•&nbsp; 15–25 minutes &nbsp;•&nbsp; pass one device</p>
+    <div class="card">
+      <div class="plist" id="plist"></div>
+      <div class="row" style="margin-top:.6em">
+        <button class="ghost" id="addP">+ Add player</button>
+      </div>
+      <div class="err" id="setupErr"></div>
+      <div class="row" style="margin-top:1.2vmin">
+        <span class="strokes">Turns each:</span>
+        <button class="ghost" data-turns="1">1</button>
+        <button class="ghost" data-turns="2">2</button>
+        <button class="ghost" data-turns="3">3</button>
+        <span class="strokes">Timer:</span>
+        <button class="ghost" data-time="30">30s</button>
+        <button class="ghost" data-time="45">45s</button>
+        <button class="ghost" data-time="60">60s</button>
+      </div>
+      <div class="row" style="margin-top:1.8vmin">
+        <button class="big" id="startBtn">START THE DERBY</button>
+      </div>
+    </div>
+    <p class="foot">One sentence of rules: draw your word with a broken pen, everyone else guesses, points for the artist and the guesser.</p>
+  </div>
+</section>
+
+<!-- ============ HANDOFF ============ -->
+<section class="screen" id="handoff">
+  <div class="center">
+    <p class="meta" id="roundLbl">Round 1</p>
+    <p class="tag" style="font-size:clamp(16px,2.8vmin,30px)">Pass the device to</p>
+    <div class="who" id="artistName">—</div>
+    <p class="tag">Everyone else: <b>no peeking</b> at the next screen.</p>
+    <div class="row" style="margin-top:2vmin">
+      <button class="big" id="readyBtn">I'M HOLDING IT — SHOW ME</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BRIEF ============ -->
+<section class="screen" id="brief">
+  <div class="center">
+    <p class="meta">Your secret word</p>
+    <div class="word" id="briefWord">—</div>
+    <div class="card" style="margin-top:1.4vmin">
+      <p class="meta" style="margin:0 0 .4em">Your handicap</p>
+      <div class="rulename" id="briefRule">—</div>
+      <div class="ruledesc" id="briefDesc">—</div>
+    </div>
+    <div class="row" style="margin-top:2vmin">
+      <button class="big" id="goDraw">START DRAWING</button>
+    </div>
+    <p class="foot">No letters, no numbers, no talking, no pointing. Just the pen.</p>
+  </div>
+</section>
+
+<!-- ============ DRAW ============ -->
+<section class="screen" id="drawScreen">
+  <div class="topbar">
+    <div class="secret" id="drawWord">—</div>
+    <div class="rulechip"><b id="drawRule">—</b><span id="drawDesc">—</span></div>
+    <div id="clock">45</div>
+  </div>
+  <div class="bar"><div id="barFill"></div></div>
+  <div class="canwrap">
+    <canvas id="pad"></canvas>
+    <div id="hint">Draw here</div>
+  </div>
+  <div class="botbar">
+    <span class="strokes" id="strokeInfo"></span>
+    <button class="ghost" id="doneBtn">DONE — REVEAL IT</button>
+  </div>
+</section>
+
+<!-- ============ REVEAL ============ -->
+<section class="screen" id="reveal">
+  <p class="meta" id="revealLbl">Hold it up! Shout your guesses.</p>
+  <div id="revealCanWrap"><canvas id="pad2"></canvas></div>
+  <div style="text-align:center">
+    <p class="tag" style="margin:0">Who got it first? <span style="color:#7d6ba3">(host taps the name)</span></p>
+    <div class="guessgrid" id="guessGrid"></div>
+  </div>
+</section>
+
+<!-- ============ SCORE ============ -->
+<section class="screen" id="scores">
+  <div class="center">
+    <p class="meta">The word was</p>
+    <div class="word" id="scoreWord">—</div>
+    <div class="pop" id="scoreMsg">—</div>
+    <table id="scoreTable"></table>
+    <div class="row" style="margin-top:1.4vmin">
+      <button class="big" id="nextBtn">NEXT ARTIST</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FINAL ============ -->
+<section class="screen" id="final">
+  <div class="center">
+    <p class="meta">Final scores</p>
+    <h1 id="winner">—</h1>
+    <table id="finalTable"></table>
+    <div class="row" style="margin-top:2vmin">
+      <button class="big" id="againBtn">PLAY AGAIN</button>
+      <button class="ghost" id="newBtn">NEW PLAYERS</button>
+    </div>
+  </div>
+</section>
+
+</div>
+<script>
+"use strict";
+/* ---------------- audio ---------------- */
+var actx=null;
+function ac(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } } if(actx&&actx.state==="suspended"){actx.resume();} return actx; }
+function tone(freq,dur,type,vol,slideTo){
+  var c=ac(); if(!c) return;
+  var o=c.createOscillator(), g=c.createGain();
+  o.type=type||"square"; o.frequency.setValueAtTime(freq,c.currentTime);
+  if(slideTo){ o.frequency.exponentialRampToValueAtTime(slideTo,c.currentTime+dur); }
+  g.gain.setValueAtTime(0.0001,c.currentTime);
+  g.gain.exponentialRampToValueAtTime(vol||0.16,c.currentTime+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+dur);
+  o.connect(g); g.connect(c.destination); o.start(); o.stop(c.currentTime+dur+0.03);
+}
+function sTick(){ tone(760,0.07,"square",0.10); }
+function sGo(){ tone(420,0.10,"square",0.14); setTimeout(function(){tone(660,0.16,"square",0.14);},110); }
+function sBuzz(){ tone(150,0.55,"sawtooth",0.20,70); }
+function sGood(){ tone(660,0.10,"triangle",0.18); setTimeout(function(){tone(880,0.10,"triangle",0.18);},95); setTimeout(function(){tone(1180,0.22,"triangle",0.18);},190); }
+function sFail(){ tone(300,0.18,"sawtooth",0.15,170); }
+function sWin(){ [523,659,784,1047,1319].forEach(function(f,i){ setTimeout(function(){ tone(f,0.28,"triangle",0.18); }, i*140); }); }
+function sTap(){ tone(520,0.05,"sine",0.09); }
+
+/* ---------------- content ---------------- */
+var WORDS=[
+"octopus","penguin","giraffe","hedgehog","flamingo","kangaroo","jellyfish","snail","owl","crab",
+"sloth","walrus","chameleon","peacock","seahorse","porcupine","narwhal","toucan","llama","beaver",
+"umbrella","telescope","waffle iron","vacuum cleaner","lighthouse","hot air balloon","treasure chest","sewing machine","skateboard","chandelier",
+"mailbox","wind chime","typewriter","snow globe","piggy bank","kite","hammock","roller coaster","ferris wheel","submarine",
+"drum kit","accordion","disco ball","trampoline","wheelbarrow","birdhouse","popcorn machine","traffic cone","fire hydrant","shopping cart",
+"tuba","toaster","paper airplane","rubber duck","garden gnome","bunk bed","revolving door","escalator","water slide","tandem bicycle",
+"cupcake","taco","pineapple","spaghetti","sushi roll","ice cream cone","pretzel","corn on the cob","birthday cake","watermelon slice",
+"pancake stack","donut","bowl of soup","cheeseburger","popsicle","cotton candy","fortune cookie","jar of pickles",
+"campfire","igloo","castle","windmill","volcano","waterfall","pyramid","treehouse","city skyline","barn",
+"sneezing","juggling","tug of war","brushing teeth","riding a unicycle","taking a selfie","walking a dog","blowing bubbles","doing a cartwheel","waiting in line",
+"high five","snoring","scuba diving","surfing","karate kick","yawning","tying shoelaces","carrying groceries","stargazing","raking leaves",
+"washing a car","flying a kite","hiccups","arm wrestling","piggyback ride","thumb war","breakdancing","tripping over","sharing an umbrella","blowing out candles",
+"pirate","astronaut","wizard","scarecrow","snowman","mermaid","knight","chef","ninja","cowboy",
+"yeti","alien","dinosaur","mummy","dragon","superhero landing","lifeguard","beekeeper","referee","mall santa",
+"rainbow","tornado","thunderstorm","solar system","magnet","hourglass","maze","seesaw","alarm clock","bubble bath",
+"laundry day","traffic jam","first day of school","brain freeze","lost sock","spilled milk","tangled headphones","wifi signal","snooze button","haircut gone wrong"
+];
+
+var MODES=[
+ {id:"mirror",   name:"MIRROR WORLD",   desc:"Your ink comes out flipped left-to-right."},
+ {id:"flip",     name:"UPSIDE DOWN",    desc:"Everything you draw lands upside down."},
+ {id:"wobble",   name:"CAFFEINE HANDS", desc:"Your line shakes. A lot."},
+ {id:"fat",      name:"GIANT MARKER",   desc:"Your pen is absurdly thick. Good luck with details."},
+ {id:"fade",     name:"FADING INK",     desc:"Old strokes fade to a whisper. Draw the important bit last."},
+ {id:"straight", name:"RULER ONLY",     desc:"Every stroke snaps to a straight line."},
+ {id:"three",    name:"THREE STROKES",  desc:"You get exactly 3 strokes. Choose wisely."},
+ {id:"invisible",name:"INVISIBLE INK",  desc:"You cannot see your drawing until the reveal."},
+ {id:"delay",    name:"LAGGY PEN",      desc:"Your ink shows up one second late."},
+ {id:"spin",     name:"SLOW SPIN",      desc:"The page keeps rotating under your pen."},
+ {id:"zoom",     name:"BIG HANDS",      desc:"Everything you draw comes out double size."},
+ {id:"shrink",   name:"CLOSING WALLS",  desc:"The drawable area shrinks as the clock runs down."}
+];
+
+/* ---------------- state ---------------- */
+var S={
+  players:[], turnsEach:2, timeLimit:45,
+  order:[], turnIdx:0, deck:[], deckPos:0, lastMode:-1,
+  cur:null, strokes:[], drawing:false, curStroke:null,
+  tStart:0, tEnd:0, raf:0, phase:"setup", frozenNow:0
+};
+
+function $(id){ return document.getElementById(id); }
+function show(id){
+  var ss=document.querySelectorAll(".screen");
+  for(var i=0;i<ss.length;i++) ss[i].classList.remove("on");
+  $(id).classList.add("on");
+  S.phase=id;
+}
+function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i];a[i]=a[j];a[j]=t; } return a; }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c];}); }
+
+/* ---------------- setup screen ---------------- */
+var names=["","","",""];
+function renderPlayers(){
+  var h="";
+  for(var i=0;i<names.length;i++){
+    h+='<div class="prow"><span class="num">'+(i+1)+'</span>'+
+       '<input type="text" maxlength="14" placeholder="Player '+(i+1)+'" data-i="'+i+'" value="'+esc(names[i])+'">'+
+       (names.length>3?'<button class="del" data-del="'+i+'">✕</button>':'')+'</div>';
+  }
+  $("plist").innerHTML=h;
+  var ins=$("plist").querySelectorAll("input");
+  for(var k=0;k<ins.length;k++){
+    ins[k].addEventListener("input",function(e){ names[+e.target.dataset.i]=e.target.value; });
+  }
+  var dels=$("plist").querySelectorAll("[data-del]");
+  for(var d=0;d<dels.length;d++){
+    dels[d].addEventListener("click",function(e){ sTap(); names.splice(+e.target.dataset.del,1); renderPlayers(); });
+  }
+}
+renderPlayers();
+$("addP").addEventListener("click",function(){ if(names.length>=10){ $("setupErr").textContent="10 players is the maximum."; return; } sTap(); names.push(""); renderPlayers(); });
+
+function markOpts(){
+  var b=document.querySelectorAll("[data-turns]");
+  for(var i=0;i<b.length;i++) b[i].style.filter=(+b[i].dataset.turns===S.turnsEach)?"brightness(1.9)":"";
+  var t=document.querySelectorAll("[data-time]");
+  for(var j=0;j<t.length;j++) t[j].style.filter=(+t[j].dataset.time===S.timeLimit)?"brightness(1.9)":"";
+}
+(function(){
+  var b=document.querySelectorAll("[data-turns]");
+  for(var i=0;i<b.length;i++) b[i].addEventListener("click",function(e){ sTap(); S.turnsEach=+e.target.dataset.turns; markOpts(); });
+  var t=document.querySelectorAll("[data-time]");
+  for(var j=0;j<t.length;j++) t[j].addEventListener("click",function(e){ sTap(); S.timeLimit=+e.target.dataset.time; markOpts(); });
+  markOpts();
+})();
+
+$("startBtn").addEventListener("click",function(){
+  ac();
+  var list=[];
+  for(var i=0;i<names.length;i++){ var n=(names[i]||"").trim(); if(n) list.push(n); }
+  if(list.length<3){ $("setupErr").textContent="Need at least 3 names to play."; sFail(); return; }
+  $("setupErr").textContent="";
+  S.players=list.map(function(n){ return {name:n,score:0,got:0,drawn:0,guessed:0}; });
+  newGame();
+});
+
+function newGame(){
+  S.order=[];
+  var idx=S.players.map(function(_,i){return i;});
+  for(var r=0;r<S.turnsEach;r++){ S.order=S.order.concat(shuffle(idx.slice())); }
+  S.turnIdx=0; S.deck=shuffle(WORDS.slice()); S.deckPos=0; S.lastMode=-1;
+  for(var i=0;i<S.players.length;i++){ S.players[i].score=0; S.players[i].drawn=0; S.players[i].guessed=0; }
+  nextTurn();
+}
+
+/* ---------------- turn flow ---------------- */
+function nextTurn(){
+  if(S.turnIdx>=S.order.length){ endGame(); return; }
+  var artist=S.order[S.turnIdx];
+  if(S.deckPos>=S.deck.length){ S.deck=shuffle(WORDS.slice()); S.deckPos=0; }
+  var word=S.deck[S.deckPos++];
+  var m; do{ m=Math.floor(Math.random()*MODES.length); }while(m===S.lastMode&&MODES.length>1);
+  S.lastMode=m;
+  S.cur={artist:artist,word:word,mode:MODES[m]};
+  $("roundLbl").textContent="Turn "+(S.turnIdx+1)+" of "+S.order.length;
+  $("artistName").textContent=S.players[artist].name;
+  show("handoff");
+}
+$("readyBtn").addEventListener("click",function(){
+  sTap();
+  $("briefWord").textContent=S.cur.word.toUpperCase();
+  $("briefRule").textContent=S.cur.mode.name;
+  $("briefDesc").textContent=S.cur.mode.desc;
+  show("brief");
+});
+$("goDraw").addEventListener("click",function(){ startDraw(); });
+
+/* ---------------- canvas ---------------- */
+var pad=$("pad"), pctx=pad.getContext("2d");
+var pad2=$("pad2"), p2ctx=pad2.getContext("2d");
+var W=800,H=600;
+
+function sizeCanvas(cv,ctx){
+  var r=cv.getBoundingClientRect();
+  var dpr=Math.min(window.devicePixelRatio||1,2);
+  cv.width=Math.max(1,Math.round(r.width*dpr));
+  cv.height=Math.max(1,Math.round(r.height*dpr));
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  return {w:r.width||800,h:r.height||600};
+}
+
+function modeAngle(prog){ return prog*1.25; }
+
+function transform(p,prog){
+  var id=S.cur.mode.id, cx=W/2, cy=H/2;
+  if(id==="mirror") return {x:W-p.x,y:p.y};
+  if(id==="flip")   return {x:p.x,y:H-p.y};
+  if(id==="wobble") return {x:p.x+(Math.random()-0.5)*24,y:p.y+(Math.random()-0.5)*24};
+  if(id==="zoom")   return {x:cx+(p.x-cx)*1.9,y:cy+(p.y-cy)*1.9};
+  if(id==="spin"){
+    var a=-modeAngle(prog), dx=p.x-cx, dy=p.y-cy;
+    return {x:cx+dx*Math.cos(a)-dy*Math.sin(a), y:cy+dx*Math.sin(a)+dy*Math.cos(a)};
+  }
+  if(id==="shrink"){
+    var m=prog*0.34*Math.min(W,H);
+    if(p.x<m||p.x>W-m||p.y<m||p.y>H-m) return null;
+    return {x:p.x,y:p.y};
+  }
+  return {x:p.x,y:p.y};
+}
+
+function penWidth(){ return S.cur.mode.id==="fat"?42:8; }
+
+function render(ctx,cw,ch,revealMode){
+  var id=S.cur.mode.id;
+  var now = revealMode ? S.frozenNow : Date.now();
+  var prog = Math.min(1,Math.max(0,(now-S.tStart)/(S.timeLimit*1000)));
+  ctx.save();
+  ctx.clearRect(0,0,cw,ch);
+  ctx.fillStyle="#fdfaf2"; ctx.fillRect(0,0,cw,ch);
+  // scale logical space to element space
+  ctx.scale(cw/W,ch/H);
+
+  if(id==="shrink"&&!revealMode){
+    var m=prog*0.34*Math.min(W,H);
+    ctx.strokeStyle="rgba(255,95,176,.55)"; ctx.lineWidth=6;
+    ctx.strokeRect(m,m,W-2*m,H-2*m);
+    ctx.fillStyle="rgba(120,60,160,.10)";
+    ctx.fillRect(0,0,W,m); ctx.fillRect(0,H-m,W,m);
+    ctx.fillRect(0,m,m,H-2*m); ctx.fillRect(W-m,m,m,H-2*m);
+  }
+  if(id==="spin"){
+    var a=modeAngle(revealMode?1:prog);
+    ctx.translate(W/2,H/2); ctx.rotate(a); ctx.translate(-W/2,-H/2);
+  }
+  var hideAll = (id==="invisible"&&!revealMode);
+  if(!hideAll){
+    ctx.lineCap="round"; ctx.lineJoin="round";
+    for(var s=0;s<S.strokes.length;s++){
+      var st=S.strokes[s]; if(st.pts.length===0) continue;
+      var alpha=1;
+      if(id==="fade"){
+        var age=(now-st.endT)/1000;
+        if(st.open) age=0;
+        alpha=Math.max(0.14,1-Math.max(0,age)/6);
+      }
+      var pts=st.pts;
+      if(id==="delay"&&!revealMode){
+        pts=[]; for(var q=0;q<st.pts.length;q++){ if(st.pts[q].t<=now-1000) pts.push(st.pts[q]); }
+        if(pts.length===0) continue;
+      }
+      ctx.globalAlpha=alpha;
+      ctx.strokeStyle="#1c1230";
+      ctx.lineWidth=st.w;
+      ctx.beginPath();
+      if(id==="straight"){
+        ctx.moveTo(pts[0].x,pts[0].y);
+        ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);
+      }else{
+        ctx.moveTo(pts[0].x,pts[0].y);
+        if(pts.length===1){ ctx.lineTo(pts[0].x+0.1,pts[0].y+0.1); }
+        for(var i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+  if(hideAll){
+    ctx.save();
+    ctx.fillStyle="rgba(40,20,70,.16)";
+    ctx.font="900 "+Math.round(Math.min(cw,ch)*0.09)+"px Trebuchet MS, sans-serif";
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText("INVISIBLE INK", cw/2, ch/2);
+    ctx.font="800 "+Math.round(Math.min(cw,ch)*0.045)+"px Trebuchet MS, sans-serif";
+    ctx.fillText(S.strokes.length+" strokes so far", cw/2, ch/2+Math.min(cw,ch)*0.09);
+    ctx.restore();
+  }
+}
+
+/* pointer handling */
+function padPoint(e){
+  var r=pad.getBoundingClientRect();
+  return {x:(e.clientX-r.left)*(W/r.width), y:(e.clientY-r.top)*(H/r.height)};
+}
+function maxStrokes(){ return S.cur.mode.id==="three"?3:9999; }
+
+pad.addEventListener("pointerdown",function(e){
+  if(S.phase!=="drawScreen") return;
+  if(S.strokes.length>=maxStrokes()){ sFail(); return; }
+  e.preventDefault();
+  try{ pad.setPointerCapture(e.pointerId); }catch(err){}
+  var prog=Math.min(1,(Date.now()-S.tStart)/(S.timeLimit*1000));
+  var p=transform(padPoint(e),prog); if(!p) return;
+  S.drawing=true;
+  S.curStroke={pts:[{x:p.x,y:p.y,t:Date.now()}],w:penWidth(),endT:Date.now(),open:true};
+  S.strokes.push(S.curStroke);
+  $("hint").style.display="none";
+  updStrokeInfo();
+});
+pad.addEventListener("pointermove",function(e){
+  if(!S.drawing||S.phase!=="drawScreen") return;
+  e.preventDefault();
+  var prog=Math.min(1,(Date.now()-S.tStart)/(S.timeLimit*1000));
+  var p=transform(padPoint(e),prog); if(!p) return;
+  var last=S.curStroke.pts[S.curStroke.pts.length-1];
+  if(Math.abs(p.x-last.x)<1.2&&Math.abs(p.y-last.y)<1.2) return;
+  S.curStroke.pts.push({x:p.x,y:p.y,t:Date.now()});
+  S.curStroke.endT=Date.now();
+});
+function endStroke(){
+  if(!S.drawing) return;
+  S.drawing=false;
+  if(S.curStroke){ S.curStroke.open=false; S.curStroke.endT=Date.now(); }
+  S.curStroke=null; updStrokeInfo();
+}
+pad.addEventListener("pointerup",endStroke);
+pad.addEventListener("pointercancel",endStroke);
+pad.addEventListener("pointerleave",function(){ if(S.drawing) endStroke(); });
+
+function updStrokeInfo(){
+  if(S.cur.mode.id==="three"){
+    $("strokeInfo").textContent="Strokes used: "+S.strokes.length+" / 3";
+  }else{
+    $("strokeInfo").textContent="No undo. That's the game.";
+  }
+}
+
+/* ---------------- draw phase ---------------- */
+var lastBeep=-1;
+function startDraw(){
+  S.strokes=[]; S.drawing=false; S.curStroke=null; lastBeep=-1;
+  $("drawWord").textContent=S.cur.word.toUpperCase();
+  $("drawRule").textContent=S.cur.mode.name;
+  $("drawDesc").textContent=S.cur.mode.desc;
+  $("hint").style.display="flex";
+  $("hint").textContent=(S.cur.mode.id==="invisible")?"Draw blind — you'll see it at the reveal":"Draw here";
+  show("drawScreen");
+  var d=sizeCanvas(pad,pctx); W=800; H=Math.max(300,Math.round(800*(d.h/d.w)));
+  updStrokeInfo();
+  S.tStart=Date.now(); S.tEnd=S.tStart+S.timeLimit*1000;
+  sGo();
+  cancelAnimationFrame(S.raf);
+  loop();
+}
+function loop(){
+  if(S.phase!=="drawScreen") return;
+  var d=pad.getBoundingClientRect();
+  if(pad.width!==Math.round(d.width*Math.min(window.devicePixelRatio||1,2))) sizeCanvas(pad,pctx);
+  var left=Math.max(0,S.tEnd-Date.now());
+  var secs=Math.ceil(left/1000);
+  $("clock").textContent=secs;
+  $("clock").classList.toggle("warn",secs<=5);
+  $("barFill").style.width=(left/(S.timeLimit*1000)*100)+"%";
+  if(secs<=5&&secs>0&&secs!==lastBeep){ lastBeep=secs; sTick(); }
+  render(pctx,d.width,d.height,false);
+  if(left<=0){ sBuzz(); finishDraw(); return; }
+  S.raf=requestAnimationFrame(loop);
+}
+$("doneBtn").addEventListener("click",function(){ endStroke(); finishDraw(); });
+
+function finishDraw(){
+  cancelAnimationFrame(S.raf);
+  endStroke();
+  S.frozenNow=Date.now();
+  show("reveal");
+  setTimeout(function(){
+    var d=sizeCanvas(pad2,p2ctx);
+    render(p2ctx,d.width,d.height,true);
+  },30);
+  var h="";
+  for(var i=0;i<S.players.length;i++){
+    if(i===S.cur.artist) continue;
+    h+='<button class="gbtn" data-g="'+i+'">'+esc(S.players[i].name)+'</button>';
+  }
+  h+='<button class="gbtn nobody" data-g="-1">NOBODY GOT IT</button>';
+  $("guessGrid").innerHTML=h;
+  var bs=$("guessGrid").querySelectorAll("[data-g]");
+  for(var k=0;k<bs.length;k++) bs[k].addEventListener("click",function(e){ resolve(+e.currentTarget.dataset.g); });
+  $("revealLbl").textContent="Hold it up! "+S.players[S.cur.artist].name+" drew this with "+S.cur.mode.name+".";
+}
+window.addEventListener("resize",function(){
+  if(S.phase==="reveal"){ var d=sizeCanvas(pad2,p2ctx); render(p2ctx,d.width,d.height,true); }
+});
+
+/* ---------------- scoring ---------------- */
+function resolve(gi){
+  var msg;
+  if(gi>=0){
+    S.players[gi].score+=3; S.players[gi].guessed++;
+    S.players[S.cur.artist].score+=2; S.players[S.cur.artist].drawn++;
+    msg='<span>'+esc(S.players[gi].name)+' +3 &nbsp;•&nbsp; '+esc(S.players[S.cur.artist].name)+' +2 for surviving '+esc(S.cur.mode.name)+'</span>';
+    sGood();
+  }else{
+    msg='<span class="miss">Nobody cracked it. No points — blame the pen.</span>';
+    sFail();
+  }
+  $("scoreWord").textContent=S.cur.word.toUpperCase();
+  $("scoreMsg").innerHTML=msg;
+  drawTable($("scoreTable"));
+  S.turnIdx++;
+  $("nextBtn").textContent=(S.turnIdx>=S.order.length)?"SEE FINAL SCORES":"NEXT ARTIST";
+  show("scores");
+}
+function drawTable(el){
+  var rows=S.players.map(function(p,i){ return {n:p.name,s:p.score,d:p.drawn,g:p.guessed}; });
+  rows.sort(function(a,b){ return b.s-a.s; });
+  var h="",top=rows.length?rows[0].s:0;
+  for(var i=0;i<rows.length;i++){
+    h+='<tr'+(rows[i].s===top&&top>0?' class="lead"':'')+'><td class="rank">'+(i+1)+'</td><td>'+esc(rows[i].n)+
+       '</td><td class="pts">'+rows[i].s+'</td></tr>';
+  }
+  el.innerHTML=h;
+}
+$("nextBtn").addEventListener("click",function(){ sTap(); nextTurn(); });
+
+function endGame(){
+  var rows=S.players.slice().sort(function(a,b){ return b.score-a.score; });
+  var top=rows[0].score;
+  var champs=rows.filter(function(p){return p.score===top;}).map(function(p){return p.name;});
+  $("winner").textContent=(champs.length>1? champs.join(" & ")+" TIE!" : champs[0]+" WINS!");
+  drawTable($("finalTable"));
+  show("final");
+  sWin();
+}
+$("againBtn").addEventListener("click",function(){ sTap(); newGame(); });
+$("newBtn").addEventListener("click",function(){ sTap(); show("setup"); });
+
+document.addEventListener("gesturestart",function(e){e.preventDefault();});
+</script>
+</body>
+</html>
