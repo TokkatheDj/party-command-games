@@ -1,0 +1,1441 @@
+<!-- CONCEPT: NATURE & WEATHER - Pip's Year Tree: one big tree lives through a whole year and each season needs a different job from you - tap sleepy buds awake in spring, slide a bee blossom-to-blossom in summer, swipe up gusts of wind to whoosh the leaves down in autumn, and tap branches to hang bird treats in winter - filling a Year Book with a photo of your tree from every season. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pip's Year Tree</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --sky-a: #bfe9ff;
+    --sky-b: #e9f9dd;
+    --accent: #ff7fb0;
+    --accent2: #ffd166;
+    --ink: #3a2f4a;
+    --panel: rgba(255,255,255,0.82);
+    --shadow: 0 6px 0 rgba(58,47,74,0.16);
+    --pad: clamp(6px, 2vw, 12px);
+  }
+
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    overflow: hidden;
+    touch-action: manipulation;
+    user-select: none; -webkit-user-select: none;
+    font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(180deg, var(--sky-a), var(--sky-b));
+    transition: background 700ms ease;
+  }
+
+  #app {
+    position: relative;
+    display: flex; flex-direction: column;
+    height: 100%; width: 100%;
+    max-width: 820px; margin: 0 auto;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; gap: 6px;
+    padding: var(--pad) var(--pad) 0 var(--pad);
+  }
+  h1 {
+    margin: 0; flex: 1;
+    font-size: clamp(19px, 5.2vw, 30px);
+    line-height: 1.1;
+    letter-spacing: 0.5px;
+    background: linear-gradient(90deg, #e0326f, #ef6a12);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 0 rgba(255,255,255,0.85));
+  }
+  .iconbtn {
+    width: 46px; height: 46px; min-width: 46px;
+    border: none; border-radius: 16px;
+    background: var(--panel); box-shadow: var(--shadow);
+    font-size: clamp(18px, 4.6vw, 24px);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .iconbtn:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(58,47,74,0.16); }
+
+  /* ---------- season wheel ---------- */
+  #wheel {
+    display: flex; gap: clamp(6px, 2vw, 12px);
+    padding: var(--pad);
+  }
+  .season {
+    flex: 1;
+    min-height: 62px;
+    border: 4px solid transparent;
+    border-radius: 20px;
+    background: var(--panel);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 1px;
+    padding: 4px 2px;
+    position: relative;
+    transition: transform 150ms ease, border-color 200ms ease;
+  }
+  .season .em { font-size: clamp(21px, 6vw, 30px); line-height: 1; }
+  .season .nm { font-size: clamp(10px, 2.7vw, 13px); font-weight: bold; opacity: 0.75; }
+  .season.on { border-color: var(--accent); transform: translateY(-3px) scale(1.04); }
+  .season .star {
+    position: absolute; top: -8px; right: -4px;
+    font-size: clamp(14px, 3.6vw, 18px);
+    display: none;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+  }
+  .season.done .star { display: block; }
+  .season:active { transform: translateY(2px); }
+
+  /* ---------- instruction + progress ---------- */
+  #banner {
+    margin: 0 var(--pad);
+    background: var(--panel);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 8px 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  #bannerText {
+    flex: 1;
+    font-size: clamp(13px, 3.6vw, 18px);
+    font-weight: bold;
+    line-height: 1.2;
+  }
+  #count {
+    font-size: clamp(13px, 3.6vw, 18px);
+    font-weight: bold;
+    white-space: nowrap;
+    color: var(--accent);
+  }
+  #barWrap {
+    margin: 6px var(--pad) 0 var(--pad);
+    height: 12px; border-radius: 99px;
+    background: rgba(255,255,255,0.6);
+    box-shadow: inset 0 2px 0 rgba(58,47,74,0.08);
+    overflow: hidden;
+  }
+  #bar {
+    height: 100%; width: 0%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 260ms ease;
+  }
+
+  /* ---------- canvas ---------- */
+  #stage { flex: 1; position: relative; min-height: 0; margin-top: 4px; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: absolute; inset: 0;
+    display: none;
+    align-items: center; justify-content: center;
+    padding: 16px;
+    background: rgba(58,47,74,0.28);
+    backdrop-filter: blur(2px);
+    z-index: 5;
+  }
+  .overlay.show { display: flex; }
+  .card {
+    background: #fff;
+    border-radius: 26px;
+    box-shadow: 0 10px 0 rgba(58,47,74,0.2);
+    padding: 18px 16px;
+    text-align: center;
+    max-width: 460px; width: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+    animation: pop 380ms cubic-bezier(.2,1.4,.4,1);
+  }
+  @keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .card .big { font-size: clamp(40px, 13vw, 66px); line-height: 1; }
+  .card h2 {
+    margin: 6px 0 2px 0;
+    font-size: clamp(20px, 6vw, 30px);
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .card p { margin: 4px 0 12px 0; font-size: clamp(13px, 3.6vw, 17px); opacity: 0.8; }
+  .bigbtn {
+    display: block; width: 100%;
+    min-height: 56px;
+    border: none; border-radius: 18px;
+    background: linear-gradient(180deg, var(--accent2), var(--accent));
+    color: #fff;
+    font-family: inherit; font-weight: bold;
+    font-size: clamp(15px, 4.4vw, 20px);
+    box-shadow: 0 6px 0 rgba(58,47,74,0.22);
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .bigbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(58,47,74,0.22); }
+  .bigbtn.soft {
+    background: #f0eef5; color: var(--ink);
+    box-shadow: 0 5px 0 rgba(58,47,74,0.14);
+  }
+
+  /* ---------- year book ---------- */
+  #photos {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    margin: 8px 0 4px 0;
+  }
+  .photo {
+    background: #f3f1f7;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 3px solid #fff;
+    box-shadow: 0 3px 0 rgba(58,47,74,0.14);
+    aspect-ratio: 4 / 3;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    font-size: clamp(22px, 8vw, 34px);
+  }
+  .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photo .lbl {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: rgba(255,255,255,0.86);
+    font-size: clamp(9px, 2.6vw, 12px);
+    font-weight: bold;
+    padding: 2px 0;
+  }
+  .photo.empty { filter: grayscale(1); opacity: 0.55; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Pip's Year Tree</h1>
+    <button class="iconbtn" id="bookBtn" aria-label="Year Book">📖</button>
+    <button class="iconbtn" id="resetBtn" aria-label="Start over">↻</button>
+  </header>
+
+  <div id="wheel">
+    <button class="season" data-s="spring"><span class="star">⭐</span><span class="em">🌸</span><span class="nm">Spring</span></button>
+    <button class="season" data-s="summer"><span class="star">⭐</span><span class="em">☀️</span><span class="nm">Summer</span></button>
+    <button class="season" data-s="autumn"><span class="star">⭐</span><span class="em">🍂</span><span class="nm">Autumn</span></button>
+    <button class="season" data-s="winter"><span class="star">⭐</span><span class="em">❄️</span><span class="nm">Winter</span></button>
+  </div>
+
+  <div id="banner">
+    <div id="bannerText">Tap the sleepy buds!</div>
+    <div id="count">0 / 12</div>
+  </div>
+  <div id="barWrap"><div id="bar"></div></div>
+
+  <div id="stage">
+    <canvas id="scene"></canvas>
+
+    <div class="overlay" id="celebrate">
+      <div class="card">
+        <div class="big" id="celEmoji">🌸</div>
+        <h2 id="celTitle">Spring is here!</h2>
+        <p id="celText">Your tree is covered in blossom.</p>
+        <button class="bigbtn" id="celNext">Next season ☀️</button>
+        <button class="bigbtn soft" id="celStay">Play here again</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="book">
+      <div class="card">
+        <div class="big">📖</div>
+        <h2>My Year Book</h2>
+        <p id="bookText">A photo of your tree from every season.</p>
+        <div id="photos"></div>
+        <button class="bigbtn" id="bookClose">Back to the tree 🌳</button>
+        <button class="bigbtn soft" id="bookReset">Start a new year 🌱</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Pip's Year Tree — one tree, four seasons, four jobs.
+   ============================================================ */
+
+const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
+
+const CONF = {
+  spring: {
+    em: '🌸', name: 'Spring',
+    sky: ['#bfe9ff', '#e9f9dd'], accent: '#ff7fb0', accent2: '#ffd166',
+    ground: ['#8fdc74', '#5cb85c'],
+    say: 'Tap the sleepy buds to wake them up!',
+    goal: 12,
+    winEm: '🌸', winTitle: 'Spring is here!', winText: 'Every branch is bursting with blossom.'
+  },
+  summer: {
+    em: '☀️', name: 'Summer',
+    sky: ['#63c8ff', '#dff4ff'], accent: '#ff9f43', accent2: '#ffe066',
+    ground: ['#6fd36f', '#3ea34a'],
+    say: 'Slide Buzzy the bee onto every blossom!',
+    goal: 12,
+    winEm: '🍎', winTitle: 'Apples for summer!', winText: 'Buzzy visited every flower and they all grew fruit.'
+  },
+  autumn: {
+    em: '🍂', name: 'Autumn',
+    sky: ['#ffc98a', '#fff0d6'], accent: '#f4712e', accent2: '#ffc14d',
+    ground: ['#e0b26a', '#bf8a4a'],
+    say: 'Swipe your finger to blow the leaves down!',
+    goal: 30,
+    winEm: '🍁', winTitle: 'What a leaf pile!', winText: 'Pip jumped right into the middle of it.'
+  },
+  winter: {
+    em: '❄️', name: 'Winter',
+    sky: ['#9dc4ea', '#eef7ff'], accent: '#4aa8ff', accent2: '#b9e6ff',
+    ground: ['#ffffff', '#dbeaf7'],
+    say: 'Tap the branches to hang treats for the birds!',
+    goal: 6,
+    winEm: '🐦', winTitle: 'The birds are safe!', winText: 'Six hungry friends found your treats. Pip says thank you.'
+  }
+};
+
+const STORE = 'cowork-seasonstree-year';
+
+/* ---------------- canvas ---------------- */
+const canvas = document.getElementById('scene');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+
+/* ---------------- tree ---------------- */
+let branches = [], slots = [], leafAnchors = [];
+let baseX = 0, baseY = 0, groundY = 0, treeScale = 1;
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function buildTree() {
+  branches = []; slots = []; leafAnchors = [];
+  groundY = H * 0.84;
+  baseX = W * 0.5;
+  baseY = groundY + H * 0.05;
+  const L = Math.min(H * 0.245, W * 0.33);
+  treeScale = L / 130;
+  const rnd = mulberry32(77123);
+
+  (function grow(x, y, a, len, w, d) {
+    const x2 = x + Math.cos(a) * len, y2 = y + Math.sin(a) * len;
+    branches.push({ x1: x, y1: y, x2: x2, y2: y2, w: w, d: d });
+    if (d >= 2) leafAnchors.push({ x: (x + x2) / 2, y: (y + y2) / 2 });
+    if (d >= 3) {
+      slots.push({ x: x2, y: y2 });
+      leafAnchors.push({ x: x2, y: y2 });
+      return;
+    }
+    const n = d === 0 ? 3 : 2;
+    for (let i = 0; i < n; i++) {
+      const spread = d === 0 ? 0.66 : 0.58;
+      const ang = a + (i - (n - 1) / 2) * spread + (rnd() - 0.5) * 0.3;
+      grow(x2, y2, ang, len * (0.74 + rnd() * 0.06), w * 0.6, d + 1);
+    }
+  })(baseX, baseY, -Math.PI / 2, L, Math.max(13, W * 0.042), 0);
+}
+
+function resize() {
+  const r = document.getElementById('stage').getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.max(240, r.width);
+  H = Math.max(240, r.height);
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  buildTree();
+  relayout();
+}
+
+/* ---------------- audio ---------------- */
+let ac = null;
+function AC() {
+  if (!ac) {
+    const A = window.AudioContext || window.webkitAudioContext;
+    if (!A) return null;
+    ac = new A();
+  }
+  if (ac.state === 'suspended') ac.resume();
+  return ac;
+}
+function tone(freq, dur, type, vol, delay) {
+  const a = AC(); if (!a) return;
+  dur = dur || 0.25; type = type || 'sine'; vol = vol == null ? 0.16 : vol; delay = delay || 0;
+  const t = a.currentTime + delay;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+function chirp(freq, dur, vol) {
+  const a = AC(); if (!a) return;
+  const t = a.currentTime;
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(freq, t);
+  o.frequency.exponentialRampToValueAtTime(freq * 1.9, t + dur * 0.45);
+  o.frequency.exponentialRampToValueAtTime(freq * 1.2, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol || 0.13, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+let noiseBuf = null;
+function whoosh(strength) {
+  const a = AC(); if (!a) return;
+  if (!noiseBuf) {
+    noiseBuf = a.createBuffer(1, a.sampleRate * 1.2, a.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const t = a.currentTime;
+  const src = a.createBufferSource(); src.buffer = noiseBuf;
+  const f = a.createBiquadFilter(); f.type = 'bandpass';
+  f.frequency.setValueAtTime(420, t);
+  f.frequency.exponentialRampToValueAtTime(1400, t + 0.22);
+  f.frequency.exponentialRampToValueAtTime(500, t + 0.55);
+  f.Q.value = 0.9;
+  const g = a.createGain();
+  const v = 0.05 + Math.min(0.09, strength * 0.0006);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(v, t + 0.08);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+  src.connect(f); f.connect(g); g.connect(a.destination);
+  src.start(t); src.stop(t + 0.65);
+}
+function fanfare() {
+  const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+  notes.forEach((n, i) => tone(n, 0.5, 'triangle', 0.15, i * 0.11));
+  tone(261.63, 1.0, 'sine', 0.1, 0.1);
+}
+
+/* ---------------- state ---------------- */
+let season = 'spring';
+let saved = { done: {}, photos: {} };
+let sky = { a: '#bfe9ff', b: '#e9f9dd', ta: '#bfe9ff', tb: '#e9f9dd', fa: '#bfe9ff', fb: '#e9f9dd', t: 1 };
+let fx = [];
+let time = 0, idle = 0, lastT = 0;
+let pip = { x: 0, y: 0, hop: 0, sleep: false, face: 1 };
+let celebrating = false;
+
+// per-season play state
+let buds = [];        // spring: {open, t}
+let blossoms = [];    // summer: {done, t}
+let bee = { x: 0, y: 0, tx: 0, ty: 0, active: false, wing: 0 };
+let leaves = [];      // autumn
+let piled = 0;
+let treats = [];      // winter: {idx, hung, t}
+let birds = [];       // winter
+let ripen = 0;        // summer apple ripening
+let pipJump = -1;     // autumn finale
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE);
+    if (raw) {
+      const o = JSON.parse(raw);
+      saved.done = o.done || {};
+      saved.photos = o.photos || {};
+    }
+  } catch (e) { saved = { done: {}, photos: {} }; }
+}
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch (e) { /* full or blocked - fine */ }
+}
+
+/* ---------------- season setup ---------------- */
+function startSeason(s) {
+  season = s;
+  celebrating = false;
+  document.getElementById('celebrate').classList.remove('show');
+  fx = [];
+  idle = 0;
+  ripen = 0;
+  pipJump = -1;
+  pip.sleep = (s === 'winter');
+  pip.hop = 0;
+
+  buds = slots.map(() => ({ open: false, t: 0 }));
+  blossoms = slots.map(() => ({ done: false, t: 0 }));
+  bee.active = false;
+
+  leaves = [];
+  piled = 0;
+  if (s === 'autumn') {
+    const rnd = mulberry32(4242);
+    const picks = leafAnchors.slice();
+    for (let i = 0; i < CONF.autumn.goal; i++) {
+      const an = picks[i % picks.length];
+      const hues = ['#ff9d3d', '#f4622e', '#ffc94d', '#d94f2b', '#e8a33d'];
+      leaves.push({
+        x: an.x + (rnd() - 0.5) * 30 * treeScale,
+        y: an.y + (rnd() - 0.5) * 30 * treeScale,
+        vx: 0, vy: 0, rot: rnd() * 6.28, spin: 0,
+        col: hues[Math.floor(rnd() * hues.length)],
+        size: (17 + rnd() * 7) * treeScale,
+        attached: true, landed: false, flut: rnd() * 6.28
+      });
+    }
+  }
+
+  treats = [];   // winter: any branch tip will take a treat, first six tapped win
+  birds = [];
+
+  const c = CONF[s];
+  sky.fa = sky.a; sky.fb = sky.b;
+  sky.ta = c.sky[0]; sky.tb = c.sky[1];
+  sky.t = 0;
+
+  document.documentElement.style.setProperty('--accent', c.accent);
+  document.documentElement.style.setProperty('--accent2', c.accent2);
+  document.documentElement.style.setProperty('--sky-a', c.sky[0]);
+  document.documentElement.style.setProperty('--sky-b', c.sky[1]);
+
+  document.getElementById('bannerText').textContent = c.say;
+  document.querySelectorAll('.season').forEach(b => b.classList.toggle('on', b.dataset.s === s));
+  relayout();
+  updateHUD();
+}
+
+function relayout() {
+  pip.x = baseX - Math.min(W * 0.3, 120);
+  pip.y = groundY + H * 0.035;
+  if (!bee.active) {
+    bee.x = bee.x || W * 0.22;
+    bee.y = bee.y || H * 0.3;
+    bee.tx = bee.x; bee.ty = bee.y;
+  }
+}
+
+function progress() {
+  if (season === 'spring') return buds.filter(b => b.open).length;
+  if (season === 'summer') return blossoms.filter(b => b.done).length;
+  if (season === 'autumn') return piled;
+  return birds.filter(b => b.arrived).length;
+}
+
+function updateHUD() {
+  const g = CONF[season].goal, p = progress();
+  document.getElementById('count').textContent = p + ' / ' + g;
+  document.getElementById('bar').style.width = Math.round(p / g * 100) + '%';
+  SEASONS.forEach(s => {
+    const el = document.querySelector('.season[data-s="' + s + '"]');
+    el.classList.toggle('done', !!saved.done[s]);
+  });
+}
+
+/* ---------------- celebration ---------------- */
+function snapshot() {
+  try {
+    const c = document.createElement('canvas');
+    c.width = 320;
+    c.height = Math.max(120, Math.round(320 * H / W));
+    const g = c.getContext('2d');
+    g.drawImage(canvas, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.7);
+  } catch (e) { return null; }
+}
+
+function burstConfetti(n, x, y) {
+  const cols = ['#ff7fb0', '#ffd166', '#7ad3ff', '#8ee87a', '#c792ff', '#ff9f43'];
+  for (let i = 0; i < n; i++) {
+    fx.push({
+      type: 'conf',
+      x: x == null ? Math.random() * W : x + (Math.random() - 0.5) * 60,
+      y: y == null ? -20 - Math.random() * H * 0.4 : y,
+      vx: (Math.random() - 0.5) * 220,
+      vy: y == null ? 60 + Math.random() * 120 : -260 - Math.random() * 220,
+      rot: Math.random() * 6.28, spin: (Math.random() - 0.5) * 12,
+      col: cols[Math.floor(Math.random() * cols.length)],
+      size: 6 + Math.random() * 7, life: 3.2
+    });
+  }
+}
+
+function celebrate() {
+  if (celebrating) return;
+  celebrating = true;
+  const s0 = season;              // the season being celebrated, even if the kid taps away
+  const c = CONF[s0];
+  fanfare();
+  burstConfetti(70);
+  pip.hop = 1.4;
+
+  setTimeout(() => {
+    if (season !== s0 || !celebrating) return;   // they moved on - drop this celebration
+    const shot = snapshot();
+    saved.done[s0] = true;
+    if (shot) saved.photos[s0] = shot;
+    save();
+    updateHUD();
+
+    const all = SEASONS.every(s => saved.done[s]);
+    document.getElementById('celEmoji').textContent = all ? '🎉' : c.winEm;
+    document.getElementById('celTitle').textContent = all ? 'A whole year!' : c.winTitle;
+    document.getElementById('celText').textContent = all
+      ? 'You looked after Pip\'s tree through every single season.'
+      : c.winText;
+    const nx = SEASONS[(SEASONS.indexOf(s0) + 1) % 4];
+    const nextBtn = document.getElementById('celNext');
+    nextBtn.textContent = all ? 'See my Year Book 📖' : 'Next: ' + CONF[nx].name + ' ' + CONF[nx].em;
+    nextBtn.dataset.go = all ? 'book' : nx;
+    document.getElementById('celebrate').classList.add('show');
+  }, 1500);
+}
+
+function checkWin() {
+  if (celebrating) return;
+  if (progress() >= CONF[season].goal) {
+    if (season === 'summer') { if (ripen >= 1) celebrate(); }
+    else if (season === 'autumn') { if (pipJump < 0) { pipJump = 0; } if (pipJump >= 1.1) celebrate(); }
+    else celebrate();
+  }
+}
+
+/* ---------------- input ---------------- */
+let ptr = { down: false, x: 0, y: 0, lx: 0, ly: 0, moved: 0 };
+let lastWhoosh = 0;
+
+function pos(e) {
+  const r = canvas.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - r.left, y: t.clientY - r.top };
+}
+
+function nearestSlot(x, y, filter) {
+  let best = -1, bd = 46 * Math.max(0.8, treeScale);
+  for (let i = 0; i < slots.length; i++) {
+    if (filter && !filter(i)) continue;
+    const d = Math.hypot(slots[i].x - x, slots[i].y - y);
+    if (d < bd) { bd = d; best = i; }
+  }
+  return best;
+}
+
+function sparkle(x, y, n, col) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * 6.28, s = 40 + Math.random() * 130;
+    fx.push({
+      type: 'spark', x: x, y: y,
+      vx: Math.cos(a) * s, vy: Math.sin(a) * s - 40,
+      life: 0.7 + Math.random() * 0.5, col: col || '#fff', size: 3 + Math.random() * 4
+    });
+  }
+}
+
+function onDown(e) {
+  e.preventDefault();
+  AC();
+  const p = pos(e);
+  ptr.down = true; ptr.x = p.x; ptr.y = p.y; ptr.lx = p.x; ptr.ly = p.y; ptr.moved = 0;
+  idle = 0;
+  if (celebrating) return;
+
+  if (season === 'spring') {
+    const i = nearestSlot(p.x, p.y, k => !buds[k].open);
+    if (i >= 0) {
+      buds[i].open = true; buds[i].t = 0;
+      const n = buds.filter(b => b.open).length;
+      tone(392 * Math.pow(2, (n - 1) / 12), 0.35, 'triangle', 0.15);
+      sparkle(slots[i].x, slots[i].y, 10, '#ffd9ea');
+      pip.hop = 0.5;
+      updateHUD(); checkWin();
+    }
+  } else if (season === 'summer') {
+    bee.active = true; bee.tx = p.x; bee.ty = p.y;
+  } else if (season === 'winter') {
+    if (treats.length < CONF.winter.goal) {
+      const i = nearestSlot(p.x, p.y, k => !treats.some(t => t.idx === k));
+      if (i >= 0) {
+        treats.push({ idx: i, hung: true, t: 0, kind: treats.length % 2 });
+        const s = slots[i];
+        tone(587.33, 0.3, 'triangle', 0.13);
+        sparkle(s.x, s.y, 8, '#ffe6a0');
+        const fromLeft = Math.random() < 0.5;
+        birds.push({
+          x: fromLeft ? -60 : W + 60,
+          y: H * (0.15 + Math.random() * 0.3),
+          tx: s.x + (fromLeft ? -26 : 26) * treeScale,
+          ty: s.y - 4 * treeScale,
+          slotIdx: i, side: fromLeft ? -1 : 1,
+          arrived: false, t: 0, bob: Math.random() * 6.28
+        });
+        updateHUD();
+      }
+    }
+  }
+}
+
+function onMove(e) {
+  if (!ptr.down) return;
+  e.preventDefault();
+  const p = pos(e);
+  const dx = p.x - ptr.lx, dy = p.y - ptr.ly;
+  const dist = Math.hypot(dx, dy);
+  ptr.moved += dist;
+  idle = 0;
+
+  if (!celebrating && season === 'summer') {
+    bee.active = true; bee.tx = p.x; bee.ty = p.y;
+  }
+
+  if (!celebrating && season === 'autumn' && dist > 3) {
+    const dirx = dx / dist, diry = dy / dist;
+    const power = Math.min(500, dist * 26);
+    let hit = 0;
+    leaves.forEach(l => {
+      if (!l.attached) return;
+      const d = Math.hypot(l.x - p.x, l.y - p.y);
+      if (d < 82) {
+        l.attached = false;
+        l.vx = dirx * (110 + power * 0.5) + (Math.random() - 0.5) * 90;
+        l.vy = diry * (70 + power * 0.35) - 40 - Math.random() * 70;
+        l.spin = (Math.random() - 0.5) * 9;
+        hit++;
+      }
+    });
+    for (let i = 0; i < 3; i++) {
+      fx.push({
+        type: 'wind', x: p.x - dirx * 20 + (Math.random() - 0.5) * 50,
+        y: p.y - diry * 20 + (Math.random() - 0.5) * 50,
+        vx: dirx * 320, vy: diry * 320, life: 0.45, len: 20 + Math.random() * 40
+      });
+    }
+    const now = performance.now();
+    if (now - lastWhoosh > 190) { lastWhoosh = now; whoosh(power); }
+    if (hit) { tone(180 + hit * 20, 0.18, 'sine', 0.07); pip.hop = 0.4; }
+  }
+
+  ptr.lx = p.x; ptr.ly = p.y;
+}
+
+function onUp(e) {
+  ptr.down = false;
+  if (season === 'summer') bee.active = false;
+}
+
+canvas.addEventListener('touchstart', onDown, { passive: false });
+canvas.addEventListener('touchmove', onMove, { passive: false });
+canvas.addEventListener('touchend', onUp);
+canvas.addEventListener('touchcancel', onUp);
+canvas.addEventListener('mousedown', onDown);
+window.addEventListener('mousemove', onMove);
+window.addEventListener('mouseup', onUp);
+
+/* ---------------- update ---------------- */
+function update(dt) {
+  time += dt;
+  idle += dt;
+
+  // sky crossfade
+  if (sky.t < 1) {
+    sky.t = Math.min(1, sky.t + dt * 1.6);
+    sky.a = mixHex(sky.fa, sky.ta, sky.t);
+    sky.b = mixHex(sky.fb, sky.tb, sky.t);
+  }
+
+  if (pip.hop > 0) pip.hop = Math.max(0, pip.hop - dt * 1.8);
+
+  buds.forEach(b => { if (b.open && b.t < 1) b.t = Math.min(1, b.t + dt * 3.2); });
+  blossoms.forEach(b => { if (b.done && b.t < 1) b.t = Math.min(1, b.t + dt * 2.4); });
+  treats.forEach(t => { if (t.hung && t.t < 1) t.t = Math.min(1, t.t + dt * 3); });
+
+  // summer bee
+  if (season === 'summer') {
+    bee.wing += dt * 40;
+    if (!bee.active) {
+      bee.tx = bee.x + Math.sin(time * 1.3) * 0.6;
+      bee.ty = bee.y + Math.sin(time * 2.1) * 0.6;
+    }
+    bee.x += (bee.tx - bee.x) * Math.min(1, dt * 11);
+    bee.y += (bee.ty - bee.y) * Math.min(1, dt * 11);
+    if (bee.active && !celebrating) {
+      slots.forEach((s, i) => {
+        if (blossoms[i].done) return;
+        if (Math.hypot(s.x - bee.x, s.y - bee.y) < 34 * Math.max(0.85, treeScale)) {
+          blossoms[i].done = true; blossoms[i].t = 0;
+          const n = blossoms.filter(b => b.done).length;
+          tone(440 * Math.pow(2, (n - 1) / 12), 0.28, 'sine', 0.13);
+          sparkle(s.x, s.y, 9, '#ffe9a0');
+          pip.hop = 0.45;
+          updateHUD();
+        }
+      });
+    }
+    if (progress() >= CONF.summer.goal && ripen < 1) {
+      ripen = Math.min(1, ripen + dt * 0.75);
+      if (ripen >= 1) checkWin();
+    }
+  }
+
+  // autumn leaves
+  if (season === 'autumn') {
+    const floor = groundY + H * 0.035;
+    leaves.forEach(l => {
+      if (l.attached) {
+        l.rot = Math.sin(time * 1.6 + l.flut) * 0.18;
+        return;
+      }
+      if (l.landed) return;
+      l.flut += dt * 6;
+      l.vy += 280 * dt;
+      l.vx += Math.sin(l.flut) * 70 * dt;
+      l.vx *= (1 - 1.1 * dt);
+      l.vy *= (1 - 0.9 * dt);
+      l.x += l.vx * dt;
+      l.y += l.vy * dt;
+      l.rot += l.spin * dt;
+      l.spin *= (1 - 1.2 * dt);
+      if (l.x < 10) { l.x = 10; l.vx = Math.abs(l.vx) * 0.4; }
+      if (l.x > W - 10) { l.x = W - 10; l.vx = -Math.abs(l.vx) * 0.4; }
+      if (l.y >= floor) {
+        l.landed = true;
+        // settle into a mound: triangular spread around the trunk, tallest in the middle
+        const tri = Math.random() + Math.random() - 1;
+        l.x = baseX + tri * W * 0.3 + (l.x - baseX) * 0.12;
+        l.x = Math.max(24, Math.min(W - 24, l.x));
+        const m = Math.max(0, 1 - Math.abs(l.x - baseX) / (W * 0.28));
+        l.y = floor + H * 0.014 - m * H * 0.05 * (0.35 + Math.random() * 0.65);
+        l.rot = (Math.random() - 0.5) * 1.3;
+        piled++;
+        tone(300 + Math.random() * 160, 0.12, 'sine', 0.05);
+        updateHUD();
+        checkWin();
+      }
+    });
+    if (pipJump >= 0 && pipJump < 1.2) {
+      const was = pipJump;
+      pipJump += dt * 0.9;
+      if (was < 0.55 && pipJump >= 0.55) {
+        whoosh(300);
+        tone(220, 0.3, 'sine', 0.1);
+        for (let i = 0; i < 18; i++) {
+          const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, s = 120 + Math.random() * 200;
+          fx.push({
+            type: 'leafburst', x: baseX + (Math.random() - 0.5) * W * 0.3, y: groundY + H * 0.02,
+            vx: Math.cos(a) * s, vy: Math.sin(a) * s, rot: Math.random() * 6.28,
+            spin: (Math.random() - 0.5) * 10, life: 1.6,
+            col: ['#ff9d3d', '#f4622e', '#ffc94d'][Math.floor(Math.random() * 3)],
+            size: 12 * treeScale
+          });
+        }
+      }
+      if (pipJump >= 1.1) checkWin();
+    }
+  }
+
+  // winter birds
+  if (season === 'winter') {
+    birds.forEach(b => {
+      b.bob += dt * 5;
+      if (b.arrived) return;
+      b.t = Math.min(1, b.t + dt * 0.85);
+      const e = 1 - Math.pow(1 - b.t, 3);
+      b.x = b.x + (b.tx - b.x) * Math.min(1, dt * 3.4);
+      b.y = b.y + (b.ty - b.y) * Math.min(1, dt * 3.4) + Math.sin(time * 8) * (1 - e) * 1.6;
+      if (Math.hypot(b.tx - b.x, b.ty - b.y) < 6) {
+        b.arrived = true;
+        b.x = b.tx; b.y = b.ty;
+        const n = birds.filter(x => x.arrived).length;
+        chirp(660 * Math.pow(2, (n - 1) / 12), 0.28, 0.11);
+        sparkle(b.x, b.y, 6, '#ffffff');
+        pip.hop = 0.5;
+        updateHUD();
+        checkWin();
+      }
+    });
+  }
+
+  // particles
+  for (let i = fx.length - 1; i >= 0; i--) {
+    const p = fx[i];
+    p.life -= dt;
+    if (p.life <= 0) { fx.splice(i, 1); continue; }
+    if (p.type === 'conf' || p.type === 'leafburst') {
+      p.vy += 430 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.rot += p.spin * dt;
+      if (p.y > H + 40) { fx.splice(i, 1); continue; }
+    } else if (p.type === 'spark') {
+      p.vy += 180 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+    } else if (p.type === 'wind') {
+      p.x += p.vx * dt; p.y += p.vy * dt;
+    } else if (p.type === 'fall') {
+      p.y += p.vy * dt;
+      p.x += Math.sin(time * 1.5 + p.seed) * p.drift * dt;
+      if (p.y > H + 20) { p.y = -20; p.x = Math.random() * W; }
+      p.life = 9;
+    }
+  }
+
+  // ambient weather
+  const want = season === 'winter' ? 40 : (season === 'spring' ? 16 : 0);
+  const have = fx.filter(p => p.type === 'fall').length;
+  if (have < want) {
+    for (let i = have; i < want; i++) {
+      fx.push({
+        type: 'fall', x: Math.random() * W, y: Math.random() * H,
+        vy: season === 'winter' ? 26 + Math.random() * 42 : 34 + Math.random() * 50,
+        drift: 18 + Math.random() * 30, seed: Math.random() * 6.28,
+        size: season === 'winter' ? 2 + Math.random() * 3.5 : 4 + Math.random() * 4,
+        col: season === 'winter' ? '#ffffff' : '#ffc7de', life: 9
+      });
+    }
+  } else if (have > want) {
+    let extra = have - want;
+    for (let i = fx.length - 1; i >= 0 && extra > 0; i--) {
+      if (fx[i].type === 'fall') { fx.splice(i, 1); extra--; }
+    }
+  }
+}
+
+function mixHex(a, b, t) {
+  const pa = hex(a), pb = hex(b);
+  const r = Math.round(pa[0] + (pb[0] - pa[0]) * t);
+  const g = Math.round(pa[1] + (pb[1] - pa[1]) * t);
+  const bl = Math.round(pa[2] + (pb[2] - pa[2]) * t);
+  return 'rgb(' + r + ',' + g + ',' + bl + ')';
+}
+function hex(c) {
+  if (c[0] === '#') {
+    return [parseInt(c.substr(1, 2), 16), parseInt(c.substr(3, 2), 16), parseInt(c.substr(5, 2), 16)];
+  }
+  const m = c.match(/\d+/g);
+  return [+m[0], +m[1], +m[2]];
+}
+
+/* ---------------- drawing ---------------- */
+function emoji(ch, x, y, size, rot, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha == null ? 1 : alpha;
+  ctx.translate(x, y);
+  if (rot) ctx.rotate(rot);
+  ctx.font = Math.round(size) + 'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#000000';           // opaque: emoji glyphs inherit fillStyle alpha
+  ctx.fillText(ch, 0, 0);
+  ctx.restore();
+}
+
+function drawSky() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, sky.a);
+  g.addColorStop(1, sky.b);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // sun / clouds
+  const sx = W * 0.82, sy = H * 0.14, sr = Math.min(W, H) * 0.075;
+  if (season === 'summer') {
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(time * 0.25);
+    ctx.strokeStyle = 'rgba(255,214,90,0.85)';
+    ctx.lineWidth = Math.max(3, sr * 0.16);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * 6.28;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * sr * 1.35, Math.sin(a) * sr * 1.35);
+      ctx.lineTo(Math.cos(a) * sr * 1.85, Math.sin(a) * sr * 1.85);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle = '#ffde59';
+    ctx.beginPath(); ctx.arc(sx, sy, sr, 0, 6.28); ctx.fill();
+  } else if (season === 'spring') {
+    ctx.fillStyle = 'rgba(255,244,150,0.95)';
+    ctx.beginPath(); ctx.arc(sx, sy, sr * 0.82, 0, 6.28); ctx.fill();
+  } else if (season === 'winter') {
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.arc(sx, sy, sr * 0.75, 0, 6.28); ctx.fill();
+  }
+
+  const cloudCol = season === 'autumn' ? 'rgba(255,255,255,0.75)'
+    : season === 'winter' ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.7)';
+  const nC = season === 'summer' ? 1 : 3;
+  for (let i = 0; i < nC; i++) {
+    const drift = season === 'autumn' ? 34 : 12;
+    const cx = ((time * drift + i * W * 0.45 + W * 0.1) % (W + 240)) - 120;
+    const cy = H * (0.09 + i * 0.075);
+    const r = Math.min(W, H) * (0.045 + i * 0.008);
+    ctx.fillStyle = cloudCol;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, 6.28);
+    ctx.arc(cx + r * 0.9, cy + r * 0.15, r * 0.78, 0, 6.28);
+    ctx.arc(cx - r * 0.9, cy + r * 0.2, r * 0.66, 0, 6.28);
+    ctx.arc(cx + r * 0.1, cy - r * 0.5, r * 0.62, 0, 6.28);
+    ctx.fill();
+  }
+}
+
+function drawGround() {
+  const c = CONF[season].ground;
+  const g = ctx.createLinearGradient(0, groundY - 10, 0, H);
+  g.addColorStop(0, c[0]);
+  g.addColorStop(1, c[1]);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  ctx.lineTo(0, groundY + H * 0.02);
+  ctx.quadraticCurveTo(W * 0.25, groundY - H * 0.03, W * 0.5, groundY + H * 0.005);
+  ctx.quadraticCurveTo(W * 0.78, groundY + H * 0.04, W, groundY - H * 0.01);
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fill();
+
+  // grass tufts / snow lumps
+  if (season !== 'winter') {
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 22; i++) {
+      const x = (i * 137.5) % W;
+      const y = groundY + H * 0.03 + (i % 4) * H * 0.02;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + 4, y - 9, x + 9, y - 12);
+      ctx.stroke();
+    }
+  }
+  if (season === 'spring') {
+    const fl = ['#ff7fb0', '#ffd166', '#c792ff', '#ffffff'];
+    for (let i = 0; i < 9; i++) {
+      const x = (i * 211.7 + 30) % (W - 40) + 20;
+      const y = groundY + H * 0.05 + (i % 3) * H * 0.025;
+      ctx.fillStyle = fl[i % fl.length];
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * 6.28;
+        ctx.beginPath(); ctx.arc(x + Math.cos(a) * 4.5, y + Math.sin(a) * 4.5, 3.2, 0, 6.28); ctx.fill();
+      }
+      ctx.fillStyle = '#fff3b0';
+      ctx.beginPath(); ctx.arc(x, y, 2.4, 0, 6.28); ctx.fill();
+    }
+  }
+}
+
+function drawTree() {
+  const sway = Math.sin(time * 1.1) * (season === 'autumn' ? 0.02 : 0.008);
+  ctx.lineCap = 'round';
+  branches.forEach(b => {
+    const dx = (b.x2 - baseX) * sway * (1 + b.d * 0.6);
+    ctx.strokeStyle = season === 'winter' ? '#6b5142' : '#7b5a41';
+    ctx.lineWidth = Math.max(2, b.w);
+    ctx.beginPath();
+    ctx.moveTo(b.x1 + dx * 0.35, b.y1);
+    ctx.lineTo(b.x2 + dx, b.y2);
+    ctx.stroke();
+    if (b.d === 0) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = Math.max(2, b.w * 0.3);
+      ctx.beginPath();
+      ctx.moveTo(b.x1 - b.w * 0.22, b.y1);
+      ctx.lineTo(b.x2 - b.w * 0.22 + dx, b.y2);
+      ctx.stroke();
+    }
+    if (season === 'winter') {
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = Math.max(1.5, b.w * 0.42);
+      ctx.beginPath();
+      ctx.moveTo(b.x1 + dx * 0.35, b.y1 - b.w * 0.42);
+      ctx.lineTo(b.x2 + dx, b.y2 - b.w * 0.42);
+      ctx.stroke();
+    }
+  });
+  // root mound
+  ctx.fillStyle = season === 'winter' ? '#f3fbff' : 'rgba(0,0,0,0.08)';
+  ctx.beginPath();
+  ctx.ellipse(baseX, groundY + H * 0.028, Math.min(W, H) * 0.11, H * 0.018, 0, 0, 6.28);
+  ctx.fill();
+}
+
+function drawBlossom(x, y, r, open) {
+  const petals = 5;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(open, open);
+  for (let i = 0; i < petals; i++) {
+    const a = i / petals * 6.28 + 0.4;
+    const grad = ctx.createRadialGradient(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7, 1, Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7, r * 0.85);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(1, '#ff9ec6');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(Math.cos(a) * r * 0.7, Math.sin(a) * r * 0.7, r * 0.65, r * 0.5, a, 0, 6.28);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#ffd75e';
+  ctx.beginPath(); ctx.arc(0, 0, r * 0.36, 0, 6.28); ctx.fill();
+  ctx.restore();
+}
+
+function drawBud(x, y, r) {
+  ctx.fillStyle = '#8fbf5a';
+  ctx.beginPath();
+  ctx.ellipse(x, y, r * 0.52, r * 0.72, 0.3, 0, 6.28);
+  ctx.fill();
+  ctx.fillStyle = '#ffb3d0';
+  ctx.beginPath();
+  ctx.ellipse(x, y - r * 0.3, r * 0.3, r * 0.34, 0.3, 0, 6.28);
+  ctx.fill();
+}
+
+function drawApple(x, y, r, ripeness) {
+  const col = mixHex('#8fce62', '#e8402f', ripeness);
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.arc(x - r * 0.28, y, r * 0.62, 0, 6.28);
+  ctx.arc(x + r * 0.28, y, r * 0.62, 0, 6.28);
+  ctx.arc(x, y + r * 0.2, r * 0.66, 0, 6.28);
+  ctx.fill();
+  ctx.strokeStyle = '#6b4a2f';
+  ctx.lineWidth = Math.max(1.5, r * 0.16);
+  ctx.beginPath();
+  ctx.moveTo(x, y - r * 0.5);
+  ctx.quadraticCurveTo(x + r * 0.2, y - r * 1.0, x + r * 0.5, y - r * 0.95);
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.beginPath();
+  ctx.ellipse(x - r * 0.32, y - r * 0.24, r * 0.2, r * 0.12, -0.5, 0, 6.28);
+  ctx.fill();
+}
+
+function drawLeafShape(x, y, size, rot, col) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rot);
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 0.6);
+  ctx.quadraticCurveTo(size * 0.62, -size * 0.1, 0, size * 0.72);
+  ctx.quadraticCurveTo(-size * 0.62, -size * 0.1, 0, -size * 0.6);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120,60,20,0.4)';
+  ctx.lineWidth = Math.max(1, size * 0.09);
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 0.5);
+  ctx.lineTo(0, size * 0.6);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTreat(x, y, r, kind, t) {
+  const drop = (1 - t) * -8;
+  ctx.strokeStyle = '#c8a05e';
+  ctx.lineWidth = Math.max(1.5, r * 0.16);
+  ctx.beginPath();
+  ctx.moveTo(x, y + drop);
+  ctx.lineTo(x, y + r * 1.1 + drop);
+  ctx.stroke();
+  const cy = y + r * 1.6 + drop;
+  if (kind === 0) {
+    // berry ring
+    for (let i = 0; i < 7; i++) {
+      const a = i / 7 * 6.28;
+      ctx.fillStyle = i % 2 ? '#e8402f' : '#ff7a5c';
+      ctx.beginPath(); ctx.arc(x + Math.cos(a) * r * 0.6, cy + Math.sin(a) * r * 0.6, r * 0.3, 0, 6.28); ctx.fill();
+    }
+  } else {
+    // seed bell
+    ctx.fillStyle = '#e6b96a';
+    ctx.beginPath();
+    ctx.moveTo(x - r * 0.55, cy + r * 0.6);
+    ctx.quadraticCurveTo(x, cy - r * 0.95, x + r * 0.55, cy + r * 0.6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(120,80,30,0.45)';
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.arc(x + (i % 3 - 1) * r * 0.28, cy + (i < 3 ? 0.1 : 0.38) * r, r * 0.09, 0, 6.28);
+      ctx.fill();
+    }
+  }
+}
+
+function drawPip() {
+  let px = pip.x, py = pip.y;
+  let hop = Math.sin(Math.min(1, pip.hop) * Math.PI) * 18;
+  const size = Math.min(W, H) * 0.105;
+
+  if (season === 'autumn' && pipJump >= 0) {
+    const t = Math.min(1, pipJump / 0.55);
+    px = pip.x + (baseX - pip.x) * t;
+    py = pip.y - Math.sin(t * Math.PI) * H * 0.16;
+    if (pipJump > 0.55) {
+      px = baseX; py = pip.y + H * 0.008;
+    }
+  }
+  if (season === 'winter' && !birdsAllHome()) {
+    // Pip snoozing in his burrow
+    ctx.fillStyle = '#c8b39a';
+    ctx.beginPath();
+    ctx.ellipse(px, py + size * 0.1, size * 0.7, size * 0.42, 0, Math.PI, 0);
+    ctx.fill();
+    emoji('🦔', px, py - size * 0.1, size * 0.8);
+    emoji('💤', px + size * 0.55, py - size * 0.55, size * 0.42, Math.sin(time * 2) * 0.15);
+    return;
+  }
+  emoji('🦔', px, py - hop, size);
+  if (season === 'winter') emoji('🧣', px, py - hop + size * 0.28, size * 0.52);
+  if (pip.hop > 0.15) emoji('✨', px + size * 0.6, py - hop - size * 0.4, size * 0.42);
+}
+
+function birdsAllHome() {
+  return season === 'winter' && birds.length >= CONF.winter.goal && birds.every(b => b.arrived);
+}
+
+function drawHint() {
+  if (celebrating || idle < 6) return;
+  const pulse = 0.5 + 0.5 * Math.sin(time * 4);
+  let target = null;
+  if (season === 'spring') {
+    const i = buds.findIndex(b => !b.open);
+    if (i >= 0) target = slots[i];
+  } else if (season === 'summer') {
+    const i = blossoms.findIndex(b => !b.done);
+    if (i >= 0) target = slots[i];
+  } else if (season === 'winter') {
+    const i = slots.findIndex((s, k) => !treats.some(t => t.idx === k));
+    if (i >= 0 && treats.length < CONF.winter.goal) target = slots[i];
+  } else if (season === 'autumn') {
+    const l = leaves.find(l => l.attached);
+    if (l) target = { x: l.x, y: l.y };
+  }
+  if (!target) return;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,' + (0.35 + pulse * 0.5) + ')';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(target.x, target.y, (22 + pulse * 12) * Math.max(0.9, treeScale), 0, 6.28);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function draw() {
+  drawSky();
+  drawGround();
+  drawTree();
+
+  const R = 15 * treeScale;
+
+  if (season === 'spring') {
+    slots.forEach((s, i) => {
+      const b = buds[i];
+      if (!b.open) drawBud(s.x, s.y, R);
+      else {
+        const e = b.t < 1 ? 0.3 + 1.05 * b.t - 0.35 * b.t * b.t : 1;
+        drawBlossom(s.x, s.y, R, e);
+      }
+    });
+  } else if (season === 'summer') {
+    slots.forEach((s, i) => {
+      const b = blossoms[i];
+      if (!b.done) drawBlossom(s.x, s.y, R, 1);
+      else {
+        if (b.t < 1) {
+          drawBlossom(s.x, s.y, R * (1 - b.t), 1 - b.t * 0.5);
+          drawApple(s.x, s.y + R * 0.4, R * 0.85 * b.t, ripen);
+        } else {
+          drawApple(s.x, s.y + R * 0.4, R * 0.85, ripen);
+        }
+      }
+    });
+    // buzzy the bee
+    const bs = Math.min(W, H) * 0.075;
+    emoji('🐝', bee.x, bee.y, bs, Math.sin(bee.wing) * 0.12);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.arc(bee.x, bee.y, bs * 0.7, 0, 6.28);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else if (season === 'autumn') {
+    if (piled > 4) {
+      ctx.fillStyle = 'rgba(198,112,46,0.32)';
+      ctx.beginPath();
+      ctx.ellipse(baseX, groundY + H * 0.052, W * 0.3 * Math.min(1, piled / 16),
+        H * 0.04 * Math.min(1, piled / 12), 0, Math.PI, 0);
+      ctx.fill();
+    }
+    leaves.filter(l => l.landed).forEach(l => drawLeafShape(l.x, l.y, l.size * 1.05, l.rot, l.col));
+    slots.forEach(s => drawApple(s.x, s.y + R * 0.4, R * 0.8, 1));
+    leaves.filter(l => !l.landed).forEach(l => drawLeafShape(l.x, l.y, l.size, l.rot, l.col));
+  } else if (season === 'winter') {
+    treats.forEach(t => {
+      if (!t.hung) return;
+      const s = slots[t.idx];
+      drawTreat(s.x, s.y, R * 0.9, t.kind, t.t);
+    });
+    birds.forEach(b => {
+      const bs = Math.min(W, H) * 0.062;
+      const bob = b.arrived ? Math.sin(b.bob) * 2 : 0;
+      emoji('🐦', b.x, b.y + bob, bs, 0);
+    });
+  }
+
+  drawPip();
+  drawHint();
+
+  // particles
+  fx.forEach(p => {
+    if (p.type === 'conf') {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, p.life);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.col;
+      ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+      ctx.restore();
+    } else if (p.type === 'leafburst') {
+      ctx.globalAlpha = Math.min(1, p.life);
+      drawLeafShape(p.x, p.y, p.size, p.rot, p.col);
+      ctx.globalAlpha = 1;
+    } else if (p.type === 'spark') {
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.6));
+      ctx.fillStyle = p.col;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 6.28); ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (p.type === 'wind') {
+      ctx.globalAlpha = Math.max(0, p.life * 2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * 0.001 * p.len, p.y - p.vy * 0.001 * p.len);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else if (p.type === 'fall') {
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = p.col;
+      if (season === 'winter') {
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 6.28); ctx.fill();
+      } else {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(Math.sin(time + p.seed));
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.size, p.size * 0.55, 0, 0, 6.28);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+  });
+}
+
+/* ---------------- loop ---------------- */
+function frame(ts) {
+  const dt = Math.min(0.05, (ts - lastT) / 1000 || 0.016);
+  lastT = ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* ---------------- UI wiring ---------------- */
+document.querySelectorAll('.season').forEach(btn => {
+  btn.addEventListener('click', () => { AC(); startSeason(btn.dataset.s); });
+});
+
+document.getElementById('celNext').addEventListener('click', () => {
+  const go = document.getElementById('celNext').dataset.go;
+  document.getElementById('celebrate').classList.remove('show');
+  if (go === 'book') { openBook(); celebrating = false; }
+  else startSeason(go);
+});
+document.getElementById('celStay').addEventListener('click', () => {
+  startSeason(season);
+});
+
+function openBook() {
+  const wrap = document.getElementById('photos');
+  wrap.innerHTML = '';
+  SEASONS.forEach(s => {
+    const d = document.createElement('div');
+    d.className = 'photo' + (saved.photos[s] ? '' : ' empty');
+    if (saved.photos[s]) {
+      const im = document.createElement('img');
+      im.src = saved.photos[s];
+      im.alt = CONF[s].name;
+      d.appendChild(im);
+    } else {
+      d.appendChild(document.createTextNode(CONF[s].em));
+    }
+    const l = document.createElement('div');
+    l.className = 'lbl';
+    l.textContent = CONF[s].name + (saved.done[s] ? ' ⭐' : '');
+    d.appendChild(l);
+    wrap.appendChild(d);
+  });
+  const n = SEASONS.filter(s => saved.done[s]).length;
+  document.getElementById('bookText').textContent =
+    n === 4 ? 'A full year at the tree. Every season, done!' :
+      n === 0 ? 'Finish a season to put its photo in here.' :
+        n + ' of 4 seasons photographed. Keep going!';
+  document.getElementById('book').classList.add('show');
+}
+document.getElementById('bookBtn').addEventListener('click', () => { AC(); openBook(); });
+document.getElementById('bookClose').addEventListener('click', () => {
+  document.getElementById('book').classList.remove('show');
+});
+document.getElementById('bookReset').addEventListener('click', () => {
+  saved = { done: {}, photos: {} };
+  save();
+  document.getElementById('book').classList.remove('show');
+  startSeason('spring');
+  tone(523.25, 0.3, 'triangle', 0.13);
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  AC();
+  startSeason(season);
+  tone(440, 0.2, 'triangle', 0.12);
+});
+
+window.addEventListener('resize', () => {
+  const openBuds = buds.map(b => b.open);
+  const openBlooms = blossoms.map(b => b.done);
+  resize();
+  buds = slots.map((s, i) => ({ open: !!openBuds[i], t: openBuds[i] ? 1 : 0 }));
+  blossoms = slots.map((s, i) => ({ done: !!openBlooms[i], t: openBlooms[i] ? 1 : 0 }));
+  leaves.forEach((l, i) => {
+    if (l.attached && leafAnchors.length) {
+      const an = leafAnchors[i % leafAnchors.length];
+      l.x = an.x; l.y = an.y;
+    }
+  });
+  birds.forEach(b => {
+    const s = slots[b.slotIdx];
+    if (!s) return;
+    b.tx = s.x + b.side * 26 * treeScale;
+    b.ty = s.y - 4 * treeScale;
+    if (b.arrived) { b.x = b.tx; b.y = b.ty; }
+  });
+  updateHUD();
+});
+
+/* ---------------- go ---------------- */
+load();
+resize();
+startSeason(SEASONS.find(s => !saved.done[s]) || 'spring');
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

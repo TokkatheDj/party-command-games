@@ -1,0 +1,1160 @@
+<!-- CONCEPT: ARCADE / ACTION - Balloon Bop: tap anywhere near the floating balloon to bop it upwards (tapping to one side kicks it the other way), steering it around a sunny garden to touch every floating treat before it drifts down - and if it ever lands, Bramble the bunny boops it straight back up, so nobody can ever lose. Six levels add bobbing treats, drifting treats, gusty wind and finally two balloons at once, each one unlocking a new balloon friend for the parade shelf. Ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Balloon Bop</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  width: 100%; height: 100%;
+  background: #87d9f5;
+  font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+}
+
+:root {
+  --sky-a: #9fe2ff;
+  --sky-b: #ffe6f2;
+  --pink: #ff5fa2;
+  --pink-lt: #ff8fc4;
+  --yellow: #ffb52e;
+  --yellow-lt: #ffe08a;
+  --blue: #3aa7ff;
+  --green: #34cf8b;
+  --purple: #9a5cff;
+  --orange: #ff7a3d;
+  --ink: #3a2a44;
+  --panel: rgba(255,255,255,0.94);
+  --shadow: 0 8px 0 rgba(58,42,68,0.18), 0 14px 26px rgba(58,42,68,0.22);
+}
+
+#stage { position: fixed; inset: 0; }
+/* only the game canvas fills the screen - the little balloon portraits must not */
+#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+canvas.portrait { position: static; display: block; margin: 0 auto; }
+
+/* ---------- top bar ---------- */
+#topbar {
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 10px;
+  pointer-events: none;
+  z-index: 5;
+}
+#brand {
+  font-size: clamp(17px, 5vw, 26px);
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(58,42,68,.35), 0 0 12px rgba(255,255,255,.5);
+  letter-spacing: .5px;
+}
+#hudRight { display: flex; align-items: center; gap: 8px; }
+#levelPill {
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: clamp(13px, 3.6vw, 17px);
+  font-weight: bold;
+  box-shadow: 0 3px 0 rgba(58,42,68,.16);
+  white-space: nowrap;
+}
+.iconbtn {
+  pointer-events: auto;
+  width: 46px; height: 46px; min-width: 46px;
+  border: none; border-radius: 50%;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 22px; line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(58,42,68,.2);
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit;
+}
+.iconbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(58,42,68,.2); }
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 14px;
+  z-index: 10;
+  background: rgba(58,42,68,0.28);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.overlay.hidden { display: none; }
+
+.card {
+  background: var(--panel);
+  border-radius: 28px;
+  padding: 18px 16px 20px;
+  width: 100%;
+  max-width: 420px;
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  text-align: center;
+  box-shadow: var(--shadow);
+  border: 4px solid #fff;
+}
+
+.bigtitle {
+  font-size: clamp(30px, 10vw, 52px);
+  font-weight: bold;
+  margin: 2px 0 2px;
+  line-height: 1.05;
+  background: linear-gradient(90deg, var(--pink), var(--yellow), var(--blue));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.sub {
+  color: var(--ink);
+  font-size: clamp(14px, 4vw, 18px);
+  line-height: 1.35;
+  margin: 8px 6px 12px;
+}
+.wintitle {
+  font-size: clamp(26px, 8vw, 40px);
+  font-weight: bold;
+  margin: 0 0 4px;
+  background: linear-gradient(90deg, var(--green), var(--blue));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+.bigbtn {
+  display: block;
+  width: 100%;
+  min-height: 62px;
+  margin: 10px auto 0;
+  border: none;
+  border-radius: 22px;
+  font-family: inherit;
+  font-size: clamp(20px, 6vw, 28px);
+  font-weight: bold;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(180deg, var(--pink-lt), var(--pink));
+  box-shadow: 0 6px 0 #d1417f, 0 10px 18px rgba(58,42,68,.25);
+  padding: 10px 14px;
+}
+.bigbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #d1417f; }
+.bigbtn.green { background: linear-gradient(180deg, #7ef0bb, var(--green)); box-shadow: 0 6px 0 #21a46b, 0 10px 18px rgba(58,42,68,.25); }
+.bigbtn.green:active { box-shadow: 0 2px 0 #21a46b; }
+.bigbtn.blue { background: linear-gradient(180deg, #8fd6ff, var(--blue)); box-shadow: 0 6px 0 #2380c9, 0 10px 18px rgba(58,42,68,.25); }
+.bigbtn.blue:active { box-shadow: 0 2px 0 #2380c9; }
+
+.howrow {
+  display: flex; align-items: center; gap: 10px;
+  background: #fff6fb;
+  border-radius: 16px;
+  padding: 8px 10px;
+  margin: 7px 0;
+  text-align: left;
+}
+.howrow .em { font-size: 26px; min-width: 32px; text-align: center; }
+.howrow .tx { font-size: clamp(13px, 3.6vw, 16px); color: var(--ink); line-height: 1.25; }
+
+#shelf, #winShelf {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
+  margin-top: 10px;
+}
+.friend {
+  width: 44px; height: 54px;
+  display: flex; align-items: flex-end; justify-content: center;
+  font-size: 11px; color: var(--ink);
+}
+.friend canvas { width: 44px; height: 54px; }
+.shelfLabel {
+  font-size: clamp(12px, 3.4vw, 15px);
+  color: #7a6a84;
+  margin-top: 10px;
+  font-weight: bold;
+}
+.unlockName {
+  font-size: clamp(16px, 5vw, 22px);
+  font-weight: bold;
+  color: var(--ink);
+  margin: 6px 0 0;
+}
+.stars { font-size: clamp(22px, 7vw, 32px); letter-spacing: 3px; margin: 4px 0 2px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <div id="topbar">
+    <div id="brand">🎈 Balloon Bop</div>
+    <div id="hudRight">
+      <div id="levelPill">Level 1</div>
+      <button class="iconbtn" id="restartBtn" aria-label="Start over">↺</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="titleScreen">
+    <div class="card">
+      <div style="font-size:clamp(38px,12vw,64px);line-height:1">🎈</div>
+      <h1 class="bigtitle">Balloon Bop</h1>
+      <p class="sub">Tap to bop the balloon up and float it onto every treat.<br>It can never pop and you can never lose!</p>
+      <div class="howrow"><div class="em">👆</div><div class="tx">Tap <b>under</b> the balloon to send it up.</div></div>
+      <div class="howrow"><div class="em">↔️</div><div class="tx">Tap the <b>left</b> side to push it right.</div></div>
+      <div class="howrow"><div class="em">🍭</div><div class="tx">Touch every treat to finish the level.</div></div>
+      <div class="howrow"><div class="em">🐰</div><div class="tx">Land on the grass? Bramble boops you back up.</div></div>
+      <button class="bigbtn" id="playBtn">Play!</button>
+      <div class="shelfLabel" id="shelfLabel">Balloon friends you have met</div>
+      <div id="shelf"></div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="winScreen">
+    <div class="card">
+      <div class="stars" id="winStars">⭐⭐⭐</div>
+      <h2 class="wintitle" id="winTitle">Level done!</h2>
+      <div id="unlockArea">
+        <div style="font-size:clamp(13px,3.6vw,16px);color:#7a6a84">A new balloon friend joined you!</div>
+        <div id="unlockBalloon" style="height:86px;margin-top:4px"></div>
+        <p class="unlockName" id="unlockName">Rosie</p>
+      </div>
+      <button class="bigbtn green" id="nextBtn">Next Level →</button>
+      <div class="shelfLabel">Your parade</div>
+      <div id="winShelf"></div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="partyScreen">
+    <div class="card">
+      <div style="font-size:clamp(34px,11vw,58px);line-height:1.1">🎉🎈🎉</div>
+      <h2 class="bigtitle">Balloon Party!</h2>
+      <p class="sub">You bopped every balloon to every treat.<br>All six friends came to the garden party!</p>
+      <div id="partyShelf" style="display:flex;flex-wrap:wrap;justify-content:center;gap:6px"></div>
+      <button class="bigbtn blue" id="againBtn">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Balloon Bop - a no-lose arcade game for ages 4-11
+   ============================================================ */
+
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+
+let W = 0, H = 0, U = 1, DPR = 1;
+let TOP = 56;      // reserved height for the HUD bar
+let groundY = 0;   // top of the grass
+
+/* ---------- persistent progress ---------- */
+const SAVE_KEY = 'cowork-balloon-bop-progress';
+let save = { unlocked: 0 };
+try {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (raw) { const p = JSON.parse(raw); if (p && typeof p.unlocked === 'number') save.unlocked = Math.max(0, Math.min(6, p.unlocked)); }
+} catch (e) { /* private mode - just play without saving */ }
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+
+/* ---------- content ---------- */
+const FRIENDS = [
+  { name: 'Rosie',  c1: '#ffb2d6', c2: '#ff4f99' },
+  { name: 'Sunny',  c1: '#ffe9a8', c2: '#ffb01f' },
+  { name: 'Sky',    c1: '#b4e4ff', c2: '#2f9dff' },
+  { name: 'Minty',  c1: '#b6f5d7', c2: '#25c483' },
+  { name: 'Grape',  c1: '#dcc2ff', c2: '#8f4dff' },
+  { name: 'Tango',  c1: '#ffd0af', c2: '#ff6d2e' }
+];
+
+const TREAT_EMOJI = ['⭐', '🎁', '🧁', '🍭', '🌈', '🍓', '🍪', '🍩'];
+
+// bob  = vertical wobble amplitude, drift = sideways glide speed,
+// wind = strength of the breeze pushing the balloon sideways
+const LEVELS = [
+  { treats: 3, bob: 0,  drift: 0,  wind: 0,  balloons: 1, sky: ['#a9e6ff', '#ffe9f4'] },
+  { treats: 4, bob: 11, drift: 0,  wind: 0,  balloons: 1, sky: ['#a2e0ff', '#fff3d6'] },
+  { treats: 5, bob: 13, drift: 11, wind: 0,  balloons: 1, sky: ['#b7dcff', '#ffe3f0'] },
+  { treats: 5, bob: 11, drift: 0,  wind: 25, balloons: 1, sky: ['#9ed8ff', '#d9f3ff'] },
+  { treats: 5, bob: 15, drift: 13, wind: 28, balloons: 1, sky: ['#c1d4ff', '#ffdcef'] },
+  { treats: 5, bob: 13, drift: 12, wind: 25, balloons: 2, sky: ['#ffd7b0', '#ffc2e2'] }
+];
+
+/* ---------- game state ---------- */
+let state = 'title';          // title | play | levelwin | party
+let level = 0;                // 0-based index into LEVELS
+let balloons = [];
+let treats = [];
+let particles = [];
+let pops = [];                // floating text
+let clouds = [];
+let flowers = [];
+let leaves = [];
+let bunny = { x: 0, y: 0, hop: 0, squash: 0, face: 1 };
+let combo = 0;
+let totalTreats = 0;          // lifetime treats collected this session
+let groundBoops = 0;
+let windPhase = 0, wind = 0;
+let idleTimer = 0;            // seconds since the last treat, drives the helper
+let lastT = 0, running = false;
+let winTimer = null;          // pending "level complete" card
+
+/* ---------- audio ---------- */
+let AC = null;
+function ac() {
+  if (!AC) {
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { AC = null; }
+  }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type, vol, when, slideTo) {
+  const a = ac(); if (!a) return;
+  const t = a.currentTime + (when || 0);
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(45, slideTo), t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol || 0.18, t + 0.014);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(t); o.stop(t + dur + 0.06);
+}
+function noise(dur, vol) {
+  const a = ac(); if (!a) return;
+  const n = Math.floor(a.sampleRate * dur);
+  const buf = a.createBuffer(1, n, a.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = a.createBufferSource(); src.buffer = buf;
+  const g = a.createGain(); g.gain.value = vol || 0.08;
+  const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1400;
+  src.connect(f); f.connect(g); g.connect(a.destination);
+  src.start();
+}
+const sfx = {
+  bop()   { tone(360 + Math.random() * 90, 0.13, 'triangle', 0.16, 0, 820); noise(0.05, 0.05); },
+  puff()  { noise(0.08, 0.035); },
+  treat(i) {
+    const scale = [523, 587, 659, 784, 880, 988, 1175, 1319];
+    const f = scale[Math.min(i, scale.length - 1)];
+    tone(f, 0.28, 'sine', 0.2, 0);
+    tone(f * 2, 0.2, 'triangle', 0.07, 0.02);
+  },
+  boing() { tone(190, 0.3, 'sine', 0.2, 0, 560); noise(0.06, 0.05); },
+  win()   { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.34, 'triangle', 0.17, i * 0.11)); },
+  party() {
+    [523, 659, 784, 1047, 988, 1047, 1319].forEach((f, i) => tone(f, 0.4, 'triangle', 0.15, i * 0.15));
+    [131, 165, 196, 262].forEach((f, i) => tone(f, 0.5, 'sine', 0.1, i * 0.3));
+  }
+};
+
+/* ---------- helpers ---------- */
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+
+/* ---------- sizing ---------- */
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cv.width = Math.round(W * DPR);
+  cv.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  U = Math.max(0.62, Math.min(W / 375, H / 667));
+  TOP = 56;
+  groundY = H - Math.max(66 * U, H * 0.13);
+  bunny.y = groundY;
+  if (bunny.x === 0 || bunny.x > W) bunny.x = W * 0.5;
+  buildScenery();
+  // keep everything on screen after a rotate, and rescale to the new size
+  for (const b of balloons) {
+    b.r = Math.max(26, 34 * U);
+    b.x = clamp(b.x, b.r, W - b.r);
+    b.y = clamp(b.y, TOP + b.r, groundY - b.r);
+  }
+  for (const t of treats) { t.x = clamp(t.x, t.r + 4, W - t.r - 4); t.baseY = clamp(t.baseY, TOP + 70 * U, groundY - 54 * U); }
+}
+
+function buildScenery() {
+  clouds = [];
+  const n = W > 620 ? 5 : 3;
+  for (let i = 0; i < n; i++) {
+    clouds.push({ x: rnd(0, W), y: rnd(TOP + 14, TOP + Math.max(70, H * 0.22)), s: rnd(0.7, 1.5) * U, v: rnd(4, 11) });
+  }
+  flowers = [];
+  const fn = Math.max(5, Math.round(W / 58));
+  for (let i = 0; i < fn; i++) {
+    flowers.push({
+      x: (i + 0.5) * (W / fn) + rnd(-8, 8),
+      y: groundY + rnd(10 * U, (H - groundY) * 0.75),
+      c: pick(['#ff7fb6', '#ffd447', '#fff', '#b98cff', '#ff9e5e']),
+      s: rnd(0.75, 1.35) * U,
+      ph: rnd(0, 6.28)
+    });
+  }
+}
+
+/* ---------- level setup ---------- */
+function startLevel(i) {
+  if (winTimer) { clearTimeout(winTimer); winTimer = null; }
+  level = clamp(i, 0, LEVELS.length - 1);
+  const L = LEVELS[level];
+  balloons = [];
+  const r = Math.max(26, 34 * U);
+  for (let k = 0; k < L.balloons; k++) {
+    const f = FRIENDS[(level + k) % FRIENDS.length];
+    balloons.push({
+      x: W * (L.balloons === 1 ? 0.5 : (k === 0 ? 0.32 : 0.68)),
+      y: groundY - (H - groundY) - 150 * U - k * 30 * U,
+      vx: 0, vy: 0, r: r,
+      squash: 0, tilt: 0, blink: 0, face: 0,
+      c1: f.c1, c2: f.c2, name: f.name
+    });
+  }
+  for (const b of balloons) b.y = clamp(b.y, TOP + b.r + 20, groundY - b.r - 40 * U);
+
+  treats = [];
+  const topBand = TOP + 78 * U;
+  const botBand = groundY - 58 * U;
+  const tr = Math.max(19, 23 * U);
+  // No treat may sit on a balloon, or in the column it is about to fall down -
+  // otherwise the level collects itself while the player is still watching.
+  const clearOfBalloons = (x, y) => {
+    for (const b of balloons) {
+      if (Math.hypot(b.x - x, b.y - y) < b.r * 3.2 + tr) return false;
+      if (Math.abs(x - b.x) < b.r * 2.0 + tr && y > b.y) return false;
+    }
+    return true;
+  };
+  const makeTreat = (x, y) => ({
+    x: x, baseY: y, y: y, r: tr,
+    em: TREAT_EMOJI[treats.length % TREAT_EMOJI.length],
+    ph: rnd(0, 6.28),
+    bob: L.bob * U,
+    drift: (Math.random() < 0.5 ? -1 : 1) * L.drift * U * (L.drift ? rnd(0.7, 1.2) : 0),
+    got: false, pop: 0, glow: 0, helping: false
+  });
+
+  let guard = 0;
+  while (treats.length < L.treats && guard < 1200) {
+    guard++;
+    const x = rnd(tr + 10 * U, W - tr - 10 * U);
+    const y = rnd(topBand, Math.max(topBand + 30, botBand));
+    if (!clearOfBalloons(x, y)) continue;
+    let ok = true;
+    for (const t of treats) {
+      if (Math.hypot(t.x - x, t.baseY - y) < tr * 4.2) { ok = false; break; }
+    }
+    if (!ok) continue;
+    treats.push(makeTreat(x, y));
+  }
+  // a stubborn layout can under-fill; top up along the sides, still clear of the balloons
+  let side = 0;
+  while (treats.length < L.treats) {
+    const x = side++ % 2 ? W - tr - 14 * U : tr + 14 * U;
+    const y = clamp(topBand + (treats.length * 71 * U) % Math.max(60, botBand - topBand), topBand, botBand);
+    treats.push(makeTreat(clearOfBalloons(x, y) ? x : W - x, y));
+  }
+
+  leaves = [];
+  if (L.wind > 0) {
+    for (let i = 0; i < 9; i++) {
+      leaves.push({ x: rnd(0, W), y: rnd(TOP + 30, groundY), s: rnd(0.6, 1.2) * U, ph: rnd(0, 6.28), sp: rnd(0.8, 1.6) });
+    }
+  }
+
+  particles = []; pops = [];
+  combo = 0; idleTimer = 0; windPhase = 0; wind = 0;
+  bunny.x = W * 0.5; bunny.hop = 0;
+  state = 'play';
+  updateHud();
+}
+
+function updateHud() {
+  const L = LEVELS[level];
+  const left = treats.filter(t => !t.got).length;
+  document.getElementById('levelPill').textContent =
+    'Level ' + (level + 1) + ' · ' + (L.treats - left) + '/' + L.treats;
+}
+
+/* ---------- input ---------- */
+function bopAt(px, py) {
+  if (state !== 'play') return;
+  let best = null, bestD = Infinity;
+  for (const b of balloons) {
+    const d = Math.hypot(b.x - px, b.y - py);
+    if (d < bestD) { bestD = d; best = b; }
+  }
+  if (!best) return;
+
+  const near = best.r * 2.5;   // generous: a small finger covers the balloon
+  const far  = best.r * 5.2;   // a distant tap still makes a gentle puff of air
+
+  if (bestD <= near) {
+    applyBop(best, px, 1);
+    sfx.bop();
+  } else if (bestD <= far) {
+    const power = 0.42 * (1 - (bestD - near) / (far - near));
+    applyBop(best, px, Math.max(0.16, power));
+    sfx.puff();
+  } else {
+    sfx.puff();
+  }
+  for (let i = 0; i < 7; i++) {
+    particles.push({
+      x: px, y: py, vx: rnd(-70, 70) * U, vy: rnd(-70, 40) * U,
+      life: 0, max: rnd(0.25, 0.5), size: rnd(2, 5) * U, col: '#ffffff', type: 'puff'
+    });
+  }
+}
+
+function applyBop(b, px, power) {
+  const up = 350 * U * power;
+  b.vy = Math.min(b.vy, 0) - up;
+  b.vy = Math.max(b.vy, -430 * U);
+  const kick = clamp((b.x - px) * 6.5, -370 * U, 370 * U) * power;
+  b.vx = clamp(b.vx + kick, -400 * U, 400 * U);
+  b.squash = 1;
+  b.face = 1;               // happy "whee" face for a moment
+  b.faceT = 0.45;
+}
+
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  ac();
+  const rect = cv.getBoundingClientRect();
+  bopAt(e.clientX - rect.left, e.clientY - rect.top);
+}, { passive: false });
+
+window.addEventListener('keydown', e => {
+  if (state !== 'play') return;
+  const b = balloons[0]; if (!b) return;
+  if (e.key === ' ' || e.key === 'ArrowUp')    { ac(); applyBop(b, b.x, 1); sfx.bop(); e.preventDefault(); }
+  if (e.key === 'ArrowLeft')  { ac(); applyBop(b, b.x + b.r * 1.6, 1); sfx.bop(); e.preventDefault(); }
+  if (e.key === 'ArrowRight') { ac(); applyBop(b, b.x - b.r * 1.6, 1); sfx.bop(); e.preventDefault(); }
+}, { passive: false });
+
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 120));
+
+/* ---------- physics ---------- */
+function step(dt) {
+  const L = LEVELS[level];
+
+  // breeze
+  if (L.wind) {
+    windPhase += dt * 0.78;   // short gusts, not one long shove
+    wind = Math.sin(windPhase) * L.wind * U + Math.sin(windPhase * 2.3) * L.wind * 0.25 * U;
+  } else {
+    wind = 0;
+  }
+
+  for (const b of balloons) {
+    b.vy += 250 * U * dt;              // gentle gravity - a balloon sinks slowly
+    b.vx += wind * dt;
+    const drag = Math.exp(-1.55 * dt); // air drag gives it that floaty feel
+    b.vx *= drag; b.vy *= drag;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+
+    // walls: soft bounce, never off-screen
+    if (b.x < b.r) { b.x = b.r; b.vx = Math.abs(b.vx) * 0.55; b.squash = Math.max(b.squash, 0.6); }
+    if (b.x > W - b.r) { b.x = W - b.r; b.vx = -Math.abs(b.vx) * 0.55; b.squash = Math.max(b.squash, 0.6); }
+    const ceil = TOP + b.r + 6;
+    if (b.y < ceil) { b.y = ceil; b.vy = Math.abs(b.vy) * 0.45; b.squash = Math.max(b.squash, 0.6); }
+
+    // the ground is friendly: Bramble boops you straight back up
+    if (b.y + b.r * 0.92 >= groundY) {
+      b.y = groundY - b.r * 0.92;
+      b.vy = -400 * U;
+      b.vx = clamp(b.vx * 0.5 + rnd(-40, 40) * U, -250 * U, 250 * U);
+      b.squash = 1;
+      groundBoops++;
+      combo = 0;
+      bunny.x = b.x; bunny.hop = 1;
+      sfx.boing();
+      addPop(b.x, groundY - 70 * U, 'Boing!', '#ff5fa2');
+      for (let i = 0; i < 14; i++) {
+        particles.push({
+          x: b.x + rnd(-20, 20) * U, y: groundY, vx: rnd(-120, 120) * U, vy: rnd(-200, -60) * U,
+          life: 0, max: rnd(0.4, 0.8), size: rnd(3, 6) * U, col: pick(['#8fe3a8', '#b7f0c6', '#fff']), type: 'spark'
+        });
+      }
+    }
+
+    b.squash = Math.max(0, b.squash - dt * 3.4);
+    b.tilt = clamp(b.vx / (420 * U), -1, 1);
+    b.blink -= dt;
+    if (b.blink < -0.1 && Math.random() < 0.006) b.blink = 0.14;
+    if (b.faceT > 0) { b.faceT -= dt; if (b.faceT <= 0) b.face = 0; }
+  }
+
+  // treats float and drift
+  idleTimer += dt;
+  let remaining = 0, nearest = null, nearD = Infinity;
+  for (const t of treats) {
+    if (t.got) { t.pop = Math.min(1, t.pop + dt * 2.6); continue; }
+    remaining++;
+    t.ph += dt * 1.6;
+    t.y = t.baseY + Math.sin(t.ph) * t.bob;
+    if (t.drift) {
+      t.x += t.drift * dt;
+      if (t.x < t.r + 8 * U) { t.x = t.r + 8 * U; t.drift = Math.abs(t.drift); }
+      if (t.x > W - t.r - 8 * U) { t.x = W - t.r - 8 * U; t.drift = -Math.abs(t.drift); }
+    }
+    t.glow = Math.max(0, t.glow - dt * 2);
+    const b0 = balloons[0];
+    if (b0) {
+      const d = Math.hypot(b0.x - t.x, b0.y - t.y);
+      if (d < nearD) { nearD = d; nearest = t; }
+    }
+    // collection - a near miss counts: the treat hops the last little gap itself
+    for (const b of balloons) {
+      const d = Math.hypot(b.x - t.x, b.y - t.y);
+      const reach = b.r + t.r * 1.15;
+      if (d < reach) { collect(t, b); remaining--; break; }
+      if (d < reach * 1.3) {
+        const pull = 210 * U * dt * (1 - d / (reach * 1.3));
+        t.x += (b.x - t.x) / d * pull;
+        t.baseY += (b.y - t.y) / d * pull;
+        t.glow = 1;
+      }
+    }
+  }
+
+  // nobody has scored in a while: the closest treat sparkles and drifts over to help
+  for (const t of treats) t.helping = false;   // only ever one glowing helper at a time
+  if (idleTimer > 5 && nearest && balloons[0]) {
+    const b0 = balloons[0];
+    nearest.helping = true;
+    // the longer you've been stuck, the more eagerly the treat comes to meet you
+    const eager = clamp((idleTimer - 5) / 5, 0.35, 1.6);
+    const wantY = clamp(b0.y, TOP + 80 * U, groundY - 60 * U);
+    const lim = 115 * U * dt * eager;
+    nearest.baseY += clamp(wantY - nearest.baseY, -lim, lim);
+    nearest.x += clamp(b0.x - nearest.x, -lim * 0.8, lim * 0.8);
+    nearest.glow = 1;
+  }
+
+  // bunny
+  bunny.hop = Math.max(0, bunny.hop - dt * 2.2);
+
+  // scenery
+  for (const c of clouds) { c.x += (c.v + wind * 0.05) * dt; if (c.x - 70 * c.s > W) c.x = -70 * c.s; if (c.x + 70 * c.s < 0) c.x = W + 70 * c.s; }
+  for (const lf of leaves) {
+    lf.ph += dt * lf.sp;
+    lf.x += (60 * U + wind * 0.6) * dt;
+    lf.y += Math.sin(lf.ph) * 14 * U * dt;
+    if (lf.x > W + 20) { lf.x = -20; lf.y = rnd(TOP + 30, groundY); }
+    if (lf.x < -20) lf.x = W + 20;
+  }
+
+  // particles + floating text
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life += dt;
+    if (p.life >= p.max) { particles.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.type === 'confetti') { p.vy += 240 * U * dt; p.vx *= 0.995; p.spin = (p.spin || 0) + dt * 7; }
+    else if (p.type === 'spark') { p.vy += 260 * U * dt; }
+    else { p.vx *= 0.94; p.vy *= 0.94; }
+  }
+  for (let i = pops.length - 1; i >= 0; i--) {
+    const p = pops[i];
+    p.life += dt;
+    if (p.life >= 1.1) { pops.splice(i, 1); continue; }
+    p.y -= 44 * U * dt;
+  }
+
+  if (remaining <= 0 && state === 'play') finishLevel();
+}
+
+function collect(t, b) {
+  t.got = true; t.pop = 0.001;
+  combo++; totalTreats++; idleTimer = 0;
+  sfx.treat(combo - 1);
+  b.face = 2; b.faceT = 0.6;
+  addPop(t.x, t.y - 10 * U, combo >= 3 ? ('Wow! x' + combo) : 'Yay!', '#ffb52e');
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 20) * Math.PI * 2;
+    particles.push({
+      x: t.x, y: t.y, vx: Math.cos(a) * rnd(60, 190) * U, vy: Math.sin(a) * rnd(60, 190) * U - 40 * U,
+      life: 0, max: rnd(0.4, 0.9), size: rnd(3, 6.5) * U,
+      col: pick(['#ffd447', '#ff7fb6', '#7fe0ff', '#b6ffcf', '#fff']), type: 'spark'
+    });
+  }
+  updateHud();
+}
+
+function addPop(x, y, text, col) {
+  pops.push({ x: x, y: y, text: text, col: col, life: 0 });
+}
+
+function confettiBurst(n) {
+  for (let i = 0; i < n; i++) {
+    particles.push({
+      x: rnd(0, W), y: rnd(-60, TOP + 40), vx: rnd(-90, 90) * U, vy: rnd(40, 190) * U,
+      life: 0, max: rnd(1.4, 2.6), size: rnd(5, 11) * U, spin: rnd(0, 6.3),
+      col: pick(['#ff5fa2', '#ffd447', '#3aa7ff', '#34cf8b', '#9a5cff', '#ff7a3d']), type: 'confetti'
+    });
+  }
+}
+
+/* ============================================================
+   Drawing
+   ============================================================ */
+
+function drawBackground(t) {
+  const L = LEVELS[level];
+  const g = ctx.createLinearGradient(0, 0, 0, groundY);
+  g.addColorStop(0, L.sky[0]);
+  g.addColorStop(1, L.sky[1]);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, groundY + 12 * U);   // overlap the grass, no hairline seam
+
+  // sun
+  ctx.save();
+  ctx.globalAlpha = 0.85;
+  const sx = W - 46 * U, sy = TOP + 42 * U, sr = 26 * U;
+  const sg = ctx.createRadialGradient(sx, sy, sr * 0.2, sx, sy, sr * 2.6);
+  sg.addColorStop(0, 'rgba(255,240,170,0.95)');
+  sg.addColorStop(1, 'rgba(255,240,170,0)');
+  ctx.fillStyle = sg;
+  ctx.beginPath(); ctx.arc(sx, sy, sr * 2.6, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = '#ffe98a';
+  ctx.beginPath(); ctx.arc(sx, sy, sr, 0, 6.2832); ctx.fill();
+  ctx.restore();
+
+  // clouds
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
+  for (const c of clouds) {
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, 20 * c.s, 0, 6.2832);
+    ctx.arc(c.x + 20 * c.s, c.y + 5 * c.s, 15 * c.s, 0, 6.2832);
+    ctx.arc(c.x - 20 * c.s, c.y + 6 * c.s, 13 * c.s, 0, 6.2832);
+    ctx.arc(c.x + 4 * c.s, c.y - 12 * c.s, 14 * c.s, 0, 6.2832);
+    ctx.fill();
+  }
+
+  // bunting across the top
+  const bw = 34 * U;
+  const cols = ['#ff5fa2', '#ffd447', '#3aa7ff', '#34cf8b', '#9a5cff', '#ff7a3d'];
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+  ctx.lineWidth = 2 * U;
+  ctx.beginPath();
+  for (let x = 0; x <= W; x += 6) {
+    const y = TOP + 6 + Math.sin(x / W * Math.PI) * 10 * U;
+    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  for (let i = 0, x = bw * 0.4; x < W; i++, x += bw) {
+    const y = TOP + 6 + Math.sin(x / W * Math.PI) * 10 * U;
+    ctx.fillStyle = cols[i % cols.length];
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(x - bw * 0.3, y); ctx.lineTo(x + bw * 0.3, y); ctx.lineTo(x, y + 17 * U);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // leaves on windy levels
+  if (leaves.length) {
+    ctx.font = (16 * U) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = '#ffffff';           // opaque before emoji, or they render faded
+    for (const lf of leaves) {
+      ctx.save();
+      ctx.translate(lf.x, lf.y);
+      ctx.rotate(Math.sin(lf.ph) * 0.9);
+      ctx.fillText('🍃', 0, 0);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // grass
+  const gg = ctx.createLinearGradient(0, groundY, 0, H);
+  gg.addColorStop(0, '#79d96a');
+  gg.addColorStop(1, '#3fa24f');
+  ctx.fillStyle = gg;
+  ctx.beginPath();
+  ctx.moveTo(0, groundY + 8 * U);
+  for (let x = 0; x <= W; x += 14) {
+    ctx.lineTo(x, groundY + Math.sin(x / 40) * 4 * U);
+  }
+  ctx.lineTo(W, H); ctx.lineTo(0, H);
+  ctx.closePath(); ctx.fill();
+
+  // flowers
+  for (const f of flowers) {
+    const sway = Math.sin(t * 1.4 + f.ph) * 2 * U + wind * 0.02;
+    ctx.strokeStyle = '#2f8f43'; ctx.lineWidth = 2 * U;
+    ctx.beginPath(); ctx.moveTo(f.x, f.y + 10 * f.s); ctx.lineTo(f.x + sway, f.y); ctx.stroke();
+    ctx.fillStyle = f.c;
+    for (let i = 0; i < 5; i++) {
+      const a = i / 5 * 6.2832;
+      ctx.beginPath();
+      ctx.arc(f.x + sway + Math.cos(a) * 4.5 * f.s, f.y + Math.sin(a) * 4.5 * f.s, 3.4 * f.s, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#ffe37a';
+    ctx.beginPath(); ctx.arc(f.x + sway, f.y, 2.6 * f.s, 0, 6.2832); ctx.fill();
+  }
+}
+
+function drawBalloon(b, t) {
+  const sq = b.squash;
+  const rx = b.r * (1 - sq * 0.16);
+  const ry = b.r * (1 + sq * 0.2);
+
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(b.tilt * 0.22);
+
+  // string
+  ctx.strokeStyle = 'rgba(80,60,90,0.5)';
+  ctx.lineWidth = 1.6 * U;
+  ctx.beginPath();
+  ctx.moveTo(0, ry * 1.02);
+  ctx.quadraticCurveTo(6 * U * Math.sin(t * 2 + b.x), ry + 16 * U, -3 * U, ry + 30 * U);
+  ctx.stroke();
+
+  // knot
+  ctx.fillStyle = b.c2;
+  ctx.beginPath();
+  ctx.moveTo(-5 * U, ry * 0.98); ctx.lineTo(5 * U, ry * 0.98); ctx.lineTo(0, ry * 1.16);
+  ctx.closePath(); ctx.fill();
+
+  // body
+  const g = ctx.createRadialGradient(-rx * 0.35, -ry * 0.4, rx * 0.15, 0, 0, rx * 1.35);
+  g.addColorStop(0, b.c1);
+  g.addColorStop(1, b.c2);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, 6.2832); ctx.fill();
+
+  // shine
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.beginPath(); ctx.ellipse(-rx * 0.36, -ry * 0.38, rx * 0.2, ry * 0.3, -0.5, 0, 6.2832); ctx.fill();
+
+  // face
+  const ey = -ry * 0.1, ex = rx * 0.33;
+  ctx.fillStyle = '#41304c';
+  if (b.blink > 0) {
+    ctx.lineWidth = 2.4 * U; ctx.strokeStyle = '#41304c';
+    ctx.beginPath(); ctx.moveTo(-ex - 4 * U, ey); ctx.lineTo(-ex + 4 * U, ey);
+    ctx.moveTo(ex - 4 * U, ey); ctx.lineTo(ex + 4 * U, ey); ctx.stroke();
+  } else {
+    const eh = b.face === 1 ? rx * 0.10 : rx * 0.13;
+    ctx.beginPath(); ctx.ellipse(-ex, ey, rx * 0.1, eh, 0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(ex, ey, rx * 0.1, eh, 0, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(-ex + 2 * U, ey - 3 * U, rx * 0.04, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.arc(ex + 2 * U, ey - 3 * U, rx * 0.04, 0, 6.2832); ctx.fill();
+  }
+  // cheeks
+  ctx.fillStyle = 'rgba(255,120,160,0.35)';
+  ctx.beginPath(); ctx.arc(-ex - 5 * U, ey + 10 * U, rx * 0.14, 0, 6.2832); ctx.fill();
+  ctx.beginPath(); ctx.arc(ex + 5 * U, ey + 10 * U, rx * 0.14, 0, 6.2832); ctx.fill();
+  // mouth
+  ctx.strokeStyle = '#41304c'; ctx.lineWidth = 2.4 * U; ctx.lineCap = 'round';
+  ctx.beginPath();
+  if (b.face === 2) {                       // big open "yay" mouth
+    ctx.fillStyle = '#41304c';
+    ctx.ellipse(0, ey + 13 * U, rx * 0.18, rx * 0.16, 0, 0, 6.2832);
+    ctx.fill();
+  } else if (b.face === 1) {                // "whee"
+    ctx.arc(0, ey + 8 * U, rx * 0.22, 0.25, Math.PI - 0.25);
+    ctx.stroke();
+  } else {
+    ctx.arc(0, ey + 7 * U, rx * 0.2, 0.35, Math.PI - 0.35);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTreats(t) {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const tr of treats) {
+    if (tr.got && tr.pop >= 1) continue;
+    const s = tr.got ? (1 + tr.pop * 0.9) : 1 + Math.sin(t * 3 + tr.ph) * 0.05;
+    const alpha = tr.got ? Math.max(0, 1 - tr.pop) : 1;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(tr.x, tr.y);
+    ctx.scale(s, s);
+    // halo
+    const hg = ctx.createRadialGradient(0, 0, 2, 0, 0, tr.r * 1.7);
+    const glow = 0.3 + tr.glow * 0.5 + (tr.helping ? 0.2 : 0) + Math.sin(t * 4 + tr.ph) * 0.08;
+    hg.addColorStop(0, 'rgba(255,255,255,' + clamp(glow, 0, 0.95) + ')');
+    hg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = hg;
+    ctx.beginPath(); ctx.arc(0, 0, tr.r * 1.7, 0, 6.2832); ctx.fill();
+    // ring for the helper pulse
+    if (tr.helping && !tr.got) {
+      ctx.strokeStyle = 'rgba(255,212,71,' + (0.5 + Math.sin(t * 6) * 0.3) + ')';
+      ctx.lineWidth = 3 * U;
+      ctx.beginPath(); ctx.arc(0, 0, tr.r * 1.35, 0, 6.2832); ctx.stroke();
+    }
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#ffffff';            // opaque fill before emoji
+    ctx.font = (tr.r * 1.9) + 'px system-ui, "Segoe UI Emoji", sans-serif';
+    ctx.fillText(tr.em, 0, 0);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawBunny(t) {
+  const hop = Math.sin(bunny.hop * Math.PI) * 26 * U;
+  ctx.save();
+  ctx.translate(bunny.x, groundY - hop);
+  const s = 1 + bunny.hop * 0.15;
+  ctx.scale(s, s);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#ffffff';              // opaque fill before emoji
+  ctx.font = (40 * U) + 'px system-ui, "Segoe UI Emoji", sans-serif';
+  ctx.fillText('🐰', 0, 6 * U);
+  ctx.restore();
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    const a = 1 - p.life / p.max;
+    ctx.globalAlpha = Math.max(0, a);
+    ctx.fillStyle = p.col;
+    if (p.type === 'confetti') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.spin || 0);
+      ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+      ctx.restore();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (p.type === 'spark' ? a : 1), 0, 6.2832); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawPops() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const p of pops) {
+    const a = p.life < 0.75 ? 1 : 1 - (p.life - 0.75) / 0.35;
+    const sc = 1 + Math.min(0.35, p.life * 1.6);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, a);
+    ctx.translate(p.x, p.y);
+    ctx.scale(sc, sc);
+    ctx.font = 'bold ' + (20 * U) + 'px "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif';
+    ctx.lineWidth = 5 * U;
+    ctx.strokeStyle = '#fff';
+    ctx.strokeText(p.text, 0, 0);
+    ctx.fillStyle = p.col;
+    ctx.fillText(p.text, 0, 0);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function render(t) {
+  ctx.clearRect(0, 0, W, H);
+  drawBackground(t);
+  drawTreats(t);
+  drawBunny(t);
+  for (const b of balloons) drawBalloon(b, t);
+  drawParticles();
+  drawPops();
+}
+
+/* ============================================================
+   Level flow + screens
+   ============================================================ */
+
+function finishLevel() {
+  state = 'levelwin';
+  sfx.win();
+  confettiBurst(70);
+  if (save.unlocked < level + 1) { save.unlocked = level + 1; persist(); }
+
+  const isLast = level >= LEVELS.length - 1;
+  if (winTimer) clearTimeout(winTimer);
+  winTimer = setTimeout(() => {
+    winTimer = null;
+    if (state !== 'levelwin') return;   // player tapped ↺ during the celebration
+    if (isLast) {
+      state = 'party';
+      sfx.party();
+      confettiBurst(120);
+      renderShelf(document.getElementById('partyShelf'), 6);
+      show('partyScreen');
+    } else {
+      const f = FRIENDS[(level + 1) % FRIENDS.length];
+      document.getElementById('winTitle').textContent = 'Level ' + (level + 1) + ' done!';
+      document.getElementById('winStars').textContent = '⭐⭐⭐';
+      document.getElementById('unlockName').textContent = f.name + ' the balloon';
+      const holder = document.getElementById('unlockBalloon');
+      holder.innerHTML = '';
+      holder.appendChild(friendCanvas(f, 72, 86));
+      renderShelf(document.getElementById('winShelf'), save.unlocked);
+      show('winScreen');
+    }
+  }, 1150);
+}
+
+/* a small standalone balloon portrait, used on the shelves */
+function friendCanvas(f, w, h) {
+  const c = document.createElement('canvas');
+  c.className = 'portrait';
+  const d = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = w * d; c.height = h * d;
+  c.style.width = w + 'px'; c.style.height = h + 'px';
+  const x = c.getContext('2d');
+  x.setTransform(d, 0, 0, d, 0, 0);
+  const cx = w / 2, cy = h * 0.42, r = Math.min(w, h) * 0.34;
+  x.strokeStyle = 'rgba(80,60,90,0.45)'; x.lineWidth = 1.4;
+  x.beginPath(); x.moveTo(cx, cy + r * 1.15); x.quadraticCurveTo(cx + 6, cy + r * 1.6, cx - 2, h - 4); x.stroke();
+  x.fillStyle = f.c2;
+  x.beginPath(); x.moveTo(cx - 4, cy + r * 1.05); x.lineTo(cx + 4, cy + r * 1.05); x.lineTo(cx, cy + r * 1.28); x.closePath(); x.fill();
+  const g = x.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.15, cx, cy, r * 1.35);
+  g.addColorStop(0, f.c1); g.addColorStop(1, f.c2);
+  x.fillStyle = g;
+  x.beginPath(); x.ellipse(cx, cy, r, r * 1.16, 0, 0, 6.2832); x.fill();
+  x.fillStyle = 'rgba(255,255,255,0.55)';
+  x.beginPath(); x.ellipse(cx - r * 0.36, cy - r * 0.42, r * 0.2, r * 0.3, -0.5, 0, 6.2832); x.fill();
+  x.fillStyle = '#41304c';
+  x.beginPath(); x.arc(cx - r * 0.33, cy - r * 0.05, r * 0.11, 0, 6.2832); x.fill();
+  x.beginPath(); x.arc(cx + r * 0.33, cy - r * 0.05, r * 0.11, 0, 6.2832); x.fill();
+  x.strokeStyle = '#41304c'; x.lineWidth = 1.8; x.lineCap = 'round';
+  x.beginPath(); x.arc(cx, cy + r * 0.12, r * 0.24, 0.4, Math.PI - 0.4); x.stroke();
+  return c;
+}
+
+function renderShelf(el, count) {
+  if (!el) return;
+  el.innerHTML = '';
+  const n = clamp(count, 0, FRIENDS.length);
+  if (n === 0) {
+    const d = document.createElement('div');
+    d.style.cssText = 'font-size:14px;color:#9a8aa4;padding:6px';
+    d.textContent = 'Finish a level to meet your first friend!';
+    el.appendChild(d);
+    return;
+  }
+  for (let i = 0; i < n; i++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'friend';
+    wrap.title = FRIENDS[i].name;
+    wrap.appendChild(friendCanvas(FRIENDS[i], 44, 54));
+    el.appendChild(wrap);
+  }
+}
+
+function show(id) {
+  ['titleScreen', 'winScreen', 'partyScreen'].forEach(k => {
+    document.getElementById(k).classList.toggle('hidden', k !== id);
+  });
+}
+function hideAll() {
+  ['titleScreen', 'winScreen', 'partyScreen'].forEach(k => document.getElementById(k).classList.add('hidden'));
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  ac(); hideAll(); startLevel(0);
+});
+document.getElementById('nextBtn').addEventListener('click', () => {
+  ac(); hideAll(); startLevel(level + 1);
+});
+document.getElementById('againBtn').addEventListener('click', () => {
+  ac(); hideAll(); startLevel(0);
+});
+document.getElementById('restartBtn').addEventListener('click', () => {
+  ac();
+  if (winTimer) { clearTimeout(winTimer); winTimer = null; }
+  state = 'title';
+  treats = []; particles = []; pops = [];
+  titleIdle();                       // the title sky keeps its bobbing balloon
+  renderShelf(document.getElementById('shelf'), save.unlocked);
+  document.getElementById('levelPill').textContent = 'Level 1';
+  show('titleScreen');
+});
+
+/* ============================================================
+   Main loop
+   ============================================================ */
+
+function frame(now) {
+  if (!lastT) lastT = now;
+  let dt = (now - lastT) / 1000;
+  lastT = now;
+  dt = Math.min(dt, 0.033);          // never let a slow frame tunnel the balloon
+  const t = now / 1000;
+
+  if (state === 'play') step(dt);
+  else {
+    // keep the world gently alive behind the overlays
+    for (const c of clouds) { c.x += c.v * dt; if (c.x - 70 * c.s > W) c.x = -70 * c.s; }
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.life += dt;
+      if (p.life >= p.max) { particles.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      if (p.type === 'confetti') { p.vy += 240 * U * dt; p.spin = (p.spin || 0) + dt * 7; }
+      else if (p.type === 'spark') { p.vy += 260 * U * dt; }
+    }
+    for (let i = pops.length - 1; i >= 0; i--) {
+      pops[i].life += dt; pops[i].y -= 44 * U * dt;
+      if (pops[i].life >= 1.1) pops.splice(i, 1);
+    }
+    for (const b of balloons) { b.blink -= dt; if (b.blink < -0.1 && Math.random() < 0.006) b.blink = 0.14; }
+  }
+
+  render(t);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- title-screen demo balloon ---------- */
+function titleIdle() {
+  const f = FRIENDS[save.unlocked % FRIENDS.length];
+  balloons = [{
+    x: W * 0.5, y: H * 0.42, vx: 0, vy: 0, r: Math.max(26, 34 * U),
+    squash: 0, tilt: 0, blink: 0, face: 0, faceT: 0,
+    c1: f.c1, c2: f.c2, name: f.name
+  }];
+  treats = [];
+}
+
+/* ---------- boot ---------- */
+resize();
+titleIdle();
+renderShelf(document.getElementById('shelf'), save.unlocked);
+show('titleScreen');
+if (!running) { running = true; requestAnimationFrame(frame); }
+
+/* ---------- test hook (used by the local drive script) ---------- */
+window.__bop = {
+  get state() { return state; },
+  get level() { return level; },
+  get treatsLeft() { return treats.filter(t => !t.got).length; },
+  get treatsTotal() { return treats.length; },
+  get collected() { return totalTreats; },
+  get groundBoops() { return groundBoops; },
+  get unlocked() { return save.unlocked; },
+  get balloon() { const b = balloons[0]; return b ? { x: b.x, y: b.y, r: b.r, vx: b.vx, vy: b.vy } : null; },
+  get balloons() { return balloons.map(b => ({ x: b.x, y: b.y, r: b.r })); },
+  get treats() { return treats.filter(t => !t.got).map(t => ({ x: t.x, y: t.y, r: t.r })); },
+  get size() { return { W: W, H: H, U: U, TOP: TOP, groundY: groundY }; },
+  _jump(n) { hideAll(); startLevel(n); }   // test hook for the local drive script
+
+};
+</script>
+</body>
+</html>

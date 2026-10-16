@@ -1,0 +1,1153 @@
+<!-- CONCEPT: Pixel Pals Paint-by-Number — tap or drag across a pixel grid to fill every numbered square with its matching paint pot and reveal a hidden pixel-art pal (kitty, rocket, butterfly, fish, flower, robot). Matching squares gently pulse so nobody has to hunt, wrong squares just wobble and never fill, each fill rings a higher note, and finishing hides the numbers, bobs the art to life and throws confetti. Includes a Free Paint mode on the same grid for making your own pixel art. Creative + sneaky number-recognition game for ages 4-11, no timer, no losing. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pixel Pals Paint-by-Number</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+}
+
+:root {
+  --bg1: #FFF3D6;
+  --bg2: #FFD9E8;
+  --bg3: #D6F0FF;
+  --ink: #43305A;
+  --ink-soft: #7A6690;
+  --panel: #FFFFFF;
+  --shadow: 0 6px 0 rgba(67, 48, 90, 0.16);
+  --shadow-sm: 0 4px 0 rgba(67, 48, 90, 0.14);
+  --grad-a: #FF7BAC;
+  --grad-b: #7A6BFF;
+  --grad-c: #2FC3E8;
+  --gap: clamp(8px, 2.4vw, 14px);
+  --pad: clamp(10px, 3vw, 18px);
+  --radius: 18px;
+  --tap: 62px;
+  --font: "Comic Sans MS", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 18% 8%, var(--bg2) 0%, transparent 52%),
+    radial-gradient(circle at 84% 14%, var(--bg3) 0%, transparent 48%),
+    linear-gradient(170deg, var(--bg1) 0%, #FFE7F3 58%, #E4F3FF 100%);
+  background-attachment: fixed;
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  inset: 0;
+}
+
+#app { position: absolute; inset: 0; display: flex; }
+
+.screen {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  padding: var(--pad);
+  gap: var(--gap);
+}
+.screen.hidden { display: none; }
+
+/* ---------- headings ---------- */
+h1 {
+  margin: 0;
+  font-size: clamp(26px, 8vw, 44px);
+  line-height: 1.05;
+  text-align: center;
+  letter-spacing: 0.5px;
+  background: linear-gradient(90deg, var(--grad-a), var(--grad-b) 55%, var(--grad-c));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.subtitle {
+  margin: 0; text-align: center;
+  font-size: clamp(13px, 3.6vw, 17px);
+  color: var(--ink-soft);
+}
+
+/* ---------- buttons ---------- */
+button {
+  font-family: var(--font);
+  border: none;
+  cursor: pointer;
+  color: var(--ink);
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.15s ease;
+}
+button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(67,48,90,0.16); }
+
+.big-btn {
+  min-height: var(--tap);
+  padding: 0 clamp(14px, 4vw, 26px);
+  font-size: clamp(16px, 4.4vw, 22px);
+  font-weight: bold;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+}
+.btn-pink   { background: linear-gradient(180deg, #FF9CC4, #FF6FA6); color: #fff; }
+.btn-purple { background: linear-gradient(180deg, #A79BFF, #7A6BFF); color: #fff; }
+.btn-teal   { background: linear-gradient(180deg, #6FE0F5, #2FC3E8); color: #fff; }
+.btn-sun    { background: linear-gradient(180deg, #FFDD79, #FFC22E); color: #6A4A00; }
+
+/* ---------- menu ---------- */
+#menu { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.menu-head { flex: 0 0 auto; }
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--gap);
+  padding-bottom: 6px;
+}
+.pic-card {
+  background: var(--panel);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 10px 8px 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  min-height: 150px;
+  position: relative;
+  overflow: hidden;
+}
+.pic-card canvas {
+  width: 84px; height: 84px;
+  image-rendering: pixelated;
+  border-radius: 12px;
+  background: #D6CDE8;
+}
+.pic-card .label {
+  font-size: clamp(14px, 3.8vw, 17px);
+  font-weight: bold;
+}
+.pic-card .stars { font-size: 15px; height: 18px; line-height: 18px; }
+.pic-card .ribbon {
+  position: absolute; top: 8px; right: -26px;
+  transform: rotate(38deg);
+  background: linear-gradient(90deg, #FFD35C, #FFB020);
+  color: #6A4A00; font-size: 11px; font-weight: bold;
+  padding: 3px 28px;
+  box-shadow: 0 2px 0 rgba(67,48,90,0.12);
+}
+.menu-foot { flex: 0 0 auto; display: flex; gap: var(--gap); }
+.menu-foot button { flex: 1; }
+
+/* ---------- play screen ---------- */
+#play { padding-bottom: calc(var(--pad) * 0.6); }
+.topbar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+}
+.icon-btn {
+  width: var(--tap); height: var(--tap);
+  min-width: var(--tap);
+  font-size: 26px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+}
+.title-wrap { flex: 1; min-width: 0; text-align: center; }
+.play-title {
+  font-size: clamp(17px, 5vw, 26px);
+  font-weight: bold;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: linear-gradient(90deg, var(--grad-b), var(--grad-a));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.progress-track {
+  height: 12px; border-radius: 999px;
+  background: rgba(255,255,255,0.75);
+  box-shadow: inset 0 2px 0 rgba(67,48,90,0.08);
+  overflow: hidden;
+  margin-top: 4px;
+}
+.progress-fill {
+  height: 100%; width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #6FE0F5, #7A6BFF, #FF7BAC);
+  transition: width 0.22s ease;
+}
+
+.now-painting {
+  flex: 0 0 auto;
+  align-self: center;
+  background: rgba(255,255,255,0.8);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: clamp(14px, 3.9vw, 18px);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
+  max-width: 100%;
+}
+.now-painting b { font-size: 1.25em; }
+.now-painting .swatch {
+  display: inline-block;
+  width: 0.9em; height: 0.9em;
+  border-radius: 5px;
+  vertical-align: -0.1em;
+  margin-right: 4px;
+  border: 2px solid rgba(67,48,90,0.18);
+}
+
+.canvas-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+#grid {
+  touch-action: none;
+  border-radius: var(--radius);
+  background: rgba(255,255,255,0.6);
+  box-shadow: var(--shadow);
+  max-width: 100%; max-height: 100%;
+}
+
+.palette {
+  flex: 0 0 auto;
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 8px;
+}
+.pot {
+  width: 64px; height: 66px;
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px;
+  padding: 4px;
+  position: relative;
+}
+.pot .chip {
+  width: 34px; height: 26px;
+  border-radius: 9px;
+  border: 2px solid rgba(67,48,90,0.18);
+}
+.pot .num {
+  font-size: 15px; font-weight: bold; line-height: 1;
+  color: var(--ink-soft);
+}
+.pot.sel {
+  outline: 4px solid var(--grad-b);
+  outline-offset: -2px;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 0 rgba(67,48,90,0.18);
+}
+.pot.done { opacity: 0.42; }
+.pot.done .num::after { content: " ✓"; }
+
+.play-foot {
+  flex: 0 0 auto;
+  display: flex; gap: 8px; justify-content: center;
+}
+.play-foot .big-btn { flex: 1; max-width: 220px; }
+
+/* ---------- celebration ---------- */
+#fx {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 60;
+}
+/* the card sits at the bottom so the finished pixel pal stays in view */
+#banner {
+  position: fixed; inset: 0;
+  z-index: 70;
+  display: flex; align-items: flex-end; justify-content: center;
+  padding: var(--pad);
+  pointer-events: none;
+}
+#banner.hidden { display: none; }
+.banner-card {
+  pointer-events: auto;
+  background: var(--panel);
+  border-radius: 26px;
+  box-shadow: 0 10px 30px rgba(67,48,90,0.28);
+  padding: clamp(12px, 3.5vw, 20px);
+  text-align: center;
+  max-width: 460px; width: 100%;
+  animation: slide-up 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes slide-up {
+  from { transform: translateY(120%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.banner-card .emoji { font-size: clamp(30px, 9vw, 44px); line-height: 1; }
+.banner-card h2 {
+  margin: 2px 0 2px;
+  font-size: clamp(21px, 6vw, 28px);
+  background: linear-gradient(90deg, var(--grad-a), var(--grad-c));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.banner-card p { margin: 0 0 12px; color: var(--ink-soft); font-size: clamp(13px, 3.6vw, 16px); }
+.banner-btns { display: flex; flex-direction: row; gap: 8px; }
+.banner-btns .big-btn {
+  flex: 1; min-width: 0;
+  padding: 0 6px;
+  font-size: clamp(13px, 3.6vw, 17px);
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ============ MENU ============ -->
+  <section id="menu" class="screen">
+    <div class="menu-head">
+      <h1>Pixel Pals</h1>
+      <p class="subtitle">Paint the numbers · find the hidden pal!</p>
+    </div>
+    <div id="cards" class="card-grid"></div>
+    <div class="menu-foot">
+      <button id="freeBtn" class="big-btn btn-sun">🎨 Free Paint</button>
+    </div>
+  </section>
+
+  <!-- ============ PLAY ============ -->
+  <section id="play" class="screen hidden">
+    <div class="topbar">
+      <button id="backBtn" class="icon-btn btn-purple" aria-label="Back to menu">⬅</button>
+      <div class="title-wrap">
+        <div id="playTitle" class="play-title">Kitty</div>
+        <div class="progress-track"><div id="progress" class="progress-fill"></div></div>
+      </div>
+      <button id="hintBtn" class="icon-btn btn-teal" aria-label="Peek at the picture">👀</button>
+    </div>
+
+    <div id="nowPainting" class="now-painting">Paint all the <b>1</b>s</div>
+
+    <div class="canvas-wrap"><canvas id="grid"></canvas></div>
+
+    <div id="palette" class="palette"></div>
+
+    <div class="play-foot">
+      <button id="resetBtn" class="big-btn btn-pink">🔄 Start Over</button>
+    </div>
+  </section>
+
+</div>
+
+<canvas id="fx"></canvas>
+
+<div id="banner" class="hidden">
+  <div class="banner-card">
+    <div class="emoji" id="bannerEmoji">🎉</div>
+    <h2 id="bannerTitle">You did it!</h2>
+    <p id="bannerText">Look at that pixel pal!</p>
+    <div class="banner-btns">
+      <button id="nextBtn" class="big-btn btn-purple">➡️ Next</button>
+      <button id="againBtn" class="big-btn btn-teal">🔄 Again</button>
+      <button id="menuBtn" class="big-btn btn-sun">🏠 Home</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Pixel Pals Paint-by-Number
+   ============================================================ */
+
+const N = 10;              // grid is always 10 x 10
+const STORE = 'cowork-pixelpals-';
+
+/* ---------- picture data: '.' = empty, '1'-'4' = paint number ---------- */
+const PICTURES = [
+  {
+    id: 'cat', name: 'Kitty', emoji: '🐱',
+    colors: ['#F79A2B', '#3A2A20', '#FF9EC4', '#FFF3E2'],
+    names: ['orange', 'dark brown', 'pink', 'cream'],
+    rows: [
+      '..........',
+      '.1......1.',
+      '.11....11.',
+      '.13....31.',
+      '.11111111.',
+      '.12111121.',
+      '.11111111.',
+      '.11433411.',
+      '..114411..',
+      '...1111...'
+    ]
+  },
+  {
+    id: 'rocket', name: 'Rocket', emoji: '🚀',
+    colors: ['#FF5A5A', '#F2F4FF', '#43B5FF', '#FFB020'],
+    names: ['red', 'white', 'blue', 'orange'],
+    rows: [
+      '....11....',
+      '...1111...',
+      '..111111..',
+      '..222222..',
+      '..223322..',
+      '..222222..',
+      '..222222..',
+      '.12222221.',
+      '1122222211',
+      '...4444...'
+    ]
+  },
+  {
+    id: 'butterfly', name: 'Butterfly', emoji: '🦋',
+    colors: ['#A97BFF', '#FF87C3', '#6B4A82', '#FFDD3C'],
+    names: ['purple', 'pink', 'plum', 'yellow'],
+    rows: [
+      '.4......4.',
+      '..4....4..',
+      '.11.33.11.',
+      '1121331211',
+      '1111331111',
+      '.11133111.',
+      '.11233211.',
+      '..113311..',
+      '...1111...',
+      '..........'
+    ]
+  },
+  {
+    id: 'fish', name: 'Fish', emoji: '🐠',
+    colors: ['#FF9F2E', '#3A2A20', '#FFF3E2', '#2FC3E8'],
+    names: ['orange', 'black', 'cream', 'teal'],
+    rows: [
+      '..........',
+      '...111....',
+      '..11111..4',
+      '.111311144',
+      '1211311144',
+      '1111311144',
+      '.111311144',
+      '..11111..4',
+      '...111....',
+      '..........'
+    ]
+  },
+  {
+    id: 'flower', name: 'Flower', emoji: '🌻',
+    colors: ['#FFDD3C', '#8A5A2B', '#4BD37B', '#2FA85E'],
+    names: ['yellow', 'brown', 'green', 'dark green'],
+    rows: [
+      '...1111...',
+      '..111111..',
+      '.11122111.',
+      '1111221111',
+      '.11122111.',
+      '..111111..',
+      '....33....',
+      '..4.33.4..',
+      '.44.33.44.',
+      '....33....'
+    ]
+  },
+  {
+    id: 'robot', name: 'Robot', emoji: '🤖',
+    colors: ['#B6C2D9', '#43B5FF', '#FF5A5A', '#FFDD3C'],
+    names: ['silver', 'blue', 'red', 'yellow'],
+    rows: [
+      '....44....',
+      '....11....',
+      '.11111111.',
+      '.12111121.',
+      '.11111111.',
+      '.11333311.',
+      '.11111111.',
+      '1111331111',
+      '1111111111',
+      '.11....11.'
+    ]
+  }
+];
+
+const FREE_COLORS = ['#FF5A5A', '#FF9F2E', '#FFDD3C', '#4BD37B', '#43B5FF', '#A97BFF', '#FF87C3', '#3A2A20'];
+
+const PRAISE = [
+  { e: '🎉', t: 'You did it!',    s: 'Look at that pixel pal!' },
+  { e: '🌟', t: 'Beautiful!',     s: 'Every square is painted.' },
+  { e: '🥳', t: 'Amazing work!',  s: 'That took great looking.' },
+  { e: '🏆', t: 'Superstar!',     s: 'Your pal came to life!' },
+  { e: '✨', t: 'Wonderful!',     s: 'What a lovely painting.' }
+];
+
+/* ============================================================
+   Sound
+   ============================================================ */
+let actx = null;
+function audio() {
+  if (!actx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    actx = new AC();
+  }
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur = 0.16, type = 'triangle', vol = 0.16, delay = 0) {
+  const ac = audio();
+  if (!ac) return;
+  const t0 = ac.currentTime + delay;
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain).connect(ac.destination);
+  osc.start(t0);
+  osc.stop(t0 + dur + 0.03);
+}
+function sfxWobble() {
+  tone(210, 0.10, 'sine', 0.10);
+  tone(168, 0.12, 'sine', 0.09, 0.07);
+}
+function sfxPotDone() {
+  [523, 659, 784].forEach((f, i) => tone(f, 0.16, 'triangle', 0.14, i * 0.07));
+}
+function sfxFanfare() {
+  [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.30, 'triangle', 0.16, i * 0.11));
+  [262, 330, 392].forEach((f, i) => tone(f, 0.5, 'sine', 0.10, 0.55 + i * 0.05));
+}
+function sfxSwoosh() {
+  tone(600, 0.18, 'sine', 0.09);
+  tone(300, 0.22, 'sine', 0.08, 0.08);
+}
+
+/* ============================================================
+   Sparkle / confetti overlay
+   ============================================================ */
+const fx = document.getElementById('fx');
+const fxc = fx.getContext('2d');
+let parts = [];
+let fxRunning = false;
+
+function sizeFx() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  fx.width = Math.floor(innerWidth * dpr);
+  fx.height = Math.floor(innerHeight * dpr);
+  fx.style.width = innerWidth + 'px';
+  fx.style.height = innerHeight + 'px';
+  fxc.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+sizeFx();
+
+function sparkle(x, y, color, count = 8) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 0.9 + Math.random() * 2.4;
+    parts.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.8,
+      g: 0.07, life: 1, decay: 0.022 + Math.random() * 0.02,
+      size: 3 + Math.random() * 4, color, shape: 'dot'
+    });
+  }
+  runFx();
+}
+function confetti(count = 130) {
+  const cols = ['#FF7BAC', '#7A6BFF', '#2FC3E8', '#FFDD3C', '#4BD37B', '#FF9F2E'];
+  for (let i = 0; i < count; i++) {
+    parts.push({
+      x: Math.random() * innerWidth,
+      y: -20 - Math.random() * innerHeight * 0.5,
+      vx: (Math.random() - 0.5) * 2.6,
+      vy: 1.6 + Math.random() * 3.2,
+      g: 0.05, life: 1, decay: 0.0042 + Math.random() * 0.004,
+      size: 6 + Math.random() * 7,
+      color: cols[i % cols.length],
+      shape: 'strip',
+      rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.26
+    });
+  }
+  runFx();
+}
+function runFx() {
+  if (fxRunning) return;
+  fxRunning = true;
+  requestAnimationFrame(stepFx);
+}
+function stepFx() {
+  fxc.clearRect(0, 0, innerWidth, innerHeight);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.x += p.vx; p.y += p.vy; p.vy += p.g; p.life -= p.decay;
+    if (p.rot !== undefined) p.rot += p.vr;
+    if (p.life <= 0 || p.y > innerHeight + 40) { parts.splice(i, 1); continue; }
+    fxc.globalAlpha = Math.max(0, Math.min(1, p.life));
+    fxc.fillStyle = p.color;
+    if (p.shape === 'strip') {
+      fxc.save();
+      fxc.translate(p.x, p.y);
+      fxc.rotate(p.rot);
+      fxc.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+      fxc.restore();
+    } else {
+      fxc.beginPath();
+      fxc.arc(p.x, p.y, p.size / 2, 0, Math.PI * 2);
+      fxc.fill();
+    }
+  }
+  fxc.globalAlpha = 1;
+  if (parts.length) requestAnimationFrame(stepFx);
+  else fxRunning = false;
+}
+
+/* ============================================================
+   Saved progress
+   ============================================================ */
+function loadDone() {
+  try { return JSON.parse(localStorage.getItem(STORE + 'done') || '{}') || {}; }
+  catch (e) { return {}; }
+}
+function saveDone(d) {
+  try { localStorage.setItem(STORE + 'done', JSON.stringify(d)); } catch (e) {}
+}
+function loadFree() {
+  try {
+    const raw = localStorage.getItem(STORE + 'freepaint');
+    if (!raw) return null;
+    const arr = JSON.parse(raw);
+    return (Array.isArray(arr) && arr.length === N * N) ? arr : null;
+  } catch (e) { return null; }
+}
+function saveFree(arr) {
+  try { localStorage.setItem(STORE + 'freepaint', JSON.stringify(Array.from(arr))); } catch (e) {}
+}
+
+/* ============================================================
+   Game state
+   ============================================================ */
+const state = {
+  mode: 'picture',   // 'picture' | 'free'
+  pic: null,
+  colors: [],
+  target: new Int8Array(N * N),   // -1 = not part of picture
+  painted: new Int8Array(N * N),  // -1 = unpainted
+  sel: 0,                          // selected paint index (-1 = eraser in free mode)
+  popAt: new Float64Array(N * N),
+  wrongIdx: -1,
+  wrongAt: 0,
+  run: 0,                          // ascending-pitch counter
+  complete: false,
+  completeAt: 0,
+  peekUntil: 0
+};
+
+/* ============================================================
+   Grid canvas
+   ============================================================ */
+const gridCanvas = document.getElementById('grid');
+const gctx = gridCanvas.getContext('2d');
+let cellPx = 30, gridPx = 300;
+
+function sizeGrid() {
+  const wrap = gridCanvas.parentElement;
+  const avail = Math.min(wrap.clientWidth, wrap.clientHeight);
+  const side = Math.max(200, Math.min(avail - 4, 460));
+  cellPx = Math.floor(side / N);
+  gridPx = cellPx * N;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  gridCanvas.style.width = gridPx + 'px';
+  gridCanvas.style.height = gridPx + 'px';
+  gridCanvas.width = Math.floor(gridPx * dpr);
+  gridCanvas.height = Math.floor(gridPx * dpr);
+  gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); return; }
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+let rafId = null;
+function render() {
+  rafId = requestAnimationFrame(render);
+  const now = performance.now();
+  const peeking = now < state.peekUntil;
+  const hideNumbers = state.complete || peeking;
+
+  gctx.clearRect(0, 0, gridPx, gridPx);
+
+  // gentle bob once the picture is finished
+  let bob = 0;
+  if (state.complete) bob = Math.sin((now - state.completeAt) / 340) * 4;
+
+  const inset = Math.max(1.5, cellPx * 0.06);
+  const rad = Math.max(3, cellPx * 0.22);
+  const pulse = 0.5 + 0.5 * Math.sin(now / 300);
+
+  for (let i = 0; i < N * N; i++) {
+    const col = i % N, row = (i / N) | 0;
+    const t = state.target[i];
+    const p = state.painted[i];
+    if (state.mode === 'picture' && t < 0) continue;   // empty background square
+
+    let x = col * cellPx + inset;
+    let y = row * cellPx + inset + bob;
+    let w = cellPx - inset * 2;
+    let h = w;
+
+    // wrong-tap wobble
+    if (i === state.wrongIdx) {
+      const dt = now - state.wrongAt;
+      if (dt < 420) x += Math.sin(dt / 26) * 3.4 * (1 - dt / 420);
+      else state.wrongIdx = -1;
+    }
+    // fill pop
+    const pa = state.popAt[i];
+    if (pa) {
+      const k = (now - pa) / 260;
+      if (k < 1) {
+        const s = 1 + 0.34 * Math.sin(Math.PI * k);
+        const cx = x + w / 2, cy = y + h / 2;
+        w *= s; h *= s; x = cx - w / 2; y = cy - h / 2;
+      } else state.popAt[i] = 0;
+    }
+
+    if (p >= 0) {
+      // painted — outline it so pale colours still read as a filled tile
+      gctx.fillStyle = state.colors[p];
+      roundRect(gctx, x, y, w, h, rad);
+      gctx.fill();
+      gctx.strokeStyle = 'rgba(67,48,90,0.16)';
+      gctx.lineWidth = 1.5;
+      gctx.stroke();
+    } else if (state.mode === 'free') {
+      gctx.fillStyle = '#DED6EE';
+      roundRect(gctx, x, y, w, h, rad);
+      gctx.fill();
+      gctx.strokeStyle = 'rgba(67,48,90,0.10)';
+      gctx.lineWidth = 1;
+      gctx.stroke();
+    } else {
+      // unpainted numbered square — kept clearly darker than any paint colour
+      const isNext = (t === state.sel);
+      gctx.fillStyle = hideNumbers ? '#D6CDE8' : (isNext ? '#FFFFFF' : '#D6CDE8');
+      roundRect(gctx, x, y, w, h, rad);
+      gctx.fill();
+      if (isNext && !hideNumbers) {
+        gctx.strokeStyle = state.colors[t];
+        gctx.lineWidth = Math.max(2, cellPx * 0.11);
+        gctx.globalAlpha = 0.45 + 0.55 * pulse;
+        gctx.stroke();
+        gctx.globalAlpha = 1;
+      } else {
+        gctx.strokeStyle = 'rgba(67,48,90,0.16)';
+        gctx.lineWidth = 1;
+        gctx.stroke();
+      }
+      if (!hideNumbers) {
+        gctx.fillStyle = isNext ? state.colors[t] : 'rgba(67,48,90,0.58)';
+        gctx.font = 'bold ' + Math.max(10, Math.floor(cellPx * 0.46)) + 'px ' +
+                    '"Trebuchet MS", system-ui, sans-serif';
+        gctx.textAlign = 'center';
+        gctx.textBaseline = 'middle';
+        gctx.fillText(String(t + 1), x + w / 2, y + h / 2 + 1);
+      }
+    }
+  }
+}
+
+/* ============================================================
+   Painting
+   ============================================================ */
+function cellFromEvent(e) {
+  const r = gridCanvas.getBoundingClientRect();
+  const cx = Math.floor(((e.clientX - r.left) / r.width) * N);
+  const cy = Math.floor(((e.clientY - r.top) / r.height) * N);
+  if (cx < 0 || cy < 0 || cx >= N || cy >= N) return -1;
+  return cy * N + cx;
+}
+function cellCenterScreen(i) {
+  const r = gridCanvas.getBoundingClientRect();
+  const col = i % N, row = (i / N) | 0;
+  return {
+    x: r.left + (col + 0.5) * (r.width / N),
+    y: r.top + (row + 0.5) * (r.height / N)
+  };
+}
+
+function paintCell(i, isTap) {
+  if (i < 0 || state.complete) return;
+
+  if (state.mode === 'free') {
+    const v = state.sel;
+    if (state.painted[i] === v) return;
+    state.painted[i] = v;
+    state.popAt[i] = performance.now();
+    saveFree(state.painted);
+    if (v >= 0) {
+      const c = cellCenterScreen(i);
+      sparkle(c.x, c.y, state.colors[v], 5);
+      state.run = (state.run + 1) % 8;
+      tone(392 * Math.pow(2, state.run / 12), 0.12, 'triangle', 0.13);
+    } else {
+      tone(240, 0.09, 'sine', 0.08);
+    }
+    return;
+  }
+
+  const t = state.target[i];
+  if (t < 0 || state.painted[i] >= 0) return;         // empty or already painted
+
+  if (t !== state.sel) {                               // never fills the wrong colour
+    if (isTap) {
+      state.wrongIdx = i;
+      state.wrongAt = performance.now();
+      sfxWobble();
+    }
+    return;
+  }
+
+  state.painted[i] = t;
+  state.popAt[i] = performance.now();
+  const c = cellCenterScreen(i);
+  sparkle(c.x, c.y, state.colors[t], 7);
+  state.run++;
+  tone(392 * Math.pow(2, Math.min(state.run, 14) / 12), 0.13, 'triangle', 0.14);
+
+  updateProgress();
+  if (remainingFor(state.sel) === 0) {
+    state.run = 0;
+    const nxt = nextUnfinishedColor(state.sel);
+    if (nxt >= 0) {
+      state.sel = nxt;
+      sfxPotDone();
+    }
+    buildPalette();
+  } else {
+    updatePotCounts();
+  }
+
+  if (totalRemaining() === 0) finish();
+}
+
+function remainingFor(colorIdx) {
+  let n = 0;
+  for (let i = 0; i < N * N; i++)
+    if (state.target[i] === colorIdx && state.painted[i] < 0) n++;
+  return n;
+}
+function totalRemaining() {
+  let n = 0;
+  for (let i = 0; i < N * N; i++)
+    if (state.target[i] >= 0 && state.painted[i] < 0) n++;
+  return n;
+}
+function nextUnfinishedColor(from) {
+  for (let k = 1; k <= state.colors.length; k++) {
+    const c = (from + k) % state.colors.length;
+    if (remainingFor(c) > 0) return c;
+  }
+  return -1;
+}
+
+/* pointer handling — tap or drag to paint */
+let dragging = false, lastCell = -1;
+gridCanvas.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  audio();
+  dragging = true;
+  lastCell = cellFromEvent(e);
+  paintCell(lastCell, true);
+  if (gridCanvas.setPointerCapture) {
+    try { gridCanvas.setPointerCapture(e.pointerId); } catch (err) {}
+  }
+});
+gridCanvas.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  e.preventDefault();
+  const i = cellFromEvent(e);
+  if (i !== lastCell) { lastCell = i; paintCell(i, false); }
+});
+function endDrag() { dragging = false; lastCell = -1; }
+gridCanvas.addEventListener('pointerup', endDrag);
+gridCanvas.addEventListener('pointercancel', endDrag);
+gridCanvas.addEventListener('pointerleave', endDrag);
+
+/* ============================================================
+   Palette
+   ============================================================ */
+const paletteEl = document.getElementById('palette');
+
+function buildPalette() {
+  paletteEl.innerHTML = '';
+  state.colors.forEach((hex, idx) => {
+    const b = document.createElement('button');
+    b.className = 'pot' + (idx === state.sel ? ' sel' : '');
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.style.background = hex;
+    const num = document.createElement('span');
+    num.className = 'num';
+    b.appendChild(chip);
+    b.appendChild(num);
+    if (state.mode === 'picture') {
+      const left = remainingFor(idx);
+      num.textContent = (idx + 1) + ' · ' + left;
+      b.setAttribute('aria-label', 'Paint pot ' + (idx + 1) + ', ' +
+        state.pic.names[idx] + ', ' + left + ' squares left');
+      if (left === 0) b.classList.add('done');
+    } else {
+      num.textContent = '●';
+      b.setAttribute('aria-label', 'Colour ' + (idx + 1));
+    }
+    b.addEventListener('click', () => {
+      audio();
+      state.sel = idx;
+      state.run = 0;
+      tone(520 + idx * 40, 0.10, 'sine', 0.11);
+      buildPalette();
+    });
+    paletteEl.appendChild(b);
+  });
+
+  if (state.mode === 'free') {
+    const er = document.createElement('button');
+    er.className = 'pot' + (state.sel === -1 ? ' sel' : '');
+    er.innerHTML = '<span class="chip" style="background:#FFF;border-style:dashed"></span>' +
+                   '<span class="num">🧽</span>';
+    er.setAttribute('aria-label', 'Eraser');
+    er.addEventListener('click', () => {
+      audio();
+      state.sel = -1;
+      tone(300, 0.10, 'sine', 0.10);
+      buildPalette();
+    });
+    paletteEl.appendChild(er);
+  }
+  updateNowPainting();
+}
+
+const nowPaintingEl = document.getElementById('nowPainting');
+function updateNowPainting() {
+  if (state.complete) {
+    nowPaintingEl.innerHTML = '🎉 All done — look at your pal!';
+    return;
+  }
+  if (state.mode === 'free') {
+    nowPaintingEl.innerHTML = state.sel === -1
+      ? '🧽 Rub squares out'
+      : '<span class="swatch" style="background:' + state.colors[state.sel] + '"></span>Draw anything you like!';
+    return;
+  }
+  const i = state.sel;
+  nowPaintingEl.innerHTML =
+    '<span class="swatch" style="background:' + state.colors[i] + '"></span>' +
+    'Paint all the <b>' + (i + 1) + '</b>s · ' + state.pic.names[i];
+}
+
+function updatePotCounts() {
+  if (state.mode !== 'picture') return;
+  const pots = paletteEl.querySelectorAll('.pot');
+  state.colors.forEach((_, idx) => {
+    const pot = pots[idx];
+    if (!pot) return;
+    const left = remainingFor(idx);
+    pot.querySelector('.num').textContent = (idx + 1) + ' · ' + left;
+    pot.classList.toggle('done', left === 0);
+  });
+}
+
+const progressEl = document.getElementById('progress');
+function updateProgress() {
+  if (state.mode === 'free') { progressEl.style.width = '100%'; return; }
+  let total = 0, done = 0;
+  for (let i = 0; i < N * N; i++) {
+    if (state.target[i] >= 0) { total++; if (state.painted[i] >= 0) done++; }
+  }
+  progressEl.style.width = (total ? (done / total) * 100 : 0) + '%';
+}
+
+/* ============================================================
+   Screens
+   ============================================================ */
+const menuEl = document.getElementById('menu');
+const playEl = document.getElementById('play');
+const bannerEl = document.getElementById('banner');
+const playTitle = document.getElementById('playTitle');
+const hintBtn = document.getElementById('hintBtn');
+
+function showMenu() {
+  playEl.classList.add('hidden');
+  bannerEl.classList.add('hidden');
+  menuEl.classList.remove('hidden');
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  buildCards();
+}
+
+function startPicture(pic) {
+  state.mode = 'picture';
+  state.pic = pic;
+  state.colors = pic.colors.slice();
+  state.complete = false;
+  state.wrongIdx = -1;
+  state.run = 0;
+  state.peekUntil = 0;
+  state.popAt = new Float64Array(N * N);
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      const ch = pic.rows[r][c];
+      state.target[r * N + c] = (ch === '.' ? -1 : parseInt(ch, 10) - 1);
+      state.painted[r * N + c] = -1;
+    }
+  }
+  state.sel = nextUnfinishedColor(-1) >= 0 ? nextUnfinishedColor(-1) : 0;
+  playTitle.textContent = pic.emoji + ' ' + pic.name;
+  hintBtn.style.display = '';
+  enterPlay();
+}
+
+function startFree() {
+  state.mode = 'free';
+  state.pic = null;
+  state.colors = FREE_COLORS.slice();
+  state.complete = false;
+  state.wrongIdx = -1;
+  state.run = 0;
+  state.peekUntil = 0;
+  state.popAt = new Float64Array(N * N);
+  state.target.fill(-1);
+  const saved = loadFree();
+  for (let i = 0; i < N * N; i++) state.painted[i] = saved ? saved[i] : -1;
+  state.sel = 0;
+  playTitle.textContent = '🎨 Free Paint';
+  hintBtn.style.display = 'none';
+  enterPlay();
+}
+
+function enterPlay() {
+  menuEl.classList.add('hidden');
+  bannerEl.classList.add('hidden');
+  playEl.classList.remove('hidden');
+  buildPalette();
+  updateProgress();
+  sizeGrid();
+  if (!rafId) render();
+}
+
+function finish() {
+  state.complete = true;
+  state.completeAt = performance.now();
+  updateNowPainting();
+  const done = loadDone();
+  done[state.pic.id] = (done[state.pic.id] || 0) + 1;
+  saveDone(done);
+  sfxFanfare();
+  confetti(150);
+  setTimeout(() => {
+    const p = PRAISE[Math.floor(Math.random() * PRAISE.length)];
+    document.getElementById('bannerEmoji').textContent = state.pic.emoji;
+    document.getElementById('bannerTitle').textContent = p.t;
+    document.getElementById('bannerText').textContent = p.s;
+    bannerEl.classList.remove('hidden');
+  }, 1500);
+}
+
+/* ---------- menu cards ---------- */
+const cardsEl = document.getElementById('cards');
+function buildCards() {
+  const done = loadDone();
+  cardsEl.innerHTML = '';
+  PICTURES.forEach((pic) => {
+    const card = document.createElement('button');
+    card.className = 'pic-card';
+    card.setAttribute('aria-label', 'Paint the ' + pic.name);
+
+    const cv = document.createElement('canvas');
+    cv.width = N; cv.height = N;
+    const c2 = cv.getContext('2d');
+    for (let r = 0; r < N; r++) {
+      for (let col = 0; col < N; col++) {
+        const ch = pic.rows[r][col];
+        if (ch === '.') continue;
+        c2.fillStyle = pic.colors[parseInt(ch, 10) - 1];
+        c2.fillRect(col, r, 1, 1);
+      }
+    }
+    card.appendChild(cv);
+
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = pic.emoji + ' ' + pic.name;
+    card.appendChild(label);
+
+    const stars = document.createElement('div');
+    stars.className = 'stars';
+    const n = done[pic.id] || 0;
+    stars.textContent = n ? '⭐'.repeat(Math.min(n, 3)) : '';
+    card.appendChild(stars);
+
+    if (n) {
+      const rib = document.createElement('div');
+      rib.className = 'ribbon';
+      rib.textContent = 'DONE';
+      card.appendChild(rib);
+    }
+
+    card.addEventListener('click', () => { audio(); sfxSwoosh(); startPicture(pic); });
+    cardsEl.appendChild(card);
+  });
+}
+
+/* ============================================================
+   Buttons
+   ============================================================ */
+document.getElementById('backBtn').addEventListener('click', () => {
+  audio(); sfxSwoosh(); showMenu();
+});
+document.getElementById('freeBtn').addEventListener('click', () => {
+  audio(); sfxSwoosh(); startFree();
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  audio(); sfxSwoosh();
+  if (state.mode === 'free') {
+    state.painted.fill(-1);
+    state.popAt = new Float64Array(N * N);
+    saveFree(state.painted);
+  } else {
+    startPicture(state.pic);
+  }
+});
+hintBtn.addEventListener('click', () => {
+  audio();
+  if (state.complete) return;
+  state.peekUntil = performance.now() + 1200;
+  tone(700, 0.12, 'sine', 0.11);
+  tone(900, 0.14, 'sine', 0.10, 0.08);
+});
+document.getElementById('againBtn').addEventListener('click', () => {
+  audio(); sfxSwoosh(); startPicture(state.pic);
+});
+document.getElementById('menuBtn').addEventListener('click', () => {
+  audio(); sfxSwoosh(); showMenu();
+});
+document.getElementById('nextBtn').addEventListener('click', () => {
+  audio(); sfxSwoosh();
+  const i = PICTURES.findIndex(p => p.id === state.pic.id);
+  startPicture(PICTURES[(i + 1) % PICTURES.length]);
+});
+
+/* ============================================================
+   Boot
+   ============================================================ */
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  sizeFx();
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (!playEl.classList.contains('hidden')) sizeGrid(); }, 80);
+});
+window.addEventListener('orientationchange', () => setTimeout(() => { sizeFx(); sizeGrid(); }, 250));
+
+buildCards();
+</script>
+</body>
+</html>

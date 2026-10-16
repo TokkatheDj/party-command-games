@@ -1,0 +1,735 @@
+<!-- CONCEPT: SORTING & CATEGORISING (odd-one-out) - Who Snuck On? Mabel the mouse runs a Ferris wheel and one rider on every ride does not belong; tap the sneaky one to boing it off into the Silly Pile while badges show why the others match, through five stations (colours, kinds, counting, animal homes, super sneaky), plus a Trick Mabel turn-taking mode where kids load the wheel themselves and Mabel guesses. No timer, no losing. Ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Who Snuck On?</title>
+<style>
+:root {
+  --sky1: #7fd3ff; --sky2: #bfe9ff; --sky3: #ffe1f0;
+  --ink: #2b2d5c; --soft: #5a5f95;
+  --a: #ff5fa2; --b: #ff9f1c; --c: #7b5cff;
+  --panel: #ffffffee; --cup: #fffaf2; --trim: #455a8a;
+  --good: #2bb673; --gold: #ffc93c;
+  --font: "Trebuchet MS", "Comic Sans MS", system-ui, sans-serif;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  font-family: var(--font); color: var(--ink);
+  background: linear-gradient(180deg, var(--sky1) 0%, var(--sky2) 55%, var(--sky3) 100%);
+}
+button { font-family: inherit; color: inherit; cursor: pointer; border: 0; }
+.screen { position: absolute; inset: 0; display: none; flex-direction: column; }
+.screen.on { display: flex; }
+.cloud { position: absolute; background: #fff; border-radius: 50px; opacity: .8; pointer-events: none; }
+.cloud::before, .cloud::after { content: ""; position: absolute; background: #fff; border-radius: 50%; }
+.cloud::before { width: 55%; height: 140%; left: 12%; top: -60%; }
+.cloud::after { width: 40%; height: 110%; right: 12%; top: -40%; }
+
+/* ---------- home ---------- */
+#home { overflow-y: auto; align-items: center; padding: 14px 14px 24px; }
+.titleRow { display: flex; align-items: center; gap: 8px; margin-top: 6px; z-index: 1; }
+.titleRow .big { font-size: clamp(34px, 10vw, 54px); }
+h1 {
+  margin: 0; font-size: clamp(34px, 10vw, 60px); line-height: 1.05; text-align: center;
+  background: linear-gradient(90deg, var(--a), var(--b), var(--c));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 3px 0 #ffffffcc);
+}
+.tag { margin: 6px 0 14px; font-size: clamp(15px, 4.2vw, 20px); text-align: center; color: var(--soft); z-index: 1; }
+.stations { width: min(560px, 100%); display: grid; grid-template-columns: 1fr 1fr; gap: 12px; z-index: 1; }
+.sCard {
+  position: relative; min-height: 96px; border-radius: 22px; background: var(--panel);
+  box-shadow: 0 6px 0 #0000001f, 0 10px 22px #2b2d5c22;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 6px;
+  font-size: clamp(16px, 4.4vw, 21px); font-weight: bold;
+  transition: transform .12s;
+}
+.sCard:active { transform: scale(.96); }
+.sCard .ic { font-size: clamp(32px, 9vw, 44px); line-height: 1.1; }
+.sCard .num { position: absolute; top: 8px; left: 12px; font-size: 14px; color: var(--soft); }
+.sCard .star { position: absolute; top: 4px; right: 8px; font-size: 26px; opacity: .18; filter: grayscale(1); }
+.sCard.done .star { opacity: 1; filter: none; animation: twinkle 2.4s ease-in-out infinite; }
+.sCard.wide { grid-column: 1 / -1; }
+.sCard.trick { background: linear-gradient(135deg, #fff 0%, #ffe7f3 100%); }
+.sCard .sub { font-size: clamp(12px, 3.4vw, 15px); font-weight: normal; color: var(--soft); }
+@keyframes twinkle { 0%,100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.18) rotate(12deg); } }
+.homeFoot { margin-top: 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; z-index: 1; }
+.pill { min-height: 48px; padding: 0 16px; border-radius: 24px; background: #ffffffcc; font-size: 16px; font-weight: bold; box-shadow: 0 3px 0 #0000001a; }
+.pill.warn { background: #ffe0e0; }
+
+/* ---------- play ---------- */
+.top {
+  height: 58px; flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  background: #ffffff99; box-shadow: 0 2px 0 #0000000f; z-index: 3;
+}
+.iconBtn { width: 48px; height: 48px; border-radius: 16px; background: #fff; font-size: 24px; box-shadow: 0 3px 0 #0000001f; flex: 0 0 auto; }
+.top .ttl { flex: 1; min-width: 0; text-align: center; font-weight: bold; font-size: clamp(16px, 4.6vw, 22px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dots { display: flex; gap: 6px; justify-content: center; margin-top: 2px; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; background: #ffffffaa; border: 2px solid var(--trim); }
+.dots i.on { background: var(--gold); }
+#bubble {
+  flex: 0 0 auto; margin: 8px 10px 0; min-height: 60px; display: flex; align-items: center; gap: 8px;
+  background: #fff; border-radius: 20px; padding: 6px 12px; box-shadow: 0 4px 0 #0000001a; z-index: 3;
+}
+#bubble .mabel { font-size: 38px; line-height: 1; flex: 0 0 auto; }
+#bubble .mabel.talk { animation: talk .35s ease-in-out 3; }
+@keyframes talk { 50% { transform: translateY(-5px) rotate(-6deg); } }
+#say { flex: 1; font-size: clamp(16px, 4.6vw, 22px); font-weight: bold; line-height: 1.2; }
+#say .hl { color: var(--a); }
+#stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+#wheelSvg { position: absolute; left: 0; top: 0; pointer-events: none; }
+.gon {
+  position: absolute; left: 0; top: 0; padding: 0; background: none; transform-origin: 50% 0;
+  touch-action: manipulation; z-index: 2;
+}
+.gon .hook { position: absolute; left: 50%; top: 0; width: 4px; height: 20%; background: var(--trim); transform: translateX(-50%); border-radius: 2px; }
+.gon .cup {
+  position: absolute; left: 0; right: 0; top: 17%; bottom: 0;
+  background: var(--cup); border: 4px solid var(--trim);
+  border-radius: 14px 14px 46% 46% / 14px 14px 38% 38%;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; align-content: center;
+  box-shadow: inset 0 -6px 0 #0000000d, 0 5px 0 #00000018; overflow: visible;
+}
+.gon .cup::before { content: ""; position: absolute; left: -6px; right: -6px; top: -9px; height: 10px; border-radius: 8px; background: var(--trim); }
+.gon .rider { display: inline-block; line-height: 1.05; }
+.gon .rider.pop { animation: pop .45s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes pop { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+.gon .rider.gone { visibility: hidden; }
+.gon .cup.wig { animation: wig .5s ease-in-out; }
+@keyframes wig { 20% { transform: rotate(-9deg); } 40% { transform: rotate(8deg); } 60% { transform: rotate(-6deg); } 80% { transform: rotate(4deg); } }
+.gon .cup.hint { animation: hint 1s ease-in-out infinite; }
+@keyframes hint { 50% { box-shadow: 0 0 0 7px var(--gold), 0 0 24px 10px #ffc93caa; transform: scale(1.05); } }
+.gon .cup.right { border-color: var(--good); }
+.gon .cup.empty { border-style: dashed; background: #ffffff88; }
+.gon .plus { font-size: 28px; color: #455a8a66; font-weight: bold; }
+.badge {
+  position: absolute; left: 50%; bottom: -14px; transform: translateX(-50%) scale(0);
+  background: #fff; border: 3px solid var(--good); border-radius: 14px; padding: 2px 8px;
+  font-size: clamp(12px, 3.4vw, 15px); font-weight: bold; white-space: nowrap; display: flex; gap: 4px; align-items: center;
+  transition: transform .25s cubic-bezier(.3,1.6,.5,1); z-index: 4; pointer-events: none;
+}
+.badge.on { transform: translateX(-50%) scale(1); }
+.badge.odd { border-color: var(--b); background: #fff4e0; }
+.badge .sw { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #0003; display: inline-block; }
+#pile {
+  flex: 0 0 auto; height: 66px; margin: 0 10px 10px; border-radius: 20px; background: #ffffffaa;
+  display: flex; align-items: center; gap: 8px; padding: 0 10px; box-shadow: inset 0 3px 0 #0000000d; z-index: 3;
+}
+#pile .lbl { font-size: 13px; font-weight: bold; color: var(--soft); text-align: center; line-height: 1.1; flex: 0 0 auto; }
+#pile .lbl b { font-size: 26px; display: block; }
+#tray { flex: 1; display: flex; flex-direction: row-reverse; justify-content: flex-end; gap: 2px; overflow: hidden; font-size: 28px; }
+#tray span { display: inline-block; animation: land .5s cubic-bezier(.3,1.8,.5,1); }
+#tray span:nth-child(odd) { transform: rotate(-12deg); }
+#tray span:nth-child(even) { transform: rotate(10deg) translateY(4px); }
+@keyframes land { 0% { transform: translateY(-20px) scale(1.4); } }
+#trickBar { flex: 0 0 auto; display: none; flex-direction: column; gap: 6px; margin: 0 10px 10px; }
+#trickBar.on { display: flex; }
+#palette {
+  height: clamp(118px, 22vh, 190px); overflow-y: auto; background: #ffffffbb; border-radius: 18px; padding: 6px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 4px; touch-action: pan-y;
+}
+#palette button { height: 50px; border-radius: 12px; background: #fff; font-size: 28px; box-shadow: 0 2px 0 #0000001a; }
+#palette button:active { transform: scale(.9); }
+.trickBtns { display: flex; gap: 8px; }
+.bigBtn {
+  flex: 1; min-height: 56px; border-radius: 20px; font-size: clamp(18px, 5vw, 24px); font-weight: bold; color: #fff;
+  background: linear-gradient(90deg, var(--a), var(--b)); box-shadow: 0 5px 0 #c2417a;
+}
+.bigBtn:disabled { filter: grayscale(.8); opacity: .55; }
+.bigBtn.alt { background: linear-gradient(90deg, #5bc0ff, var(--c)); box-shadow: 0 5px 0 #4b3bb0; }
+.bigBtn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 2px 0 #c2417a; }
+
+/* ---------- overlay ---------- */
+#over { position: absolute; inset: 0; background: #2b2d5c88; display: none; align-items: center; justify-content: center; z-index: 20; padding: 16px; }
+#over.on { display: flex; }
+.card {
+  width: min(400px, 100%); background: #fff; border-radius: 28px; padding: 22px 18px; text-align: center;
+  box-shadow: 0 10px 0 #0000002a; animation: cardIn .5s cubic-bezier(.3,1.6,.5,1);
+}
+@keyframes cardIn { 0% { transform: scale(.4); opacity: 0; } }
+.card .stk { font-size: 84px; line-height: 1; animation: twinkle 1.6s ease-in-out infinite; }
+.card h2 { margin: 8px 0 4px; font-size: clamp(24px, 7vw, 34px); }
+.card p { margin: 0 0 16px; font-size: clamp(16px, 4.5vw, 20px); color: var(--soft); }
+.card .row { display: flex; gap: 10px; }
+#fx { position: absolute; inset: 0; pointer-events: none; z-index: 30; }
+.flyer { position: fixed; pointer-events: none; z-index: 25; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="cloud" style="width:120px;height:34px;left:6%;top:16%"></div>
+<div class="cloud" style="width:90px;height:26px;right:8%;top:30%"></div>
+<div class="cloud" style="width:150px;height:40px;left:40%;top:6%"></div>
+
+<section id="home" class="screen on">
+  <div class="titleRow"><span class="big">🎡</span><h1>Who Snuck On?</h1><span class="big">🐭</span></div>
+  <p class="tag">One rider doesn't belong. Can you spot the sneaky one?</p>
+  <div class="stations" id="stations"></div>
+  <div class="homeFoot">
+    <div class="pill" style="display:flex;align-items:center">Silly Pile:&nbsp;<b id="pileCount">0</b></div>
+    <button class="pill warn" id="resetBtn">↺ Start over</button>
+  </div>
+</section>
+
+<section id="play" class="screen">
+  <div class="top">
+    <button class="iconBtn" id="homeBtn" aria-label="Home">🏠</button>
+    <div class="ttl"><div id="ttl">Colours</div><div class="dots" id="dots"></div></div>
+    <button class="iconBtn" id="sndBtn" aria-label="Sound">🔊</button>
+  </div>
+  <div id="bubble" role="button" aria-label="Say it again"><span class="mabel" id="mabel">🐭</span><span id="say">Who snuck on?</span></div>
+  <div id="stage"><svg id="wheelSvg"></svg></div>
+  <div id="pile"><div class="lbl"><b>🎪</b>Silly Pile</div><div id="tray"></div></div>
+  <div id="trickBar">
+    <div id="palette"></div>
+    <div class="trickBtns">
+      <button class="bigBtn alt" id="clearBtn">🔄 Empty</button>
+      <button class="bigBtn" id="guessBtn" disabled>🤔 Guess, Mabel!</button>
+    </div>
+  </div>
+</section>
+
+<div id="over"><div class="card" id="overCard"></div></div>
+<canvas id="fx"></canvas>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const rand = n => Math.random() * n | 0;
+const pick = a => a[rand(a.length)];
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const KEY = 'cowork-whosnuckon-progress';
+
+/* ---------- riders ----------
+   colour is only set where the emoji is the same colour on every phone; null = "mixed" */
+const RAW = [
+  ['🍎','apple','red','fruit'], ['🍓','strawberry','red','fruit'], ['🍒','cherries','red','fruit'],
+  ['🍌','banana','yellow','fruit'], ['🍋','lemon','yellow','fruit'], ['🍊','orange','orange','fruit'],
+  ['🍑','peach','orange','fruit'], ['🍏','green apple','green','fruit'], ['🍐','pear','green','fruit'], ['🍇','grapes','purple','fruit'],
+  ['🥕','carrot','orange','veg'], ['🥦','broccoli','green','veg'], ['🥒','cucumber','green','veg'], ['🌽','corn','yellow','veg'],
+  ['🍆','eggplant','purple','veg'], ['🥔','potato','brown','veg'], ['🎃','pumpkin','orange','veg'],
+  ['🐷','pig','pink','animal','land'], ['🦊','fox','orange','animal','land'], ['🐻','bear','brown','animal','land'],
+  ['🐘','elephant','grey','animal','land'], ['🐑','sheep','white','animal','land'], ['🦒','giraffe','yellow','animal','land'],
+  ['🐒','monkey','brown','animal','land'], ['🐄','cow',null,'animal','land'], ['🐇','bunny',null,'animal','land'],
+  ['🐝','bee','yellow','animal','sky'], ['🦉','owl','brown','animal','sky'], ['🦅','eagle','brown','animal','sky'],
+  ['🐞','ladybug','red','animal','sky'], ['🦋','butterfly',null,'animal','sky'], ['🦇','bat',null,'animal','sky'],
+  ['🦜','parrot',null,'animal','sky'], ['🐦','bird',null,'animal','sky'],
+  ['🐳','whale','blue','animal','water'], ['🐬','dolphin','blue','animal','water'], ['🦀','crab','red','animal','water'],
+  ['🐟','fish',null,'animal','water'], ['🐙','octopus',null,'animal','water'], ['🦈','shark','grey','animal','water'],
+  ['🐠','tropical fish',null,'animal','water'],
+  ['🐸','frog','green','animal',null], ['🐢','turtle','green','animal',null], ['🦩','flamingo','pink','animal',null], ['🐤','chick','yellow','animal',null],
+  ['🌹','rose','red','plant'], ['🌻','sunflower','yellow','plant'], ['🌸','blossom','pink','plant'], ['🌷','tulip','pink','plant'],
+  ['🌵','cactus','green','plant'], ['🍀','clover','green','plant'], ['🌲','pine tree','green','plant'],
+  ['🍪','cookie','brown','treat'], ['🍫','chocolate','brown','treat'], ['🍩','donut',null,'treat'], ['🍭','lollipop',null,'treat'],
+  ['🧁','cupcake',null,'treat'], ['🍦','ice cream',null,'treat'], ['🍰','cake',null,'treat'],
+  ['🚒','fire truck','red','vehicle'], ['🚗','car','red','vehicle'], ['🚕','taxi','yellow','vehicle'], ['🚜','tractor',null,'vehicle'],
+  ['🚀','rocket',null,'vehicle'], ['🚲','bike',null,'vehicle'], ['🚁','helicopter',null,'vehicle'], ['🚌','bus',null,'vehicle'],
+  ['🎈','balloon','red','toy'], ['🏀','basketball','orange','toy'], ['🧸','teddy bear','brown','toy'], ['🪁','kite',null,'toy'],
+  ['🎲','dice','white','toy'], ['🪀','yo-yo',null,'toy'],
+  ['👖','jeans','blue','clothes'], ['🎩','top hat',null,'clothes'], ['🧦','socks',null,'clothes'], ['👗','dress',null,'clothes'],
+  ['🧢','cap',null,'clothes'], ['👟','sneaker',null,'clothes'], ['🧤','gloves',null,'clothes'], ['🧣','scarf',null,'clothes'],
+];
+const ITEMS = RAW.map(([e, name, c, k, h]) => ({ e, name, c, k, h: h || null }));
+
+const COL = {
+  red: '#e53935', orange: '#ff8f1f', yellow: '#ffd21f', green: '#43a047', blue: '#1e88e5',
+  purple: '#8e44ad', pink: '#ff7eb6', brown: '#8d5a3b', grey: '#9e9e9e', white: '#ffffff',
+};
+const KIND = {
+  fruit: ['fruit', 'a fruit'], veg: ['veggies', 'a veggie'], animal: ['animals', 'an animal'],
+  plant: ['plants', 'a plant'], treat: ['treats', 'a treat'], vehicle: ['things that go', 'a thing that goes'],
+  toy: ['toys', 'a toy'], clothes: ['things to wear', 'something to wear'],
+};
+const HOME = {
+  sky: ['☁️', 'sky', 'fly in the sky', 'flies'],
+  water: ['🌊', 'water', 'swim in the water', 'swims'],
+  land: ['🌳', 'land', 'walk on land', 'walks'],
+};
+const NUMW = ['zero', 'one', 'two', 'three', 'four', 'five'];
+
+const STATIONS = [
+  { name: 'Colours', icon: '🎨', rule: 'colour', n: 4 },
+  { name: 'Kinds', icon: '🧺', rule: 'kind', n: 4 },
+  { name: 'Counting', icon: '🔢', rule: 'count', n: 4 },
+  { name: 'Animal Homes', icon: '🏡', rule: 'home', n: 4 },
+  { name: 'Super Sneaky', icon: '🌟', rule: 'mix', n: 5 },
+];
+const ROUNDS = 4;
+
+/* ---------- the odd-one-out brain (shared by the game and Trick Mabel) ---------- */
+const FEATS = ['colour', 'kind', 'home', 'count'];
+function featVal(b, i, f) {
+  const it = b[i].it;
+  if (f === 'colour') return it.c || ('x' + i);   // a "mixed" colour never matches anything
+  if (f === 'kind') return it.k;
+  if (f === 'home') return it.h || ('x' + i);
+  return b[i].n;
+}
+// Map of index -> [{f, key}] for every rider that is the only one different on some feature
+function oddsOf(b) {
+  const res = new Map();
+  for (const f of FEATS) {
+    const vals = b.map((_, i) => featVal(b, i, f));
+    for (let i = 0; i < b.length; i++) {
+      const others = vals.filter((_, j) => j !== i);
+      if (others.every(v => v === others[0]) && vals[i] !== others[0]) {
+        if (!res.has(i)) res.set(i, []);
+        res.get(i).push({ f, key: others[0] });
+      }
+    }
+  }
+  return res;
+}
+const COLOUR_KEYS = Object.keys(COL).filter(c => ITEMS.filter(i => i.c === c).length >= 4);
+const KIND_KEYS = Object.keys(KIND).filter(k => ITEMS.filter(i => i.k === k).length >= 4);
+
+function gen(rule, n, used) {
+  for (let t = 0; t < 4000; t++) {
+    const r = rule === 'mix' ? pick(['colour', 'kind', 'home', 'count']) : rule;
+    let same, others, key, cnt = 1, ocnt = 1;
+    if (r === 'colour') {
+      key = pick(COLOUR_KEYS.filter(c => ITEMS.filter(i => i.c === c).length >= n - 1));
+      same = ITEMS.filter(i => i.c === key); others = ITEMS.filter(i => i.c && i.c !== key);
+    } else if (r === 'kind') {
+      key = pick(KIND_KEYS); same = ITEMS.filter(i => i.k === key); others = ITEMS.filter(i => i.k !== key);
+    } else if (r === 'home') {
+      key = pick(Object.keys(HOME)); same = ITEMS.filter(i => i.h === key); others = ITEMS.filter(i => i.h && i.h !== key);
+    } else {
+      cnt = 1 + rand(4); key = cnt;
+      ocnt = pick([1, 2, 3, 4, 5].filter(x => x !== cnt && Math.abs(x - cnt) <= 2));
+      same = ITEMS; others = ITEMS;
+    }
+    if (same.length < n - 1) continue;
+    const ss = shuffle(same.slice()).slice(0, n - 1);
+    const pool = others.filter(i => !ss.includes(i));
+    const o = pick(pool);
+    if (used && t < 3000 && (used.has(o.e) || ss.some(i => used.has(i.e)))) continue;
+    const board = ss.map(it => ({ it, n: cnt }));
+    const oi = rand(n);
+    board.splice(oi, 0, { it: o, n: ocnt });
+    const od = oddsOf(board);
+    if (od.size !== 1 || !od.has(oi)) continue;
+    const why = od.get(oi);
+    if (!why.some(w => w.f === r)) continue;
+    if (t < 3000 && why.length !== 1) continue;   // prefer boards with exactly one reason
+    return { board, odd: oi, rule: r, key };
+  }
+  return null;
+}
+
+/* ---------- words ---------- */
+const cap = s => s[0].toUpperCase() + s.slice(1);
+function sharedText(f, key) {
+  if (f === 'colour') return `They're all <span class="hl">${key}</span>!`;
+  if (f === 'kind') return `They're all <span class="hl">${KIND[key][0]}</span>!`;
+  if (f === 'home') return `They all <span class="hl">${HOME[key][2]}</span>!`;
+  return `They all have <span class="hl">${NUMW[key]}</span>!`;
+}
+function oddText(f, key, slot) {
+  const nm = slot.it.name;
+  if (f === 'colour') return `The ${nm} isn't ${key}!`;
+  if (f === 'count') return `That one has ${NUMW[slot.n]}!`;
+  if (f === 'home' && slot.it.h) return `The ${nm} ${HOME[slot.it.h][3]}!`;
+  return `The ${nm} snuck on!`;
+}
+function sameText(f, key, slot) {
+  const nm = cap(slot.it.name);
+  if (f === 'colour') return `${nm} is ${key} too!`;
+  if (f === 'kind') return `${nm} is ${KIND[key][1]} too!`;
+  if (f === 'home') return `${nm} ${HOME[key][3]} too!`;
+  return `${NUMW[slot.n] === 'one' ? 'Just one' : cap(NUMW[slot.n])}, like its friends!`;
+}
+function badgeHTML(f, slot) {
+  const it = slot.it;
+  if (f === 'colour') return it.c ? `<span class="sw" style="background:${COL[it.c]}"></span>${it.c}` : '';
+  if (f === 'kind') return KIND[it.k][0];
+  if (f === 'home') return it.h ? `${HOME[it.h][0]} ${HOME[it.h][1]}` : '';
+  return `${slot.n}`;
+}
+const plain = h => h.replace(/<[^>]+>/g, '');
+
+/* ---------- saving ---------- */
+let prog = { done: [false, false, false, false, false], pile: [], tricks: 0, sound: true };
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && Array.isArray(s.done)) prog = Object.assign(prog, s); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prog)); } catch (e) {} };
+
+/* ---------- sound ---------- */
+let ac = null;
+function audio() {
+  if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
+  if (ac && ac.state === 'suspended') ac.resume();
+  return ac;
+}
+function tone(f, dur, type = 'sine', vol = .18, delay = 0, slide = 0) {
+  if (!prog.sound) return;
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .05);
+}
+const sfx = {
+  tap: () => tone(660, .08, 'triangle', .12),
+  boing: () => { tone(180, .5, 'square', .08, 0, 720); tone(300, .35, 'sine', .14, .05, 1100); },
+  yay: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .22, 'triangle', .16, i * .09)),
+  hmm: () => { tone(330, .18, 'sine', .12); tone(294, .26, 'sine', .12, .16); },
+  ride: () => [392, 523, 659, 523, 587, 494, 392].forEach((f, i) => tone(f, .16, 'square', .045, i * .17)),
+  win: () => [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, .3, 'triangle', .16, i * .12)),
+  think: () => [440, 494, 440].forEach((f, i) => tone(f, .12, 'sine', .08, i * .22)),
+};
+function speak(text) {
+  if (!prog.sound || !('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(plain(text));
+    u.rate = .95; u.pitch = 1.3; speechSynthesis.speak(u);
+  } catch (e) {}
+}
+let lastSaid = '';
+function say(html, talk = true) {
+  $('#say').innerHTML = `<span>${html}</span>`;
+  lastSaid = html;
+  if (talk) { speak(html); const m = $('#mabel'); m.classList.remove('talk'); void m.offsetWidth; m.classList.add('talk'); }
+}
+
+/* ---------- wheel ---------- */
+const stage = $('#stage'), svg = $('#wheelSvg');
+const W = { cx: 0, cy: 0, R: 100, G: 70, rot: 0, n: 4 };
+let gons = [];      // {el, cup, badge}
+let slots = [];     // {it, n} or null
+let spin = null;    // {from, to, t0, dur, half, halfDone, done}
+
+function layout() {
+  const r = stage.getBoundingClientRect();
+  const w = r.width, h = r.height;
+  W.R = Math.max(60, Math.min((w - 10) / 2.6, (h - 36) / 2.62));
+  W.G = Math.max(56, Math.min(W.R * 0.6, 120));
+  W.cx = w / 2; W.cy = W.R + 12;
+  const R = W.R, cx = W.cx, cy = W.cy, n = W.n;
+  svg.setAttribute('width', w); svg.setAttribute('height', h);
+  let s = `<g stroke="#455a8a" stroke-width="${Math.max(6, R * .06)}" stroke-linecap="round">
+    <line x1="${cx}" y1="${cy}" x2="${cx - R * .62}" y2="${h + 4}"/><line x1="${cx}" y1="${cy}" x2="${cx + R * .62}" y2="${h + 4}"/></g>
+    <g id="spinG" transform="translate(${cx} ${cy}) rotate(0)">
+    <circle r="${R}" fill="none" stroke="#ff5fa2" stroke-width="${Math.max(5, R * .05)}"/>
+    <circle r="${R * .82}" fill="none" stroke="#ffb3d1" stroke-width="${Math.max(3, R * .025)}"/>`;
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6;
+    s += `<line x1="0" y1="0" x2="${(Math.cos(a) * R).toFixed(1)}" y2="${(Math.sin(a) * R).toFixed(1)}" stroke="#7b5cff" stroke-width="${Math.max(2, R * .02)}"/>`;
+  }
+  const bulbs = ['#ffc93c', '#5bc0ff', '#ff5fa2', '#7ee081'];
+  for (let i = 0; i < 24; i++) {
+    const a = i * Math.PI / 12;
+    s += `<circle class="bulb" cx="${(Math.cos(a) * R).toFixed(1)}" cy="${(Math.sin(a) * R).toFixed(1)}" r="${Math.max(3, R * .03)}" fill="${bulbs[i % 4]}"/>`;
+  }
+  s += `<circle r="${R * .13}" fill="#ffc93c" stroke="#455a8a" stroke-width="4"/></g>`;
+  svg.innerHTML = s;
+  gons.forEach(g => sizeGon(g));
+  place();
+}
+function sizeGon(g) {
+  g.el.style.width = W.G + 'px'; g.el.style.height = (W.G * 1.08) + 'px';
+}
+function buildGons(n) {
+  gons.forEach(g => g.el.remove());
+  gons = []; W.n = n;
+  for (let i = 0; i < n; i++) {
+    const el = document.createElement('button');
+    el.className = 'gon';
+    el.innerHTML = `<span class="hook"></span><span class="cup"></span><span class="badge"></span>`;
+    const g = { el, cup: el.querySelector('.cup'), badge: el.querySelector('.badge'), i };
+    el.addEventListener('pointerdown', ev => { ev.preventDefault(); onGon(i); });
+    stage.appendChild(el); sizeGon(g); gons.push(g);
+  }
+}
+function place() {
+  const sp = spin ? Math.sin(Math.min(1, (performance.now() - spin.t0) / spin.dur) * Math.PI) : 0;
+  const t = performance.now() / 1000;
+  gons.forEach((g, i) => {
+    const a = (W.rot - 90 + i * 360 / W.n) * Math.PI / 180;
+    const x = W.cx + Math.cos(a) * W.R, y = W.cy + Math.sin(a) * W.R;
+    const sway = Math.sin(t * 1.6 + i) * 2.5 + sp * 9;
+    g.el.style.transform = `translate(${(x - W.G / 2).toFixed(1)}px, ${(y - 2).toFixed(1)}px) rotate(${sway.toFixed(2)}deg)`;
+  });
+  const sg = document.getElementById('spinG');
+  if (sg) sg.setAttribute('transform', `translate(${W.cx} ${W.cy}) rotate(${W.rot})`);
+}
+function fillGon(i, anim) {
+  const g = gons[i], s = slots[i];
+  g.cup.className = 'cup' + (s ? '' : ' empty');
+  g.badge.className = 'badge';
+  if (!s) { g.cup.innerHTML = mode === 'trick' ? '<span class="plus">+</span>' : ''; g.el.setAttribute('aria-label', 'empty seat'); return; }
+  const fs = W.G * (s.n <= 1 ? .5 : s.n === 2 ? .33 : s.n <= 4 ? .29 : .25);
+  g.cup.innerHTML = Array.from({ length: s.n }, () => `<span class="rider${anim ? ' pop' : ''}" style="font-size:${fs.toFixed(0)}px">${s.it.e}</span>`).join('');
+  if (s.n === 4) g.cup.style.padding = `0 ${W.G * .12}px`; else g.cup.style.padding = '';
+  g.el.setAttribute('aria-label', (s.n > 1 ? s.n + ' ' : '') + s.it.name);
+}
+const ease = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+function spinWheel(dur, half, done) {
+  spin = { from: W.rot, to: W.rot + 360, t0: performance.now(), dur, half, halfDone: false, done };
+  sfx.ride();
+}
+function frame(now) {
+  if (spin) {
+    const p = Math.min(1, (now - spin.t0) / spin.dur);
+    W.rot = spin.from + (spin.to - spin.from) * ease(p);
+    if (!spin.halfDone && p >= .5) { spin.halfDone = true; spin.half && spin.half(); }
+    if (p >= 1) { W.rot = spin.to % 360; const d = spin.done; spin = null; d && d(); }
+  }
+  if (screenOn === 'play') place();
+  stepFx();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- game flow ---------- */
+let mode = 'game', screenOn = 'home', st = 0, round = 0, cur = null, wrongs = 0, busy = false, used = new Set();
+
+function show(id) {
+  screenOn = id;
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
+  if (id === 'home') { renderHome(); if ('speechSynthesis' in window) speechSynthesis.cancel(); }
+}
+function renderHome() {
+  const box = $('#stations');
+  box.innerHTML = STATIONS.map((s, i) => `<button class="sCard${prog.done[i] ? ' done' : ''}${i === 4 ? ' wide' : ''}" data-s="${i}">
+     <span class="num">${i + 1}</span><span class="star">⭐</span><span class="ic">${s.icon}</span>${s.name}</button>`).join('') +
+    `<button class="sCard wide trick" data-s="trick"><span class="ic">🐭🎡</span>Trick Mabel!<span class="sub">You load the wheel - Mabel guesses</span>${prog.tricks ? `<span class="star" style="opacity:1;filter:none">🏅</span>` : ''}</button>`;
+  $('#pileCount').textContent = prog.pile.length;
+}
+$('#stations').addEventListener('click', e => {
+  const b = e.target.closest('[data-s]'); if (!b) return;
+  audio(); sfx.tap();
+  if (b.dataset.s === 'trick') startTrick(); else startStation(+b.dataset.s);
+});
+let resetArm = 0;
+$('#resetBtn').addEventListener('click', () => {
+  const b = $('#resetBtn');
+  if (Date.now() - resetArm < 3000) {
+    prog.done = [false, false, false, false, false]; prog.pile = []; prog.tricks = 0; save();
+    b.textContent = '↺ Start over'; resetArm = 0; renderHome();
+  } else { resetArm = Date.now(); b.textContent = 'Tap again to clear'; setTimeout(() => { if (Date.now() - resetArm >= 2900) b.textContent = '↺ Start over'; }, 3000); }
+});
+$('#homeBtn').addEventListener('click', () => { spin = null; busy = false; closeOver(); show('home'); });
+function sndIcon() { $('#sndBtn').textContent = prog.sound ? '🔊' : '🔇'; }
+$('#sndBtn').addEventListener('click', () => { prog.sound = !prog.sound; save(); sndIcon(); if (!prog.sound && 'speechSynthesis' in window) speechSynthesis.cancel(); else sfx.tap(); });
+$('#bubble').addEventListener('click', () => speak(lastSaid));
+
+function renderPile() {
+  $('#tray').innerHTML = prog.pile.slice(-24).map(e => `<span>${e}</span>`).join('');
+}
+function renderDots() {
+  $('#dots').innerHTML = mode === 'trick' ? '' : Array.from({ length: ROUNDS }, (_, i) => `<i class="${i < round ? 'on' : ''}"></i>`).join('');
+}
+
+function startStation(i) {
+  mode = 'game'; st = i; round = 0; used = new Set(); busy = true;
+  $('#trickBar').classList.remove('on'); $('#pile').style.display = '';
+  $('#ttl').textContent = STATIONS[i].icon + ' ' + STATIONS[i].name;
+  show('play');
+  buildGons(STATIONS[i].n); slots = Array(STATIONS[i].n).fill(null);
+  layout(); slots.forEach((_, k) => fillGon(k));
+  renderPile(); renderDots();
+  say('All aboard! 🎡', false);
+  nextRide(true);
+}
+function nextRide(first) {
+  busy = true; wrongs = 0;
+  const s = STATIONS[st];
+  cur = gen(s.rule, s.n, used);
+  cur.board.forEach(b => used.add(b.it.e));
+  spinWheel(first ? 1900 : 2300, () => {
+    slots = cur.board.slice();
+    slots.forEach((_, k) => fillGon(k, true));
+  }, () => {
+    busy = false;
+    say(first ? 'One rider snuck on! Who doesn\'t belong? 🤔' : 'Who snuck on this time? 🤔');
+  });
+}
+function onGon(i) {
+  audio();
+  if (mode === 'trick') return trickTap(i);
+  if (busy || !cur || !slots[i]) return;
+  const why = oddsOf(cur.board).get(cur.odd).find(w => w.f === cur.rule);
+  if (i === cur.odd) {
+    busy = true;
+    gons[i].cup.classList.remove('hint');
+    sfx.yay();
+    slots.forEach((s, k) => {
+      const g = gons[k];
+      const html = badgeHTML(why.f, s);
+      if (html) { g.badge.innerHTML = html; g.badge.className = 'badge on' + (k === i ? ' odd' : ''); }
+      if (k !== i) g.cup.classList.add('right');
+    });
+    say(`${oddText(why.f, why.key, slots[i])} ${sharedText(why.f, why.key)}`);
+    setTimeout(() => bootRider(i), 1500);
+    setTimeout(() => {
+      round++; renderDots();
+      gons.forEach(g => { g.badge.className = 'badge'; g.cup.classList.remove('right'); });
+      if (round >= ROUNDS) stationDone(); else nextRide(false);
+    }, 3300);
+  } else {
+    wrongs++;
+    sfx.hmm();
+    const g = gons[i];
+    g.cup.classList.remove('wig'); void g.cup.offsetWidth; g.cup.classList.add('wig');
+    const html = badgeHTML(why.f, slots[i]);
+    if (html) { g.badge.innerHTML = html; g.badge.className = 'badge on'; }
+    clearTimeout(g.t); g.t = setTimeout(() => { if (!busy) g.badge.className = 'badge'; }, 2200);
+    say(`${sameText(why.f, why.key, slots[i])} ${wrongs >= 2 ? 'Look at the wiggly one!' : 'Who is different?'}`);
+    if (wrongs >= 2) gons[cur.odd].cup.classList.add('hint');
+  }
+}
+function bootRider(i) {
+  const g = gons[i], s = slots[i]; if (!s) return;
+  sfx.boing();
+  const tray = $('#tray').getBoundingClientRect();
+  const riders = g.cup.querySelectorAll('.rider');
+  riders.forEach((r, k) => {
+    const rr = r.getBoundingClientRect();
+    const fl = document.createElement('span');
+    fl.className = 'flyer'; fl.textContent = s.it.e;
+    fl.style.fontSize = getComputedStyle(r).fontSize; fl.style.left = rr.left + 'px'; fl.style.top = rr.top + 'px';
+    document.body.appendChild(fl);
+    r.classList.add('gone');
+    const tx = tray.left + 16 - rr.left, ty = tray.top + 10 - rr.top;
+    const an = fl.animate([
+      { transform: 'translate(0,0) rotate(0) scale(1)' },
+      { transform: `translate(${tx * .35}px, ${-90 - k * 10}px) rotate(220deg) scale(1.3)`, offset: .4 },
+      { transform: `translate(${tx}px, ${ty}px) rotate(540deg) scale(.7)` },
+    ], { duration: 950 + k * 80, easing: 'cubic-bezier(.3,.1,.5,1)' });
+    an.onfinish = () => fl.remove();
+  });
+  setTimeout(() => {
+    prog.pile.push(s.it.e); if (prog.pile.length > 200) prog.pile.shift();
+    save(); renderPile();
+    slots[i] = null; fillGon(i);
+  }, 1000);
+}
+function stationDone() {
+  busy = true;
+  prog.done[st] = true; save();
+  const all = prog.done.every(Boolean);
+  sfx.win(); confetti(all ? 260 : 140);
+  const s = STATIONS[st];
+  const next = st < STATIONS.length - 1;
+  say(all ? 'You found every sneaky rider! Hooray!' : `${s.name} station - all done! Great spotting!`);
+  openOver(`<div class="stk">${all ? '🏆' : s.icon}</div>
+    <h2>${all ? 'Grand Champion!' : 'Station complete!'}</h2>
+    <p>${all ? 'Every station has a gold star ⭐' : 'You earned a gold star ⭐'}</p>
+    <div class="row">
+      <button class="bigBtn alt" id="oHome">🏠 Home</button>
+      ${next ? '<button class="bigBtn" id="oNext">▶ Next</button>' : '<button class="bigBtn" id="oAgain">🔁 Again</button>'}
+    </div>`);
+  $('#oHome').onclick = () => { closeOver(); show('home'); };
+  const nb = $('#oNext') || $('#oAgain');
+  nb.onclick = () => { closeOver(); startStation(next ? st + 1 : st); };
+}
+function openOver(html) { $('#overCard').innerHTML = html; $('#over').classList.add('on'); }
+function closeOver() { $('#over').classList.remove('on'); }
+
+/* ---------- Trick Mabel ---------- */
+const PALETTE = ITEMS.filter(i => i.c || i.h || ['treat', 'vehicle', 'clothes', 'toy'].includes(i.k));
+let trickDone = false;
+function startTrick() {
+  mode = 'trick'; busy = false; trickDone = false;
+  $('#ttl').textContent = '🐭 Trick Mabel!';
+  $('#pile').style.display = 'none'; $('#trickBar').classList.add('on');
+  show('play');
+  buildGons(4); slots = [null, null, null, null];
+  $('#palette').innerHTML = PALETTE.map((it, k) => `<button data-k="${k}" aria-label="${it.name}">${it.e}</button>`).join('');
+  layout(); slots.forEach((_, k) => fillGon(k));
+  renderDots(); updGuess();
+  say('Your turn! Load the wheel with one sneaky rider. Can you trick me?');
+}
+$('#palette').addEventListener('click', e => {
+  const b = e.target.closest('[data-k]'); if (!b || busy) return;
+  audio();
+  if (trickDone) resetTrickMarks();
+  const k = slots.indexOf(null);
+  if (k < 0) { sfx.hmm(); say('The wheel is full! Tap a seat to empty it.', false); return; }
+  sfx.tap();
+  slots[k] = { it: PALETTE[+b.dataset.k], n: 1 };
+  fillGon(k, true); updGuess();
+  if (slots.every(Boolean)) say('Ready? Press <span class="hl">Guess</span>!', false);
+});
+function trickTap(i) {
+  if (busy) return;
+  if (trickDone) resetTrickMarks();
+  if (!slots[i]) return;
+  sfx.tap(); slots[i] = null; fillGon(i); updGuess();
+}
+function resetTrickMarks() {
+  trickDone = false;
+  gons.forEach(g => { g.badge.className = 'badge'; g.cup.classList.remove('hint', 'right'); });
+}
+function updGuess() { $('#guessBtn').disabled = !slots.every(Boolean) || busy; }
+$('#clearBtn').addEventListener('click', () => {
+  if (busy) return; audio(); sfx.tap(); resetTrickMarks();
+  slots = slots.map(() => null); slots.forEach((_, k) => fillGon(k)); updGuess();
+  say('All empty! Pick four riders.', false);
+});
+$('#guessBtn').addEventListener('click', () => {
+  if (busy || !slots.every(Boolean)) return;
+  audio(); busy = true; updGuess(); resetTrickMarks();
+  say('Hmm... let me think... 🤔', false); sfx.think();
+  spinWheel(1800, null, () => {
+    busy = false; trickDone = true; updGuess();
+    const od = oddsOf(slots);
+    if (od.size === 0) {
+      sfx.hmm();
+      say('You tricked me! I can\'t find a sneaky one. Try making three riders alike!');
+      gons.forEach(g => { g.cup.classList.remove('wig'); void g.cup.offsetWidth; g.cup.classList.add('wig'); });
+      return;
+    }
+    const idx = [...od.keys()];
+    const i = pick(idx), why = od.get(i)[0];
+    prog.tricks++; save();
+    sfx.yay();
+    gons[i].cup.classList.add('hint');
+    slots.forEach((s, k) => {
+      const html = badgeHTML(why.f, s);
+      if (html) { gons[k].badge.innerHTML = html; gons[k].badge.className = 'badge on' + (k === i ? ' odd' : ''); }
+      if (k !== i) gons[k].cup.classList.add('right');
+    });
+    const more = idx.length > 1 ? ' Ooh, there\'s more than one sneaky rider!' : '';
+    say(`I think it's the <span class="hl">${slots[i].it.name}</span>! ${sharedText(why.f, why.key)}${more}`);
+    if (idx.length === 1) confetti(60);
+  });
+});
+
+/* ---------- confetti ---------- */
+const fx = $('#fx'), fctx = fx.getContext('2d');
+let bits = [];
+function sizeFx() { fx.width = innerWidth * devicePixelRatio; fx.height = innerHeight * devicePixelRatio; fctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0); }
+function confetti(n) {
+  const cols = ['#ff5fa2', '#ffc93c', '#5bc0ff', '#7ee081', '#7b5cff', '#ff9f1c'];
+  for (let i = 0; i < n; i++) bits.push({
+    x: innerWidth / 2 + (Math.random() - .5) * 80, y: innerHeight * .4,
+    vx: (Math.random() - .5) * 14, vy: -6 - Math.random() * 10, r: Math.random() * 6, vr: (Math.random() - .5) * .4,
+    w: 6 + Math.random() * 6, h: 4 + Math.random() * 4, c: pick(cols), life: 140 + rand(60),
+  });
+}
+function stepFx() {
+  if (!bits.length) return;
+  fctx.clearRect(0, 0, innerWidth, innerHeight);
+  bits.forEach(b => {
+    b.vy += .3; b.vx *= .99; b.x += b.vx; b.y += b.vy; b.r += b.vr; b.life--;
+    fctx.save(); fctx.translate(b.x, b.y); fctx.rotate(b.r); fctx.fillStyle = b.c; fctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h); fctx.restore();
+  });
+  bits = bits.filter(b => b.life > 0 && b.y < innerHeight + 30);
+  if (!bits.length) fctx.clearRect(0, 0, innerWidth, innerHeight);
+}
+
+addEventListener('resize', () => { sizeFx(); if (screenOn === 'play') { layout(); slots.forEach((_, k) => fillGon(k)); } });
+sizeFx(); sndIcon(); renderHome();
+requestAnimationFrame(frame);
+window.__wso = { gen, oddsOf, ITEMS, get cur() { return cur; }, get slots() { return slots; }, get busy() { return busy; }, prog: () => prog };
+</script>
+</body>
+</html>

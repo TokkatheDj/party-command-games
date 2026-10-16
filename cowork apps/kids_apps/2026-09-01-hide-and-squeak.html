@@ -1,0 +1,983 @@
+<!-- CONCEPT: Hide & Squeak — a HIDE & SEEK / SEARCH game built on hot-and-cold warmth deduction (not a hidden-object scanning game): a shy critter hides under one of the props in a meadow, beach, snow, jungle, farm or toybox scene, and every spot you peek under lights up with a warmth ring — ❄️ freezing, 💧 cold, 🌤️ warm, ☀️ hot, 🔥 SUPER HOT — plus a rising musical beep, so kids reason their way to the hiding place instead of hunting pixels; find all 6 friends to throw a Big Squeak Party. No timer, no losing, cold peeks are free and a helper puffs away icy spots if you get stuck. Ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Hide &amp; Squeak</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+}
+
+:root {
+  --ink: #2b2140;
+  --panel: #fffdf6;
+  --shadow: 0 6px 0 rgba(0,0,0,.16);
+  --spot: clamp(58px, 15.5vw, 78px);
+  --sky: #a9e8ff;
+  --ground: #7ddc6a;
+  --accent-a: #ff7ab8;
+  --accent-b: #7a6bff;
+  --w0: #3aa0ff;
+  --w1: #23c9d6;
+  --w2: #ffd233;
+  --w3: #ff9022;
+  --w4: #ff4d5e;
+  font-family: "Comic Sans MS", "Chalkboard SE", "Trebuchet MS", system-ui, sans-serif;
+}
+
+body {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  background: #ffe9c9;
+  color: var(--ink);
+  font-family: "Comic Sans MS", "Chalkboard SE", "Trebuchet MS", system-ui, sans-serif;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px 8px;
+  background:
+    radial-gradient(120% 60% at 50% 0%, #fff5d8 0%, #ffe0ad 55%, #ffcf95 100%);
+}
+
+/* ---------- top bar ---------- */
+#topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#topbar h1 {
+  flex: 1;
+  margin: 0;
+  text-align: center;
+  font-size: clamp(21px, 6.6vw, 34px);
+  letter-spacing: .5px;
+  background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 0 rgba(255,255,255,.6);
+}
+
+.iconbtn {
+  width: 46px; height: 46px;
+  min-width: 46px;
+  border: none;
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .12s ease;
+}
+.iconbtn:active { transform: translateY(3px); box-shadow: 0 3px 0 rgba(0,0,0,.16); }
+
+/* ---------- status ---------- */
+#statusRow {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 6px 10px;
+  box-shadow: var(--shadow);
+}
+#roundInfo {
+  flex: 1;
+  font-size: clamp(15px, 4.4vw, 22px);
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#peekInfo {
+  font-size: clamp(12px, 3.4vw, 17px);
+  opacity: .75;
+  white-space: nowrap;
+}
+
+/* ---------- scene ---------- */
+#scene {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 200px;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: var(--shadow), inset 0 0 0 4px rgba(255,255,255,.55);
+  background:
+    radial-gradient(130% 10% at 50% 22%, var(--ground) 0 70%, transparent 71%),
+    linear-gradient(180deg, var(--sky) 0%, var(--sky) 22%, var(--ground) 22%, var(--ground) 100%);
+}
+
+.deco {
+  position: absolute;
+  font-size: clamp(18px, 5vw, 28px);
+  opacity: .75;
+  pointer-events: none;
+  animation: drift 9s ease-in-out infinite alternate;
+}
+@keyframes drift {
+  from { transform: translateX(-6px) translateY(0); }
+  to   { transform: translateX(10px) translateY(-6px); }
+}
+
+#field {
+  position: absolute;
+  inset: 12% 5% 6%;
+}
+
+.spot {
+  position: absolute;
+  width: var(--spot);
+  height: var(--spot);
+  transform: translate(-50%, -50%);
+  border: none;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,.35);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.45);
+  font-size: calc(var(--spot) * .58);
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform .14s ease, background .2s ease, box-shadow .2s ease, opacity .3s ease;
+}
+.spot:active { transform: translate(-50%, -50%) scale(.9); }
+
+.spot .prop {
+  display: block;
+  filter: drop-shadow(0 3px 2px rgba(0,0,0,.28));
+  transition: transform .2s ease;
+}
+
+.spot .badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  font-size: calc(var(--spot) * .32);
+  line-height: 1;
+  opacity: 0;
+  transform: scale(.4);
+  transition: opacity .2s ease, transform .2s ease;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.35));
+}
+.spot.peeked .badge { opacity: 1; transform: scale(1); }
+
+.spot.peeked { background: rgba(255,255,255,.72); }
+.spot.w0 { box-shadow: 0 0 0 5px var(--w0), 0 0 14px 2px var(--w0); }
+.spot.w1 { box-shadow: 0 0 0 5px var(--w1), 0 0 14px 2px var(--w1); }
+.spot.w2 { box-shadow: 0 0 0 5px var(--w2), 0 0 14px 2px var(--w2); }
+.spot.w3 { box-shadow: 0 0 0 5px var(--w3), 0 0 16px 3px var(--w3); }
+.spot.w4 { box-shadow: 0 0 0 6px var(--w4), 0 0 22px 5px var(--w4); animation: sizzle .8s ease-in-out infinite; }
+@keyframes sizzle {
+  0%,100% { transform: translate(-50%,-50%) scale(1); }
+  50%     { transform: translate(-50%,-50%) scale(1.09); }
+}
+
+.spot.gone {
+  opacity: .28;
+  pointer-events: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.spot.found {
+  background: #fff8b0;
+  box-shadow: 0 0 0 7px #ffd233, 0 0 30px 10px rgba(255,210,51,.85);
+  animation: popout .6s ease;
+  z-index: 5;
+}
+@keyframes popout {
+  0%   { transform: translate(-50%,-50%) scale(.6) rotate(-14deg); }
+  55%  { transform: translate(-50%,-50%) scale(1.45) rotate(10deg); }
+  100% { transform: translate(-50%,-50%) scale(1.2) rotate(0deg); }
+}
+.spot.found .prop { animation: wiggle .5s ease-in-out 3; }
+@keyframes wiggle {
+  0%,100% { transform: rotate(-12deg); }
+  50%     { transform: rotate(12deg); }
+}
+
+/* ---------- warmth meter ---------- */
+#meter {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border-radius: 20px;
+  padding: 8px 12px;
+  box-shadow: var(--shadow);
+}
+#meterFace {
+  font-size: clamp(30px, 9vw, 46px);
+  line-height: 1;
+  transition: transform .2s ease;
+}
+#meterFace.bump { animation: bump .4s ease; }
+@keyframes bump {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.4) rotate(-8deg); }
+  100% { transform: scale(1); }
+}
+#meterBody { flex: 1; min-width: 0; }
+#meterWord {
+  font-size: clamp(15px, 4.6vw, 23px);
+  font-weight: bold;
+  margin-bottom: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#meterBar {
+  display: flex;
+  gap: 5px;
+  height: 16px;
+}
+#meterBar i {
+  flex: 1;
+  border-radius: 8px;
+  background: #e6e1d4;
+  transition: background .25s ease;
+}
+
+/* ---------- shelf ---------- */
+#shelf {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  background: var(--panel);
+  border-radius: 18px;
+  padding: 5px 8px;
+  box-shadow: var(--shadow);
+}
+.slot {
+  width: clamp(34px, 9.6vw, 48px);
+  height: clamp(34px, 9.6vw, 48px);
+  border-radius: 12px;
+  background: #efe9dc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(18px, 5.4vw, 27px);
+  line-height: 1;
+}
+.slot.on {
+  background: linear-gradient(160deg, #fff3a8, #ffd06b);
+  animation: pop .5s ease;
+}
+@keyframes pop {
+  0% { transform: scale(.4); }
+  60% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- overlay ---------- */
+#overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(43,33,64,.55);
+  backdrop-filter: blur(3px);
+}
+#overlay.hidden { display: none; }
+
+#panel {
+  width: min(94vw, 460px);
+  max-height: 92%;
+  overflow-y: auto;
+  background: var(--panel);
+  border-radius: 28px;
+  padding: 18px 16px 20px;
+  text-align: center;
+  box-shadow: 0 14px 0 rgba(0,0,0,.2);
+  animation: rise .35s ease;
+}
+@keyframes rise {
+  from { transform: translateY(26px) scale(.94); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+#panel .big {
+  font-size: clamp(44px, 15vw, 78px);
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+#panel h2 {
+  margin: 4px 0 8px;
+  font-size: clamp(22px, 7vw, 34px);
+  background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+#panel p {
+  margin: 6px 0;
+  font-size: clamp(14px, 4.2vw, 19px);
+  line-height: 1.45;
+}
+#panel .rules {
+  text-align: left;
+  display: inline-block;
+  margin: 8px auto 4px;
+}
+#panel .rules div {
+  margin: 7px 0;
+  font-size: clamp(13px, 3.9vw, 18px);
+}
+
+.bigbtn {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  margin-top: 14px;
+  border: none;
+  border-radius: 22px;
+  background: linear-gradient(160deg, var(--accent-a), var(--accent-b));
+  color: #fff;
+  font-family: inherit;
+  font-weight: bold;
+  font-size: clamp(19px, 5.6vw, 26px);
+  cursor: pointer;
+  box-shadow: 0 6px 0 rgba(0,0,0,.22);
+  transition: transform .12s ease;
+}
+.bigbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.22); }
+
+.friendrow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 10px 0 2px;
+}
+.friendrow span {
+  font-size: clamp(30px, 9vw, 44px);
+  animation: pop .5s ease backwards;
+}
+
+#confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+
+@media (min-height: 720px) {
+  #scene { min-height: 300px; }
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="topbar">
+    <button class="iconbtn" id="btnSound" aria-label="Sound on or off">🔊</button>
+    <h1>Hide &amp; Squeak</h1>
+    <button class="iconbtn" id="btnRestart" aria-label="Start a new game">↻</button>
+  </div>
+
+  <div id="statusRow">
+    <div id="roundInfo">Ready to play!</div>
+    <div id="peekInfo">Peeks: 0</div>
+  </div>
+
+  <div id="scene">
+    <div id="field"></div>
+  </div>
+
+  <div id="meter">
+    <div id="meterFace">🙈</div>
+    <div id="meterBody">
+      <div id="meterWord">Tap a hiding spot!</div>
+      <div id="meterBar"><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+  </div>
+
+  <div id="shelf"></div>
+</div>
+
+<div id="overlay">
+  <div id="panel"></div>
+</div>
+
+<canvas id="confetti"></canvas>
+
+<script>
+(() => {
+'use strict';
+
+/* ============ data ============ */
+
+const FRIENDS = [
+  { e: '🐭', n: 'Pip' },
+  { e: '🐸', n: 'Bloop' },
+  { e: '🦔', n: 'Prickle' },
+  { e: '🐢', n: 'Shelly' },
+  { e: '🦉', n: 'Hoot' },
+  { e: '🐰', n: 'Nibbles' }
+];
+
+const SCENES = [
+  { name: 'Sunny Meadow', sky: '#a9e8ff', ground: '#7ddc6a',
+    deco: ['☁️', '☁️', '🦋', '🌈'],
+    props: ['🌳', '🌲', '🌸', '🌻', '🍄', '🪨', '🪵', '🌾', '🌷', '🌿', '🪻', '🏵️'] },
+  { name: 'Sandy Beach', sky: '#9fe6ff', ground: '#ffe2a8',
+    deco: ['☁️', '🌊', '🦩', '☀️'],
+    props: ['🌴', '🐚', '🪣', '⛱️', '🪸', '🧺', '🥥', '🪨', '⚓', '🛟', '🏖️', '🪁'] },
+  { name: 'Snowy Hill', sky: '#cfe9ff', ground: '#f2f8ff',
+    deco: ['❄️', '❄️', '☁️', '🌟'],
+    props: ['⛄', '🎄', '🧊', '🪵', '🏔️', '🛷', '🎁', '🌲', '🪨', '🧣', '🕯️', '🏠'] },
+  { name: 'Jungle Path', sky: '#8fe0c8', ground: '#4fb85f',
+    deco: ['🦜', '☁️', '🍃', '🦋'],
+    props: ['🌴', '🪴', '🌺', '🍌', '🪨', '🪵', '🎋', '🌿', '🥭', '🪷', '🌳', '🍍'] },
+  { name: 'Busy Farm', sky: '#ffd9a0', ground: '#c9e26a',
+    deco: ['☁️', '🌞', '🐝', '🍂'],
+    props: ['🌽', '🎃', '🪣', '🧺', '🚜', '🪵', '🛖', '🌻', '🥕', '🧱', '🌾', '🪴'] },
+  { name: 'Toy Corner', sky: '#ffd4ef', ground: '#c6b7ff',
+    deco: ['⭐', '🎈', '✨', '🎀'],
+    props: ['🧸', '📦', '🧦', '🎒', '🪑', '🥁', '🚚', '🎩', '🪀', '🧢', '🪆', '🎨'] }
+];
+
+const COUNTS = [8, 9, 10, 11, 12, 12];
+
+const WARM = [
+  { word: 'Brrr… freezing!', face: '🥶', badge: '❄️', col: '#3aa0ff' },
+  { word: 'Cold over here.',  face: '😐', badge: '💧', col: '#23c9d6' },
+  { word: 'Getting warm…',    face: '🙂', badge: '🌤️', col: '#ffd233' },
+  { word: 'Hot! Very close!', face: '😃', badge: '☀️', col: '#ff9022' },
+  { word: 'SUPER HOT!!',      face: '🤩', badge: '🔥', col: '#ff4d5e' }
+];
+
+const FREQ = [175, 233, 311, 415, 554];
+const STORE_KEY = 'cowork-hide-and-squeak-stats';
+
+/* ============ elements ============ */
+
+const $ = (id) => document.getElementById(id);
+const sceneEl = $('scene');
+const fieldEl = $('field');
+const overlay = $('overlay');
+const panel = $('panel');
+const shelfEl = $('shelf');
+const roundInfo = $('roundInfo');
+const peekInfo = $('peekInfo');
+const meterFace = $('meterFace');
+const meterWord = $('meterWord');
+const meterBar = $('meterBar');
+const btnSound = $('btnSound');
+const btnRestart = $('btnRestart');
+const cvs = $('confetti');
+const cctx = cvs.getContext('2d');
+
+/* ============ state ============ */
+
+let round = 0;
+let spots = [];
+let targetIdx = -1;
+let totalPeeks = 0;
+let roundPeeks = 0;
+let lastHelpAt = 0;
+let playing = false;
+let soundOn = true;
+let stats = { games: 0, best: null, friends: 0 };
+
+/* ============ storage ============ */
+
+function loadStats() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        stats.games = Number(parsed.games) || 0;
+        stats.friends = Number(parsed.friends) || 0;
+        stats.best = (typeof parsed.best === 'number' && parsed.best > 0) ? parsed.best : null;
+      }
+    }
+  } catch (e) { /* corrupt storage: just use defaults */ }
+}
+function saveStats() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(stats)); } catch (e) { /* ignore */ }
+}
+
+/* ============ audio ============ */
+
+let actx = null;
+function ensureAudio() {
+  if (!soundOn) return null;
+  try {
+    if (!actx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      actx = new AC();
+    }
+    if (actx.state === 'suspended') actx.resume();
+  } catch (e) { actx = null; }
+  return actx;
+}
+
+function tone(freq, dur, type, vol, delay) {
+  const ac = ensureAudio();
+  if (!ac) return;
+  const t0 = ac.currentTime + (delay || 0);
+  const osc = ac.createOscillator();
+  const g = ac.createGain();
+  osc.type = type || 'triangle';
+  osc.frequency.setValueAtTime(freq, t0);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol || 0.18, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(g); g.connect(ac.destination);
+  osc.start(t0); osc.stop(t0 + dur + 0.05);
+}
+
+function squeak() {
+  const ac = ensureAudio();
+  if (!ac) return;
+  const t0 = ac.currentTime;
+  const osc = ac.createOscillator();
+  const g = ac.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(420, t0);
+  osc.frequency.exponentialRampToValueAtTime(1300, t0 + 0.14);
+  osc.frequency.exponentialRampToValueAtTime(760, t0 + 0.34);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.16, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.4);
+  osc.connect(g); g.connect(ac.destination);
+  osc.start(t0); osc.stop(t0 + 0.45);
+}
+
+function fanfare() {
+  [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.3, 'triangle', 0.16, i * 0.11));
+}
+
+function puff() {
+  const ac = ensureAudio();
+  if (!ac) return;
+  const len = Math.floor(ac.sampleRate * 0.22);
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = ac.createBufferSource();
+  const g = ac.createGain();
+  const flt = ac.createBiquadFilter();
+  flt.type = 'bandpass'; flt.frequency.value = 900;
+  g.gain.value = 0.16;
+  src.buffer = buf;
+  src.connect(flt); flt.connect(g); g.connect(ac.destination);
+  src.start();
+}
+
+/* ============ helpers ============ */
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+
+/* ============ scene building ============ */
+
+function layoutPositions(count) {
+  const cols = 3;
+  const rows = Math.ceil(count / cols);
+  const cells = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push([c, r]);
+  shuffle(cells);
+  const cw = 100 / cols, ch = 100 / rows;
+  return cells.slice(0, count).map(([c, r]) => ({
+    // rows are tighter than columns, so jitter vertically less or big spots touch
+    x: cw * (c + 0.5) + (Math.random() - 0.5) * cw * 0.3,
+    y: ch * (r + 0.5) + (Math.random() - 0.5) * ch * 0.2
+  }));
+}
+
+function buildRound() {
+  const scene = SCENES[round % SCENES.length];
+  const count = COUNTS[Math.min(round, COUNTS.length - 1)];
+
+  sceneEl.style.setProperty('--sky', scene.sky);
+  sceneEl.style.setProperty('--ground', scene.ground);
+
+  // decorations
+  Array.prototype.slice.call(sceneEl.querySelectorAll('.deco')).forEach((d) => d.remove());
+  scene.deco.forEach((emo, i) => {
+    const d = document.createElement('div');
+    d.className = 'deco';
+    d.textContent = emo;
+    d.style.left = (8 + i * 24 + Math.random() * 8) + '%';
+    d.style.top = (2 + Math.random() * 9) + '%';
+    d.style.animationDelay = (i * 0.7) + 's';
+    sceneEl.appendChild(d);
+  });
+
+  const props = shuffle(scene.props.slice()).slice(0, count);
+  const pos = layoutPositions(count);
+
+  fieldEl.innerHTML = '';
+  spots = pos.map((p, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'spot';
+    btn.style.left = p.x + '%';
+    btn.style.top = p.y + '%';
+    btn.setAttribute('aria-label', 'Peek under hiding spot ' + (i + 1));
+    const prop = document.createElement('span');
+    prop.className = 'prop';
+    prop.textContent = props[i];
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    btn.appendChild(prop);
+    btn.appendChild(badge);
+    btn.addEventListener('click', () => peek(i));
+    fieldEl.appendChild(btn);
+    return { el: btn, propEl: prop, badgeEl: badge, x: p.x, y: p.y, peeked: false, gone: false, level: 0 };
+  });
+
+  targetIdx = Math.floor(Math.random() * spots.length);
+  computeWarmth();
+}
+
+// Warmth is rank-normalised across the round so the nearest wrong spot is always
+// SUPER HOT and the farthest is always freezing — every peek tells you something.
+function computeWarmth() {
+  const w = fieldEl.clientWidth || 300;
+  const h = fieldEl.clientHeight || 300;
+  const tx = spots[targetIdx].x / 100 * w;
+  const ty = spots[targetIdx].y / 100 * h;
+  const dists = [];
+  spots.forEach((s, i) => {
+    if (i === targetIdx) { s.dist = 0; return; }
+    const dx = s.x / 100 * w - tx;
+    const dy = s.y / 100 * h - ty;
+    s.dist = Math.sqrt(dx * dx + dy * dy);
+    dists.push(s.dist);
+  });
+  const lo = Math.min.apply(null, dists);
+  const hi = Math.max.apply(null, dists);
+  const span = (hi - lo) || 1;
+  spots.forEach((s, i) => {
+    if (i === targetIdx) { s.level = 4; return; }
+    const t = (s.dist - lo) / span;          // 0 = nearest, 1 = farthest
+    s.level = Math.max(0, Math.min(4, 4 - Math.floor(t * 4.999)));
+  });
+}
+
+/* ============ gameplay ============ */
+
+function startGame() {
+  round = 0;
+  totalPeeks = 0;
+  stats.games += 1;
+  saveStats();
+  renderShelf();
+  startRound();
+}
+
+function startRound() {
+  roundPeeks = 0;
+  lastHelpAt = 0;
+  playing = true;
+  buildRound();
+  // field size is known now, but re-measure next frame in case layout settled late
+  requestAnimationFrame(computeWarmth);
+  setMeter(-1);
+  updateHud();
+}
+
+function peek(i) {
+  ensureAudio();
+  if (!playing) return;
+  const s = spots[i];
+  if (s.gone) return;
+
+  if (i === targetIdx) { reveal(i); return; }
+
+  if (!s.peeked) { totalPeeks++; roundPeeks++; }
+  s.peeked = true;
+  s.el.classList.add('peeked', 'w' + s.level);
+  s.badgeEl.textContent = WARM[s.level].badge;
+  setMeter(s.level);
+  tone(FREQ[s.level], 0.18, 'triangle', 0.2, 0);
+  if (s.level >= 3) tone(FREQ[s.level] * 1.5, 0.14, 'sine', 0.13, 0.13);
+  updateHud();
+  maybeHelp();
+}
+
+// After a few chilly peeks, quietly puff away an icy spot so nobody gets stuck.
+function maybeHelp() {
+  if (roundPeeks < 4) return;
+  if (roundPeeks - lastHelpAt < 3) return;
+  const alive = spots.filter((s, i) => !s.gone && i !== targetIdx);
+  if (alive.length <= 2) return;
+  const icy = alive.filter((s) => !s.peeked && s.level <= 1);
+  if (!icy.length) return;
+  const pick = icy[Math.floor(Math.random() * icy.length)];
+  pick.gone = true;
+  pick.propEl.textContent = '💨';
+  pick.el.classList.add('gone');
+  lastHelpAt = roundPeeks;
+  puff();
+}
+
+function reveal(i) {
+  playing = false;
+  const s = spots[i];
+  const friend = FRIENDS[round % FRIENDS.length];
+  s.el.classList.remove('peeked', 'w0', 'w1', 'w2', 'w3', 'w4');
+  s.el.classList.add('found');
+  s.propEl.textContent = friend.e;
+  s.badgeEl.textContent = '';
+  setMeter(4, 'Found ' + friend.n + '! 🎉');
+
+  stats.friends += 1;
+  saveStats();
+  renderShelf(round + 1);
+
+  squeak();
+  setTimeout(fanfare, 220);
+  burstAt(0.5, 0.45, 90);
+
+  setTimeout(() => {
+    round++;
+    if (round >= FRIENDS.length) finishGame();
+    else showFoundPanel(friend);
+  }, 1150);
+}
+
+function finishGame() {
+  if (stats.best === null || totalPeeks < stats.best) stats.best = totalPeeks;
+  saveStats();
+  // fire from the edges so the celebration panel in the middle stays readable
+  burstAt(0.1, 0.62, 55);
+  setTimeout(() => burstAt(0.9, 0.62, 55), 260);
+  setTimeout(() => burstAt(0.5, 0.06, 55), 520);
+  fanfare();
+  setTimeout(() => fanfare(), 500);
+
+  const row = FRIENDS.map((f, i) =>
+    '<span style="animation-delay:' + (i * 0.09) + 's">' + f.e + '</span>').join('');
+
+  showPanel(
+    '<div class="big">🎉🐭🎉</div>' +
+    '<h2>Big Squeak Party!</h2>' +
+    '<p>You found <b>all 6 friends</b>!</p>' +
+    '<div class="friendrow">' + row + '</div>' +
+    '<p>You peeked <b>' + totalPeeks + '</b> times.<br>Fewest ever: <b>' + stats.best + '</b> 🏆</p>',
+    'Play Again 🔁', startGame
+  );
+}
+
+function showFoundPanel(friend) {
+  const nextFriend = FRIENDS[round % FRIENDS.length];
+  const nextScene = SCENES[round % SCENES.length];
+  const nice = roundPeeks === 0 ? 'First try — amazing!'
+             : roundPeeks <= 2 ? 'Wow, super speedy!'
+             : roundPeeks <= 5 ? 'Great sniffing!'
+             : 'You never gave up!';
+  const tally = roundPeeks === 0 ? 'No peeks needed!'
+              : roundPeeks + (roundPeeks === 1 ? ' peek' : ' peeks');
+  showPanel(
+    '<div class="big">' + friend.e + '</div>' +
+    '<h2>You found ' + friend.n + '!</h2>' +
+    '<p>' + nice + ' (' + tally + ')</p>' +
+    '<p>Next up: <b>' + nextFriend.n + '</b> ' + nextFriend.e + ' is hiding in the<br><b>' + nextScene.name + '</b>!</p>',
+    'Go Find ' + nextFriend.n + ' →', startRound
+  );
+}
+
+/* ============ ui ============ */
+
+function updateHud() {
+  const friend = FRIENDS[round % FRIENDS.length];
+  roundInfo.textContent = 'Find ' + friend.n + '! ' + friend.e;
+  peekInfo.textContent = 'Friend ' + (round + 1) + '/6 · Peeks ' + roundPeeks;
+}
+
+function setMeter(level, customWord) {
+  const bars = meterBar.children;
+  if (level < 0) {
+    meterFace.textContent = '🙈';
+    meterWord.textContent = 'Tap a hiding spot!';
+    for (let i = 0; i < bars.length; i++) bars[i].style.background = '#e6e1d4';
+    return;
+  }
+  const w = WARM[level];
+  meterFace.textContent = w.face;
+  meterWord.textContent = customWord || w.word;
+  for (let i = 0; i < bars.length; i++) {
+    bars[i].style.background = i <= level ? w.col : '#e6e1d4';
+  }
+  meterFace.classList.remove('bump');
+  void meterFace.offsetWidth;
+  meterFace.classList.add('bump');
+}
+
+function renderShelf(foundCount) {
+  const found = typeof foundCount === 'number' ? foundCount : round;
+  shelfEl.innerHTML = '';
+  FRIENDS.forEach((f, i) => {
+    const d = document.createElement('div');
+    d.className = 'slot' + (i < found ? ' on' : '');
+    d.textContent = i < found ? f.e : '❔';
+    shelfEl.appendChild(d);
+  });
+}
+
+function showPanel(html, btnLabel, onClick) {
+  panel.innerHTML = html;
+  const b = document.createElement('button');
+  b.className = 'bigbtn';
+  b.textContent = btnLabel;
+  b.addEventListener('click', () => {
+    ensureAudio();
+    tone(660, 0.14, 'triangle', 0.16, 0);
+    overlay.classList.add('hidden');
+    onClick();
+  });
+  panel.appendChild(b);
+  overlay.classList.remove('hidden');
+}
+
+function showTitle() {
+  const bestLine = stats.best !== null
+    ? '<p>🏆 Fewest peeks ever: <b>' + stats.best + '</b></p>' : '';
+  showPanel(
+    '<div class="big">🐭🌳🔎</div>' +
+    '<h2>Hide &amp; Squeak</h2>' +
+    '<div class="rules">' +
+      '<div>🙈 A shy little friend is hiding!</div>' +
+      '<div>👆 Tap any spot to peek under it.</div>' +
+      '<div>❄️ Cold means far away…</div>' +
+      '<div>🔥 SUPER HOT means right next door!</div>' +
+      '<div>🎉 Find all 6 friends to win!</div>' +
+    '</div>' + bestLine,
+    'Play! 🔎', startGame
+  );
+}
+
+/* ============ confetti ============ */
+
+const COLORS = ['#ff4d5e', '#ffd233', '#3aa0ff', '#7ddc6a', '#ff7ab8', '#7a6bff', '#23c9d6'];
+let parts = [];
+let raf = null;
+
+function fitCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cvs.width = Math.floor(window.innerWidth * dpr);
+  cvs.height = Math.floor(window.innerHeight * dpr);
+  cvs.style.width = window.innerWidth + 'px';
+  cvs.style.height = window.innerHeight + 'px';
+  cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function burstAt(fx, fy, n) {
+  const cx = window.innerWidth * fx;
+  const cy = window.innerHeight * fy;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 3 + Math.random() * 8;
+    parts.push({
+      x: cx, y: cy,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp - 4,
+      w: 6 + Math.random() * 8,
+      h: 8 + Math.random() * 10,
+      rot: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.35,
+      col: COLORS[Math.floor(Math.random() * COLORS.length)],
+      life: 1
+    });
+  }
+  if (!raf) raf = requestAnimationFrame(tick);
+}
+
+function tick() {
+  cctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i];
+    p.vy += 0.32;
+    p.vx *= 0.99;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rot += p.vr;
+    p.life -= 0.008;
+    if (p.life <= 0 || p.y > window.innerHeight + 40) { parts.splice(i, 1); continue; }
+    cctx.save();
+    cctx.translate(p.x, p.y);
+    cctx.rotate(p.rot);
+    cctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+    cctx.fillStyle = p.col;
+    cctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    cctx.restore();
+  }
+  if (parts.length) { raf = requestAnimationFrame(tick); }
+  else { raf = null; cctx.clearRect(0, 0, window.innerWidth, window.innerHeight); }
+}
+
+/* ============ wiring ============ */
+
+btnSound.addEventListener('click', () => {
+  soundOn = !soundOn;
+  btnSound.textContent = soundOn ? '🔊' : '🔇';
+  if (soundOn) { ensureAudio(); tone(660, 0.14, 'triangle', 0.16, 0); }
+});
+
+btnRestart.addEventListener('click', () => {
+  ensureAudio();
+  puff();
+  parts = [];
+  round = 0;
+  totalPeeks = 0;
+  playing = false;
+  renderShelf(0);
+  setMeter(-1);
+  showTitle();
+});
+
+window.addEventListener('resize', () => {
+  fitCanvas();
+  // only re-measure before any peek, so rotating mid-round can't leave stale rings
+  if (spots.length && !spots.some((s) => s.peeked)) computeWarmth();
+});
+
+fitCanvas();
+loadStats();
+renderShelf(0);
+showTitle();
+
+})();
+</script>
+</body>
+</html>

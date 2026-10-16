@@ -1,0 +1,1094 @@
+<!-- CONCEPT: Potion Pals — a color-mixing potion lab; friendly creatures order a colored potion, kids tap big paint-drop bottles (red, yellow, blue, white, black) to splash drops into a bubbling cauldron that mixes them like real paint (blue + yellow = green), then hit SERVE to earn stars. Twelve orders climb from single colors to secondaries, pastels, ratios and shades, with a gentle hint after two tries and no way to lose. Includes a Free Mix sandbox that names every color you invent and bottles it onto your shelf. Sneaky-educational color-theory game for ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Potion Pals</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+}
+
+:root {
+  --bg1: #2a1b4d;
+  --bg2: #43246b;
+  --bg3: #6b2f7a;
+  --panel: rgba(255,255,255,0.10);
+  --panel-solid: #3b2263;
+  --ink: #fff6ff;
+  --ink-dim: #d9c2f0;
+  --gold: #ffd85e;
+  --gold2: #ff9f43;
+  --mint: #5ff0c4;
+  --pink: #ff86c8;
+  --radius: 18px;
+  --tap: 56px;
+  --font: "Comic Sans MS", "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 20% 8%, rgba(255,134,200,0.30), transparent 55%),
+    radial-gradient(circle at 82% 18%, rgba(95,240,196,0.22), transparent 50%),
+    linear-gradient(170deg, var(--bg1), var(--bg2) 45%, var(--bg3));
+  height: 100vh; height: 100dvh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+#stars-bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.55; }
+
+#app {
+  position: relative; z-index: 2;
+  width: 100%;
+  max-width: 520px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px 10px;
+  gap: 6px;
+}
+
+/* ---------- header ---------- */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; flex: 0 0 auto;
+}
+h1 {
+  margin: 0;
+  font-size: clamp(20px, 6.2vw, 30px);
+  letter-spacing: 0.5px;
+  background: linear-gradient(90deg, var(--gold), var(--pink) 50%, var(--mint));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(0,0,0,0.25));
+}
+.hud { display: flex; gap: 6px; align-items: center; }
+.chip {
+  background: var(--panel);
+  border: 2px solid rgba(255,255,255,0.16);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: clamp(12px, 3.4vw, 15px);
+  white-space: nowrap;
+  font-weight: bold;
+}
+
+/* ---------- customer ---------- */
+#customer {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--panel);
+  border: 3px solid rgba(255,255,255,0.18);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  min-height: 92px;
+  position: relative;
+  overflow: hidden;
+}
+#pal {
+  font-size: clamp(40px, 12vw, 56px);
+  line-height: 1;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 3px 4px rgba(0,0,0,0.35));
+  transform-origin: 50% 85%;
+  animation: bob 2.2s ease-in-out infinite;
+}
+@keyframes bob { 0%,100%{transform:translateY(0) rotate(-2deg);} 50%{transform:translateY(-7px) rotate(2deg);} }
+#pal.cheer { animation: cheer 0.5s ease-out 2; }
+@keyframes cheer { 0%{transform:scale(1) rotate(0);} 30%{transform:scale(1.25) rotate(-12deg);} 60%{transform:scale(1.25) rotate(12deg);} 100%{transform:scale(1) rotate(0);} }
+
+#bubble {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.94);
+  color: #3a2159;
+  border-radius: 16px;
+  padding: 8px 10px;
+  position: relative;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.18);
+}
+#bubble::before {
+  content: ""; position: absolute; left: -10px; top: 50%;
+  transform: translateY(-50%);
+  border: 9px solid transparent; border-right-color: rgba(255,255,255,0.94);
+}
+#say {
+  font-size: clamp(12px, 3.5vw, 16px);
+  font-weight: bold; line-height: 1.2;
+  flex: 1 1 auto; min-width: 0;
+}
+#target-wrap { flex: 0 0 auto; text-align: center; }
+#target {
+  width: clamp(46px, 14vw, 60px); height: clamp(46px, 14vw, 60px);
+  border-radius: 50%;
+  border: 4px solid #fff;
+  box-shadow: 0 0 0 3px #3a2159, 0 3px 10px rgba(0,0,0,0.4);
+  background: #888;
+}
+#target-lbl { font-size: 10px; color: #6b5389; margin-top: 2px; font-weight: bold; }
+
+/* ---------- cauldron ---------- */
+#stage {
+  flex: 1 1 auto;
+  min-height: 130px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+#pot { width: 100%; height: 100%; display: block; }
+
+#hint {
+  position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+  display: none; align-items: center; gap: 5px;
+  background: rgba(0,0,0,0.42);
+  border: 2px solid var(--gold);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px; font-weight: bold;
+  white-space: nowrap;
+}
+#hint.on { display: flex; }
+.hdot { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #fff; display: inline-block; }
+
+/* ---------- drop queue ---------- */
+#queue {
+  flex: 0 0 auto;
+  min-height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 5px; flex-wrap: wrap;
+  padding: 0 2px;
+}
+#queue .qd {
+  width: 19px; height: 19px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.85);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.35);
+  animation: pop 0.28s ease-out;
+}
+#queue .empty { font-size: 12px; color: var(--ink-dim); opacity: 0.75; }
+@keyframes pop { 0%{transform:scale(0.1);} 70%{transform:scale(1.35);} 100%{transform:scale(1);} }
+
+/* ---------- bottles ---------- */
+#bottles {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.bottle {
+  min-height: var(--tap);
+  border: none; padding: 6px 2px 5px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.12);
+  border: 2px solid rgba(255,255,255,0.22);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: clamp(9px, 2.7vw, 12px);
+  font-weight: bold;
+  cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  transition: transform 0.08s ease;
+}
+.bottle .blob {
+  width: clamp(26px, 8vw, 34px); height: clamp(26px, 8vw, 34px);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  border: 2px solid rgba(255,255,255,0.9);
+  box-shadow: inset -3px -4px 6px rgba(0,0,0,0.25), 0 3px 6px rgba(0,0,0,0.35);
+}
+.bottle:active { transform: scale(0.9); }
+.bottle.ping { animation: ping 0.3s ease-out; }
+@keyframes ping { 50% { transform: scale(1.14); box-shadow: 0 0 16px var(--gold); } }
+
+/* ---------- actions ---------- */
+#actions {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr 2.1fr;
+  gap: 7px;
+}
+.btn {
+  min-height: var(--tap);
+  border-radius: 14px;
+  border: none;
+  font-family: var(--font);
+  font-weight: bold;
+  cursor: pointer;
+  color: #3a2159;
+  font-size: clamp(13px, 3.8vw, 17px);
+  background: linear-gradient(180deg, #ffffff, #ddd0f0);
+  box-shadow: 0 4px 0 rgba(0,0,0,0.28);
+  transition: transform 0.07s ease, box-shadow 0.07s ease;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.28); }
+.btn.stack { flex-direction: column; gap: 0; line-height: 1.05; }
+.btn.stack small { font-size: clamp(10px, 2.9vw, 12px); opacity: 0.75; }
+.btn.go {
+  background: linear-gradient(180deg, var(--gold), var(--gold2));
+  font-size: clamp(15px, 4.6vw, 21px);
+  letter-spacing: 0.5px;
+}
+.btn.go.pulse { animation: gpulse 1.1s ease-in-out infinite; }
+@keyframes gpulse { 0%,100%{ box-shadow: 0 4px 0 rgba(0,0,0,0.28); } 50%{ box-shadow: 0 4px 0 rgba(0,0,0,0.28), 0 0 22px rgba(255,216,94,0.85); } }
+.btn[disabled] { opacity: 0.45; }
+
+/* ---------- shelf (free mix) ---------- */
+#shelf {
+  display: none;
+  flex: 0 0 auto;
+  min-height: 34px;
+  align-items: center; gap: 5px;
+  padding: 3px 6px;
+  background: var(--panel);
+  border: 2px solid rgba(255,255,255,0.16);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+#shelf.on { display: flex; }
+#shelf .sv {
+  flex: 0 0 auto;
+  width: 22px; height: 28px;
+  border-radius: 4px 4px 8px 8px;
+  border: 2px solid rgba(255,255,255,0.85);
+  animation: pop 0.3s ease-out;
+}
+#shelf .lbl { font-size: 11px; color: var(--ink-dim); flex: 0 0 auto; }
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: fixed; inset: 0; z-index: 40;
+  display: none;
+  align-items: center; justify-content: center;
+  padding: 16px;
+  background: rgba(24,12,44,0.86);
+  backdrop-filter: blur(3px);
+}
+.overlay.on { display: flex; }
+.card {
+  width: 100%; max-width: 420px;
+  max-height: 92vh; overflow-y: auto;
+  background: linear-gradient(165deg, #4a2a78, #2c1a4f);
+  border: 4px solid rgba(255,255,255,0.28);
+  border-radius: 24px;
+  padding: 18px 16px;
+  text-align: center;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.5);
+}
+.card h2 {
+  margin: 0 0 6px;
+  font-size: clamp(22px, 7vw, 32px);
+  background: linear-gradient(90deg, var(--gold), var(--pink) 55%, var(--mint));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.card p { margin: 6px 0; font-size: clamp(13px, 3.7vw, 16px); line-height: 1.4; color: var(--ink-dim); }
+.card .big { font-size: clamp(38px, 13vw, 60px); margin: 4px 0; }
+.card .btn { width: 100%; margin-top: 9px; }
+#final-shelf {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin: 10px 0;
+}
+#final-shelf div {
+  width: 26px; height: 34px; border-radius: 5px 5px 10px 10px;
+  border: 2px solid rgba(255,255,255,0.85);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+}
+.howto { text-align: left; display: inline-block; margin: 2px auto; }
+.howto div { margin: 7px 0; font-size: clamp(13px, 3.7vw, 16px); }
+
+#fx { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+
+/* result flash */
+#flash {
+  position: fixed; z-index: 50; left: 50%; top: 42%;
+  transform: translate(-50%,-50%);
+  pointer-events: none;
+  font-size: clamp(26px, 9vw, 42px);
+  font-weight: bold;
+  color: var(--gold);
+  text-shadow: 0 4px 0 rgba(0,0,0,0.35);
+  opacity: 0;
+  white-space: nowrap;
+}
+#flash.show { animation: flash 1.25s ease-out; }
+@keyframes flash {
+  0% { opacity: 0; transform: translate(-50%,-50%) scale(0.4); }
+  22% { opacity: 1; transform: translate(-50%,-50%) scale(1.15); }
+  70% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-60%) scale(1); }
+}
+
+@media (min-height: 720px) {
+  :root { --tap: 62px; }
+  #customer { min-height: 108px; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="stars-bg"></canvas>
+
+<div id="app">
+  <header>
+    <h1>Potion Pals</h1>
+    <div class="hud">
+      <div class="chip" id="chip-progress">🧪 1/12</div>
+      <div class="chip" id="chip-stars">⭐ 0</div>
+      <button class="chip" id="btn-mode" style="cursor:pointer;font-family:var(--font);color:var(--ink);">🎨</button>
+    </div>
+  </header>
+
+  <div id="customer">
+    <div id="pal">🐸</div>
+    <div id="bubble">
+      <div id="say">Hi! Can you mix me this color?</div>
+      <div id="target-wrap">
+        <div id="target"></div>
+        <div id="target-lbl">wants</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="stage">
+    <canvas id="pot"></canvas>
+    <div id="hint"><span>Try:</span></div>
+  </div>
+
+  <div id="queue"><span class="empty">tap a color to add a drop</span></div>
+
+  <div id="bottles"></div>
+
+  <div id="shelf"><span class="lbl">shelf:</span></div>
+
+  <div id="actions">
+    <button class="btn stack" id="btn-undo"><span>↩️</span><small>Undo</small></button>
+    <button class="btn stack" id="btn-wash"><span>🧼</span><small>Wash</small></button>
+    <button class="btn go" id="btn-serve">SERVE!</button>
+  </div>
+</div>
+
+<div id="flash"></div>
+<canvas id="fx"></canvas>
+
+<div class="overlay on" id="ov-start">
+  <div class="card">
+    <div class="big">🧪🐸✨</div>
+    <h2>Potion Pals</h2>
+    <p>Friendly pals want colorful potions!</p>
+    <div class="howto">
+      <div>1️⃣ Tap the color bottles to drop paint in the cauldron.</div>
+      <div>2️⃣ Colors mix like real paint — 💙 + 💛 = 💚!</div>
+      <div>3️⃣ Match the color your pal wants, then tap SERVE.</div>
+    </div>
+    <p>You can always wash the pot and try again. 💜</p>
+    <button class="btn go" id="btn-play">Let's Mix! 🎉</button>
+    <button class="btn" id="btn-free">🎨 Free Mix Lab</button>
+  </div>
+</div>
+
+<div class="overlay" id="ov-win">
+  <div class="card">
+    <div class="big">🏆</div>
+    <h2>Potion Master!</h2>
+    <p>You mixed all 12 potions!</p>
+    <div id="final-shelf"></div>
+    <p id="win-stars">⭐ 0 stars</p>
+    <p id="win-best"></p>
+    <button class="btn go" id="btn-again">Play Again 🔁</button>
+    <button class="btn" id="btn-free2">🎨 Free Mix Lab</button>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ============================================================
+   AUDIO — created / resumed only on a real user gesture
+   ============================================================ */
+let AC = null;
+function ac() {
+  if (!AC) {
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch (e) { return null; }
+  }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type, vol, delay) {
+  const c = ac(); if (!c) return;
+  dur = dur || 0.18; type = type || 'sine'; vol = vol == null ? 0.16 : vol; delay = delay || 0;
+  const t = c.currentTime + delay;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(c.destination);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+function blip(freq) {
+  const c = ac(); if (!c) return;
+  const t = c.currentTime;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(freq * 1.6, t);
+  o.frequency.exponentialRampToValueAtTime(freq * 0.75, t + 0.16);
+  g.gain.setValueAtTime(0.22, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+  o.connect(g); g.connect(c.destination);
+  o.start(t); o.stop(t + 0.24);
+}
+function swoosh(dur, vol) {
+  const c = ac(); if (!c) return;
+  dur = dur || 0.5; vol = vol == null ? 0.09 : vol;
+  const len = Math.floor(c.sampleRate * dur);
+  const buf = c.createBuffer(1, len, c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = c.createBufferSource(); src.buffer = buf;
+  const f = c.createBiquadFilter(); f.type = 'bandpass';
+  f.frequency.setValueAtTime(500, c.currentTime);
+  f.frequency.linearRampToValueAtTime(1700, c.currentTime + dur);
+  f.Q.value = 2;
+  const g = c.createGain(); g.gain.setValueAtTime(vol, c.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+  src.connect(f); f.connect(g); g.connect(c.destination);
+  src.start();
+}
+function arp(notes, step, type) {
+  notes.forEach((n, i) => tone(n, 0.3, type || 'triangle', 0.16, i * (step || 0.09)));
+}
+function fanfare() {
+  arp([523, 659, 784, 1047, 1319], 0.11, 'triangle');
+  arp([392, 523, 659, 784], 0.11, 'sine');
+  tone(1568, 0.9, 'triangle', 0.13, 0.56);
+}
+
+/* ============================================================
+   COLOR — subtractive RYB mixing (blue + yellow = green)
+   Trilinear interpolation over the RYB colour cube.
+   ============================================================ */
+const RYB_CUBE = {
+  k000: [1.000, 1.000, 1.000],  // nothing  -> white
+  k100: [0.950, 0.130, 0.160],  // R        -> red
+  k010: [1.000, 0.930, 0.150],  // Y        -> yellow
+  k001: [0.100, 0.290, 0.760],  // B        -> blue
+  k110: [1.000, 0.540, 0.070],  // R+Y      -> orange
+  k101: [0.520, 0.130, 0.620],  // R+B      -> purple
+  k011: [0.130, 0.700, 0.250],  // Y+B      -> green
+  k111: [0.230, 0.150, 0.090]   // R+Y+B    -> brown/black
+};
+function rybToRgb(r, y, b) {
+  const C = RYB_CUBE, out = [];
+  const w000 = (1 - r) * (1 - y) * (1 - b), w100 = r * (1 - y) * (1 - b),
+        w010 = (1 - r) * y * (1 - b), w001 = (1 - r) * (1 - y) * b,
+        w110 = r * y * (1 - b), w101 = r * (1 - y) * b,
+        w011 = (1 - r) * y * b, w111 = r * y * b;
+  for (let i = 0; i < 3; i++) {
+    const v = C.k000[i] * w000 + C.k100[i] * w100 + C.k010[i] * w010 + C.k001[i] * w001 +
+              C.k110[i] * w110 + C.k101[i] * w101 + C.k011[i] * w011 + C.k111[i] * w111;
+    out.push(Math.max(0, Math.min(255, Math.round(v * 255))));
+  }
+  return out;
+}
+function lerp3(a, b, t) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t].map(v => Math.round(v));
+}
+/** recipe: {r,y,b,w,k} drop counts -> [R,G,B] */
+function mixColor(rec) {
+  const r = rec.r || 0, y = rec.y || 0, b = rec.b || 0, w = rec.w || 0, k = rec.k || 0;
+  const m = Math.max(r, y, b);
+  let rgb;
+  if (m === 0) {
+    rgb = [252, 252, 255];               // just white / nothing
+  } else {
+    rgb = rybToRgb(r / m, y / m, b / m);
+  }
+  if (w > 0) rgb = lerp3(rgb, [255, 255, 255], 1 - Math.pow(0.55, w));
+  if (k > 0) rgb = lerp3(rgb, [26, 20, 34], 1 - Math.pow(0.55, k));
+  return rgb;
+}
+function css(rgb, a) { return a == null ? 'rgb(' + rgb.join(',') + ')' : 'rgba(' + rgb.join(',') + ',' + a + ')'; }
+function totalDrops(rec) { return (rec.r || 0) + (rec.y || 0) + (rec.b || 0) + (rec.w || 0) + (rec.k || 0); }
+/** perceptual-ish distance, normalised roughly to 0..1 */
+function colorDist(a, b) {
+  const dr = (a[0] - b[0]) / 255, dg = (a[1] - b[1]) / 255, db = (a[2] - b[2]) / 255;
+  return Math.sqrt((2 * dr * dr + 4 * dg * dg + 3 * db * db) / 9);
+}
+
+const INKS = [
+  { key: 'r', name: 'Red',    rgb: [235, 45, 55] },
+  { key: 'y', name: 'Yellow', rgb: [255, 214, 40] },
+  { key: 'b', name: 'Blue',   rgb: [40, 90, 215] },
+  { key: 'w', name: 'White',  rgb: [255, 255, 255] },
+  { key: 'k', name: 'Black',  rgb: [40, 34, 48] }
+];
+const INK_BY_KEY = {};
+INKS.forEach(i => INK_BY_KEY[i.key] = i);
+
+const NAMES = [
+  ['Red', { r: 1 }], ['Yellow', { y: 1 }], ['Blue', { b: 1 }],
+  ['Orange', { r: 1, y: 1 }], ['Green', { y: 1, b: 1 }], ['Purple', { r: 1, b: 1 }],
+  ['Pink', { r: 1, w: 1 }], ['Sky Blue', { b: 1, w: 1 }], ['Mint', { y: 1, b: 1, w: 1 }],
+  ['Peach', { r: 1, y: 1, w: 1 }], ['Lavender', { r: 1, b: 1, w: 1 }],
+  ['Sunset', { r: 2, y: 1 }], ['Lime', { y: 2, b: 1 }], ['Teal', { y: 1, b: 2 }],
+  ['Berry', { r: 2, b: 1 }], ['Grape', { r: 1, b: 2 }], ['Chocolate', { r: 1, y: 1, b: 1 }],
+  ['Midnight', { r: 1, b: 1, k: 1 }], ['Forest', { y: 1, b: 1, k: 1 }],
+  ['Brick', { r: 1, y: 1, k: 1 }], ['Snow White', { w: 1 }], ['Ink Black', { k: 1 }],
+  ['Cloud', { r: 1, y: 1, b: 1, w: 3 }], ['Water', {} ]
+];
+const NAME_RGB = NAMES.map(n => ({ name: n[0], rgb: mixColor(n[1]) }));
+function nameOf(rgb) {
+  let best = NAME_RGB[0], bd = 99;
+  for (const n of NAME_RGB) { const d = colorDist(rgb, n.rgb); if (d < bd) { bd = d; best = n; } }
+  return best.name;
+}
+
+/* ============================================================
+   ORDERS
+   ============================================================ */
+const ORDERS = [
+  { pal: '🐸', name: 'Red',       rec: { r: 1 },              line: 'A big bright RED, please!' },
+  { pal: '🐧', name: 'Blue',      rec: { b: 1 },              line: 'Something cool and BLUE!' },
+  { pal: '🦊', name: 'Orange',    rec: { r: 1, y: 1 },        line: 'Red and yellow... make ORANGE!' },
+  { pal: '🐢', name: 'Green',     rec: { y: 1, b: 1 },        line: 'Blue plus yellow makes my GREEN!' },
+  { pal: '🐙', name: 'Purple',    rec: { r: 1, b: 1 },        line: 'Red and blue, please — PURPLE!' },
+  { pal: '🐷', name: 'Pink',      rec: { r: 1, w: 1 },        line: 'Red plus white gives me PINK!' },
+  { pal: '🐳', name: 'Sky Blue',  rec: { b: 1, w: 1 },        line: 'A soft sky blue, nice and light.' },
+  { pal: '🦋', name: 'Mint',      rec: { y: 1, b: 1, w: 1 },  line: 'Green... but sprinkled with white!' },
+  { pal: '🦁', name: 'Sunset',    rec: { r: 2, y: 1 },        line: 'Extra red in my orange, please!' },
+  { pal: '🐛', name: 'Lime',      rec: { y: 2, b: 1 },        line: 'Green with lots of yellow!' },
+  { pal: '🐻', name: 'Chocolate', rec: { r: 1, y: 1, b: 1 },  line: 'All three colors make my brown!' },
+  { pal: '🦉', name: 'Midnight',  rec: { r: 1, b: 1, k: 1 },  line: 'Purple, then darken it. Spooky!' }
+];
+const WIN_LINES = ['Perfect! ⭐', 'Wow, exactly right! ⭐', 'That is MY color! ⭐', 'Beautiful! ⭐'];
+const CLOSE_LINES = ['Ooh, so close — I love it! 💜', 'Lovely! Close enough for me! 💚', 'Pretty! That works! 💛'];
+const MISS_LINES = ['Hmm, not quite yet — try again! 😊', 'Nice color! But not mine. Keep going! 💫',
+  'Almost! Wash the pot and mix again. 🧼', 'Great try! Let\'s mix a new one. ✨'];
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const BEST_KEY = 'cowork-potionpals-best';
+const S = {
+  mode: 'orders',       // 'orders' | 'free'
+  idx: 0,
+  drops: [],            // array of ink keys
+  stars: 0,
+  misses: 0,
+  done: [],             // rgb of served potions
+  shelf: [],
+  busy: false,
+  playing: false
+};
+
+/* ============================================================
+   DOM
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const elPal = $('pal'), elSay = $('say'), elTarget = $('target'), elTargetLbl = $('target-lbl');
+const elQueue = $('queue'), elBottles = $('bottles'), elHint = $('hint'), elShelf = $('shelf');
+const elServe = $('btn-serve'), elUndo = $('btn-undo'), elWash = $('btn-wash'), elMode = $('btn-mode');
+const elProg = $('chip-progress'), elStars = $('chip-stars'), elFlash = $('flash');
+
+INKS.forEach(ink => {
+  const b = document.createElement('button');
+  b.className = 'bottle';
+  b.dataset.key = ink.key;
+  b.innerHTML = '<span class="blob" style="background:' + css(ink.rgb) + '"></span><span>' + ink.name + '</span>';
+  b.addEventListener('click', () => addDrop(ink.key, b));
+  elBottles.appendChild(b);
+});
+
+/* ============================================================
+   CAULDRON CANVAS
+   ============================================================ */
+const pot = $('pot'), pctx = pot.getContext('2d');
+let PW = 0, PH = 0, DPR = 1;
+function sizePot() {
+  const r = pot.parentElement.getBoundingClientRect();
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  PW = Math.max(120, r.width); PH = Math.max(110, r.height);
+  pot.width = PW * DPR; pot.height = PH * DPR;
+  pot.style.width = PW + 'px'; pot.style.height = PH + 'px';
+  pctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+
+let bubbles = [], splashes = [];
+let liquid = [252, 252, 255], liquidTarget = [252, 252, 255];
+let shake = 0, glow = 0;
+
+/** shared cauldron geometry — keeps drawing + physics in sync, pot centred in its stage */
+function geo() {
+  const rw = Math.min(PW * 0.42, PH * 0.46);
+  const cy = PH * 0.5 - rw * 0.10;
+  const surfaceY = cy - rw * 0.52;
+  return { cx: PW / 2, cy: cy, rw: rw, surfaceY: surfaceY, fillTop: surfaceY + rw * 0.16 };
+}
+
+function spawnSplash(rgb) {
+  const g = geo(), cx = g.cx, cy = g.fillTop;
+  for (let i = 0; i < 16; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 1.4 + Math.random() * 3.4;
+    splashes.push({ x: cx + (Math.random() - 0.5) * 40, y: cy, vx: Math.cos(a) * sp, vy: -Math.abs(Math.sin(a) * sp) - 1.6,
+      r: 2 + Math.random() * 4, life: 1, c: rgb });
+  }
+  glow = 1;
+}
+function drawPot(t) {
+  pctx.clearRect(0, 0, PW, PH);
+  liquid = lerp3(liquid, liquidTarget, 0.16);
+
+  const G = geo();
+  const cx = G.cx, rw = G.rw, cy = G.cy, surfaceY = G.surfaceY;
+  const sx = shake > 0 ? Math.sin(t / 22) * shake * 7 : 0;
+  const empty = S.drops.length === 0;
+
+  pctx.save();
+  pctx.translate(sx, 0);
+
+  // glow behind
+  if (glow > 0) {
+    const g = pctx.createRadialGradient(cx, cy, rw * 0.2, cx, cy, rw * 1.7);
+    g.addColorStop(0, css(liquid, 0.42 * glow));
+    g.addColorStop(1, css(liquid, 0));
+    pctx.fillStyle = g;
+    pctx.fillRect(0, 0, PW, PH);
+  }
+
+  // pot body
+  pctx.beginPath();
+  pctx.moveTo(cx - rw, surfaceY);
+  pctx.quadraticCurveTo(cx - rw * 1.12, cy + rw * 0.62, cx, cy + rw * 0.72);
+  pctx.quadraticCurveTo(cx + rw * 1.12, cy + rw * 0.62, cx + rw, surfaceY);
+  pctx.closePath();
+  const pg = pctx.createLinearGradient(cx - rw, 0, cx + rw, 0);
+  pg.addColorStop(0, '#241436'); pg.addColorStop(0.42, '#4a2f6e');
+  pg.addColorStop(0.62, '#3a2456'); pg.addColorStop(1, '#1c0f2c');
+  pctx.fillStyle = pg; pctx.fill();
+
+  // liquid (clipped to pot interior)
+  pctx.save();
+  pctx.beginPath();
+  pctx.moveTo(cx - rw * 0.92, surfaceY);
+  pctx.quadraticCurveTo(cx - rw * 1.02, cy + rw * 0.52, cx, cy + rw * 0.62);
+  pctx.quadraticCurveTo(cx + rw * 1.02, cy + rw * 0.52, cx + rw * 0.92, surfaceY);
+  pctx.closePath();
+  pctx.clip();
+
+  const fillTop = G.fillTop;
+  pctx.beginPath();
+  pctx.moveTo(cx - rw, PH);
+  pctx.lineTo(cx - rw, fillTop);
+  for (let x = -rw; x <= rw; x += 4) {
+    const wy = fillTop + Math.sin((x / rw) * 3.1 + t / 340) * 3.4 + Math.sin((x / rw) * 6.4 - t / 220) * 1.8;
+    pctx.lineTo(cx + x, wy);
+  }
+  pctx.lineTo(cx + rw, PH);
+  pctx.closePath();
+  const lg = pctx.createLinearGradient(0, fillTop, 0, cy + rw * 0.7);
+  if (empty) {
+    // nothing mixed yet — plain clear water, never mistaken for the White ink
+    lg.addColorStop(0, 'rgba(180,225,255,0.30)');
+    lg.addColorStop(0.45, 'rgba(140,195,240,0.34)');
+    lg.addColorStop(1, 'rgba(70,110,175,0.40)');
+  } else {
+    lg.addColorStop(0, css(lerp3(liquid, [255, 255, 255], 0.28)));
+    lg.addColorStop(0.45, css(liquid));
+    lg.addColorStop(1, css(lerp3(liquid, [0, 0, 0], 0.35)));
+  }
+  pctx.fillStyle = lg; pctx.fill();
+
+  // bubbles inside liquid
+  for (const b of bubbles) {
+    pctx.beginPath();
+    pctx.arc(cx + b.x, b.y, b.r, 0, 6.284);
+    pctx.fillStyle = 'rgba(255,255,255,' + (0.10 + b.a * 0.30) + ')';
+    pctx.fill();
+    pctx.strokeStyle = 'rgba(255,255,255,' + (0.16 + b.a * 0.34) + ')';
+    pctx.lineWidth = 1.2; pctx.stroke();
+  }
+  pctx.restore();
+
+  // rim
+  pctx.beginPath();
+  pctx.ellipse(cx, surfaceY, rw, rw * 0.20, 0, 0, 6.284);
+  pctx.strokeStyle = '#6b48a0'; pctx.lineWidth = 7; pctx.stroke();
+  pctx.strokeStyle = '#9d78d6'; pctx.lineWidth = 2.6; pctx.stroke();
+
+  // shine
+  pctx.beginPath();
+  pctx.ellipse(cx - rw * 0.42, cy + rw * 0.02, rw * 0.12, rw * 0.26, -0.32, 0, 6.284);
+  pctx.fillStyle = 'rgba(255,255,255,0.10)'; pctx.fill();
+
+  // splash particles
+  for (const s of splashes) {
+    pctx.globalAlpha = Math.max(0, s.life);
+    pctx.beginPath(); pctx.arc(s.x + sx, s.y, s.r, 0, 6.284);
+    pctx.fillStyle = css(s.c); pctx.fill();
+    pctx.globalAlpha = 1;
+  }
+
+  pctx.restore();
+}
+
+function stepPot(dt, t) {
+  const G = geo();
+  if (Math.random() < 0.09 && bubbles.length < 22) {
+    bubbles.push({ x: (Math.random() - 0.5) * G.rw * 1.4, y: G.cy + G.rw * 0.5, r: 2 + Math.random() * 5, a: Math.random(), v: 0.25 + Math.random() * 0.6 });
+  }
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    b.y -= b.v * dt * 0.06;
+    b.x += Math.sin(t / 300 + b.y / 22) * 0.25;
+    if (b.y < G.fillTop) bubbles.splice(i, 1);
+  }
+  for (let i = splashes.length - 1; i >= 0; i--) {
+    const s = splashes[i];
+    s.x += s.vx * dt * 0.06; s.y += s.vy * dt * 0.06; s.vy += 0.14 * dt * 0.06;
+    s.life -= 0.016 * dt * 0.06 * 3;
+    if (s.life <= 0) splashes.splice(i, 1);
+  }
+  if (shake > 0) shake = Math.max(0, shake - dt * 0.004);
+  if (glow > 0) glow = Math.max(0, glow - dt * 0.0016);
+}
+
+/* ============================================================
+   BACKGROUND SPARKLE STARS
+   ============================================================ */
+const bgc = $('stars-bg'), bctx = bgc.getContext('2d');
+let bgStars = [];
+function sizeBg() {
+  bgc.width = window.innerWidth; bgc.height = window.innerHeight;
+  bgStars = [];
+  const n = Math.round(window.innerWidth * window.innerHeight / 16000);
+  for (let i = 0; i < n; i++) {
+    bgStars.push({ x: Math.random() * bgc.width, y: Math.random() * bgc.height, r: 0.6 + Math.random() * 1.8, p: Math.random() * 6.28, s: 0.6 + Math.random() });
+  }
+}
+function drawBg(t) {
+  bctx.clearRect(0, 0, bgc.width, bgc.height);
+  for (const s of bgStars) {
+    const a = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin(t / 700 * s.s + s.p));
+    bctx.beginPath(); bctx.arc(s.x, s.y, s.r, 0, 6.284);
+    bctx.fillStyle = 'rgba(255,240,255,' + a + ')'; bctx.fill();
+  }
+}
+
+/* ============================================================
+   CONFETTI FX
+   ============================================================ */
+const fx = $('fx'), fctx = fx.getContext('2d');
+let conf = [];
+function sizeFx() { fx.width = window.innerWidth; fx.height = window.innerHeight; }
+function confetti(n, tint) {
+  n = n || 70;
+  const cols = tint ? [css(tint), '#ffd85e', '#ff86c8', '#5ff0c4', '#ffffff'] : ['#ffd85e', '#ff9f43', '#ff86c8', '#5ff0c4', '#8ecaff', '#ffffff'];
+  for (let i = 0; i < n; i++) {
+    conf.push({
+      x: fx.width * (0.15 + Math.random() * 0.7),
+      y: fx.height * 0.42 + (Math.random() - 0.5) * 60,
+      vx: (Math.random() - 0.5) * 9,
+      vy: -5 - Math.random() * 9,
+      w: 5 + Math.random() * 8, h: 6 + Math.random() * 10,
+      rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.3,
+      c: cols[(Math.random() * cols.length) | 0], life: 1
+    });
+  }
+}
+function stepFx(dt) {
+  fctx.clearRect(0, 0, fx.width, fx.height);
+  const f = dt * 0.06;
+  for (let i = conf.length - 1; i >= 0; i--) {
+    const p = conf[i];
+    p.x += p.vx * f; p.y += p.vy * f; p.vy += 0.42 * f; p.vx *= 0.994;
+    p.rot += p.vr * f; p.life -= 0.006 * f;
+    if (p.life <= 0 || p.y > fx.height + 40) { conf.splice(i, 1); continue; }
+    fctx.save();
+    fctx.translate(p.x, p.y); fctx.rotate(p.rot);
+    fctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.6));
+    fctx.fillStyle = p.c;
+    fctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    fctx.restore();
+  }
+}
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+let last = 0;
+function loop(t) {
+  const dt = Math.min(40, t - last || 16); last = t;
+  stepPot(dt, t); drawPot(t);
+  drawBg(t);
+  stepFx(dt);
+  requestAnimationFrame(loop);
+}
+
+function resizeAll() { sizePot(); sizeBg(); sizeFx(); }
+window.addEventListener('resize', resizeAll);
+window.addEventListener('orientationchange', () => setTimeout(resizeAll, 250));
+
+/* ============================================================
+   GAME LOGIC
+   ============================================================ */
+function recipe() {
+  const r = {};
+  S.drops.forEach(k => r[k] = (r[k] || 0) + 1);
+  return r;
+}
+function currentColor() { return mixColor(recipe()); }
+
+function renderQueue() {
+  elQueue.innerHTML = '';
+  if (!S.drops.length) {
+    const e = document.createElement('span');
+    e.className = 'empty';
+    e.textContent = S.mode === 'free' ? 'tap colors to invent a potion' : 'tap a color to add a drop';
+    elQueue.appendChild(e);
+    return;
+  }
+  S.drops.forEach(k => {
+    const d = document.createElement('span');
+    d.className = 'qd';
+    d.style.background = css(INK_BY_KEY[k].rgb);
+    elQueue.appendChild(d);
+  });
+}
+
+function refresh() {
+  liquidTarget = currentColor();
+  renderQueue();
+  const n = S.drops.length;
+  elUndo.disabled = n === 0;
+  elWash.disabled = n === 0;
+  if (S.mode === 'free') {
+    elServe.disabled = n === 0;
+    elServe.textContent = '🍾 Bottle It!';
+    elSay.textContent = n === 0 ? 'Mix anything you like! I will name it. 🎨'
+                                : 'That is ' + nameOf(currentColor()) + '!';
+    elTarget.style.background = css(currentColor());
+  } else {
+    elServe.textContent = 'SERVE!';
+    elServe.disabled = n === 0 || S.busy;
+    elServe.classList.toggle('pulse', n > 0 && !S.busy);
+  }
+}
+
+function addDrop(key, btn) {
+  if (S.busy) return;
+  if (S.drops.length >= 9) { swoosh(0.2, 0.05); return; }
+  S.drops.push(key);
+  if (btn) { btn.classList.remove('ping'); void btn.offsetWidth; btn.classList.add('ping'); }
+  refresh();
+  spawnSplash(INK_BY_KEY[key].rgb);
+  blip(300 + S.drops.length * 55);
+}
+
+elUndo.addEventListener('click', () => {
+  if (S.busy || !S.drops.length) return;
+  S.drops.pop(); refresh();
+  tone(420, 0.12, 'triangle', 0.13);
+});
+elWash.addEventListener('click', () => {
+  if (S.busy || !S.drops.length) return;
+  wash();
+});
+function wash() {
+  S.drops = []; refresh();
+  bubbles = []; swoosh(0.55, 0.10);
+}
+
+function setOrder() {
+  const o = ORDERS[S.idx];
+  S.misses = 0;
+  elHint.classList.remove('on');
+  elPal.textContent = o.pal;
+  elSay.textContent = o.line;
+  elTarget.style.background = css(mixColor(o.rec));
+  elTargetLbl.textContent = 'wants';
+  elProg.textContent = '🧪 ' + (S.idx + 1) + '/12';
+  elStars.textContent = '⭐ ' + S.stars;
+  wash();
+  refresh();
+}
+
+function showHint() {
+  const rec = ORDERS[S.idx].rec;
+  elHint.innerHTML = '<span>Try:</span>';
+  INKS.forEach(ink => {
+    const n = rec[ink.key] || 0;
+    for (let i = 0; i < n; i++) {
+      const d = document.createElement('span');
+      d.className = 'hdot';
+      d.style.background = css(ink.rgb);
+      elHint.appendChild(d);
+    }
+  });
+  elHint.classList.add('on');
+}
+
+function flash(text, color) {
+  elFlash.textContent = text;
+  elFlash.style.color = color || 'var(--gold)';
+  elFlash.classList.remove('show'); void elFlash.offsetWidth; elFlash.classList.add('show');
+}
+
+elServe.addEventListener('click', () => {
+  if (S.busy || !S.drops.length) return;
+  if (S.mode === 'free') { bottleIt(); return; }
+  serve();
+});
+
+function serve() {
+  S.busy = true;
+  elServe.classList.remove('pulse');
+  const mine = currentColor();
+  const want = mixColor(ORDERS[S.idx].rec);
+  const d = colorDist(mine, want);
+  swoosh(0.45, 0.10);
+
+  // 0.13 keeps the ratio orders honest: plain orange must not pass for Sunset (2 red + 1 yellow)
+  if (d < 0.13) {
+    // success
+    const perfect = d < 0.045;
+    const st = perfect ? 3 : (d < 0.09 ? 2 : 1);
+    S.stars += st;
+    S.done.push(mine);
+    elPal.classList.remove('cheer'); void elPal.offsetWidth; elPal.classList.add('cheer');
+    elSay.textContent = (perfect ? WIN_LINES[(Math.random() * WIN_LINES.length) | 0]
+                                 : CLOSE_LINES[(Math.random() * CLOSE_LINES.length) | 0]);
+    elStars.textContent = '⭐ ' + S.stars;
+    flash('★'.repeat(st) + (perfect ? ' PERFECT!' : ''), css(mine));
+    confetti(perfect ? 90 : 55, mine);
+    arp(perfect ? [523, 659, 784, 1047] : [440, 554, 659], 0.09);
+    setTimeout(() => {
+      S.busy = false;
+      S.idx++;
+      if (S.idx >= ORDERS.length) win();
+      else setOrder();
+    }, 1500);
+  } else {
+    // gentle retry — never a loss
+    shake = 1;
+    S.misses++;
+    elSay.textContent = MISS_LINES[(Math.random() * MISS_LINES.length) | 0];
+    tone(300, 0.18, 'sine', 0.12);
+    tone(240, 0.24, 'sine', 0.12, 0.12);
+    if (S.misses >= 2) showHint();
+    setTimeout(() => { wash(); S.busy = false; refresh(); }, 900);
+  }
+}
+
+function win() {
+  const shelf = $('final-shelf');
+  shelf.innerHTML = '';
+  S.done.forEach((c, i) => {
+    const b = document.createElement('div');
+    b.style.background = css(c);
+    b.style.animation = 'pop 0.4s ease-out ' + (i * 0.07) + 's backwards';
+    shelf.appendChild(b);
+  });
+  $('win-stars').textContent = '⭐ ' + S.stars + ' stars out of 36';
+  let best = 0;
+  try { best = parseInt(localStorage.getItem(BEST_KEY) || '0', 10) || 0; } catch (e) {}
+  if (S.stars > best) {
+    best = S.stars;
+    try { localStorage.setItem(BEST_KEY, String(best)); } catch (e) {}
+    $('win-best').textContent = '🎉 New best!';
+  } else {
+    $('win-best').textContent = 'Best ever: ⭐ ' + best;
+  }
+  $('ov-win').classList.add('on');
+  fanfare();
+  confetti(150);
+  setTimeout(() => confetti(120), 600);
+  setTimeout(() => confetti(120), 1200);
+}
+
+/* ---------- free mix ---------- */
+function bottleIt() {
+  const c = currentColor();
+  S.shelf.push(c);
+  if (S.shelf.length > 14) S.shelf.shift();
+  renderShelf();
+  confetti(30, c);
+  arp([659, 880, 1047], 0.07);
+  flash(nameOf(c) + '!', css(c));
+  wash();
+  refresh();
+}
+function renderShelf() {
+  elShelf.innerHTML = '<span class="lbl">shelf:</span>';
+  S.shelf.forEach(c => {
+    const v = document.createElement('div');
+    v.className = 'sv';
+    v.style.background = css(c);
+    elShelf.appendChild(v);
+  });
+}
+
+/* ---------- modes ---------- */
+function startOrders() {
+  S.mode = 'orders'; S.idx = 0; S.stars = 0; S.done = []; S.busy = false;
+  elShelf.classList.remove('on');
+  elMode.textContent = '🎨';
+  elTargetLbl.textContent = 'wants';
+  $('ov-start').classList.remove('on');
+  $('ov-win').classList.remove('on');
+  S.playing = true;
+  resizeAll();
+  setOrder();
+}
+function startFree() {
+  S.mode = 'free'; S.busy = false;
+  elShelf.classList.add('on');
+  elMode.textContent = '🧪';
+  elPal.textContent = '🧙';
+  elProg.textContent = '🎨 Free Mix';
+  elStars.textContent = '⭐ ' + S.stars;
+  elTargetLbl.textContent = 'yours';
+  elHint.classList.remove('on');
+  elServe.classList.remove('pulse');
+  $('ov-start').classList.remove('on');
+  $('ov-win').classList.remove('on');
+  S.playing = true;
+  renderShelf();
+  resizeAll();
+  wash();
+  refresh();
+}
+
+elMode.addEventListener('click', () => {
+  ac();
+  if (S.mode === 'free') startOrders(); else startFree();
+});
+$('btn-play').addEventListener('click', () => { ac(); tone(660, 0.2, 'triangle', 0.16); startOrders(); });
+$('btn-free').addEventListener('click', () => { ac(); tone(660, 0.2, 'triangle', 0.16); startFree(); });
+$('btn-again').addEventListener('click', () => { ac(); startOrders(); });
+$('btn-free2').addEventListener('click', () => { ac(); startFree(); });
+
+// unlock audio on the very first touch anywhere
+document.addEventListener('pointerdown', function once() {
+  ac();
+  document.removeEventListener('pointerdown', once);
+}, { passive: true });
+
+/* ---------- boot ---------- */
+resizeAll();
+refresh();
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>

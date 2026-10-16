@@ -1,0 +1,1354 @@
+<!-- CONCEPT: BUILDING & STACKING - Domino Party: drag your finger across the party floor to lay a trail of perfectly spaced rainbow dominoes, then press GO so Dot the dog boops the first one and a colour wave topples the whole run into bells, balloons, drums, ducks and cakes; eight missions with curvy routes, forking waves and no-go puddles, plus an unlimited Free Play floor. Ages 4-11, no timer, no losing. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Domino Party</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --sky1: #7be0f5;
+  --sky2: #ffd86b;
+  --floor: #fff7e6;
+  --floor2: #ffe9c4;
+  --ink: #3f2b52;
+  --ink-soft: #6b5580;
+  --panel: rgba(255, 255, 255, 0.86);
+  --go1: #5ed95e;
+  --go2: #21b84f;
+  --hot1: #ff5a7a;
+  --hot2: #ff9a3c;
+  --pad: clamp(6px, 2vw, 14px);
+  --r: 18px;
+}
+
+html, body {
+  margin: 0; padding: 0;
+  width: 100%; height: 100%;
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  font-family: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+  color: var(--ink);
+  background: linear-gradient(160deg, var(--sky1), var(--sky2));
+}
+
+#wrap {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  gap: var(--pad);
+  padding: var(--pad);
+}
+
+/* ---------- top bar ---------- */
+#bar {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--panel);
+  border-radius: var(--r);
+  padding: 6px 8px;
+  box-shadow: 0 4px 0 rgba(63, 43, 82, 0.18);
+}
+#lvlBadge {
+  min-width: 46px; height: 46px;
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, var(--hot1), var(--hot2));
+  color: #fff;
+  font-size: clamp(16px, 4.4vw, 22px);
+  font-weight: bold;
+  padding: 0 8px;
+  text-shadow: 0 2px 2px rgba(0,0,0,.2);
+}
+#trayBox {
+  display: flex; align-items: center; gap: 4px;
+  height: 46px; padding: 0 12px 0 8px;
+  border-radius: 14px;
+  background: #fff;
+  border: 3px solid #ffe14d;
+  font-size: clamp(16px, 4.6vw, 24px);
+  font-weight: bold;
+}
+#trayPips { font-size: 1.15em; letter-spacing: -2px; }
+#spacer { flex: 1 1 auto; }
+.mini {
+  width: 46px; height: 46px;
+  min-width: 46px;
+  border: none; border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 4px 0 #d9c9b0;
+  font-size: 22px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit;
+}
+.mini:active { transform: translateY(3px); box-shadow: 0 1px 0 #d9c9b0; }
+
+/* ---------- stage ---------- */
+#stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: var(--r);
+  overflow: hidden;
+}
+#cv {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  touch-action: none;
+}
+#toast {
+  position: absolute;
+  left: 50%; bottom: 10px;
+  transform: translateX(-50%);
+  max-width: 94%;
+  background: rgba(63, 43, 82, 0.88);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: clamp(13px, 3.6vw, 18px);
+  text-align: center;
+  opacity: 0;
+  transition: opacity .25s;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#toast.show { opacity: 1; }
+
+/* ---------- footer ---------- */
+#foot { flex: 0 0 auto; display: flex; gap: 8px; }
+#btnGo {
+  flex: 1 1 auto;
+  height: clamp(64px, 13vh, 88px);
+  border: none;
+  border-radius: var(--r);
+  background: linear-gradient(160deg, var(--go1), var(--go2));
+  color: #fff;
+  font-family: inherit;
+  font-size: clamp(24px, 7vw, 38px);
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-shadow: 0 3px 3px rgba(0,0,0,.25);
+  box-shadow: 0 6px 0 #158a3a;
+  cursor: pointer;
+}
+#btnGo:active { transform: translateY(4px); box-shadow: 0 2px 0 #158a3a; }
+#btnGo.busy { filter: grayscale(.55) brightness(1.05); }
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: absolute; inset: 0;
+  z-index: 20;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 14px;
+  padding: 18px;
+  background: linear-gradient(160deg, #6fd8f2, #ffcf5e);
+  overflow-y: auto;
+}
+.overlay.hidden { display: none; }
+/* the win overlay stays see-through so the toppled run and the
+   confetti are still visible behind the celebration */
+#win {
+  background: rgba(63, 43, 82, 0.55);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+#win #winMsg { color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.45); }
+h1 {
+  margin: 0;
+  font-size: clamp(30px, 10vw, 54px);
+  line-height: 1;
+  text-align: center;
+  background: linear-gradient(90deg, #ff2d62, #ff7a1f, #12a5d8, #7b3fe4);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 3px 0 rgba(255,255,255,.85));
+}
+.sub {
+  margin: 0;
+  font-size: clamp(14px, 4vw, 20px);
+  text-align: center;
+  color: var(--ink);
+  max-width: 24em;
+}
+#tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 460px;
+}
+.tile {
+  aspect-ratio: 1 / 1;
+  min-height: 62px;
+  border: none;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 5px 0 rgba(63,43,82,.25);
+  font-family: inherit;
+  cursor: pointer;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 1px;
+  padding: 2px;
+}
+.tile:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(63,43,82,.25); }
+.tile .num { font-size: clamp(18px, 5.4vw, 26px); font-weight: bold; line-height: 1; }
+.tile .ic { font-size: clamp(11px, 3.2vw, 15px); line-height: 1; }
+.tile .st { font-size: clamp(12px, 3.4vw, 16px); line-height: 1; height: 1.1em; }
+.tile.done { background: linear-gradient(160deg, #fff6c9, #ffe14d); }
+.big {
+  border: none;
+  border-radius: var(--r);
+  padding: 16px 26px;
+  min-height: 64px;
+  font-family: inherit;
+  font-size: clamp(18px, 5.4vw, 26px);
+  font-weight: bold;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(160deg, #9a7bff, #6a43e8);
+  box-shadow: 0 6px 0 #4f2fb5;
+  text-shadow: 0 2px 2px rgba(0,0,0,.2);
+}
+.big:active { transform: translateY(4px); box-shadow: 0 2px 0 #4f2fb5; }
+.big.green { background: linear-gradient(160deg, var(--go1), var(--go2)); box-shadow: 0 6px 0 #158a3a; }
+.big.green:active { box-shadow: 0 2px 0 #158a3a; }
+.big.pink { background: linear-gradient(160deg, #ff7bd5, #ff3d71); box-shadow: 0 6px 0 #c41d4c; }
+.big.pink:active { box-shadow: 0 2px 0 #c41d4c; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+#winArt { font-size: clamp(44px, 16vw, 90px); line-height: 1; }
+#winMsg { font-size: clamp(16px, 4.6vw, 24px); text-align: center; font-weight: bold; }
+
+@media (min-width: 620px) {
+  #tiles { grid-template-columns: repeat(4, 96px); }
+}
+</style>
+</head>
+<body>
+
+<div id="wrap">
+  <header id="bar">
+    <div id="lvlBadge">1</div>
+    <div id="trayBox"><span id="trayPips">🁢</span><span id="trayCount">18</span></div>
+    <div id="spacer"></div>
+    <button id="btnStand" class="mini" aria-label="Stand them up">🔁</button>
+    <button id="btnClear" class="mini" aria-label="Clear the floor">🧹</button>
+    <button id="btnMenu" class="mini" aria-label="Menu">🏠</button>
+  </header>
+
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div id="toast"></div>
+  </div>
+
+  <footer id="foot">
+    <button id="btnGo">GO!</button>
+  </footer>
+</div>
+
+<div id="menu" class="overlay">
+  <h1>Domino Party</h1>
+  <p class="sub">Drag your finger to lay a line of dominoes — then knock them all down! 🐶</p>
+  <div id="tiles"></div>
+  <button id="btnFree" class="big pink">🎉 Free Play Floor</button>
+</div>
+
+<div id="win" class="overlay hidden">
+  <div id="winArt">🎉</div>
+  <div id="winMsg">Party Time!</div>
+  <div class="row">
+    <button id="btnNext" class="big green">Next ▶</button>
+    <button id="btnAgain" class="big">Again 🔁</button>
+    <button id="btnHome" class="big pink">🏠</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   DOMINO PARTY
+   Virtual board is a fixed 100 x 150 portrait floor. Everything
+   (levels, dominoes, props) lives in those units; one uniform
+   scale maps it to the canvas so geometry is identical on every
+   screen size and the floor just gets letterboxed on wide ones.
+   ============================================================ */
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+const BW = 100, BH = 150;          // virtual floor size
+const H = 8;                       // domino height (standing)
+const DW = 5.4;                    // domino face width
+const DT = 2.5;                    // domino thickness (footprint depth)
+const SPACING = 6.0;               // gap between drag-laid dominoes
+const REACH = 8.8;                 // how far a falling domino can knock
+const MIN_GAP = 4.2;               // closest two dominoes may be placed
+const REACH_ANGLE = Math.PI * 0.42;// ~75 degrees of knock-over spread
+const FALL_MS = 190;               // how long one domino takes to fall
+const BOOP_R = 15;                 // how near Dot's paw the first one must be
+const PROP_R = 6.5;                // no-placing radius around a prop
+const HIT_R = 9.5;                 // how near a tip must land to set a prop off
+
+let view = { s: 1, ox: 0, oy: 0, w: 0, h: 0 };
+
+function fitCanvas() {
+  const r = cv.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  view.w = Math.max(1, r.width);
+  view.h = Math.max(1, r.height);
+  cv.width = Math.round(view.w * dpr);
+  cv.height = Math.round(view.h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  view.s = Math.min(view.w / BW, view.h / BH);
+  view.ox = (view.w - BW * view.s) / 2;
+  view.oy = (view.h - BH * view.s) / 2;
+}
+const SX = x => view.ox + x * view.s;
+const SY = y => view.oy + y * view.s;
+const SC = n => n * view.s;
+function toBoard(px, py) {
+  return { x: (px - view.ox) / view.s, y: (py - view.oy) / view.s };
+}
+
+/* ---------- props (the noisy things you knock over) ---------- */
+const PROPS = {
+  bell:    { emoji: '🔔', name: 'bell' },
+  balloon: { emoji: '🎈', name: 'balloon' },
+  drum:    { emoji: '🥁', name: 'drum' },
+  duck:    { emoji: '🦆', name: 'duck' },
+  cake:    { emoji: '🎂', name: 'cake' }
+};
+
+/* ---------- levels ----------
+   pools/beds are no-go zones. Every tray is ~1.9x the dominoes a
+   tidy route actually needs (measured by driving each level), so a
+   wobbly line never runs the floor dry -- and picking a domino back
+   up always refunds it anyway.                                   */
+const LEVELS = [
+  { tray: 20, start: { x: 13, y: 75 },
+    props: [{ x: 86, y: 75, kind: 'bell' }],
+    zones: [] },
+
+  { tray: 40, start: { x: 14, y: 128 },
+    props: [{ x: 86, y: 26, kind: 'drum' }],
+    zones: [{ t: 'bed', x: 50, y: 92, w: 30, h: 24 }] },
+
+  { tray: 50, start: { x: 50, y: 133 },
+    props: [{ x: 16, y: 32, kind: 'bell' }, { x: 84, y: 32, kind: 'balloon' }],
+    zones: [] },
+
+  { tray: 46, start: { x: 13, y: 20 },
+    props: [{ x: 87, y: 131, kind: 'cake' }],
+    zones: [{ t: 'pool', x: 50, y: 74, rx: 29, ry: 21 }] },
+
+  { tray: 50, start: { x: 50, y: 138 },
+    props: [{ x: 13, y: 96, kind: 'duck' }, { x: 50, y: 22, kind: 'bell' },
+            { x: 87, y: 96, kind: 'balloon' }],
+    zones: [] },
+
+  { tray: 64, start: { x: 11, y: 136 },
+    props: [{ x: 89, y: 120, kind: 'drum' }, { x: 16, y: 19, kind: 'cake' }],
+    zones: [{ t: 'pool', x: 36, y: 98, rx: 19, ry: 13 },
+            { t: 'pool', x: 74, y: 56, rx: 17, ry: 12 },
+            { t: 'bed', x: 28, y: 44, w: 30, h: 15 }] },
+
+  { tray: 66, start: { x: 50, y: 140 },
+    props: [{ x: 12, y: 64, kind: 'bell' }, { x: 88, y: 64, kind: 'balloon' },
+            { x: 50, y: 17, kind: 'duck' }],
+    zones: [{ t: 'bed', x: 50, y: 101, w: 42, h: 13 }] },
+
+  { tray: 78, start: { x: 50, y: 142 },
+    props: [{ x: 50, y: 20, kind: 'cake' }, { x: 12, y: 112, kind: 'bell' },
+            { x: 88, y: 112, kind: 'balloon' }, { x: 18, y: 44, kind: 'drum' },
+            { x: 82, y: 44, kind: 'duck' }],
+    zones: [{ t: 'pool', x: 50, y: 88, rx: 15, ry: 11 }] }
+];
+
+const FREE = {
+  free: true, tray: Infinity, start: { x: 50, y: 138 },
+  props: [{ x: 15, y: 105, kind: 'bell' }, { x: 85, y: 105, kind: 'balloon' },
+          { x: 15, y: 40, kind: 'drum' }, { x: 85, y: 40, kind: 'duck' },
+          { x: 50, y: 18, kind: 'cake' }],
+  zones: []
+};
+
+const DOM_COLORS = ['#ff5a7a', '#ffa62b', '#ffe14d', '#5ed95e',
+                    '#3fc5ff', '#9a7bff', '#ff7bd5'];
+
+/* ---------- game state ---------- */
+const S = {
+  screen: 'menu',      // menu | play
+  levelIdx: 0,
+  level: null,
+  doms: [],
+  props: [],
+  tray: 0,
+  phase: 'build',      // build | run | done
+  runStart: 0,
+  runEnd: 0,
+  boop: 0,             // timestamp of Dot's paw boop
+  hint: null,
+  particles: [],
+  rings: [],
+  floats: [],
+  drag: null,
+  stars: []
+};
+
+const SAVE_KEY = 'cowork-dominoparty-stars';
+function loadStars() {
+  try {
+    const v = JSON.parse(localStorage.getItem(SAVE_KEY) || '[]');
+    S.stars = Array.isArray(v) ? v.filter(n => typeof n === 'number') : [];
+  } catch (e) { S.stars = []; }
+}
+function saveStar(i) {
+  if (S.stars.includes(i)) return;
+  S.stars.push(i);
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S.stars)); } catch (e) {}
+}
+
+/* ---------- audio ---------- */
+let AC = null;
+function ac() {
+  if (!AC) {
+    const C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return null;
+    AC = new C();
+  }
+  if (AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(freq, dur, type, vol, delay, glideTo) {
+  const a = ac(); if (!a) return;
+  const t0 = a.currentTime + (delay || 0);
+  const o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(a.destination);
+  o.start(t0); o.stop(t0 + dur + 0.03);
+}
+function noise(dur, vol, hz, delay) {
+  const a = ac(); if (!a) return;
+  const t0 = a.currentTime + (delay || 0);
+  const n = Math.max(1, Math.floor(a.sampleRate * dur));
+  const buf = a.createBuffer(1, n, a.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const src = a.createBufferSource(); src.buffer = buf;
+  const bp = a.createBiquadFilter(); bp.type = 'bandpass';
+  bp.frequency.value = hz || 1800; bp.Q.value = 1.1;
+  const g = a.createGain(); g.gain.value = vol || 0.2;
+  src.connect(bp); bp.connect(g); g.connect(a.destination);
+  src.start(t0);
+}
+const PENTA = [392, 440, 494, 587, 659, 784, 880, 988, 1175];
+function sfxClack(i) {
+  noise(0.05, 0.13, 2600);
+  tone(PENTA[i % PENTA.length], 0.09, 'triangle', 0.13);
+}
+function sfxPlace() { tone(660, 0.05, 'square', 0.06); }
+function sfxPick() { tone(420, 0.06, 'sine', 0.07); }
+function sfxNope() { tone(200, 0.13, 'sine', 0.1, 0, 150); }
+function sfxBoop() { tone(520, 0.1, 'sine', 0.16, 0, 760); }
+function sfxProp(kind) {
+  if (kind === 'bell') {
+    tone(1568, 0.6, 'sine', 0.2); tone(2093, 0.5, 'sine', 0.1, 0.02);
+  } else if (kind === 'drum') {
+    tone(150, 0.26, 'sine', 0.3, 0, 60); noise(0.1, 0.18, 400);
+  } else if (kind === 'balloon') {
+    noise(0.14, 0.34, 900); tone(320, 0.08, 'square', 0.1, 0, 90);
+  } else if (kind === 'duck') {
+    tone(500, 0.1, 'sawtooth', 0.16, 0, 320);
+    tone(470, 0.12, 'sawtooth', 0.14, 0.14, 300);
+  } else {
+    [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.22, 'triangle', 0.16, i * 0.07));
+  }
+}
+function sfxWin() {
+  [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.42, 'triangle', 0.2, i * 0.1));
+  [0, 0.1, 0.2, 0.3].forEach(d => noise(0.2, 0.1, 3200, d + 0.05));
+}
+function sfxStand() {
+  noise(0.18, 0.12, 1500);
+  [392, 523, 659].forEach((f, i) => tone(f, 0.12, 'sine', 0.1, i * 0.05));
+}
+/* ============================================================
+   GEOMETRY + PLACEMENT
+   ============================================================ */
+
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+function inZone(p) {
+  for (const z of S.level.zones) {
+    if (z.t === 'pool') {
+      const dx = (p.x - z.x) / (z.rx + DT * 0.5);
+      const dy = (p.y - z.y) / (z.ry + DT * 0.5);
+      if (dx * dx + dy * dy <= 1) return z;
+    } else {
+      if (Math.abs(p.x - z.x) <= z.w / 2 + 1 && Math.abs(p.y - z.y) <= z.h / 2 + 1) return z;
+    }
+  }
+  return null;
+}
+
+/* Can a domino stand here? Returns a reason string, or null if fine. */
+function blockedAt(p) {
+  if (p.x < 3.5 || p.x > BW - 3.5 || p.y < 3.5 || p.y > BH - 3.5) return 'edge';
+  if (inZone(p)) return 'zone';
+  if (dist(p, S.level.start) < 8) return 'dot';
+  for (const pr of S.props) if (dist(p, pr) < PROP_R) return 'prop';
+  for (const d of S.doms) if (dist(p, d) < MIN_GAP) return 'close';
+  return null;
+}
+
+function domAt(p) {
+  let best = null, bd = 1e9;
+  for (const d of S.doms) {
+    const dd = dist(p, d);
+    if (dd < H * 0.62 && dd < bd) { bd = dd; best = d; }
+  }
+  return best;
+}
+
+function placeDom(p, ang) {
+  if (S.tray <= 0) return false;
+  if (blockedAt(p)) return false;
+  S.doms.push({
+    x: p.x, y: p.y,
+    ang: ang,                 // which way it faces / will topple
+    color: DOM_COLORS[S.doms.length % DOM_COLORS.length],
+    pips: 1 + (S.doms.length % 6),
+    born: performance.now(),
+    fall: null, played: false
+  });
+  if (S.tray !== Infinity) S.tray--;
+  updateHud();
+  return true;
+}
+
+/* A tapped domino has no travel direction, so aim it at whatever
+   it is most likely meant to knock: the last domino, else a prop. */
+function guessAngle(p) {
+  if (S.doms.length) {
+    const last = S.doms[S.doms.length - 1];
+    if (dist(p, last) < H * 3.4) return Math.atan2(p.y - last.y, p.x - last.x);
+  }
+  let best = null, bd = 1e9;
+  for (const pr of S.props) if (!pr.hit) { const d = dist(p, pr); if (d < bd) { bd = d; best = pr; } }
+  if (best) return Math.atan2(best.y - p.y, best.x - p.x);
+  return Math.atan2(BH * 0.4 - p.y, BW / 2 - p.x);
+}
+
+/* ============================================================
+   INPUT  (pointer events; canvas has touch-action:none so the
+   drag-to-lay gesture never turns into a page scroll)
+   ============================================================ */
+
+function evPoint(e) {
+  const r = cv.getBoundingClientRect();
+  return toBoard(e.clientX - r.left, e.clientY - r.top);
+}
+
+cv.addEventListener('pointerdown', e => {
+  if (S.screen !== 'play' || S.phase === 'run') return;
+  ac();
+  cv.setPointerCapture(e.pointerId);
+  const p = evPoint(e);
+  if (S.phase === 'done') restand(true);
+
+  // Touching a domino that is already standing is ambiguous: a tap
+  // means "pick it back up", but a drag means "start a new branch
+  // from here" -- which is how anyone naturally builds a fork. So
+  // hold the decision until pointerup, once the finger has spoken.
+  const hit = domAt(p);
+  if (hit && !hit.fall) {
+    S.drag = { last: p, start: p, moved: 0, placed: 0, over: hit };
+    return;
+  }
+
+  if (S.tray <= 0) { toast('No dominoes left — tap one to pick it up 🧹'); sfxNope(); return; }
+  const why = blockedAt(p);
+  if (why) {
+    S.drag = { last: p, start: p, moved: 0, placed: 0, over: null };
+    if (why === 'zone') { toast('Not on the puddle! 💧'); sfxNope(); }
+    return;
+  }
+  const ok = placeDom(p, guessAngle(p));
+  if (ok) sfxPlace();
+  S.drag = { last: p, start: p, moved: 0, placed: ok ? 1 : 0, over: null };
+});
+
+cv.addEventListener('pointermove', e => {
+  if (!S.drag || S.screen !== 'play' || S.phase === 'run') return;
+  const p = evPoint(e);
+  S.drag.moved = Math.max(S.drag.moved, dist(p, S.drag.start));
+  let guard = 0;
+  // walk toward the finger, dropping a domino every SPACING units
+  while (dist(p, S.drag.last) >= SPACING && guard++ < 24) {
+    const a = Math.atan2(p.y - S.drag.last.y, p.x - S.drag.last.x);
+    const np = { x: S.drag.last.x + Math.cos(a) * SPACING,
+                 y: S.drag.last.y + Math.sin(a) * SPACING };
+    S.drag.last = np;
+    if (S.tray <= 0) { S.drag = null; return; }
+    if (blockedAt(np)) continue;
+    if (placeDom(np, a)) { sfxPlace(); S.drag.placed++; }
+  }
+});
+
+function endDrag(e) {
+  // a tap that never became a drag, on a domino: pick it up and refund
+  if (S.drag && S.drag.over && !S.drag.placed && S.drag.moved < H * 0.45) {
+    const i = S.doms.indexOf(S.drag.over);
+    if (i >= 0) {
+      S.doms.splice(i, 1);
+      if (S.tray !== Infinity) S.tray++;
+      recolor();
+      sfxPick();
+      updateHud();
+    }
+  }
+  if (S.drag && cv.hasPointerCapture && e && e.pointerId !== undefined) {
+    try { cv.releasePointerCapture(e.pointerId); } catch (err) {}
+  }
+  S.drag = null;
+}
+cv.addEventListener('pointerup', endDrag);
+cv.addEventListener('pointercancel', endDrag);
+cv.addEventListener('pointerleave', endDrag);
+
+function recolor() {
+  S.doms.forEach((d, i) => { d.color = DOM_COLORS[i % DOM_COLORS.length]; });
+}
+/* ============================================================
+   THE TOPPLE
+   The whole cascade is solved at GO time by a breadth-first
+   search over *positions* (never placement order) so a run that
+   branches topples down both arms at once, and Free Play blobs
+   spread outward the way real dominoes do.
+   ============================================================ */
+
+function lagFor(d) { return 70 + 62 * (d / REACH); }
+
+function solveCascade(seeds) {
+  S.doms.forEach(d => { d.fall = null; d.played = false; });
+  const frontier = [];
+  for (const s of seeds) {
+    const d = S.doms[s.i];
+    if (d && !d.fall) { d.fall = { t: s.t, dir: s.dir }; frontier.push(d); }
+  }
+
+  while (frontier.length) {
+    // always expand the earliest-falling domino next
+    frontier.sort((a, b) => a.fall.t - b.fall.t);
+    const cur = frontier.shift();
+    for (const nb of S.doms) {
+      if (nb.fall) continue;
+      const dx = nb.x - cur.x, dy = nb.y - cur.y;
+      const dd = Math.hypot(dx, dy);
+      if (dd > REACH) continue;
+      const a = Math.atan2(dy, dx);
+      let diff = Math.abs(a - cur.fall.dir);
+      while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2);
+      if (diff > REACH_ANGLE) continue;
+      nb.fall = { t: cur.fall.t + lagFor(dd), dir: a };
+      frontier.push(nb);
+    }
+  }
+
+  return true;
+}
+
+/* Work out which props the settled cascade sets off, and when. */
+function applyProps(t0) {
+  let last = t0;
+  for (const d of S.doms) {
+    if (!d.fall) continue;
+    d.ang = d.fall.dir;
+    last = Math.max(last, d.fall.t);
+    const tip = { x: d.x + Math.cos(d.fall.dir) * H, y: d.y + Math.sin(d.fall.dir) * H };
+    for (const pr of S.props) {
+      if (dist(tip, pr) <= HIT_R || dist(d, pr) <= HIT_R * 0.72) {
+        const when = d.fall.t + FALL_MS * 0.62;
+        if (pr.trig === null || when < pr.trig) pr.trig = when;
+      }
+    }
+  }
+  return last;
+}
+
+function go() {
+  if (S.screen !== 'play') return;
+  ac();
+  if (S.phase === 'run') return;
+  if (S.phase === 'done') { restand(true); return; }
+  if (!S.doms.length) { toast('Drag your finger to lay some dominoes! 👆'); sfxNope(); return; }
+
+  const now = performance.now();
+  let firstIdx = -1, firstDir = 0;
+
+  if (S.level.free) {
+    // knock over the oldest domino still standing, so repeated
+    // presses set off each separate snake you built
+    for (let i = 0; i < S.doms.length; i++) {
+      if (!S.doms[i].fall) { firstIdx = i; break; }
+    }
+    if (firstIdx < 0) { restand(true); return; }
+    firstDir = S.doms[firstIdx].ang;
+  } else {
+    let bd = 1e9;
+    S.doms.forEach((d, i) => {
+      const dd = dist(d, S.level.start);
+      if (dd <= BOOP_R && dd < bd) { bd = dd; firstIdx = i; }
+    });
+    if (firstIdx < 0) {
+      toast("Start next to Dot's paw! 🐶");
+      sfxNope();
+      S.hint = { from: S.level.start, to: null, pulse: now };
+      return;
+    }
+    const f = S.doms[firstIdx];
+    firstDir = Math.atan2(f.y - S.level.start.y, f.x - S.level.start.x);
+  }
+
+  S.props.forEach(pr => { pr.trig = null; pr.fired = false; });
+  if (S.level.free) S.props.forEach(pr => { pr.hit = false; });
+
+  S.boop = now;
+  sfxBoop();
+  const t0 = now + 190;
+
+  // Dot's paw sweeps the whole start pad, so if you began a second
+  // line right next to the first one it gets knocked over too --
+  // a domino behind the first one can never be reached by it.
+  const seeds = [{ i: firstIdx, dir: firstDir, t: t0 }];
+  for (let pass = 0; pass < 5; pass++) {
+    solveCascade(seeds);
+    if (S.level.free) break;
+    let nxt = -1, bd = 1e9;
+    S.doms.forEach((d, i) => {
+      if (d.fall) return;
+      const dd = dist(d, S.level.start);
+      if (dd <= BOOP_R && dd < bd) { bd = dd; nxt = i; }
+    });
+    if (nxt < 0) break;
+    const f = S.doms[nxt];
+    seeds.push({ i: nxt, t: t0 + 80 * seeds.length,
+                 dir: Math.atan2(f.y - S.level.start.y, f.x - S.level.start.x) });
+  }
+  S.runEnd = applyProps(t0) + FALL_MS + 520;
+  S.phase = 'run';
+  S.runStart = now;
+  S.hint = null;
+  document.getElementById('btnGo').classList.add('busy');
+}
+
+function waveDone() {
+  S.phase = 'done';
+  document.getElementById('btnGo').classList.remove('busy');
+  const missed = S.props.filter(pr => !pr.hit);
+
+  if (S.level.free) {
+    const standing = S.doms.some(d => !d.fall);
+    document.getElementById('btnGo').textContent = standing ? 'KNOCK!' : 'Stand Up 🔁';
+    toast(standing ? 'Press KNOCK for the next line! 👉' : 'Nice run! Stand them up again 🔁');
+    return;
+  }
+
+  if (!missed.length) { win(); return; }
+
+  // point from the end of the wave toward whatever is still quiet
+  let tail = null, tt = -1;
+  for (const d of S.doms) if (d.fall && d.fall.t > tt) { tt = d.fall.t; tail = d; }
+  let goal = missed[0], bd = 1e9;
+  if (tail) for (const pr of missed) { const dd = dist(tail, pr); if (dd < bd) { bd = dd; goal = pr; } }
+  S.hint = { from: tail || S.level.start, to: goal, pulse: performance.now() };
+  toast('So close! Add more dominoes this way 👉');
+  document.getElementById('btnGo').textContent = 'GO!';
+}
+
+let winTimer = 0;
+function win() {
+  saveStar(S.levelIdx);
+  sfxWin();
+  burst(BW / 2, BH * 0.42, 90);
+  S.props.forEach(pr => burst(pr.x, pr.y, 22));
+  // the celebration waits for the confetti, so it has to be
+  // cancellable -- otherwise it pops up over the next level or
+  // the menu if you leave during that pause
+  clearTimeout(winTimer);
+  winTimer = setTimeout(() => {
+    if (S.screen !== 'play' || S.phase !== 'done') return;
+    const last = S.levelIdx >= LEVELS.length - 1;
+    document.getElementById('winArt').textContent = last ? '🏆' : '🎉';
+    document.getElementById('winMsg').textContent = last
+      ? 'You finished every party!'
+      : 'Party Time! You knocked them all down!';
+    document.getElementById('btnNext').style.display = last ? 'none' : '';
+    document.getElementById('win').classList.remove('hidden');
+  }, 1250);
+}
+
+function restand(quiet) {
+  S.doms.forEach(d => { d.fall = null; d.played = false; d.born = performance.now(); });
+  S.props.forEach(pr => { pr.hit = false; pr.trig = null; pr.fired = false; });
+  S.phase = 'build';
+  S.hint = null;
+  S.particles.length = 0;
+  S.rings.length = 0;
+  document.getElementById('btnGo').classList.remove('busy');
+  document.getElementById('btnGo').textContent = S.level && S.level.free ? 'KNOCK!' : 'GO!';
+  if (!quiet) sfxStand();
+  updateHud();
+}
+
+function clearFloor() {
+  S.doms.length = 0;
+  S.tray = S.level.tray;
+  restand(true);
+  sfxStand();
+  toast('Fresh floor! 🧹');
+}
+
+function loadLevel(idx) {
+  clearTimeout(winTimer);
+  S.levelIdx = idx;
+  const src = idx === 'free' ? FREE : LEVELS[idx];
+  S.level = { free: !!src.free, tray: src.tray, start: { ...src.start },
+              zones: src.zones.map(z => ({ ...z })) };
+  S.props = src.props.map(p => ({ ...p, hit: false, trig: null, fired: false, wob: 0 }));
+  S.doms = [];
+  S.tray = src.tray;
+  S.particles = []; S.rings = []; S.floats = [];
+  S.phase = 'build';
+  S.hint = null;
+  S.boop = 0;
+  S.screen = 'play';
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('win').classList.add('hidden');
+  document.getElementById('btnGo').textContent = S.level.free ? 'KNOCK!' : 'GO!';
+  document.getElementById('btnGo').classList.remove('busy');
+  document.getElementById('lvlBadge').textContent = idx === 'free' ? '🎉' : String(idx + 1);
+  updateHud();
+  fitCanvas();
+  toast(S.level.free ? 'Build anything you like! 🎨' : 'Drag from Dot to the ' +
+        PROPS[S.props[0].kind].name + '! 👆');
+}
+
+/* ---------- particles ---------- */
+function burst(x, y, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 0.25 + Math.random() * 0.75;
+    S.particles.push({
+      x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 0.5,
+      life: 1, spin: Math.random() * 6,
+      c: DOM_COLORS[(Math.random() * DOM_COLORS.length) | 0],
+      sz: 1 + Math.random() * 1.8
+    });
+  }
+}
+function ring(x, y, col) { S.rings.push({ x, y, t: performance.now(), c: col || '#fff' }); }
+function floatText(x, y, txt) { S.floats.push({ x, y, txt, t: performance.now() }); }
+
+function stepParticles(dt) {
+  for (let i = S.particles.length - 1; i >= 0; i--) {
+    const p = S.particles[i];
+    p.x += p.vx * dt * 0.06; p.y += p.vy * dt * 0.06;
+    p.vy += dt * 0.0022; p.spin += dt * 0.008;
+    p.life -= dt * 0.0006;
+    if (p.life <= 0 || p.y > BH + 8) S.particles.splice(i, 1);
+  }
+  const now = performance.now();
+  for (let i = S.rings.length - 1; i >= 0; i--) if (now - S.rings[i].t > 620) S.rings.splice(i, 1);
+  for (let i = S.floats.length - 1; i >= 0; i--) if (now - S.floats[i].t > 1100) S.floats.splice(i, 1);
+}
+/* ============================================================
+   DRAWING  (everything is authored in virtual units and pushed
+   through SX/SY/SC, so one code path serves every screen)
+   ============================================================ */
+
+function rr(x, y, w, h, r) {
+  const rad = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.lineTo(x + w - rad, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + rad);
+  ctx.lineTo(x + w, y + h - rad);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - rad, y + h);
+  ctx.lineTo(x + rad, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - rad);
+  ctx.lineTo(x, y + rad);
+  ctx.quadraticCurveTo(x, y, x + rad, y);
+  ctx.closePath();
+}
+function emoji(ch, x, y, px) {
+  ctx.globalAlpha = 1;               // emoji inherit fillStyle alpha
+  ctx.fillStyle = '#000';
+  ctx.font = px + 'px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(ch, x, y);
+}
+
+/* deterministic confetti specks on the floor */
+const SPECKS = (() => {
+  let s = 7;
+  const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  return Array.from({ length: 70 }, () => ({
+    x: rnd() * BW, y: rnd() * BH, a: rnd() * 6.3,
+    c: DOM_COLORS[(rnd() * DOM_COLORS.length) | 0]
+  }));
+})();
+
+function drawFloor() {
+  ctx.clearRect(0, 0, view.w, view.h);
+  const g = ctx.createLinearGradient(0, 0, 0, view.h);
+  g.addColorStop(0, '#7be0f5'); g.addColorStop(1, '#ffd86b');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, view.w, view.h);
+
+  const fg = ctx.createLinearGradient(0, SY(0), 0, SY(BH));
+  fg.addColorStop(0, '#fff9ec'); fg.addColorStop(1, '#ffe9c4');
+  ctx.fillStyle = fg;
+  rr(SX(0), SY(0), SC(BW), SC(BH), SC(4)); ctx.fill();
+
+  ctx.save();
+  rr(SX(0), SY(0), SC(BW), SC(BH), SC(4)); ctx.clip();
+  for (const sp of SPECKS) {
+    ctx.save();
+    ctx.translate(SX(sp.x), SY(sp.y));
+    ctx.rotate(sp.a);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = sp.c;
+    ctx.fillRect(-SC(0.9), -SC(0.35), SC(1.8), SC(0.7));
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(63,43,82,.18)';
+  ctx.lineWidth = Math.max(1, SC(0.5));
+  rr(SX(0), SY(0), SC(BW), SC(BH), SC(4)); ctx.stroke();
+}
+
+function drawZones(now) {
+  for (const z of S.level.zones) {
+    if (z.t === 'pool') {
+      ctx.fillStyle = '#7fd4f7';
+      ctx.beginPath();
+      ctx.ellipse(SX(z.x), SY(z.y), SC(z.rx), SC(z.ry), 0, 0, 6.3);
+      ctx.fill();
+      ctx.strokeStyle = '#3fb4e0'; ctx.lineWidth = Math.max(1, SC(0.7)); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.75)';
+      ctx.lineWidth = Math.max(1, SC(0.6));
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        const yy = SY(z.y + i * z.ry * 0.42);
+        const w = SC(z.rx * (0.55 - Math.abs(i) * 0.16));
+        for (let k = 0; k <= 10; k++) {
+          const xx = SX(z.x) - w + (2 * w * k) / 10;
+          const oy = Math.sin(k * 0.9 + now * 0.002 + i) * SC(0.55);
+          k === 0 ? ctx.moveTo(xx, yy + oy) : ctx.lineTo(xx, yy + oy);
+        }
+        ctx.stroke();
+      }
+      emoji('💧', SX(z.x), SY(z.y), SC(z.ry * 0.85));
+    } else {
+      ctx.fillStyle = '#9ce88a';
+      rr(SX(z.x - z.w / 2), SY(z.y - z.h / 2), SC(z.w), SC(z.h), SC(2.5)); ctx.fill();
+      ctx.strokeStyle = '#5fbf4d'; ctx.lineWidth = Math.max(1, SC(0.7)); ctx.stroke();
+      const n = Math.max(2, Math.round(z.w / 9));
+      for (let i = 0; i < n; i++) {
+        const fx = z.x - z.w / 2 + ((i + 0.5) * z.w) / n;
+        const bob = Math.sin(now * 0.003 + i) * SC(0.4);
+        emoji(i % 2 ? '🌷' : '🌸', SX(fx), SY(z.y) + bob, SC(z.h * 0.62));
+      }
+    }
+  }
+}
+
+function drawProps(now) {
+  for (const pr of S.props) {
+    const x = SX(pr.x), y = SY(pr.y);
+    const age = pr.hit ? (now - pr.hitAt) : 0;
+    let sc = 1, lift = 0, rot = 0;
+
+    if (pr.hit && age < 900) {
+      const q = age / 900;
+      sc = 1 + Math.sin(q * Math.PI) * 0.45;
+      if (pr.kind === 'duck' || pr.kind === 'balloon') lift = -Math.sin(q * Math.PI) * SC(6);
+      if (pr.kind === 'bell') rot = Math.sin(age * 0.03) * (1 - q) * 0.5;
+      if (pr.kind === 'drum') sc = 1 + Math.sin(age * 0.045) * (1 - q) * 0.3;
+    } else if (pr.hit) {
+      sc = 1.12;
+    }
+
+    // little podium so it reads as a thing standing on the floor
+    ctx.fillStyle = pr.hit ? 'rgba(94,217,94,.35)' : 'rgba(63,43,82,.13)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + SC(2.6), SC(5), SC(1.9), 0, 0, 6.3);
+    ctx.fill();
+
+    if (!pr.hit) {
+      const pulse = 0.55 + 0.45 * Math.sin(now * 0.004);
+      ctx.strokeStyle = 'rgba(255,90,122,' + (0.25 + pulse * 0.4) + ')';
+      ctx.lineWidth = Math.max(1, SC(0.7));
+      ctx.beginPath();
+      ctx.arc(x, y, SC(PROP_R * 0.86 + pulse * 0.7), 0, 6.3);
+      ctx.stroke();
+    }
+
+    ctx.save();
+    ctx.translate(x, y + lift);
+    ctx.rotate(rot);
+    ctx.scale(sc, sc);
+    emoji(PROPS[pr.kind].emoji, 0, 0, SC(9));
+    ctx.restore();
+
+    if (pr.hit) emoji('⭐', x + SC(4.4), y - SC(5) + lift, SC(4.6));
+  }
+}
+
+function drawDot(now) {
+  const st = S.level.start;
+  const x = SX(st.x), y = SY(st.y);
+  const boopAge = now - S.boop;
+  const booping = S.boop && boopAge >= 0 && boopAge < 420;
+  const bob = Math.sin(now * 0.004) * SC(0.5);
+
+  // paw pad you start from
+  ctx.fillStyle = 'rgba(63,43,82,.10)';
+  ctx.beginPath(); ctx.arc(x, y + SC(3), SC(6.5), 0, 6.3); ctx.fill();
+  if (S.phase === 'build' && !S.doms.length && !S.level.free) {
+    const p = 0.5 + 0.5 * Math.sin(now * 0.005);
+    ctx.strokeStyle = 'rgba(94,217,94,' + (0.3 + p * 0.5) + ')';
+    ctx.lineWidth = Math.max(1, SC(0.8));
+    ctx.beginPath(); ctx.arc(x, y, SC(9 + p * 2.5), 0, 6.3); ctx.stroke();
+  }
+
+  let pawDx = 0, pawDy = 0;
+  if (booping) {
+    let tgt = null, bd = 1e9;
+    for (const d of S.doms) { const dd = dist(d, st); if (dd < bd) { bd = dd; tgt = d; } }
+    if (tgt) {
+      const a = Math.atan2(tgt.y - st.y, tgt.x - st.x);
+      const push = Math.sin((boopAge / 420) * Math.PI) * SC(5);
+      pawDx = Math.cos(a) * push; pawDy = Math.sin(a) * push;
+    }
+  }
+
+  ctx.save();
+  ctx.translate(x, y + bob);
+  // ears
+  ctx.fillStyle = '#b5773f';
+  ctx.beginPath(); ctx.ellipse(-SC(4.6), -SC(2.4), SC(2.1), SC(3.2), -0.4, 0, 6.3); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(SC(4.6), -SC(2.4), SC(2.1), SC(3.2), 0.4, 0, 6.3); ctx.fill();
+  // head
+  ctx.fillStyle = '#fff3dc';
+  ctx.beginPath(); ctx.arc(0, 0, SC(5.2), 0, 6.3); ctx.fill();
+  ctx.strokeStyle = '#d8b78c'; ctx.lineWidth = Math.max(1, SC(0.5)); ctx.stroke();
+  // patch
+  ctx.fillStyle = '#b5773f';
+  ctx.beginPath(); ctx.ellipse(-SC(2.4), -SC(1.4), SC(2.1), SC(1.8), 0.3, 0, 6.3); ctx.fill();
+  // eyes
+  ctx.fillStyle = '#3f2b52';
+  const blink = (now % 4200) < 140 ? 0.25 : 1;
+  ctx.beginPath(); ctx.ellipse(-SC(1.8), -SC(0.4), SC(0.75), SC(0.9 * blink), 0, 0, 6.3); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(SC(1.8), -SC(0.4), SC(0.75), SC(0.9 * blink), 0, 0, 6.3); ctx.fill();
+  // snout
+  ctx.fillStyle = '#ffe6c9';
+  ctx.beginPath(); ctx.ellipse(0, SC(1.9), SC(2.5), SC(1.8), 0, 0, 6.3); ctx.fill();
+  ctx.fillStyle = '#3f2b52';
+  ctx.beginPath(); ctx.ellipse(0, SC(1.3), SC(0.85), SC(0.65), 0, 0, 6.3); ctx.fill();
+  if (booping) {
+    ctx.fillStyle = '#ff5a7a';
+    ctx.beginPath(); ctx.ellipse(0, SC(3.1), SC(1), SC(1.2), 0, 0, 6.3); ctx.fill();
+  }
+  ctx.restore();
+
+  // the booping paw
+  ctx.fillStyle = '#fff3dc';
+  ctx.strokeStyle = '#d8b78c';
+  ctx.lineWidth = Math.max(1, SC(0.4));
+  ctx.beginPath();
+  ctx.arc(x + pawDx + SC(3.4), y + pawDy + SC(4.2), SC(2.2), 0, 6.3);
+  ctx.fill(); ctx.stroke();
+
+  if (booping) emoji('💫', x + pawDx + SC(6), y + pawDy + SC(1), SC(4.5));
+}
+
+function drawDomino(d, now) {
+  let p = 0;
+  if (d.fall) {
+    if (now >= d.fall.t) p = Math.min(1, (now - d.fall.t) / FALL_MS);
+    // ease in: dominoes accelerate as they go over
+    p = p * p * (1.08 - 0.08 * p);
+    p = Math.min(1, p);
+  }
+  const theta = p * Math.PI * 0.5;
+  const len = DT + H * Math.sin(theta);
+  const pop = Math.min(1, (now - d.born) / 140);
+  const grow = 0.6 + 0.4 * (pop < 1 ? 1 + Math.sin(pop * Math.PI) * 0.45 : 1);
+  const wid = DW * (pop < 1 ? 0.75 + 0.25 * grow : 1);
+
+  // Shadow lives in screen space (always down-right, never rotated
+  // with the piece) and shrinks away as the domino goes flat, so a
+  // standing domino reads as having height whichever way it faces.
+  const up = 1 - p;
+  if (up > 0.03) {
+    ctx.save();
+    ctx.translate(SX(d.x) + SC(1.3 * up), SY(d.y) + SC(1.7 * up));
+    ctx.rotate(d.ang);
+    ctx.fillStyle = 'rgba(63,43,82,' + (0.16 * up) + ')';
+    rr(SC(-DT * 0.5), SC(-wid / 2), SC(len), SC(wid), SC(1.1));
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(SX(d.x), SY(d.y));
+  ctx.rotate(d.ang);
+
+  // body
+  ctx.fillStyle = d.color;
+  rr(SC(-DT * 0.5), SC(-wid / 2), SC(len), SC(wid), SC(1.1));
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(63,43,82,.42)';
+  ctx.lineWidth = Math.max(1, SC(0.35));
+  ctx.stroke();
+
+  // glossy top edge while it is still standing up
+  ctx.globalAlpha = 0.45 + 0.35 * up;
+  ctx.fillStyle = 'rgba(255,255,255,.8)';
+  rr(SC(-DT * 0.5 + 0.4), SC(-wid / 2 + 0.4), SC(Math.max(0.8, len - 0.8)), SC(wid * 0.3), SC(0.6));
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // pips: a divider plus dots, readable once it is lying down
+  if (len > DT * 1.6) {
+    const half = len / 2 - DT * 0.5;
+    ctx.strokeStyle = 'rgba(63,43,82,.5)';
+    ctx.lineWidth = Math.max(1, SC(0.3));
+    ctx.beginPath();
+    ctx.moveTo(SC(half), SC(-wid / 2 + 0.6));
+    ctx.lineTo(SC(half), SC(wid / 2 - 0.6));
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(63,43,82,.62)';
+    const r = SC(Math.min(0.62, wid * 0.13));
+    const spots = [[half * 0.55, 0], [half * 1.45, -wid * 0.2], [half * 1.45, wid * 0.2]];
+    const count = 1 + (d.pips % 3);
+    for (let i = 0; i < Math.min(count, spots.length); i++) {
+      ctx.beginPath(); ctx.arc(SC(spots[i][0]), SC(spots[i][1]), r, 0, 6.3); ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = 'rgba(63,43,82,.5)';
+    ctx.beginPath(); ctx.arc(0, SC(-wid * 0.18), SC(0.5), 0, 6.3); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, SC(wid * 0.18), SC(0.5), 0, 6.3); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawHint(now) {
+  if (!S.hint) return;
+  const h = S.hint;
+  if (!h.to) {
+    const p = 0.5 + 0.5 * Math.sin(now * 0.006);
+    ctx.strokeStyle = 'rgba(255,90,122,' + (0.4 + p * 0.5) + ')';
+    ctx.lineWidth = Math.max(2, SC(1));
+    ctx.beginPath(); ctx.arc(SX(h.from.x), SY(h.from.y), SC(11 + p * 3), 0, 6.3); ctx.stroke();
+    return;
+  }
+  const a = Math.atan2(h.to.y - h.from.y, h.to.x - h.from.x);
+  const total = dist(h.from, h.to);
+  for (let i = 1; i <= 3; i++) {
+    const t = ((now * 0.0006 + i * 0.28) % 1);
+    const r = 6 + t * Math.min(total - 4, 26);
+    const x = SX(h.from.x + Math.cos(a) * r), y = SY(h.from.y + Math.sin(a) * r);
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(a);
+    ctx.globalAlpha = 0.85 * (1 - t);
+    ctx.fillStyle = '#ff5a7a';
+    ctx.beginPath();
+    ctx.moveTo(SC(2.4), 0); ctx.lineTo(SC(-1.6), SC(-2)); ctx.lineTo(SC(-1.6), SC(2));
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawFx(now) {
+  for (const r of S.rings) {
+    const q = (now - r.t) / 620;
+    if (q > 1) continue;
+    ctx.globalAlpha = 1 - q;
+    ctx.strokeStyle = r.c;
+    ctx.lineWidth = Math.max(1, SC(1.1 * (1 - q)));
+    ctx.beginPath(); ctx.arc(SX(r.x), SY(r.y), SC(3 + q * 13), 0, 6.3); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  for (const p of S.particles) {
+    ctx.save();
+    ctx.translate(SX(p.x), SY(p.y));
+    ctx.rotate(p.spin);
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life));
+    ctx.fillStyle = p.c;
+    ctx.fillRect(SC(-p.sz / 2), SC(-p.sz / 4), SC(p.sz), SC(p.sz / 2));
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  for (const f of S.floats) {
+    const q = (now - f.t) / 1100;
+    ctx.globalAlpha = Math.max(0, 1 - q);
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = 'rgba(63,43,82,.8)';
+    ctx.lineWidth = Math.max(2, SC(0.6));
+    ctx.font = 'bold ' + SC(6) + 'px "Comic Sans MS", "Trebuchet MS", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const yy = SY(f.y) - SC(q * 10);
+    ctx.strokeText(f.txt, SX(f.x), yy);
+    ctx.fillText(f.txt, SX(f.x), yy);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function render(now) {
+  drawFloor();
+  drawZones(now);
+  drawHint(now);
+  drawProps(now);
+  // lying-down dominoes first so standing ones overlap them
+  const flat = [], tall = [];
+  for (const d of S.doms) ((d.fall && now > d.fall.t + FALL_MS) ? flat : tall).push(d);
+  for (const d of flat) drawDomino(d, now);
+  tall.sort((a, b) => a.y - b.y);
+  for (const d of tall) drawDomino(d, now);
+  drawDot(now);
+  drawFx(now);
+}
+/* ============================================================
+   HUD, MENU, LOOP
+   ============================================================ */
+
+const elTray = document.getElementById('trayCount');
+const elToast = document.getElementById('toast');
+let toastTimer = 0;
+
+function toast(msg) {
+  elToast.textContent = msg;
+  elToast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => elToast.classList.remove('show'), 2600);
+}
+
+function updateHud() {
+  elTray.textContent = S.tray === Infinity ? '∞' : String(S.tray);
+}
+
+function buildMenu() {
+  const wrap = document.getElementById('tiles');
+  wrap.innerHTML = '';
+  LEVELS.forEach((lv, i) => {
+    const b = document.createElement('button');
+    b.className = 'tile' + (S.stars.includes(i) ? ' done' : '');
+    const icons = lv.props.map(p => PROPS[p.kind].emoji).join('');
+    b.innerHTML = '<span class="num">' + (i + 1) + '</span>' +
+                  '<span class="ic">' + icons + '</span>' +
+                  '<span class="st">' + (S.stars.includes(i) ? '⭐' : '') + '</span>';
+    b.addEventListener('click', () => { ac(); loadLevel(i); });
+    wrap.appendChild(b);
+  });
+}
+
+function showMenu() {
+  clearTimeout(winTimer);
+  S.screen = 'menu';
+  S.drag = null;
+  buildMenu();
+  document.getElementById('win').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+}
+
+/* ---------- per-frame wave bookkeeping ---------- */
+let clackIdx = 0;
+
+function stepWave(now) {
+  if (S.phase !== 'run') return;
+
+  let i = 0;
+  for (const d of S.doms) {
+    if (d.fall && !d.played && now >= d.fall.t) {
+      d.played = true;
+      sfxClack(clackIdx++);
+      i++;
+      if (i > 3) break;            // never more than a few clacks a frame
+    }
+  }
+
+  for (const pr of S.props) {
+    if (!pr.fired && pr.trig !== null && now >= pr.trig) {
+      pr.fired = true;
+      pr.hit = true;
+      pr.hitAt = now;
+      sfxProp(pr.kind);
+      ring(pr.x, pr.y, '#fff');
+      burst(pr.x, pr.y, 26);
+      floatText(pr.x, pr.y - 8, 'YES!');
+    }
+  }
+
+  if (now >= S.runEnd) waveDone();
+}
+
+let lastT = performance.now();
+function loop(now) {
+  const dt = Math.min(48, now - lastT);
+  lastT = now;
+  if (S.screen === 'play' && S.level) {
+    stepWave(now);
+    stepParticles(dt);
+    render(now);
+  }
+  requestAnimationFrame(loop);
+}
+
+/* ---------- buttons ---------- */
+document.getElementById('btnGo').addEventListener('click', go);
+document.getElementById('btnStand').addEventListener('click', () => { ac(); restand(false); });
+document.getElementById('btnClear').addEventListener('click', () => { ac(); clearFloor(); });
+document.getElementById('btnMenu').addEventListener('click', () => { ac(); showMenu(); });
+document.getElementById('btnFree').addEventListener('click', () => { ac(); loadLevel('free'); });
+document.getElementById('btnAgain').addEventListener('click', () => {
+  document.getElementById('win').classList.add('hidden');
+  loadLevel(S.levelIdx);
+});
+document.getElementById('btnNext').addEventListener('click', () => {
+  document.getElementById('win').classList.add('hidden');
+  loadLevel(Math.min(LEVELS.length - 1, S.levelIdx + 1));
+});
+document.getElementById('btnHome').addEventListener('click', showMenu);
+
+window.addEventListener('resize', fitCanvas);
+window.addEventListener('orientationchange', () => setTimeout(fitCanvas, 220));
+
+/* ---------- boot ---------- */
+loadStars();
+buildMenu();
+fitCanvas();
+updateHud();
+requestAnimationFrame(loop);
+
+/* hooks so a headless drive can verify the mechanics */
+window.__dp = { S, LEVELS, loadLevel, placeDom, go, restand, H, SPACING, REACH, toBoard, SX, SY };
+</script>
+</body>
+</html>

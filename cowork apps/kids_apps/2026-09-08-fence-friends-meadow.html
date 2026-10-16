@@ -1,0 +1,770 @@
+<!-- CONCEPT: Fence Friends — a friendly turn-taking dots-and-boxes game where you and Buddy the sheepdog take turns tapping fence rails in a meadow; close a square and a baby farm animal hops into your pen, and you get another go. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Fence Friends</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+  height: 100%;
+}
+
+:root {
+  --sky-top: #7ee0ff;
+  --sky-bot: #b9f2a8;
+  --you: #ff5fa2;
+  --you-soft: #ffd0e4;
+  --buddy: #2fb6ff;
+  --buddy-soft: #ccecff;
+  --wood: #8a5a2b;
+  --wood-dark: #5e3a17;
+  --ink: #2b2140;
+  --panel: rgba(255,255,255,0.92);
+  --gap: clamp(6px, 1.8vw, 12px);
+  --font: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font);
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--sky-top) 0%, #a8ecff 40%, var(--sky-bot) 100%);
+}
+
+#app {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center;
+  padding: var(--gap);
+  gap: var(--gap);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(22px, 7vw, 40px);
+  letter-spacing: 1px;
+  text-align: center;
+  line-height: 1.1;
+}
+/* Gradient only on the words — emoji outside it keep their own colours. */
+h1 .grad {
+  background: linear-gradient(90deg, var(--you), #ffb03a 50%, var(--buddy));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+#turnbar {
+  width: 100%;
+  max-width: 560px;
+  min-height: 48px;
+  border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px;
+  padding: 6px 14px;
+  font-size: clamp(14px, 4vw, 20px);
+  font-weight: bold;
+  background: var(--panel);
+  box-shadow: 0 4px 0 rgba(0,0,0,0.12);
+  text-align: center;
+  transition: background .25s, color .25s;
+}
+#turnbar.you   { background: var(--you);   color: #fff; }
+#turnbar.buddy { background: var(--buddy); color: #fff; }
+#turnbar .face { font-size: 1.35em; line-height: 1; }
+
+#boardwrap {
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 0;
+}
+#board {
+  border-radius: 22px;
+  box-shadow: 0 8px 0 rgba(0,0,0,0.18), 0 0 0 5px #ffffff inset;
+  touch-action: none;
+  display: block;
+}
+
+#scores {
+  width: 100%; max-width: 560px;
+  display: flex; gap: var(--gap);
+}
+.score {
+  flex: 1;
+  border-radius: 16px;
+  padding: 6px 10px;
+  background: var(--panel);
+  box-shadow: 0 4px 0 rgba(0,0,0,0.12);
+  text-align: center;
+  font-size: clamp(13px, 3.6vw, 18px);
+  font-weight: bold;
+  transition: transform .18s;
+}
+.score.pulse { transform: scale(1.09); }
+.score .num { font-size: clamp(20px, 6.5vw, 30px); display: block; line-height: 1.1; }
+.score.mine  { color: var(--you); }
+.score.theirs{ color: #0a7fbd; }
+
+#controls {
+  width: 100%; max-width: 560px;
+  display: flex; gap: var(--gap);
+}
+button {
+  font-family: var(--font);
+  font-weight: bold;
+  border: none;
+  border-radius: 16px;
+  min-height: 48px;
+  padding: 10px 14px;
+  font-size: clamp(14px, 4vw, 19px);
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(180deg, #ffb03a, #f2820e);
+  box-shadow: 0 5px 0 #c96a08;
+  transition: transform .08s, box-shadow .08s;
+}
+button:active { transform: translateY(4px); box-shadow: 0 1px 0 #c96a08; }
+#controls button { flex: 1; }
+#menuBtn { background: linear-gradient(180deg, #9b86e8, #7057c4); box-shadow: 0 5px 0 #5a45a3; }
+#menuBtn:active { box-shadow: 0 1px 0 #5a45a3; }
+
+/* ---------- overlays ---------- */
+.overlay {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: clamp(8px, 2.5vw, 16px);
+  padding: clamp(12px, 4vw, 24px);
+  background: linear-gradient(180deg, rgba(126,224,255,0.97), rgba(185,242,168,0.97));
+  z-index: 20;
+  overflow-y: auto;
+  text-align: center;
+}
+.overlay.hidden { display: none; }
+
+.card {
+  width: 100%; max-width: 460px;
+  background: var(--panel);
+  border-radius: 26px;
+  padding: clamp(12px, 4vw, 20px);
+  box-shadow: 0 8px 0 rgba(0,0,0,0.15);
+}
+.card h2 {
+  margin: 0 0 8px;
+  font-size: clamp(16px, 4.6vw, 22px);
+}
+.pickrow { display: flex; gap: 8px; }
+.pick {
+  flex: 1;
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 5px 0 #ccc4dd;
+  border: 3px solid transparent;
+  line-height: 1.2;
+  min-height: 62px;
+}
+.pick small { display: block; font-size: 0.72em; opacity: .75; font-weight: normal; }
+.pick.sel {
+  background: linear-gradient(180deg, #fff2b0, #ffd84d);
+  border-color: #f2820e;
+  box-shadow: 0 5px 0 #c99a08;
+}
+.pick:active { box-shadow: 0 1px 0 #ccc4dd; }
+
+#playBtn, #againBtn {
+  width: 100%; max-width: 460px;
+  font-size: clamp(20px, 6vw, 28px);
+  min-height: 66px;
+  background: linear-gradient(180deg, #6fe36f, #2eb62e);
+  box-shadow: 0 6px 0 #1d8a1d;
+}
+#playBtn:active, #againBtn:active { box-shadow: 0 1px 0 #1d8a1d; }
+
+.blurb { font-size: clamp(13px, 3.6vw, 17px); max-width: 460px; line-height: 1.4; }
+.tally { font-size: clamp(13px, 3.6vw, 17px); font-weight: bold; }
+
+/* Solid colour, not gradient text — JS writes an emoji into this line. */
+#endTitle { font-size: clamp(26px, 8vw, 44px); margin: 0; line-height: 1.1;
+  color: #e0417f; text-shadow: 0 3px 0 rgba(255,255,255,0.85); }
+#endPens { font-size: clamp(22px, 7vw, 34px); line-height: 1.5; word-break: break-word; }
+#endLine { font-size: clamp(15px, 4.2vw, 20px); font-weight: bold; }
+
+#fx {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <h1>🐑 <span class="grad">Fence Friends</span> 🐶</h1>
+  <div id="turnbar"><span class="face">🙋</span><span id="turnText">Your turn — tap a fence!</span></div>
+  <div id="boardwrap"><canvas id="board"></canvas></div>
+  <div id="scores">
+    <div class="score mine" id="scoreYou">You<span class="num">0</span></div>
+    <div class="score theirs" id="scoreBuddy">Buddy<span class="num">0</span></div>
+  </div>
+  <div id="controls">
+    <button id="newBtn">🔄 New Game</button>
+    <button id="menuBtn">🏠 Menu</button>
+  </div>
+</div>
+
+<div class="overlay" id="startScreen">
+  <h1>🐑 <span class="grad">Fence Friends</span> 🐶</h1>
+  <p class="blurb">Take turns with <b>Buddy the sheepdog</b>. Tap between two posts to build a fence. Close up a square and a baby animal hops into <b>your</b> pen — and you get another turn!</p>
+
+  <div class="card">
+    <h2>🌾 How big is the meadow?</h2>
+    <div class="pickrow">
+      <button class="pick sel" data-size="3">Little<small>9 pens</small></button>
+      <button class="pick" data-size="4">Medium<small>16 pens</small></button>
+      <button class="pick" data-size="5">Big<small>25 pens</small></button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🐶 How clever is Buddy?</h2>
+    <div class="pickrow">
+      <button class="pick sel" data-ai="easy">😊 Puppy<small>still learning</small></button>
+      <button class="pick" data-ai="clever">🎓 Sheepdog<small>quite tricky</small></button>
+    </div>
+  </div>
+
+  <button id="playBtn">▶ Let's Play!</button>
+  <div class="tally" id="tally"></div>
+</div>
+
+<div class="overlay hidden" id="endScreen">
+  <h1 id="endTitle">Great game!</h1>
+  <div id="endPens"></div>
+  <div class="card">
+    <div id="endLine"></div>
+  </div>
+  <button id="againBtn">▶ Play Again</button>
+  <button id="endMenuBtn" style="max-width:460px;width:100%;">🏠 Change Meadow</button>
+</div>
+
+<canvas id="fx"></canvas>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ============================ audio ============================ */
+  let AC = null;
+  function ac() {
+    if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (AC.state === 'suspended') AC.resume();
+    return AC;
+  }
+  function tone(freq, dur, type, vol, when, glideTo) {
+    const c = ac(); if (!c) return;
+    const t0 = c.currentTime + (when || 0);
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, t0);
+    if (glideTo) o.frequency.exponentialRampToValueAtTime(glideTo, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(vol || 0.18, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  const S = {
+    clack(who) { tone(who === 'you' ? 260 : 200, 0.11, 'triangle', 0.16); tone(who === 'you' ? 130 : 100, 0.09, 'square', 0.06); },
+    pen(n) { const base = 440 * Math.pow(1.12, Math.min(n, 8));
+             tone(base, 0.14, 'sine', 0.2); tone(base * 1.5, 0.2, 'sine', 0.15, 0.08); },
+    baa() { tone(340, 0.28, 'sawtooth', 0.09, 0, 260); },
+    moo() { tone(150, 0.32, 'sawtooth', 0.1, 0, 120); },
+    peep() { tone(880, 0.1, 'square', 0.08, 0, 1200); },
+    nope() { tone(180, 0.12, 'sine', 0.1, 0, 140); },
+    fanfare() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.32, 'triangle', 0.2, i * 0.13)); },
+    soft() { [392, 523].forEach((f, i) => tone(f, 0.3, 'sine', 0.14, i * 0.14)); }
+  };
+  const ANIMAL_SOUND = { '🐑': S.baa, '🐐': S.baa, '🐄': S.moo, '🐖': S.moo, '🐴': S.moo,
+                         '🐔': S.peep, '🐤': S.peep, '🦆': S.peep, '🐰': S.peep, '🦃': S.peep };
+
+  /* ============================ state ============================ */
+  const ANIMALS = ['🐑', '🐄', '🐖', '🐔', '🐰', '🐐', '🦆', '🐴', '🐤', '🦃'];
+  const YOU = 'you', BUDDY = 'buddy';
+
+  const G = {
+    n: 3, ai: 'easy',
+    H: [], V: [], boxes: [],
+    edges: [], turn: YOU, busy: false, over: true, gen: 0,
+    score: { you: 0, buddy: 0 },
+    S: 300, pad: 0, step: 0
+  };
+
+  // Timers tagged with the game they belong to, so a "New Game" tap mid-think
+  // can't let Buddy's pending move land on the fresh board.
+  function later(fn, ms) { const g = G.gen; setTimeout(() => { if (G.gen === g) fn(); }, ms); }
+
+  const board = document.getElementById('board');
+  const bctx = board.getContext('2d');
+  const fx = document.getElementById('fx');
+  const fctx = fx.getContext('2d');
+  const turnbar = document.getElementById('turnbar');
+  const turnText = document.getElementById('turnText');
+  const turnFace = turnbar.querySelector('.face');
+  const scoreYouEl = document.getElementById('scoreYou');
+  const scoreBuddyEl = document.getElementById('scoreBuddy');
+
+  const TOTAL_KEY = 'cowork-fencefriends-total';
+  function totalPenned() { return parseInt(localStorage.getItem(TOTAL_KEY) || '0', 10) || 0; }
+  function addPenned(n) { localStorage.setItem(TOTAL_KEY, String(totalPenned() + n)); }
+
+  /* ============================ build board ============================ */
+  function newGame() {
+    const n = G.n;
+    G.H = []; G.V = []; G.boxes = []; G.edges = [];
+    for (let r = 0; r <= n; r++) { G.H.push(new Array(n).fill(null)); }
+    for (let r = 0; r < n; r++) { G.V.push(new Array(n + 1).fill(null)); }
+    for (let r = 0; r < n; r++) {
+      const row = [];
+      for (let c = 0; c < n; c++) row.push({ owner: null, animal: null, anim: 0, bob: Math.random() * 6.28 });
+      G.boxes.push(row);
+    }
+    for (let r = 0; r <= n; r++) for (let c = 0; c < n; c++) G.edges.push({ t: 'h', r, c, owner: null, anim: 0 });
+    for (let r = 0; r < n; r++) for (let c = 0; c <= n; c++) G.edges.push({ t: 'v', r, c, owner: null, anim: 0 });
+    G.score.you = 0; G.score.buddy = 0;
+    G.gen++;
+    G.turn = YOU; G.busy = false; G.over = false;
+    updateScores(false, false);
+    setTurnBar(YOU, "Your turn — tap a fence!");
+    layout();
+  }
+
+  function edgeOwner(e) { return e.t === 'h' ? G.H[e.r][e.c] : G.V[e.r][e.c]; }
+  function setEdgeOwner(e, who) { if (e.t === 'h') G.H[e.r][e.c] = who; else G.V[e.r][e.c] = who; e.owner = who; }
+
+  function sides(r, c) {
+    return (G.H[r][c] ? 1 : 0) + (G.H[r + 1][c] ? 1 : 0) + (G.V[r][c] ? 1 : 0) + (G.V[r][c + 1] ? 1 : 0);
+  }
+  function adjacent(e) {
+    const n = G.n, out = [];
+    if (e.t === 'h') { if (e.r > 0) out.push([e.r - 1, e.c]); if (e.r < n) out.push([e.r, e.c]); }
+    else { if (e.c > 0) out.push([e.r, e.c - 1]); if (e.c < n) out.push([e.r, e.c]); }
+    return out;
+  }
+
+  /* ============================ geometry ============================ */
+  function dotXY(r, c) { return [G.pad + c * G.step, G.pad + r * G.step]; }
+  function edgePts(e) {
+    if (e.t === 'h') { const a = dotXY(e.r, e.c), b = dotXY(e.r, e.c + 1); return [a[0], a[1], b[0], b[1]]; }
+    const a = dotXY(e.r, e.c), b = dotXY(e.r + 1, e.c); return [a[0], a[1], b[0], b[1]];
+  }
+  function distToSeg(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1, L = dx * dx + dy * dy;
+    let t = L ? ((px - x1) * dx + (py - y1) * dy) / L : 0;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+  }
+
+  function layout() {
+    const wrap = document.getElementById('boardwrap');
+    // Floor is low so a short landscape phone crops nothing; the board just shrinks.
+    const size = Math.max(140, Math.floor(Math.min(wrap.clientWidth, wrap.clientHeight)));
+    G.S = size;
+    board.style.width = size + 'px';
+    board.style.height = size + 'px';
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    board.width = Math.round(size * dpr);
+    board.height = Math.round(size * dpr);
+    bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    G.pad = size * (G.n === 3 ? 0.13 : G.n === 4 ? 0.11 : 0.095);
+    G.step = (size - 2 * G.pad) / G.n;
+
+    fx.width = Math.round(window.innerWidth * dpr);
+    fx.height = Math.round(window.innerHeight * dpr);
+    fx.style.width = window.innerWidth + 'px';
+    fx.style.height = window.innerHeight + 'px';
+    fctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  /* ============================ drawing ============================ */
+  const TUFTS = [];
+  for (let i = 0; i < 46; i++) TUFTS.push([Math.random(), Math.random(), Math.random() * 0.5 + 0.5]);
+
+  function rr(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function draw(t) {
+    const s = G.S, ctx = bctx;
+    ctx.clearRect(0, 0, s, s);
+
+    // meadow
+    const g = ctx.createLinearGradient(0, 0, 0, s);
+    g.addColorStop(0, '#a8e66a'); g.addColorStop(0.55, '#7fd44f'); g.addColorStop(1, '#63bf3d');
+    ctx.fillStyle = g;
+    rr(ctx, 0, 0, s, s, 22); ctx.fill();
+
+    // grass tufts
+    ctx.strokeStyle = 'rgba(255,255,255,0.28)';
+    ctx.lineWidth = Math.max(2, s * 0.006);
+    ctx.lineCap = 'round';
+    TUFTS.forEach(([tx, ty, h]) => {
+      const x = tx * s, y = ty * s, hh = h * s * 0.022;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - hh * 0.4, y - hh); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + hh * 0.4, y - hh * 0.85); ctx.stroke();
+    });
+
+    const st = G.step;
+
+    // completed pens
+    for (let r = 0; r < G.n; r++) for (let c = 0; c < G.n; c++) {
+      const b = G.boxes[r][c];
+      if (!b.owner) continue;
+      b.anim = Math.min(1, b.anim + 0.075);
+      const p = b.anim;
+      const ease = p < 1 ? 1 - Math.pow(1 - p, 3) : 1;
+      const pop = p < 1 ? ease * (1 + 0.35 * Math.sin(p * Math.PI)) : 1;
+      const [x, y] = dotXY(r, c);
+      const inset = st * 0.09;
+      ctx.save();
+      ctx.globalAlpha = ease;
+      ctx.fillStyle = b.owner === YOU ? 'rgba(255,95,162,0.34)' : 'rgba(47,182,255,0.34)';
+      rr(ctx, x + inset, y + inset, st - inset * 2, st - inset * 2, st * 0.18);
+      ctx.fill();
+      ctx.restore();
+
+      const bob = Math.sin(t / 520 + b.bob) * st * 0.035;
+      ctx.save();
+      ctx.translate(x + st / 2, y + st / 2 + bob);
+      ctx.scale(pop, pop);
+      ctx.font = (st * 0.48) + 'px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(b.animal, 0, 0);
+      ctx.restore();
+    }
+
+    // ghost fences (where you can still build)
+    if (!G.over) {
+      ctx.save();
+      ctx.setLineDash([st * 0.11, st * 0.11]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.62)';
+      ctx.lineWidth = Math.max(3, st * 0.045);
+      ctx.lineCap = 'round';
+      G.edges.forEach(e => {
+        if (edgeOwner(e)) return;
+        const [x1, y1, x2, y2] = edgePts(e);
+        const sh = 0.16;
+        ctx.beginPath();
+        ctx.moveTo(x1 + (x2 - x1) * sh, y1 + (y2 - y1) * sh);
+        ctx.lineTo(x2 - (x2 - x1) * sh, y2 - (y2 - y1) * sh);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    // built fences
+    const w = Math.max(7, st * 0.15);
+    G.edges.forEach(e => {
+      const own = edgeOwner(e);
+      if (!own) return;
+      e.anim = Math.min(1, e.anim + 0.14);
+      const p = 1 - Math.pow(1 - e.anim, 3);
+      const [x1, y1, x2, y2] = edgePts(e);
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const ax = mx + (x1 - mx) * p, ay = my + (y1 - my) * p;
+      const bx = mx + (x2 - mx) * p, by = my + (y2 - my) * p;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+      ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(ax, ay + w * 0.28); ctx.lineTo(bx, by + w * 0.28); ctx.stroke();
+      ctx.strokeStyle = own === YOU ? '#ff5fa2' : '#2fb6ff';
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.strokeStyle = own === YOU ? 'rgba(255,214,232,0.9)' : 'rgba(214,240,255,0.9)';
+      ctx.lineWidth = w * 0.3;
+      ctx.beginPath(); ctx.moveTo(ax, ay - w * 0.2); ctx.lineTo(bx, by - w * 0.2); ctx.stroke();
+    });
+
+    // posts
+    const pr = Math.max(5, st * 0.1);
+    for (let r = 0; r <= G.n; r++) for (let c = 0; c <= G.n; c++) {
+      const [x, y] = dotXY(r, c);
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath(); ctx.arc(x, y + pr * 0.3, pr, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = '#8a5a2b';
+      ctx.beginPath(); ctx.arc(x, y, pr, 0, 6.2832); ctx.fill();
+      ctx.fillStyle = '#b57c45';
+      ctx.beginPath(); ctx.arc(x - pr * 0.25, y - pr * 0.25, pr * 0.42, 0, 6.2832); ctx.fill();
+    }
+  }
+
+  /* ============================ confetti ============================ */
+  const parts = [];
+  function burst(cx, cy, n, emojis) {
+    for (let i = 0; i < n; i++) {
+      parts.push({
+        x: cx, y: cy,
+        vx: (Math.random() - 0.5) * 9,
+        vy: -Math.random() * 11 - 3,
+        life: 1,
+        rot: Math.random() * 6.28,
+        vr: (Math.random() - 0.5) * 0.3,
+        sz: 10 + Math.random() * 14,
+        col: ['#ff5fa2', '#ffd84d', '#2fb6ff', '#6fe36f', '#ff8c3a', '#c98bff'][(Math.random() * 6) | 0],
+        em: emojis && Math.random() < 0.45 ? emojis[(Math.random() * emojis.length) | 0] : null
+      });
+    }
+  }
+  function drawFx() {
+    fctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.vy += 0.42; p.x += p.vx; p.y += p.vy; p.vx *= 0.995; p.rot += p.vr;
+      p.life -= 0.009;
+      if (p.life <= 0 || p.y > window.innerHeight + 60) { parts.splice(i, 1); continue; }
+      fctx.save();
+      fctx.globalAlpha = Math.max(0, Math.min(1, p.life * 1.6));
+      fctx.translate(p.x, p.y); fctx.rotate(p.rot);
+      if (p.em) { fctx.font = (p.sz * 1.7) + 'px serif'; fctx.textAlign = 'center'; fctx.textBaseline = 'middle'; fctx.fillText(p.em, 0, 0); }
+      else { fctx.fillStyle = p.col; fctx.fillRect(-p.sz / 2, -p.sz / 4, p.sz, p.sz / 2); }
+      fctx.restore();
+    }
+  }
+
+  function boxScreenXY(r, c) {
+    const rect = board.getBoundingClientRect();
+    const [x, y] = dotXY(r, c);
+    return [rect.left + x + G.step / 2, rect.top + y + G.step / 2];
+  }
+
+  /* ============================ turn bar / scores ============================ */
+  function setTurnBar(who, text) {
+    turnbar.className = who;
+    turnFace.textContent = who === YOU ? '🙋' : '🐶';
+    turnText.textContent = text;
+  }
+  function updateScores(pulseYou, pulseBuddy) {
+    scoreYouEl.innerHTML = 'You<span class="num">' + G.score.you + '</span>';
+    scoreBuddyEl.innerHTML = 'Buddy<span class="num">' + G.score.buddy + '</span>';
+    if (pulseYou) pulse(scoreYouEl);
+    if (pulseBuddy) pulse(scoreBuddyEl);
+  }
+  function pulse(el) { el.classList.add('pulse'); setTimeout(() => el.classList.remove('pulse'), 200); }
+
+  const YOU_CHEERS = ['Nice pen! 🎉', 'Woohoo! Go again!', 'You got one! 🌟', 'Great fencing!', 'Buddy says: wow!'];
+  const YOU_MULTI = ['DOUBLE PEN! 🤩', 'TRIPLE PEN! 🎊', 'AMAZING! 🌈', 'SUPER PEN! ✨'];
+  const BUDDY_LINES = ['Buddy penned one! 🐶', 'Buddy woofs happily!', 'Buddy got a pen — your turn soon!', 'Good one, Buddy!'];
+  const BUDDY_THINK = ['Buddy is thinking… 🤔', 'Buddy sniffs the grass… 🐾', 'Buddy wags his tail… 🐕', 'Buddy looks around… 👀'];
+  const pick = a => a[(Math.random() * a.length) | 0];
+
+  /* ============================ playing ============================ */
+  function freeEdges() { return G.edges.filter(e => !edgeOwner(e)); }
+
+  function place(e, who) {
+    setEdgeOwner(e, who);
+    e.anim = 0;
+    S.clack(who);
+
+    let got = 0;
+    adjacent(e).forEach(([r, c]) => {
+      const b = G.boxes[r][c];
+      if (!b.owner && sides(r, c) === 4) {
+        b.owner = who;
+        b.animal = ANIMALS[(Math.random() * ANIMALS.length) | 0];
+        b.anim = 0;
+        got++;
+        G.score[who]++;
+        S.pen(G.score[who]);
+        const snd = ANIMAL_SOUND[b.animal];
+        if (snd) later(snd, 140);
+        const [sx, sy] = boxScreenXY(r, c);
+        burst(sx, sy, who === YOU ? 22 : 12, [b.animal, '⭐', '💚']);
+      }
+    });
+
+    updateScores(got && who === YOU, got && who === BUDDY);
+
+    if (freeEdges().length === 0) { G.turn = null; later(endGame, 700); return; }
+
+    if (got > 0) {
+      // same player goes again
+      if (who === YOU) {
+        setTurnBar(YOU, got > 1 ? pick(YOU_MULTI) : pick(YOU_CHEERS));
+        G.busy = false;
+      } else {
+        setTurnBar(BUDDY, pick(BUDDY_LINES));
+        G.busy = true;
+        later(buddyTurn, 800);
+      }
+    } else {
+      if (who === YOU) {
+        G.turn = BUDDY; G.busy = true;
+        setTurnBar(BUDDY, pick(BUDDY_THINK));
+        later(buddyTurn, 750 + Math.random() * 450);
+      } else {
+        G.turn = YOU; G.busy = false;
+        setTurnBar(YOU, 'Your turn — tap a fence!');
+      }
+    }
+  }
+
+  function buddyTurn() {
+    if (G.over) return;
+    const free = freeEdges();
+    if (!free.length) { endGame(); return; }
+
+    // 1. take a pen if one is there
+    const caps = free.filter(e => adjacent(e).some(([r, c]) => sides(r, c) === 3));
+    let choice;
+    if (caps.length) {
+      choice = pick(caps);
+    } else if (G.ai === 'clever') {
+      // 2. safe moves: don't hand a third side to anybody
+      const safe = free.filter(e => adjacent(e).every(([r, c]) => sides(r, c) < 2));
+      if (safe.length) {
+        choice = pick(safe);
+      } else {
+        // 3. give away as little as possible
+        let best = Infinity, pool = [];
+        free.forEach(e => {
+          const cost = adjacent(e).filter(([r, c]) => sides(r, c) === 2).length;
+          if (cost < best) { best = cost; pool = [e]; }
+          else if (cost === best) pool.push(e);
+        });
+        choice = pick(pool);
+      }
+    } else {
+      choice = pick(free);
+    }
+    place(choice, BUDDY);
+  }
+
+  function endGame() {
+    if (G.over) return;
+    G.over = true; G.busy = true;
+    addPenned(G.score.you);
+
+    const you = G.score.you, bud = G.score.buddy;
+    const title = document.getElementById('endTitle');
+    const pensEl = document.getElementById('endPens');
+    const lineEl = document.getElementById('endLine');
+
+    let pens = '';
+    for (let r = 0; r < G.n; r++) for (let c = 0; c < G.n; c++) {
+      const b = G.boxes[r][c];
+      if (b.owner === YOU) pens += b.animal;
+    }
+    pensEl.textContent = pens || '🌾';
+
+    if (you > bud) {
+      title.textContent = 'You win! 🏆';
+      lineEl.innerHTML = 'Your pens: <b>' + you + '</b> &nbsp;•&nbsp; Buddy: <b>' + bud + '</b><br>Buddy says: <i>"Great fencing! Woof!"</i> 🐶';
+      S.fanfare();
+    } else if (you === bud) {
+      title.textContent = "It's a tie! 🤝";
+      lineEl.innerHTML = 'You both penned <b>' + you + '</b>!<br>Buddy says: <i>"Perfectly matched! Woof!"</i> 🐶';
+      S.fanfare();
+    } else {
+      title.textContent = 'Nice game! 🌟';
+      lineEl.innerHTML = 'Your pens: <b>' + you + '</b> &nbsp;•&nbsp; Buddy: <b>' + bud + '</b><br>Buddy got a few more this time. He says: <i>"Play me again?"</i> 🐶';
+      S.soft();
+    }
+
+    setTurnBar(YOU, 'All fenced up! 🎉');
+    const cx = window.innerWidth / 2;
+    burst(cx - 60, window.innerHeight * 0.45, 40, ['🎉', '⭐', '🐑']);
+    burst(cx + 60, window.innerHeight * 0.45, 40, ['🎊', '🌈', '🐶']);
+    later(() => burst(cx, window.innerHeight * 0.4, 40, ['✨', '🐄', '🐔']), 320);
+
+    later(() => document.getElementById('endScreen').classList.remove('hidden'), 900);
+  }
+
+  /* ============================ input ============================ */
+  function tap(clientX, clientY) {
+    if (G.over || G.busy || G.turn !== YOU) return;
+    ac();
+    const rect = board.getBoundingClientRect();
+    const px = clientX - rect.left, py = clientY - rect.top;
+    let best = null, bestD = Infinity;
+    G.edges.forEach(e => {
+      if (edgeOwner(e)) return;
+      const [x1, y1, x2, y2] = edgePts(e);
+      const d = distToSeg(px, py, x1, y1, x2, y2);
+      if (d < bestD) { bestD = d; best = e; }
+    });
+    // 0.45 of a cell: generous around every rail, but a tap dead-centre in a
+    // square (0.5 from all four) gets a gentle nudge instead of a surprise fence.
+    if (best && bestD < G.step * 0.45) { G.busy = true; place(best, YOU); if (G.turn === YOU && !G.over) G.busy = false; }
+    else S.nope();
+  }
+
+  board.addEventListener('pointerdown', ev => { ev.preventDefault(); tap(ev.clientX, ev.clientY); });
+
+  /* ============================ menus ============================ */
+  const startScreen = document.getElementById('startScreen');
+  const endScreen = document.getElementById('endScreen');
+
+  document.querySelectorAll('.pick[data-size]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.pick[data-size]').forEach(o => o.classList.remove('sel'));
+    b.classList.add('sel'); G.n = parseInt(b.dataset.size, 10); ac(); tone(660, 0.09, 'triangle', 0.12);
+  }));
+  document.querySelectorAll('.pick[data-ai]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.pick[data-ai]').forEach(o => o.classList.remove('sel'));
+    b.classList.add('sel'); G.ai = b.dataset.ai; ac(); tone(660, 0.09, 'triangle', 0.12);
+  }));
+
+  function showTally() {
+    const t = totalPenned();
+    document.getElementById('tally').textContent = t > 0 ? '🐾 ' + t + ' animals penned so far!' : '';
+  }
+
+  function startPlaying() {
+    ac();
+    startScreen.classList.add('hidden');
+    endScreen.classList.add('hidden');
+    newGame();
+    tone(523, 0.12, 'triangle', 0.16); tone(784, 0.18, 'triangle', 0.16, 0.1);
+  }
+
+  document.getElementById('playBtn').addEventListener('click', startPlaying);
+  document.getElementById('againBtn').addEventListener('click', startPlaying);
+  document.getElementById('newBtn').addEventListener('click', startPlaying);
+  document.getElementById('menuBtn').addEventListener('click', () => {
+    G.over = true; G.busy = true; G.gen++;
+    parts.length = 0;
+    showTally();
+    endScreen.classList.add('hidden');
+    startScreen.classList.remove('hidden');
+  });
+  document.getElementById('endMenuBtn').addEventListener('click', () => {
+    G.gen++;
+    parts.length = 0;
+    showTally();
+    endScreen.classList.add('hidden');
+    startScreen.classList.remove('hidden');
+  });
+
+  window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', () => setTimeout(layout, 220));
+
+  /* ============================ loop ============================ */
+  function frame(t) { draw(t); drawFx(); requestAnimationFrame(frame); }
+
+  newGame();
+  G.over = true; G.busy = true;   // menu is showing
+  showTally();
+  layout();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
