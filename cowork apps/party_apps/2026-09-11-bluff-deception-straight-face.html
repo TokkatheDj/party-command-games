@@ -1,0 +1,754 @@
+<!-- CONCEPT: bluff-deception - One player tells a story the game has secretly labelled TRUE or FALSE, the room cross-examines them for 45 seconds, then everyone secretly votes; points for fooling the room and for reading it right. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>STRAIGHT FACE — the cross-examination party game</title>
+<style>
+  :root{
+    --bg:#07121f; --bg2:#0f2540; --ink:#f2f7ff;
+    --hot:#ff3b6b; --gold:#ffc93c; --mint:#2fe3a0; --sky:#49c6ff; --violet:#8b5cf6;
+    --dim:#8fa9c4; --panel:rgba(255,255,255,.07); --line:rgba(255,255,255,.18);
+    --shadow:0 18px 50px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;height:100%}
+  body{
+    font-family:"Trebuchet MS","Segoe UI",Avenir,system-ui,-apple-system,sans-serif;
+    background:
+      radial-gradient(1200px 700px at 15% -10%, #1c3f6b 0%, transparent 60%),
+      radial-gradient(900px 600px at 100% 110%, #3a1150 0%, transparent 60%),
+      linear-gradient(170deg,var(--bg) 0%, var(--bg2) 100%);
+    background-attachment:fixed;
+    color:var(--ink); overflow-x:hidden;
+    -webkit-user-select:none;user-select:none;
+  }
+  .wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;
+    padding:clamp(12px,2.5vw,28px);max-width:1100px;margin:0 auto}
+  .screen{display:none;width:100%;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:clamp(10px,1.8vh,22px)}
+  .screen.on{display:flex;animation:fade .28s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  h1{font-size:clamp(38px,9vw,96px);line-height:.92;margin:0;letter-spacing:-.03em;
+     background:linear-gradient(92deg,var(--gold),var(--hot) 55%,var(--violet));
+     -webkit-background-clip:text;background-clip:text;color:transparent;text-align:center;font-weight:900}
+  h2{font-size:clamp(24px,5vw,48px);margin:0;text-align:center;font-weight:900;letter-spacing:-.02em}
+  .tag{font-size:clamp(13px,2.2vw,20px);color:var(--gold);letter-spacing:.22em;text-transform:uppercase;text-align:center;font-weight:700}
+  .sub{font-size:clamp(14px,2.3vw,21px);color:var(--dim);text-align:center;max-width:44ch;line-height:1.45}
+  .meta{font-size:clamp(12px,1.8vw,16px);color:var(--dim);text-align:center;letter-spacing:.1em;text-transform:uppercase}
+
+  .card{background:var(--panel);border:2px solid var(--line);border-radius:22px;
+    padding:clamp(16px,3vw,30px);width:100%;box-shadow:var(--shadow);backdrop-filter:blur(6px)}
+
+  button{font-family:inherit;font-weight:900;cursor:pointer;border:none;border-radius:18px;
+    transition:transform .1s ease, filter .15s ease, background .15s}
+  button:active{transform:translateY(2px) scale(.985)}
+  button:disabled{opacity:.35;cursor:default}
+  .big{font-size:clamp(19px,3.4vw,30px);padding:clamp(15px,2.6vw,24px) clamp(26px,5vw,54px);
+    background:linear-gradient(100deg,var(--hot),var(--violet));color:#fff;letter-spacing:.03em;
+    box-shadow:0 10px 0 rgba(0,0,0,.28)}
+  .big.gold{background:linear-gradient(100deg,var(--gold),#ff8a3c);color:#25160a}
+  .big.mint{background:linear-gradient(100deg,var(--mint),var(--sky));color:#04241c}
+  .ghost{font-size:clamp(14px,2.2vw,19px);padding:12px 24px;background:transparent;border:2px solid var(--line);color:var(--dim)}
+  .ghost:hover{color:var(--ink);border-color:var(--ink)}
+  .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:center}
+
+  input[type=text]{font-family:inherit;font-size:clamp(17px,3vw,24px);font-weight:800;padding:14px 18px;
+    border-radius:14px;border:2px solid var(--line);background:rgba(0,0,0,.3);color:var(--ink);
+    width:min(340px,70vw);outline:none}
+  input[type=text]:focus{border-color:var(--gold)}
+
+  .plist{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:4px}
+  .chip{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.1);border:2px solid var(--line);
+    border-radius:999px;padding:8px 10px 8px 18px;font-size:clamp(15px,2.4vw,21px);font-weight:900}
+  .chip b{max-width:9ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip .x{width:28px;height:28px;border-radius:50%;background:rgba(255,59,107,.85);color:#fff;font-size:16px;line-height:1;
+    display:grid;place-items:center;border:none}
+
+  .seg{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .seg button{font-size:clamp(14px,2.2vw,19px);padding:11px 20px;background:rgba(255,255,255,.08);
+    color:var(--dim);border:2px solid var(--line)}
+  .seg button.sel{background:var(--gold);color:#25160a;border-color:var(--gold)}
+
+  .prompt{font-size:clamp(23px,4.6vw,44px);font-weight:900;line-height:1.18;text-align:center;
+    letter-spacing:-.01em;text-wrap:balance}
+  .verdict{font-size:clamp(44px,12vw,120px);font-weight:900;letter-spacing:-.03em;text-align:center;line-height:1}
+  .v-true{color:var(--mint);text-shadow:0 0 40px rgba(47,227,160,.5)}
+  .v-lie{color:var(--hot);text-shadow:0 0 40px rgba(255,59,107,.5)}
+
+  .hold{width:min(560px,92vw);min-height:clamp(180px,34vh,300px);border-radius:22px;
+    border:3px dashed var(--line);display:grid;place-items:center;gap:10px;padding:20px;
+    background:rgba(0,0,0,.35);font-size:clamp(17px,3vw,26px);font-weight:900;color:var(--dim);text-align:center;
+    touch-action:none}
+  .hold.live{border-style:solid;border-color:var(--gold);background:rgba(255,201,60,.1);color:var(--ink)}
+
+  .timer{font-size:clamp(60px,17vw,170px);font-weight:900;line-height:.9;letter-spacing:-.04em;
+    font-variant-numeric:tabular-nums;color:var(--sky);text-shadow:0 0 50px rgba(73,198,255,.35)}
+  .timer.warn{color:var(--gold);text-shadow:0 0 50px rgba(255,201,60,.45)}
+  .timer.out{color:var(--hot);animation:pulse .5s infinite alternate}
+  @keyframes pulse{to{transform:scale(1.06)}}
+  .bar{width:min(700px,92vw);height:14px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--mint),var(--sky));transition:width .1s linear}
+
+  .twist{border:2px solid var(--gold);background:rgba(255,201,60,.12);border-radius:16px;
+    padding:12px 18px;max-width:min(640px,92vw);text-align:center}
+  .twist .lbl{font-size:clamp(11px,1.8vw,14px);letter-spacing:.22em;color:var(--gold);font-weight:900;text-transform:uppercase}
+  .twist .txt{font-size:clamp(15px,2.5vw,22px);font-weight:800;margin-top:4px;line-height:1.3}
+
+  .grid{display:grid;gap:12px;width:100%;
+    grid-template-columns:repeat(auto-fit,minmax(clamp(130px,22vw,200px),1fr))}
+  .tile{padding:clamp(14px,2.4vw,22px) 10px;border-radius:18px;border:3px solid var(--line);
+    background:rgba(255,255,255,.07);color:var(--ink);font-size:clamp(16px,2.6vw,24px);font-weight:900;
+    display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+  .tile .st{font-size:clamp(11px,1.8vw,14px);letter-spacing:.18em;color:var(--dim);font-weight:900}
+  .tile.locked{border-color:var(--mint);background:rgba(47,227,160,.14)}
+  .tile.locked .st{color:var(--mint)}
+  .tile.res-ok{border-color:var(--mint);background:rgba(47,227,160,.18)}
+  .tile.res-no{border-color:var(--hot);background:rgba(255,59,107,.15)}
+  .tile .nm{max-width:11ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  .modal{position:fixed;inset:0;background:rgba(3,8,16,.94);display:none;place-items:center;z-index:50;padding:20px}
+  .modal.on{display:grid}
+  .modal .box{width:min(560px,94vw);text-align:center;display:flex;flex-direction:column;gap:18px}
+  .vbtn{font-size:clamp(26px,6vw,52px);padding:clamp(22px,5vw,44px);border-radius:22px;width:100%;letter-spacing:.04em}
+  .vtrue{background:linear-gradient(100deg,var(--mint),var(--sky));color:#04241c}
+  .vlie{background:linear-gradient(100deg,var(--hot),var(--violet));color:#fff}
+
+  table{width:100%;border-collapse:collapse;font-size:clamp(15px,2.5vw,23px)}
+  td{padding:10px 8px;border-bottom:1px solid var(--line);font-weight:800}
+  td.r{text-align:right;font-variant-numeric:tabular-nums}
+  td.pos{width:2.2em;color:var(--gold)}
+  .gain{color:var(--mint);font-size:.8em;margin-left:8px}
+  tr.lead td{color:var(--gold)}
+
+  .podium{display:flex;gap:12px;align-items:flex-end;justify-content:center;flex-wrap:wrap}
+  .pod{border-radius:18px 18px 0 0;padding:14px 12px;min-width:clamp(92px,20vw,150px);text-align:center;
+    display:flex;flex-direction:column;justify-content:flex-end;gap:6px;font-weight:900;color:#0a1422}
+  .pod .n{font-size:clamp(15px,2.6vw,22px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pod .s{font-size:clamp(13px,2.2vw,18px);opacity:.75;font-variant-numeric:tabular-nums}
+  .p1{background:linear-gradient(180deg,var(--gold),#ff9b2f);height:clamp(130px,22vh,200px)}
+  .p2{background:linear-gradient(180deg,#dbe6f2,#9fb3c8);height:clamp(100px,17vh,155px)}
+  .p3{background:linear-gradient(180deg,#e8a06a,#b9713f);height:clamp(80px,14vh,125px)}
+
+  .rules{text-align:left;max-width:640px;font-size:clamp(14px,2.3vw,19px);line-height:1.55;color:var(--dim)}
+  .rules b{color:var(--ink)}
+  .rules li{margin:8px 0}
+  .hdr{display:flex;justify-content:space-between;align-items:center;width:100%;gap:10px;
+    font-size:clamp(11px,1.9vw,15px);letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:900}
+  .warnbox{border:3px solid var(--hot);background:rgba(255,59,107,.13);border-radius:18px;padding:14px 20px;
+    font-size:clamp(15px,2.6vw,24px);font-weight:900;text-align:center;max-width:min(620px,94vw)}
+  .mutebtn{position:fixed;top:10px;right:10px;z-index:60;background:rgba(0,0,0,.35);border:2px solid var(--line);
+    color:var(--dim);font-size:18px;width:44px;height:44px;border-radius:12px;display:grid;place-items:center}
+</style>
+</head>
+<body>
+<button class="mutebtn" id="mute" title="Sound on/off">&#9835;</button>
+<div class="wrap">
+
+<!-- ============ SETUP ============ -->
+<section class="screen on" id="s-setup">
+  <div class="tag">A bluff &amp; deception party game</div>
+  <h1>STRAIGHT<br>FACE</h1>
+  <p class="sub">The game secretly tells you whether your story is <b style="color:var(--mint)">TRUE</b> or a <b style="color:var(--hot)">LIE</b>. Tell it. Survive the cross-examination. See who the room believes.</p>
+  <div class="meta">3–10 players &nbsp;·&nbsp; 20–35 minutes &nbsp;·&nbsp; one screen, passed around</div>
+
+  <div class="card" style="max-width:720px">
+    <div class="row">
+      <input type="text" id="pname" placeholder="Player name" maxlength="14" autocomplete="off">
+      <button class="big gold" id="addp" style="padding:14px 28px;font-size:clamp(17px,2.8vw,22px)">ADD</button>
+    </div>
+    <div class="plist" id="plist"></div>
+    <div style="margin-top:18px" class="meta">Rounds per player</div>
+    <div class="seg" id="laps" style="margin-top:8px">
+      <button data-l="1">1 lap</button>
+      <button data-l="2" class="sel">2 laps</button>
+      <button data-l="3">3 laps</button>
+    </div>
+  </div>
+
+  <div class="row">
+    <button class="big" id="start" disabled>START GAME</button>
+    <button class="ghost" id="tohow">How to play</button>
+  </div>
+</section>
+
+<!-- ============ HOW TO ============ -->
+<section class="screen" id="s-how">
+  <h2>How to play</h2>
+  <div class="card rules" style="max-width:700px">
+    <ol>
+      <li><b>One player takes the screen</b> and holds down to peek at their secret card: a story prompt, plus a hidden verdict — <b style="color:var(--mint)">TRUE STORY</b> or <b style="color:var(--hot)">MAKE IT UP</b>.</li>
+      <li><b>They tell the story out loud</b> to the room. 45 seconds.</li>
+      <li><b>CROSS-EXAMINATION.</b> 45 seconds where anyone can fire questions at them. They must answer — instantly, confidently, in character.</li>
+      <li><b>Everyone else votes</b> in secret on the screen: TRUE or LIE.</li>
+      <li><b>Reveal.</b> Guess right: <b>+100</b>. Teller earns <b>+150</b> for every person they fooled — and a <b>+250</b> bonus for fooling the entire room.</li>
+    </ol>
+    <p style="margin-bottom:0">Random <b style="color:var(--gold)">TWISTS</b> land on some rounds — no hands, one-word answers, double points. The screen tells you when.</p>
+  </div>
+  <button class="big mint" id="backhow">GOT IT</button>
+</section>
+
+<!-- ============ HANDOFF ============ -->
+<section class="screen" id="s-hand">
+  <div class="hdr"><span id="h-round">Round 1</span><span id="h-lead">—</span></div>
+  <div class="tag">Pass the screen to</div>
+  <h1 id="tellerName" style="font-size:clamp(44px,13vw,120px)">—</h1>
+  <p class="sub">Everyone else: <b>eyes off the screen.</b></p>
+  <button class="big gold" id="toCard">I'VE GOT IT</button>
+</section>
+
+<!-- ============ SECRET CARD ============ -->
+<section class="screen" id="s-card">
+  <div class="warnbox"><span id="cardWho">—</span> only — hold the screen close</div>
+  <div class="hold" id="hold">
+    <div id="holdHint">PRESS AND HOLD<br><span style="font-size:.6em;color:var(--dim)">to reveal your secret card</span></div>
+  </div>
+  <div class="row"><button class="big mint" id="cardReady" disabled>READY — START TELLING</button></div>
+  <div class="meta" id="cardNote">Peek as many times as you like. Nobody else can see it.</div>
+</section>
+
+<!-- ============ TELLING ============ -->
+<section class="screen" id="s-tell">
+  <div class="hdr"><span id="t-round">Round 1</span><span>TELLING</span></div>
+  <div class="tag" id="tellWho">—</div>
+  <p class="prompt" id="tellPrompt">—</p>
+  <div class="twist" id="tellTwist" style="display:none"><div class="lbl">Twist</div><div class="txt" id="tellTwistTxt"></div></div>
+  <div class="timer" id="tellTimer">45</div>
+  <div class="bar"><i id="tellBar" style="width:100%"></i></div>
+  <div class="row">
+    <button class="big" id="toCross">CROSS-EXAMINE →</button>
+    <button class="ghost" id="tellMore">+15 seconds</button>
+  </div>
+</section>
+
+<!-- ============ CROSS EXAM ============ -->
+<section class="screen" id="s-cross">
+  <div class="hdr"><span id="x-round">Round 1</span><span>CROSS-EXAMINATION</span></div>
+  <h2 style="color:var(--hot)">QUESTION THEM</h2>
+  <p class="sub" id="crossSub">Anyone may ask. <b id="crossWho">They</b> must answer immediately.</p>
+  <div class="twist" id="crossTwist" style="display:none"><div class="lbl">Twist still active</div><div class="txt" id="crossTwistTxt"></div></div>
+  <div class="timer" id="crossTimer">45</div>
+  <div class="bar"><i id="crossBar" style="width:100%"></i></div>
+  <div class="row">
+    <button class="big gold" id="toVote">REST MY CASE → VOTE</button>
+    <button class="ghost" id="crossMore">+15 seconds</button>
+  </div>
+</section>
+
+<!-- ============ VOTE ============ -->
+<section class="screen" id="s-vote">
+  <div class="hdr"><span id="v-round">Round 1</span><span>SECRET BALLOT</span></div>
+  <h2>Was <span id="voteWho" style="color:var(--gold)">—</span> telling the truth?</h2>
+  <p class="sub">Tap your own name, shield the screen, lock your vote.</p>
+  <div class="card"><div class="grid" id="voteGrid"></div></div>
+  <button class="big mint" id="toReveal" disabled>REVEAL THE VERDICT</button>
+</section>
+
+<!-- ============ REVEAL ============ -->
+<section class="screen" id="s-reveal">
+  <div class="hdr"><span id="r-round">Round 1</span><span>THE VERDICT</span></div>
+  <div class="tag" id="revealWho">—</div>
+  <div class="verdict" id="revealVerdict">—</div>
+  <p class="sub" id="revealLine">—</p>
+  <div class="card"><div class="grid" id="revealGrid"></div></div>
+  <button class="big" id="toScores">SCOREBOARD →</button>
+</section>
+
+<!-- ============ SCOREBOARD ============ -->
+<section class="screen" id="s-scores">
+  <div class="hdr"><span id="sc-round">Round 1</span><span>SCORES</span></div>
+  <h2>Scoreboard</h2>
+  <div class="card" style="max-width:640px"><table id="scTable"></table></div>
+  <button class="big gold" id="nextRound">NEXT ROUND →</button>
+</section>
+
+<!-- ============ FINAL ============ -->
+<section class="screen" id="s-final">
+  <div class="tag">Game over</div>
+  <h1 id="winName">—</h1>
+  <p class="sub" id="winLine">—</p>
+  <div class="podium" id="podium"></div>
+  <div class="card" style="max-width:640px"><table id="finTable"></table></div>
+  <div class="row">
+    <button class="big mint" id="again">PLAY AGAIN</button>
+    <button class="ghost" id="newgame">New players</button>
+  </div>
+</section>
+
+</div>
+
+<!-- vote modal -->
+<div class="modal" id="vmodal">
+  <div class="box">
+    <div class="tag">Secret vote</div>
+    <h2 id="vmName">—</h2>
+    <p class="sub" style="margin:0 auto">Do you believe <b id="vmTeller">them</b>?</p>
+    <button class="vbtn vtrue" data-v="T">TRUE STORY</button>
+    <button class="vbtn vlie" data-v="L">THEY'RE LYING</button>
+    <button class="ghost" id="vmCancel">Cancel</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------------- CONTENT ---------------- */
+const PROMPTS = [
+ "A time you got completely, hopelessly lost.",
+ "The worst haircut you have ever had.",
+ "A time you were mistaken for somebody else.",
+ "Your most embarrassing moment in a supermarket.",
+ "A time you broke something that wasn't yours.",
+ "The strangest thing you have ever eaten.",
+ "A time you ended up on TV, radio, or in a newspaper.",
+ "The worst present you have ever been given.",
+ "A time an animal caused you serious trouble.",
+ "Your finest moment in a sport — or your worst.",
+ "A time you got in trouble at school.",
+ "The most money you have ever found lying around.",
+ "A time you met someone famous — or very nearly did.",
+ "A phone call that went horribly wrong.",
+ "A time you forgot something extremely important.",
+ "The most dangerous thing you have done entirely by accident.",
+ "A talent you have that nobody in this room knows about.",
+ "A time you were spectacularly, unforgivably late.",
+ "The worst meal you have ever cooked.",
+ "A competition you actually won.",
+ "Your strangest ever encounter with a total stranger.",
+ "A time technology betrayed you at the worst possible moment.",
+ "A time you were absolutely certain you were right, and were not.",
+ "The best thing you have ever found in a second-hand shop.",
+ "A time you got stuck somewhere.",
+ "Your worst experience with a haircut, a dentist, or a doctor.",
+ "A time you gave someone completely wrong directions.",
+ "The weirdest job you have ever done, paid or unpaid.",
+ "A time you accidentally insulted somebody.",
+ "Something you broke and secretly never told anyone about.",
+ "A time you were the only person who found something funny.",
+ "The most impressive thing you have ever built or fixed.",
+ "A time a queue changed the course of your day.",
+ "Your worst experience on public transport.",
+ "A time you wore completely the wrong clothes.",
+ "Something you were obsessed with as a child.",
+ "A time you tried to be helpful and made it much worse.",
+ "The longest you have ever waited for anything.",
+ "A time you got a name badly, badly wrong.",
+ "An argument you won that you should have lost.",
+ "A time you were caught doing something harmless but suspicious.",
+ "The strangest thing you have ever found in a pocket.",
+ "A holiday or trip that went off the rails.",
+ "A time you were far braver than usual.",
+ "The most useless fact you know, and how you learned it.",
+ "A time you locked yourself out of something.",
+ "Your greatest triumph in a kitchen.",
+ "A time a plan of yours worked perfectly.",
+ "Something you have queued for that was not worth it.",
+ "A time you were completely upstaged by a child.",
+ "The best excuse you have ever used.",
+ "A time you lost something valuable and got it back.",
+ "Your worst experience with paint, glue, or a power tool.",
+ "A time you were somewhere you probably shouldn't have been.",
+ "The strangest gift you have ever given someone.",
+ "A time weather ruined or rescued your day.",
+ "An injury with a very boring cause and a dramatic result.",
+ "A time you accidentally became part of someone else's event.",
+ "The most stubborn thing you have ever done.",
+ "A time you were mistaken for staff somewhere.",
+ "Your worst haggle, bargain, or deal.",
+ "A time a machine flatly refused to cooperate with you.",
+ "Something you can do that looks much harder than it is.",
+ "A time you got hopelessly confused by instructions.",
+ "The nicest thing a stranger has ever done for you.",
+ "A time you had to improvise in front of other people.",
+ "Your most memorable birthday, for the wrong reasons.",
+ "A time you found out something far too late.",
+ "The worst advice you have ever followed.",
+ "A time you were the last person to realise something.",
+ "Something that happened to you that nobody believed.",
+ "A time you spectacularly misjudged a distance.",
+ "The most food you have ever eaten in one sitting.",
+ "A time a pet or animal outsmarted you.",
+ "Your worst experience with a piece of furniture.",
+ "A time you had to run for something.",
+ "The strangest place you have ever fallen asleep.",
+ "A time someone gave you far too much credit.",
+ "Something you have been unfairly blamed for.",
+ "A time you made a very small decision that changed a whole day."
+];
+
+const TWISTS = [
+ {t:"NO HANDS — tell the whole story without moving your hands."},
+ {t:"MONOTONE — not one drop of emotion in your voice."},
+ {t:"SPECIFICS — you must say three exact numbers out loud."},
+ {t:"ONE-WORD ANSWERS — during cross-examination only.", xOnly:true},
+ {t:"NAME NAMES — everyone in your story needs a full name."},
+ {t:"SLOW MOTION — tell it at half your normal speed."},
+ {t:"THE SMELL TEST — you must describe a smell in detail."},
+ {t:"WEATHER REPORT — you must say exactly what the weather was doing."},
+ {t:"ON YOUR FEET — stand up for the whole round."},
+ {t:"EYES ON ONE — stare at the player on your left the entire time."},
+ {t:"SOUND EFFECTS — include at least two, out loud."},
+ {t:"THE CLOSER — finish with: “and that's why I never do that anymore.”"},
+ {t:"HECKLER — the player on your right may interrupt you once, with anything."},
+ {t:"SHORT LEASH — you only get 20 seconds to tell it.", tell:20},
+ {t:"SILENT JURY — nobody may ask questions. You get 60 seconds to tell it instead.", tell:60, cross:12},
+ {t:"DOUBLE STAKES — every point this round is worth double.", mult:2},
+ {t:"THE GRILLING — cross-examination runs for 75 seconds.", cross:75},
+ {t:"PAST MASTER — say “honestly” or “literally” and the room shouts FOUL."},
+ {t:"SIDEKICK — a person you have never mentioned before must appear in the story."},
+ {t:"TWO DETAILS — name a colour and a time of day, and stick to them."}
+];
+
+/* ---------------- AUDIO ---------------- */
+let AC=null, muted=false;
+function ac(){ if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ AC=null; } }
+  if(AC && AC.state==="suspended") AC.resume(); return AC; }
+function tone(f,d,type,vol,when){
+  const c=ac(); if(!c||muted) return;
+  const t0=c.currentTime+(when||0);
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type||"sine"; o.frequency.setValueAtTime(f,t0);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.001,vol||0.18),t0+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+  o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0+d+0.04);
+}
+function sweep(f1,f2,d,type,vol){
+  const c=ac(); if(!c||muted) return;
+  const t0=c.currentTime;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type||"sawtooth"; o.frequency.setValueAtTime(f1,t0);
+  o.frequency.exponentialRampToValueAtTime(Math.max(20,f2),t0+d);
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(vol||0.16,t0+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+  o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0+d+0.05);
+}
+const sfx={
+  tap(){ tone(520,0.07,"square",0.08); },
+  add(){ tone(660,0.08,"triangle",0.12); tone(990,0.09,"triangle",0.09,0.06); },
+  flip(){ sweep(200,900,0.18,"triangle",0.12); },
+  tick(){ tone(1200,0.045,"square",0.07); },
+  timeup(){ tone(220,0.18,"square",0.16); tone(180,0.24,"square",0.16,0.18); },
+  lock(){ tone(880,0.06,"sine",0.1); tone(1320,0.08,"sine",0.08,0.05); },
+  truth(){ [523,659,784,1047].forEach((f,i)=>tone(f,0.45,"triangle",0.14,i*0.09)); },
+  lie(){ sweep(420,90,0.55,"sawtooth",0.17); tone(120,0.5,"square",0.1,0.05); },
+  score(){ [784,988,1175].forEach((f,i)=>tone(f,0.2,"sine",0.1,i*0.05)); },
+  win(){ [523,659,784,1047,1319,1047,1319,1568].forEach((f,i)=>tone(f,0.38,"triangle",0.15,i*0.11)); }
+};
+
+/* ---------------- STATE ---------------- */
+const S={
+  players:[], laps:2, round:0, totalRounds:0,
+  teller:0, prompt:"", verdict:true, twist:null,
+  votes:{}, promptBag:[], twistBag:[], lastGain:{}
+};
+
+const $=id=>document.getElementById(id);
+const screens=["setup","how","hand","card","tell","cross","vote","reveal","scores","final"];
+function show(name){
+  screens.forEach(s=>$("s-"+s).classList.toggle("on", s===name));
+  window.scrollTo(0,0);
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function drawFrom(bagName, source){
+  if(!S[bagName].length) S[bagName]=shuffle(source.slice());
+  return S[bagName].pop();
+}
+
+/* ---------------- SETUP ---------------- */
+function renderPlayers(){
+  const el=$("plist"); el.innerHTML="";
+  S.players.forEach((p,i)=>{
+    const d=document.createElement("div"); d.className="chip";
+    const b=document.createElement("b"); b.textContent=p.name;
+    const x=document.createElement("button"); x.className="x"; x.textContent="×";
+    x.onclick=()=>{ S.players.splice(i,1); sfx.tap(); renderPlayers(); };
+    d.appendChild(b); d.appendChild(x); el.appendChild(d);
+  });
+  $("start").disabled = S.players.length<3;
+  $("pname").disabled = S.players.length>=10;
+  $("addp").disabled = S.players.length>=10;
+}
+function addPlayer(){
+  const v=$("pname").value.trim();
+  if(!v || S.players.length>=10) return;
+  if(S.players.some(p=>p.name.toLowerCase()===v.toLowerCase())) { $("pname").value=""; return; }
+  S.players.push({name:v, score:0});
+  $("pname").value=""; sfx.add(); renderPlayers(); $("pname").focus();
+}
+$("addp").onclick=addPlayer;
+$("pname").addEventListener("keydown",e=>{ if(e.key==="Enter") addPlayer(); });
+$("laps").querySelectorAll("button").forEach(b=>{
+  b.onclick=()=>{ S.laps=+b.dataset.l; sfx.tap();
+    $("laps").querySelectorAll("button").forEach(x=>x.classList.toggle("sel",x===b)); };
+});
+$("tohow").onclick=()=>{ sfx.tap(); show("how"); };
+$("backhow").onclick=()=>{ sfx.tap(); show("setup"); };
+$("mute").onclick=()=>{ muted=!muted; $("mute").style.color=muted?"var(--hot)":"var(--dim)";
+  $("mute").innerHTML = muted ? "&#9834;&#10006;" : "&#9835;"; if(!muted) sfx.tap(); };
+
+$("start").onclick=()=>{
+  ac(); sfx.score();
+  S.players.forEach(p=>p.score=0);
+  shuffle(S.players);
+  S.round=0; S.totalRounds=S.players.length*S.laps;
+  S.promptBag=[]; S.twistBag=[];
+  beginRound();
+};
+
+/* ---------------- ROUND FLOW ---------------- */
+function leaderText(){
+  const best=S.players.reduce((a,b)=>b.score>a.score?b:a, S.players[0]);
+  if(!best || best.score===0) return "All square";
+  const tied=S.players.filter(p=>p.score===best.score);
+  return (tied.length>1 ? "Tied "+best.score : "Leader: "+best.name+" "+best.score);
+}
+function beginRound(){
+  S.teller = S.round % S.players.length;
+  S.prompt = drawFrom("promptBag", PROMPTS);
+  S.verdict = Math.random()<0.5;
+  S.twist = Math.random()<0.4 ? drawFrom("twistBag", TWISTS) : null;
+  S.votes={}; S.lastGain={};
+  peeked=false;
+  const rtxt="Round "+(S.round+1)+" of "+S.totalRounds;
+  ["h-round","t-round","x-round","v-round","r-round","sc-round"].forEach(id=>$(id).textContent=rtxt);
+  $("h-lead").textContent=leaderText();
+  $("tellerName").textContent=S.players[S.teller].name;
+  show("hand");
+}
+
+/* --- secret card --- */
+let peeked=false, holding=false;
+$("toCard").onclick=()=>{
+  sfx.tap();
+  $("cardWho").textContent=S.players[S.teller].name;
+  $("cardReady").disabled=true;
+  peeked=false;
+  hideCard();
+  show("card");
+};
+function showCard(){
+  holding=true;
+  const h=$("hold"); h.classList.add("live");
+  const v=S.verdict;
+  h.innerHTML =
+    '<div class="verdict '+(v?"v-true":"v-lie")+'" style="font-size:clamp(30px,8vw,68px)">'+(v?"TRUE STORY":"MAKE IT UP")+'</div>'+
+    '<div class="prompt" style="font-size:clamp(17px,3.2vw,30px)">'+S.prompt+'</div>'+
+    '<div class="meta" style="margin-top:6px">'+(v?"Tell it exactly as it happened.":"Invent it. Make it believable.")+'</div>';
+  if(!peeked){ peeked=true; sfx.flip(); $("cardReady").disabled=false; }
+}
+function hideCard(){
+  holding=false;
+  const h=$("hold"); h.classList.remove("live");
+  h.innerHTML='<div id="holdHint">PRESS AND HOLD<br><span style="font-size:.6em;color:var(--dim)">'+
+    (peeked?"to peek again":"to reveal your secret card")+'</span></div>';
+}
+(function bindHold(){
+  const h=$("hold");
+  const down=e=>{ e.preventDefault(); ac(); showCard(); };
+  const up=e=>{ if(holding){ e.preventDefault(); hideCard(); } };
+  h.addEventListener("pointerdown",down);
+  h.addEventListener("pointerup",up);
+  h.addEventListener("pointercancel",up);
+  h.addEventListener("pointerleave",up);
+  h.addEventListener("contextmenu",e=>e.preventDefault());
+})();
+$("cardReady").onclick=()=>{ sfx.tap(); hideCard(); startTell(); };
+
+/* --- timers --- */
+let timerId=null;
+function runTimer(secs, elTime, elBar, onEnd){
+  clearInterval(timerId);
+  const total=secs; let end=Date.now()+secs*1000; let lastWhole=secs;
+  const tickFn=()=>{
+    const left=Math.max(0,(end-Date.now())/1000);
+    const whole=Math.ceil(left);
+    elTime.textContent=whole;
+    elBar.style.width=(left/total*100)+"%";
+    elTime.classList.toggle("warn", left<=15 && left>5);
+    elTime.classList.toggle("out", left<=5);
+    if(whole!==lastWhole){
+      lastWhole=whole;
+      if(whole<=5 && whole>0) sfx.tick();
+    }
+    if(left<=0){ clearInterval(timerId); timerId=null; sfx.timeup(); if(onEnd) onEnd(); }
+  };
+  tickFn();
+  timerId=setInterval(tickFn,80);
+  return ()=>{ end+=15000; };
+}
+let extendTell=null, extendCross=null;
+function stopTimer(){ clearInterval(timerId); timerId=null; }
+
+function twistBox(boxId,txtId){
+  if(S.twist){ $(boxId).style.display=""; $(txtId).textContent=S.twist.t; }
+  else $(boxId).style.display="none";
+}
+function startTell(){
+  $("tellWho").textContent=S.players[S.teller].name+"'s story";
+  $("tellPrompt").textContent=S.prompt;
+  if(S.twist && S.twist.xOnly){ $("tellTwist").style.display="none"; }
+  else twistBox("tellTwist","tellTwistTxt");
+  show("tell");
+  const secs=(S.twist && S.twist.tell) ? S.twist.tell : 45;
+  extendTell=runTimer(secs,$("tellTimer"),$("tellBar"),null);
+}
+$("tellMore").onclick=()=>{ if(extendTell){ sfx.tap(); extendTell(); } };
+$("toCross").onclick=()=>{ sfx.tap(); stopTimer(); startCross(); };
+
+function startCross(){
+  twistBox("crossTwist","crossTwistTxt");
+  $("crossSub").innerHTML = (S.twist && S.twist.cross===12)
+    ? "No questions this round. Let it sit and watch them squirm."
+    : 'Anyone may ask. <b style="color:var(--gold)">'+escapeHtml(S.players[S.teller].name)+'</b> must answer immediately.';
+  show("cross");
+  const secs=(S.twist && S.twist.cross) ? S.twist.cross : 45;
+  extendCross=runTimer(secs,$("crossTimer"),$("crossBar"),null);
+}
+$("crossMore").onclick=()=>{ if(extendCross){ sfx.tap(); extendCross(); } };
+$("toVote").onclick=()=>{ sfx.tap(); stopTimer(); startVote(); };
+
+/* --- voting --- */
+let votingFor=-1;
+function startVote(){
+  $("voteWho").textContent=S.players[S.teller].name;
+  S.votes={};
+  renderVoteGrid();
+  show("vote");
+}
+function renderVoteGrid(){
+  const g=$("voteGrid"); g.innerHTML="";
+  S.players.forEach((p,i)=>{
+    if(i===S.teller) return;
+    const b=document.createElement("button");
+    const locked=!!S.votes[i];
+    b.className="tile"+(locked?" locked":"");
+    b.innerHTML='<span class="nm">'+escapeHtml(p.name)+'</span><span class="st">'+(locked?"LOCKED ✓":"TAP TO VOTE")+'</span>';
+    b.onclick=()=>openVote(i);
+    g.appendChild(b);
+  });
+  $("toReveal").disabled = S.players.some((p,i)=> i!==S.teller && !S.votes[i]);
+}
+function escapeHtml(s){ return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function openVote(i){
+  votingFor=i; sfx.tap();
+  $("vmName").textContent=S.players[i].name;
+  $("vmTeller").textContent=S.players[S.teller].name;
+  $("vmodal").classList.add("on");
+}
+$("vmodal").querySelectorAll(".vbtn").forEach(b=>{
+  b.onclick=()=>{ S.votes[votingFor]=b.dataset.v; sfx.lock();
+    $("vmodal").classList.remove("on"); renderVoteGrid(); };
+});
+$("vmCancel").onclick=()=>{ sfx.tap(); $("vmodal").classList.remove("on"); };
+$("toReveal").onclick=()=>{ doReveal(); };
+
+/* --- reveal & scoring --- */
+function doReveal(){
+  const mult=(S.twist && S.twist.mult) ? S.twist.mult : 1;
+  const truth = S.verdict ? "T" : "L";
+  let right=0, fooled=0;
+  S.lastGain={};
+  S.players.forEach((p,i)=>{
+    if(i===S.teller) return;
+    if(S.votes[i]===truth){ right++; const g=100*mult; p.score+=g; S.lastGain[i]=g; }
+    else { fooled++; S.lastGain[i]=0; }
+  });
+  let tg = fooled*150*mult;
+  const voters=S.players.length-1;
+  const perfect = (fooled===voters && voters>0);
+  if(perfect) tg += 250*mult;
+  S.players[S.teller].score += tg;
+  S.lastGain[S.teller]=tg;
+
+  $("revealWho").textContent=S.players[S.teller].name+" was...";
+  const vEl=$("revealVerdict");
+  vEl.textContent = S.verdict ? "TELLING THE TRUTH" : "LYING";
+  vEl.className = "verdict "+(S.verdict?"v-true":"v-lie");
+  vEl.style.fontSize = "clamp(30px,7.5vw,86px)";
+
+  let line;
+  if(perfect) line="A perfect poker face — the whole room fell for it. +"+(250*mult)+" bonus.";
+  else if(fooled===0) line="Read like a book. Nobody bought it.";
+  else if(right===0) line="Everyone got it wrong somehow!";
+  else line=right+" of "+voters+" read it right. "+fooled+" fooled.";
+  $("revealLine").textContent=line;
+
+  const g=$("revealGrid"); g.innerHTML="";
+  S.players.forEach((p,i)=>{
+    if(i===S.teller) return;
+    const ok=S.votes[i]===truth;
+    const d=document.createElement("div");
+    d.className="tile "+(ok?"res-ok":"res-no");
+    d.innerHTML='<span class="nm">'+escapeHtml(p.name)+'</span><span class="st">'+
+      (S.votes[i]==="T"?"SAID TRUE":"SAID LIE")+'</span><span class="st" style="color:'+(ok?"var(--mint)":"var(--hot)")+'">'+
+      (ok?"+"+(100*mult):"+0")+'</span>';
+    g.appendChild(d);
+  });
+  show("reveal");
+  if(S.verdict) sfx.truth(); else sfx.lie();
+}
+$("toScores").onclick=()=>{ sfx.tap(); renderScores(); show("scores"); };
+
+function renderScores(){
+  const rows=S.players.map((p,i)=>({p,i})).sort((a,b)=>b.p.score-a.p.score);
+  const t=$("scTable"); t.innerHTML="";
+  rows.forEach((r,n)=>{
+    const tr=document.createElement("tr");
+    if(n===0) tr.className="lead";
+    const gain=S.lastGain[r.i];
+    tr.innerHTML='<td class="pos">'+(n+1)+'</td><td>'+escapeHtml(r.p.name)+
+      (r.i===S.teller?' <span class="st" style="color:var(--gold);font-size:.7em">TELLER</span>':'')+
+      '</td><td class="r">'+r.p.score+(gain?'<span class="gain">+'+gain+'</span>':'')+'</td>';
+    t.appendChild(tr);
+  });
+  $("nextRound").textContent = (S.round+1>=S.totalRounds) ? "FINAL RESULTS →" : "NEXT ROUND →";
+  sfx.score();
+}
+$("nextRound").onclick=()=>{
+  sfx.tap(); S.round++;
+  if(S.round>=S.totalRounds) finish(); else beginRound();
+};
+
+/* --- final --- */
+function finish(){
+  const rows=S.players.slice().sort((a,b)=>b.score-a.score);
+  const top=rows[0].score;
+  const winners=rows.filter(p=>p.score===top);
+  $("winName").textContent = winners.length>1 ? "IT'S A TIE!" : winners[0].name.toUpperCase()+" WINS";
+  $("winLine").textContent = winners.length>1
+    ? winners.map(w=>w.name).join(" & ")+" — "+top+" points each. Nobody could read anybody."
+    : top+" points. Utterly unreadable.";
+  const pod=$("podium"); pod.innerHTML="";
+  const order=[1,0,2];
+  order.forEach(idx=>{
+    if(!rows[idx]) return;
+    const d=document.createElement("div");
+    d.className="pod p"+(idx+1);
+    d.innerHTML='<div class="n">'+escapeHtml(rows[idx].name)+'</div><div class="s">'+rows[idx].score+'</div>';
+    pod.appendChild(d);
+  });
+  const t=$("finTable"); t.innerHTML="";
+  rows.forEach((p,n)=>{
+    const tr=document.createElement("tr");
+    if(n===0) tr.className="lead";
+    tr.innerHTML='<td class="pos">'+(n+1)+'</td><td>'+escapeHtml(p.name)+'</td><td class="r">'+p.score+'</td>';
+    t.appendChild(tr);
+  });
+  show("final"); sfx.win();
+}
+$("again").onclick=()=>{
+  sfx.tap();
+  S.players.forEach(p=>p.score=0);
+  shuffle(S.players);
+  S.round=0; S.totalRounds=S.players.length*S.laps;
+  beginRound();
+};
+$("newgame").onclick=()=>{ sfx.tap(); stopTimer(); renderPlayers(); show("setup"); };
+
+renderPlayers();
+</script>
+</body>
+</html>
