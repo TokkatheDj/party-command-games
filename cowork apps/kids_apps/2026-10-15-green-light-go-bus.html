@@ -1,0 +1,320 @@
+<!-- CONCEPT: Green Light Go! - hold the GO button to drive a school bus, stop at red lights (ducks cross!) and bus stops to pick up 5 animal friends - a traffic-light reaction/timing game. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Green Light Go! - Bus Buddies</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:#8fd8ff;font-family:"Trebuchet MS","Comic Sans MS",system-ui,sans-serif}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hud{position:fixed;top:8px;left:0;right:0;display:flex;justify-content:center;gap:10px;pointer-events:none}
+.pill{background:#fff;border:4px solid #ff8a00;border-radius:30px;padding:4px 16px;font-size:clamp(18px,3.4vmin,30px);font-weight:900;color:#c25400;box-shadow:0 4px 0 #c25400}
+#toast{position:fixed;top:16%;left:50%;transform:translateX(-50%);background:#fff;border:5px solid #ff4fa3;color:#d4237a;border-radius:26px;padding:8px 22px;font-size:clamp(20px,4.4vmin,38px);font-weight:900;opacity:0;transition:opacity .25s;pointer-events:none;text-align:center;max-width:92vw}
+#toast.show{opacity:1}
+.btn{position:fixed;bottom:14px;border:0;border-radius:36px;font-weight:900;color:#fff;font-family:inherit;touch-action:none;cursor:pointer}
+#go{right:14px;width:min(46vw,300px);height:min(24vh,130px);font-size:clamp(28px,7vmin,54px);background:linear-gradient(#4be36a,#1faa3c);box-shadow:0 8px 0 #14802b}
+#go.down{transform:translateY(6px);box-shadow:0 2px 0 #14802b;filter:brightness(1.1)}
+#back{left:14px;width:min(26vw,170px);height:min(16vh,90px);font-size:clamp(18px,4.2vmin,30px);background:linear-gradient(#ffb347,#f08a00);box-shadow:0 6px 0 #b56200}
+#back.down{transform:translateY(5px);box-shadow:0 1px 0 #b56200}
+.overlay{position:fixed;inset:0;background:rgba(40,100,180,.82);display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;color:#fff;padding:16px}
+.overlay.hidden{display:none}
+.overlay h1{margin:0 0 6px;font-size:clamp(34px,9vmin,80px);text-shadow:0 5px 0 #1b4f99;line-height:1}
+.overlay p{font-size:clamp(18px,3.8vmin,30px);max-width:640px;margin:8px 0 18px;font-weight:700}
+.big{font-size:clamp(28px,6vmin,48px);padding:14px 44px;border:0;border-radius:40px;background:linear-gradient(#ffe14d,#ffb300);color:#7a4a00;font-weight:900;font-family:inherit;box-shadow:0 8px 0 #c58100;cursor:pointer}
+.big:active{transform:translateY(6px);box-shadow:0 2px 0 #c58100}
+#stars{font-size:clamp(50px,13vmin,110px);letter-spacing:6px}
+.emoji{font-size:clamp(50px,12vmin,100px)}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud"><div class="pill" id="pass">🚌 0 / 5</div><div class="pill" id="hint">Green = GO! Red = wait!</div></div>
+<div id="toast"></div>
+<button class="btn" id="back">⬅ Back</button>
+<button class="btn" id="go">Hold to GO!</button>
+
+<div class="overlay" id="start">
+  <div class="emoji">🚦🚌🚦</div>
+  <h1>Green Light Go!</h1>
+  <p>Hold the green button to drive the bus. Wait at red lights while the ducks cross, then stop at bus stops to pick up your 5 animal friends!</p>
+  <button class="big" id="startBtn">▶ Let's Go!</button>
+</div>
+<div class="overlay hidden" id="win">
+  <h1>Hooray! 🎉</h1>
+  <div id="stars">⭐⭐⭐</div>
+  <p id="winMsg">Everyone made it to school!</p>
+  <button class="big" id="again">🔁 Play Again</button>
+</div>
+
+<script>
+(()=>{
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const LH=600;let W,H,S,LW;
+function resize(){const d=window.devicePixelRatio||1;W=innerWidth;H=innerHeight;cv.width=W*d;cv.height=H*d;S=H/LH*d;LW=W/(H/LH);}
+addEventListener('resize',resize);resize();
+
+/* ---------- audio ---------- */
+let ac=null,eng=null,engG=null;
+function initAudio(){
+  if(ac){if(ac.state==='suspended')ac.resume();return;}
+  try{
+    ac=new (window.AudioContext||window.webkitAudioContext)();
+    eng=ac.createOscillator();eng.type='sawtooth';eng.frequency.value=50;
+    const f=ac.createBiquadFilter();f.type='lowpass';f.frequency.value=260;
+    engG=ac.createGain();engG.gain.value=0;
+    eng.connect(f);f.connect(engG);engG.connect(ac.destination);eng.start();
+  }catch(e){ac=null}
+}
+function tone(freq,dur,type='sine',vol=.2,delay=0,slide=0){
+  if(!ac)return;const t=ac.currentTime+delay;
+  const o=ac.createOscillator(),g=ac.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);
+  if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(30,freq+slide),t+dur);
+  g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+dur+.02);
+}
+const sfx={
+  ding(){tone(880,.15,'triangle',.25);tone(1320,.3,'triangle',.25,.1)},
+  honk(){tone(330,.25,'square',.12);tone(415,.25,'square',.12)},
+  bonk(){tone(300,.4,'sawtooth',.18,0,-220);tone(180,.3,'square',.1,.1)},
+  quack(){tone(520,.12,'square',.07,0,-200);tone(480,.12,'square',.07,.16,-180)},
+  green(){tone(660,.1,'triangle',.15);tone(990,.15,'triangle',.15,.09)},
+  fan(){[523,659,784,1047,784,1047,1319].forEach((f,i)=>tone(f,.28,'triangle',.22,i*.13))}
+};
+
+/* ---------- world ---------- */
+const ROAD_TOP=420,GROUND=470,BUS_W=150;
+const SCHOOL_X=7200;
+const lightDefs=[1500,2900,4300,5600];
+const stopDefs=[[800,'🐰'],[2200,'🐻'],[3600,'🐸'],[4950,'🐼'],[6300,'🦊']];
+let bus,lights,stops,passengers,bonks,time,parts,shake,toastT,done,started,msgCool;
+
+function reset(){
+  bus={x:60,v:0,wheel:0};
+  lights=lightDefs.map((x,i)=>({x,off:Math.random()*9,prev:'g'}));
+  stops=stopDefs.map(([x,a])=>({x,a,boarded:false,prog:0,hop:0}));
+  passengers=[];bonks=0;time=0;parts=[];shake=0;toastT=0;done=false;msgCool=0;
+  updHud();
+}
+const CYC=9,GREEN=4,YEL=5.2;
+function lstate(l){const t=(time+l.off)%CYC;return t<GREEN?'g':t<YEL?'y':'r'}
+function updHud(){document.getElementById('pass').textContent='🚌 '+passengers.length+' / 5'}
+const toastEl=document.getElementById('toast');
+function toast(t,ms=1800){toastEl.textContent=t;toastEl.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('show'),ms)}
+
+function confetti(x,y,n=40){
+  const cols=['#ff4fa3','#ffd400','#35c8ff','#6dde4a','#ff8a00','#b06bff'];
+  for(let i=0;i<n;i++)parts.push({x,y,vx:(Math.random()-.5)*400,vy:-Math.random()*400-100,c:cols[i%6],life:1.4+Math.random(),r:Math.random()*6.28,s:5+Math.random()*6});
+}
+
+/* ---------- input ---------- */
+const keys={go:false,back:false};
+function bindBtn(id,k){
+  const b=document.getElementById(id);
+  const dn=e=>{e.preventDefault();initAudio();keys[k]=true;b.classList.add('down');try{b.setPointerCapture(e.pointerId)}catch(_){}};
+  const up=e=>{e.preventDefault();keys[k]=false;b.classList.remove('down')};
+  b.addEventListener('pointerdown',dn);b.addEventListener('pointerup',up);b.addEventListener('pointercancel',up);b.addEventListener('lostpointercapture',up);
+  b.addEventListener('contextmenu',e=>e.preventDefault());
+}
+bindBtn('go','go');bindBtn('back','back');
+addEventListener('keydown',e=>{
+  if(e.code==='ArrowRight'||e.code==='Space'||e.code==='ArrowUp'){keys.go=true;document.getElementById('go').classList.add('down');initAudio();e.preventDefault()}
+  if(e.code==='ArrowLeft'||e.code==='ArrowDown'){keys.back=true;document.getElementById('back').classList.add('down');e.preventDefault()}
+});
+addEventListener('keyup',e=>{
+  if(e.code==='ArrowRight'||e.code==='Space'||e.code==='ArrowUp'){keys.go=false;document.getElementById('go').classList.remove('down')}
+  if(e.code==='ArrowLeft'||e.code==='ArrowDown'){keys.back=false;document.getElementById('back').classList.remove('down')}
+});
+document.getElementById('startBtn').onclick=()=>{initAudio();document.getElementById('start').classList.add('hidden');started=true;reset();toast('Hold GO to drive! 🚌',2500)};
+document.getElementById('again').onclick=()=>{initAudio();document.getElementById('win').classList.add('hidden');reset();started=true;toast('Hold GO to drive! 🚌',2000)};
+
+/* ---------- update ---------- */
+function update(dt){
+  time+=dt;
+  // light change sounds/messages
+  lights.forEach(l=>{const s=lstate(l);l.prev=s});
+  if(!started||done){if(engG)engG.gain.value=0;return}
+  const MAX=270;
+  if(keys.go){bus.v+=320*dt}
+  else if(keys.back){bus.v-=320*dt}
+  else{ // brake
+    const b=520*dt;if(Math.abs(bus.v)<=b)bus.v=0;else bus.v-=Math.sign(bus.v)*b;
+  }
+  bus.v=Math.max(-110,Math.min(MAX,bus.v));
+  bus.x+=bus.v*dt;bus.wheel+=bus.v*dt/20;
+  if(bus.x<0){bus.x=0;bus.v=0}
+  const front=bus.x+BUS_W;
+  // red lights
+  lights.forEach(l=>{
+    const line=l.x-40;
+    if(lstate(l)==='r'&&front>line&&front<line+120&&bus.v>=0&&bus.x<line){
+      bus.x=line-BUS_W-50;bus.v=0;bonks++;shake=.4;sfx.bonk();
+      toast('Oops! Wait for green! 🚦');
+    }
+  });
+  // school gate
+  if(passengers.length<5&&front>SCHOOL_X-60){bus.x=SCHOOL_X-60-BUS_W;bus.v=0;toast('Pick up all 5 friends first! 🐾',2200)}
+  // bus stops
+  stops.forEach(s=>{
+    if(s.boarded)return;
+    const door=bus.x+85;
+    if(Math.abs(door-s.x)<75&&Math.abs(bus.v)<35){
+      s.prog+=dt/0.9;
+      if(s.prog>=1){s.boarded=true;passengers.push(s.a);sfx.ding();sfx.honk();updHud();confetti(s.x-camX()+0,GROUND-60,35);toast(s.a+' hopped on! '+passengers.length+' / 5');}
+    }else s.prog=Math.max(0,s.prog-dt*1.5);
+  });
+  // win
+  if(passengers.length===5&&bus.x+80>=SCHOOL_X){
+    done=true;started=false;sfx.fan();
+    const st=bonks<=1?3:bonks<=3?2:1;
+    document.getElementById('stars').textContent='⭐'.repeat(st)+'☆'.repeat(3-st);
+    document.getElementById('winMsg').textContent=(bonks===0?'Perfect driving! ':'Great driving! ')+'Everyone made it to school!';
+    for(let i=0;i<6;i++)setTimeout(()=>confetti(Math.random()*LW,150,40),i*200);
+    setTimeout(()=>document.getElementById('win').classList.remove('hidden'),1800);
+  }
+  if(shake>0)shake-=dt;
+  if(engG&&ac){engG.gain.value=.03+Math.abs(bus.v)/MAX*.05;eng.frequency.value=45+Math.abs(bus.v)*.25}
+  // green light hint
+  const nl=lights.find(l=>l.x>front-20);
+  if(nl){const d=nl.x-front;if(d<420&&d>0){const s=lstate(nl);const h=document.getElementById('hint');h.textContent=s==='r'?'🔴 Red - wait!':s==='y'?'🟡 Almost!':'🟢 Green - GO!'}else document.getElementById('hint').textContent='Green = GO! Red = wait!'}
+}
+function camX(){return bus.x-170}
+
+/* ---------- draw ---------- */
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function txt(s,x,y,size,align='center'){ctx.font=size+'px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';ctx.textAlign=align;ctx.textBaseline='middle';ctx.fillText(s,x,y)}
+
+function draw(){
+  ctx.setTransform(S,0,0,S,0,0);
+  const cam=camX();
+  const sh=shake>0?(Math.random()-.5)*10:0;
+  ctx.save();ctx.translate(sh,0);
+  // sky
+  const g=ctx.createLinearGradient(0,0,0,ROAD_TOP);g.addColorStop(0,'#6cc7ff');g.addColorStop(1,'#d6f3ff');
+  ctx.fillStyle=g;ctx.fillRect(-20,0,LW+40,LH);
+  // sun & clouds
+  ctx.fillStyle='#fff3a0';ctx.beginPath();ctx.arc(LW-110,90,50,0,7);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  for(let i=0;i<8;i++){const cx=((i*420-cam*.08)%(LW+500)+LW+500)%(LW+500)-250,cy=60+(i%3)*45;
+    ctx.beginPath();ctx.arc(cx,cy,26,0,7);ctx.arc(cx+30,cy+6,32,0,7);ctx.arc(cx+62,cy,24,0,7);ctx.fill();}
+  // hills
+  ctx.fillStyle='#8fdc7a';
+  for(let i=-1;i<LW/300+2;i++){const hx=i*300-((cam*.2)%300);ctx.beginPath();ctx.arc(hx+150,ROAD_TOP+40,170,Math.PI,0);ctx.fill();}
+  ctx.fillStyle='#6fcb5c';
+  for(let i=-1;i<LW/340+2;i++){const hx=i*340-((cam*.35)%340)+90;ctx.beginPath();ctx.arc(hx+120,ROAD_TOP+60,120,Math.PI,0);ctx.fill();}
+  // houses & trees (parallax .6)
+  const hc=['#ff8fb1','#ffd166','#7bd3ff','#b69cff','#ff9b5e'];
+  const off=cam*.6;const first=Math.floor(off/280)-1;
+  for(let i=first;i<first+LW/280+3;i++){
+    const x=i*280-off+40;
+    if(((i%3)+3)%3===1){ // tree
+      ctx.fillStyle='#8a5a2b';ctx.fillRect(x+100,ROAD_TOP-70,16,70);ctx.fillStyle='#3fb24a';ctx.beginPath();ctx.arc(x+108,ROAD_TOP-90,46,0,7);ctx.fill();
+    }else{
+      const c=hc[((i%5)+5)%5];ctx.fillStyle=c;rr(x,ROAD_TOP-110,130,110,8);ctx.fill();
+      ctx.fillStyle='#c0504d';ctx.beginPath();ctx.moveTo(x-10,ROAD_TOP-108);ctx.lineTo(x+65,ROAD_TOP-165);ctx.lineTo(x+140,ROAD_TOP-108);ctx.fill();
+      ctx.fillStyle='#fff';rr(x+20,ROAD_TOP-85,34,34,6);ctx.fill();rr(x+78,ROAD_TOP-85,34,34,6);ctx.fill();
+      ctx.fillStyle='#8a5a2b';rr(x+52,ROAD_TOP-48,26,48,6);ctx.fill();
+    }
+  }
+  // sidewalk + road
+  ctx.fillStyle='#d9d4c7';ctx.fillRect(-20,ROAD_TOP-6,LW+40,22);
+  ctx.fillStyle='#5b6573';ctx.fillRect(-20,ROAD_TOP+16,LW+40,120);
+  ctx.fillStyle='#fff';
+  const dash=-(cam%80);for(let x=dash-80;x<LW+80;x+=80)ctx.fillRect(x,ROAD_TOP+76,44,6);
+  ctx.fillStyle='#6fcb5c';ctx.fillRect(-20,ROAD_TOP+136,LW+40,LH);
+  // flowers
+  for(let i=0;i<60;i++){const fx=((i*173)%9000)-cam*1.0;const x=((fx%(LW+200))+LW+200)%(LW+200)-100;txt(i%2?'🌼':'🌷',x,ROAD_TOP+170+(i%4)*28,24)}
+
+  // start line
+  ctx.fillStyle='#fff';ctx.font='bold 26px sans-serif';
+  // bus stops
+  stops.forEach(s=>{
+    const x=s.x-cam;if(x<-120||x>LW+120)return;
+    // painted zone
+    ctx.fillStyle='rgba(255,225,70,.85)';rr(x-75,ROAD_TOP+100,150,16,6);ctx.fill();
+    // sign
+    ctx.fillStyle='#777';ctx.fillRect(x+60,ROAD_TOP-110,8,110);
+    ctx.fillStyle='#2f7bff';ctx.beginPath();ctx.arc(x+64,ROAD_TOP-125,28,0,7);ctx.fill();
+    txt('🚌',x+64,ROAD_TOP-124,30);
+    if(!s.boarded){
+      const bob=Math.sin(time*5+s.x)*5;
+      txt(s.a,x,ROAD_TOP-28+bob,64);
+      if(s.prog>0){ctx.strokeStyle='#ffd400';ctx.lineWidth=10;ctx.lineCap='round';ctx.beginPath();ctx.arc(x,ROAD_TOP-30,52,-Math.PI/2,-Math.PI/2+s.prog*6.283);ctx.stroke();}
+      else{txt('🛑',x,ROAD_TOP-100,0.1);}
+    }
+  });
+  // lights
+  lights.forEach(l=>{
+    const x=l.x-cam;if(x<-120||x>LW+120)return;
+    const st=lstate(l);
+    // crosswalk
+    ctx.fillStyle='#fff';for(let k=0;k<5;k++)ctx.fillRect(x-40+k*0,ROAD_TOP+22+k*22,80,10);
+    // pole + box
+    ctx.fillStyle='#444';ctx.fillRect(x+44,ROAD_TOP-150,10,150);
+    ctx.fillStyle='#2b2b2b';rr(x+26,ROAD_TOP-240,46,100,10);ctx.fill();
+    [['r','#ff3b3b','#5a1515',-218],['y','#ffd400','#5a5015',-190],['g','#2ee05a','#14501f',-162]].forEach(([k,on,off2,dy])=>{
+      ctx.fillStyle=st===k?on:off2;ctx.beginPath();ctx.arc(x+49,ROAD_TOP+dy+0,12,0,7);ctx.fill();
+      if(st===k){ctx.fillStyle=on+'55';ctx.beginPath();ctx.arc(x+49,ROAD_TOP+dy,22,0,7);ctx.fill();}
+    });
+    // ducks cross on red
+    if(st==='r'){
+      const t=((time+l.off)%CYC-YEL)/(CYC-YEL);
+      for(let d=0;d<3;d++){const dx=x-60+(t*140)+d*0;txt('🦆',x-70+t*140-d*34,ROAD_TOP+55+Math.abs(Math.sin(time*8+d))*-6,34);}
+    }
+  });
+  // school
+  const sx=SCHOOL_X-cam;
+  if(sx>-300&&sx<LW+300){
+    txt('🏫',sx+60,ROAD_TOP-70,200);
+    ctx.fillStyle='#fff';rr(sx-30,ROAD_TOP-250,180,40,12);ctx.fill();ctx.fillStyle='#2f7bff';ctx.font='900 26px sans-serif';ctx.textAlign='center';ctx.fillText('SCHOOL',sx+60,ROAD_TOP-230);
+    // finish flag
+    txt('🏁',sx-60,ROAD_TOP+60,60);
+  }
+  // bus
+  drawBus(bus.x-cam,GROUND+20);
+  ctx.restore();
+  // confetti
+  parts.forEach(p=>{ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;ctx.globalAlpha=Math.min(1,p.life);ctx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2);ctx.restore()});
+  ctx.globalAlpha=1;
+}
+function drawBus(x,y){
+  ctx.save();ctx.translate(x,y-20);
+  const bob=Math.abs(bus.v)>5?Math.sin(time*30)*1.2:0;ctx.translate(0,bob);
+  // body
+  ctx.fillStyle='#ffc61a';rr(0,-70,BUS_W,70,16);ctx.fill();
+  ctx.fillStyle='#e6a800';ctx.fillRect(0,-24,BUS_W,8);
+  // windows w/ passengers
+  for(let i=0;i<5;i++){
+    const wx=10+i*26;ctx.fillStyle='#bfe9ff';rr(wx,-60,22,26,5);ctx.fill();
+    if(passengers[i])txt(passengers[i],wx+11,-46,20);
+  }
+  // windshield
+  ctx.fillStyle='#bfe9ff';rr(BUS_W-16,-60,12,34,4);ctx.fill();
+  // headlight
+  ctx.fillStyle='#fff6a8';ctx.beginPath();ctx.arc(BUS_W-4,-14,6,0,7);ctx.fill();
+  // driver
+  txt('🧑‍✈️',BUS_W-26,-40,0.1);
+  // wheels
+  [[32],[BUS_W-34]].forEach(([wx])=>{
+    ctx.save();ctx.translate(wx,0);ctx.fillStyle='#222';ctx.beginPath();ctx.arc(0,0,17,0,7);ctx.fill();
+    ctx.rotate(bus.wheel);ctx.fillStyle='#ccc';ctx.beginPath();ctx.arc(0,0,8,0,7);ctx.fill();ctx.fillStyle='#555';ctx.fillRect(-1.5,-8,3,16);ctx.restore();
+  });
+  ctx.restore();
+}
+
+/* ---------- loop ---------- */
+let last=performance.now();
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  update(dt);
+  parts.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=700*dt;p.r+=dt*6;p.life-=dt});
+  parts=parts.filter(p=>p.life>0);
+  draw();requestAnimationFrame(frame);
+}
+reset();started=false;
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

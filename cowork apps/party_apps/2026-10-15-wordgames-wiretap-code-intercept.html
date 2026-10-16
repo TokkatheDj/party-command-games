@@ -1,0 +1,764 @@
+<!-- CONCEPT: WORD GAMES / TEAM CODEBREAKING - "Wiretap": two spy teams each hold 4 secret numbered keywords that stay theirs all game; every round each team's Encryptor privately draws a 3-digit code (e.g. 3-1-4) on the passed phone and types one clue per digit pointing at those keywords, then the clues go up on the shared screen - the RIVAL team tries to INTERCEPT the code first (from round 2), using the public wiretap log of every clue ever filed under each number, then the Encryptor's own team decodes it; two intercepts wins, two miscommunications loses, so clues must be clear to your team but cryptic to eavesdroppers. App-checked clue legality, hold-to-peek keyword gate, keyword-guess tiebreak, 256 keywords in 8 categories | Players: 4-12 in 2 teams | ~25-40 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Wiretap — Team Code Intercept</title>
+<style>
+:root {
+  --bg: #0a0f1c;
+  --bg2: #111a2e;
+  --panel: #16213a;
+  --panel2: #1d2a48;
+  --line: #2a3a60;
+  --ink: #eef3ff;
+  --muted: #95a3c4;
+  --accent: #2de2c4;
+  --accent2: #5aa8ff;
+  --a: #ffb547;
+  --a-soft: rgba(255,181,71,.16);
+  --b: #c084fc;
+  --b-soft: rgba(192,132,252,.16);
+  --good: #3ddc84;
+  --bad: #ff5d6c;
+  --warn: #ffd84d;
+  --radius: 14px;
+  --gap: clamp(8px, 2.4vw, 14px);
+  --mono: "Cascadia Mono", "Consolas", "SF Mono", "Menlo", monospace;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  height: 100%; overflow: hidden;
+  background: radial-gradient(ellipse at 50% -10%, #1a2850 0%, var(--bg) 60%);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+}
+input { user-select: text; -webkit-user-select: text; }
+#app { height: 100%; height: 100dvh; display: flex; flex-direction: column; max-width: 860px; margin: 0 auto; }
+.top {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+  padding: 8px var(--gap); border-bottom: 1px solid var(--line);
+  background: rgba(10,15,28,.85);
+}
+.top .brand { font-weight: 800; letter-spacing: .12em; font-size: clamp(13px, 3.4vw, 16px); color: var(--accent); font-family: var(--mono); }
+.top .rnd { margin-left: auto; font-family: var(--mono); color: var(--muted); font-size: clamp(12px, 3.2vw, 15px); }
+.iconbtn {
+  min-width: 44px; min-height: 44px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); font-size: 18px; cursor: pointer;
+}
+.main { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: var(--gap); display: flex; flex-direction: column; gap: var(--gap); -webkit-overflow-scrolling: touch; }
+.bar { flex: 0 0 auto; padding: 10px var(--gap) calc(10px + env(safe-area-inset-bottom)); display: flex; gap: var(--gap); border-top: 1px solid var(--line); background: rgba(10,15,28,.92); }
+.bar .btn { flex: 1; }
+
+h1.title {
+  margin: 6px 0 0; text-align: center; font-family: var(--mono);
+  font-size: clamp(40px, 13vw, 76px); letter-spacing: .08em; line-height: 1.05;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+h2 { margin: 0; font-size: clamp(20px, 5.6vw, 30px); line-height: 1.2; }
+h3 { margin: 0; font-size: clamp(15px, 4.2vw, 19px); color: var(--muted); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+p { margin: 0; line-height: 1.45; font-size: clamp(14px, 3.8vw, 17px); }
+.sub { text-align: center; color: var(--muted); }
+.meta { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.pill { padding: 6px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-size: clamp(12px, 3.3vw, 14px); color: var(--muted); }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(12px, 3.6vw, 20px); display: flex; flex-direction: column; gap: 10px; }
+.card.ta { border-color: var(--a); background: linear-gradient(180deg, var(--a-soft), var(--panel) 70%); }
+.card.tb { border-color: var(--b); background: linear-gradient(180deg, var(--b-soft), var(--panel) 70%); }
+.center { text-align: center; align-items: center; }
+
+.btn {
+  min-height: 52px; padding: 12px 16px; border-radius: 14px; border: none; cursor: pointer;
+  font-size: clamp(15px, 4.2vw, 19px); font-weight: 700; color: #06101e;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  font-family: inherit;
+}
+.btn.ghost { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); }
+.btn.warn { background: var(--bad); color: #fff; }
+.btn.ta { background: var(--a); }
+.btn.tb { background: var(--b); }
+.btn:disabled { opacity: .38; cursor: default; }
+.btn.sm { min-height: 44px; font-size: 15px; padding: 8px 12px; }
+
+.tA { color: var(--a); } .tB { color: var(--b); }
+
+/* scoreboard */
+.score { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sc { border-radius: 12px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sc.ta { border-color: var(--a); } .sc.tb { border-color: var(--b); }
+.sc .nm { font-weight: 800; font-size: clamp(14px, 3.8vw, 17px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tok { display: flex; align-items: center; gap: 6px; font-size: clamp(11px, 3vw, 13px); color: var(--muted); }
+.dot { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); flex: 0 0 auto; }
+.dot.int.on { background: var(--good); border-color: var(--good); box-shadow: 0 0 8px var(--good); }
+.dot.mis.on { background: var(--bad); border-color: var(--bad); box-shadow: 0 0 8px var(--bad); }
+
+/* setup */
+.row { display: flex; gap: 8px; align-items: center; }
+.row > * { min-width: 0; }
+.field { flex: 1; min-height: 46px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); color: var(--ink); padding: 8px 12px; font-size: 16px; font-family: inherit; }
+.field:focus { outline: 2px solid var(--accent); border-color: transparent; }
+.field.bad { outline: 2px solid var(--bad); }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { flex: 1; min-width: 64px; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); color: var(--ink); font-size: 15px; font-weight: 600; cursor: pointer; font-family: inherit; }
+.seg button.on { background: var(--accent); color: #06101e; border-color: var(--accent); }
+.x { min-width: 44px; min-height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); color: var(--muted); font-size: 20px; cursor: pointer; }
+
+/* keywords */
+.kw { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.kw .k { border-radius: 12px; background: var(--bg2); border: 1px solid var(--line); padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.kw .n { font-family: var(--mono); font-size: 22px; font-weight: 800; color: var(--accent); }
+.kw .w { font-size: clamp(17px, 5vw, 24px); font-weight: 800; text-transform: uppercase; letter-spacing: .03em; text-align: center; overflow-wrap: anywhere; }
+
+/* code display */
+.code { display: flex; gap: 10px; justify-content: center; }
+.code .d { width: clamp(58px, 18vw, 84px); height: clamp(70px, 22vw, 100px); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: clamp(40px, 13vw, 64px); font-weight: 800; background: var(--bg2); border: 2px solid var(--accent); color: var(--accent); }
+.code.small .d { width: 44px; height: 52px; font-size: 28px; border-width: 1px; }
+.code.masked .d { color: var(--muted); border-color: var(--line); }
+.code.hit .d { border-color: var(--good); color: var(--good); }
+.code.miss .d { border-color: var(--bad); color: var(--bad); }
+
+/* clue entry */
+.clue { display: flex; gap: 8px; align-items: center; }
+.clue .tag { flex: 0 0 auto; width: 92px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); padding: 6px; text-align: center; }
+.clue .tag b { display: block; font-family: var(--mono); font-size: 22px; color: var(--accent); }
+.clue .tag span { display: block; font-size: 12px; text-transform: uppercase; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.err { color: var(--bad); font-size: 14px; min-height: 0; }
+.timer { font-family: var(--mono); font-size: 22px; font-weight: 800; color: var(--accent); text-align: center; }
+.timer.low { color: var(--bad); animation: blink .6s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+
+/* transmission */
+.tx { display: flex; flex-direction: column; gap: 8px; }
+.tx .c { display: flex; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.tx .c .i { font-family: var(--mono); color: var(--muted); font-size: 14px; flex: 0 0 auto; width: 22px; }
+.tx .c .t { font-size: clamp(20px, 6vw, 30px); font-weight: 800; overflow-wrap: anywhere; min-width: 0; }
+.tx .c .g { margin-left: auto; font-family: var(--mono); font-size: 22px; font-weight: 800; color: var(--accent); flex: 0 0 auto; }
+
+/* digit picker */
+.pick { display: grid; grid-template-columns: repeat(4, 1fr) 1.2fr; gap: 8px; }
+.pick button { min-height: 56px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel2); color: var(--ink); font-family: var(--mono); font-size: 26px; font-weight: 800; cursor: pointer; }
+.pick button:disabled { opacity: .3; cursor: default; }
+.pick button.clr { font-family: inherit; font-size: 15px; }
+
+/* wiretap log */
+.log { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.log .col { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 4px; min-height: 64px; min-width: 0; }
+.log .h { font-family: var(--mono); font-weight: 800; text-align: center; color: var(--accent); font-size: 18px; border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+.log .h small { display: block; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 11px; color: var(--ink); text-transform: uppercase; overflow-wrap: anywhere; }
+.log .e { font-size: clamp(11px, 3.2vw, 14px); line-height: 1.2; overflow-wrap: anywhere; color: var(--ink); }
+.log .e.new { color: var(--warn); font-weight: 700; }
+.log .none { font-size: 11px; color: var(--muted); text-align: center; }
+
+.banner { text-align: center; font-weight: 800; font-size: clamp(22px, 7vw, 36px); letter-spacing: .04em; }
+.banner.good { color: var(--good); } .banner.bad { color: var(--bad); }
+.res { display: flex; align-items: center; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+.res .lbl { font-size: clamp(14px, 3.9vw, 17px); }
+.big-emoji { font-size: 54px; text-align: center; line-height: 1; }
+ul.rules { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: clamp(14px, 3.8vw, 16px); line-height: 1.4; }
+
+/* peek overlay */
+#peek { position: fixed; inset: 0; background: rgba(6,9,18,.97); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 20px; z-index: 20; }
+#peek.on { display: flex; }
+#peek .kw { width: min(520px, 100%); }
+.hold { touch-action: none; }
+
+.toast { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); background: var(--panel2); border: 1px solid var(--accent); border-radius: 12px; padding: 10px 16px; font-weight: 700; z-index: 30; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 92vw; text-align: center; }
+.toast.on { opacity: 1; }
+
+@media (min-width: 720px) {
+  .wide2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); align-items: start; }
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="peek"></div>
+<div class="toast" id="toast"></div>
+<script>
+'use strict';
+// ---------- Keyword deck: 8 categories x 32. Each team is dealt one word from 4 different categories. ----------
+const DECK = {
+  Animals: ['penguin','giraffe','octopus','kangaroo','owl','shark','spider','camel','dolphin','tiger','bat','snail','eagle','frog','elephant','rabbit','squirrel','crab','parrot','wolf','bee','zebra','turtle','peacock','gorilla','jellyfish','hedgehog','flamingo','lobster','moose','panda','swan'],
+  Places: ['castle','desert','library','volcano','island','airport','jungle','museum','prison','circus','lighthouse','cave','stadium','farm','hospital','harbor','mountain','theater','cemetery','bakery','beach','palace','school','swamp','temple','zoo','attic','glacier','canyon','market','station','igloo'],
+  Objects: ['umbrella','mirror','ladder','candle','hammer','compass','anchor','key','clock','helmet','scissors','pillow','rope','magnet','bell','whistle','camera','envelope','balloon','telescope','crown','shield','lantern','needle','backpack','bucket','trumpet','map','glove','basket','button','flag'],
+  Food: ['pizza','pineapple','popcorn','honey','pancake','cheese','lemon','cookie','sushi','carrot','chocolate','pretzel','mushroom','banana','soup','taco','pepper','donut','coconut','waffle','noodle','onion','cherry','sandwich','peanut','pumpkin','toast','yogurt','burrito','marshmallow','grape','cupcake'],
+  Nature: ['thunder','rainbow','river','snow','moon','tornado','forest','sunset','wave','fog','lightning','meadow','comet','pebble','rose','cactus','iceberg','waterfall','tide','storm','leaf','sand','galaxy','puddle','cloud','eclipse','acorn','coral','feather','seed','frost','star'],
+  People: ['pirate','wizard','doctor','chef','astronaut','knight','farmer','clown','teacher','detective','pilot','queen','robot','ghost','ninja','mermaid','cowboy','firefighter','dentist','referee','giant','scientist','sailor','vampire','judge','magician','mummy','gardener','baby','dragon','superhero','monk'],
+  Travel: ['rocket','bicycle','submarine','train','helicopter','skateboard','canoe','tractor','elevator','parachute','sled','bus','taxi','ambulance','yacht','scooter','tank','blimp','carriage','spaceship','raft','ferry','escalator','motorcycle','truck','glider','unicycle','tram','wagon','jetpack','surfboard','kite'],
+  Things: ['music','dream','birthday','party','secret','shadow','echo','treasure','magic','laughter','winter','summer','holiday','game','puzzle','story','nightmare','wedding','gift','alarm','ticket','money','silence','smoke','fire','ice','light','gold','glass','paper','sugar','salt']
+};
+const CATS = Object.keys(DECK);
+const ALL_WORDS = CATS.flatMap(c => DECK[c]);
+
+// all 24 three-digit codes with distinct digits 1-4
+const CODES = [];
+for (let a = 1; a <= 4; a++) for (let b = 1; b <= 4; b++) for (let c = 1; c <= 4; c++)
+  if (a !== b && b !== c && a !== c) CODES.push([a, b, c]);
+
+// ---------- helpers ----------
+const KEY = 'cowork-wiretap-state';
+const USED_KEY = 'cowork-wiretap-used';
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const rnd = n => Math.floor(Math.random() * n);
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const stem = w => {
+  if (w.length > 5 && w.endsWith('ing')) return w.slice(0, -3);
+  if (w.length > 4 && w.endsWith('ies')) return w.slice(0, -3) + 'y';
+  if (w.length > 4 && (w.endsWith('es') || w.endsWith('ed'))) return w.slice(0, -2);
+  if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  return w;
+};
+const lev = (a, b) => {
+  const m = a.length, n = b.length; if (Math.abs(m - n) > 2) return 9;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+};
+// true when two words overlap enough that they shouldn't share a game (fire / firefighter)
+const overlaps = (a, b) => a === b || (a.length >= 3 && b.includes(a)) || (b.length >= 3 && a.includes(b));
+
+// A clue is illegal if it is, contains, or is a chunk of one of the encryptor's own keywords.
+function clueProblem(clue, words) {
+  const c = norm(clue);
+  if (!c) return 'empty';
+  const toks = c.split(' ').map(stem);
+  toks.push(c.replace(/ /g, ''));
+  for (let i = 0; i < words.length; i++) {
+    const k = stem(norm(words[i]));
+    for (const t of toks) {
+      if (t === k || (k.length >= 3 && t.includes(k)) || (t.length >= 4 && k.includes(t)))
+        return 'too close to keyword ' + (i + 1);
+    }
+  }
+  return '';
+}
+function guessMatches(guess, word) {
+  const g = stem(norm(guess)).replace(/ /g, ''), w = stem(norm(word));
+  if (!g) return false;
+  return g === w || (w.length >= 5 && lev(g, w) <= 1);
+}
+
+// ---------- sound ----------
+let AC = null;
+function tone(freq, dur = 0.12, type = 'sine', vol = 0.15, delay = 0) {
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch (e) { /* audio unavailable */ }
+}
+const SFX = {
+  tap: () => tone(660, 0.05, 'square', 0.05),
+  lock: () => { tone(440, 0.08, 'square', 0.08); tone(880, 0.1, 'square', 0.08, 0.08); },
+  good: () => { [523, 659, 784].forEach((f, i) => tone(f, 0.16, 'triangle', 0.14, i * 0.09)); },
+  intercept: () => { for (let i = 0; i < 4; i++) { tone(980, 0.09, 'sawtooth', 0.09, i * 0.16); tone(740, 0.09, 'sawtooth', 0.09, i * 0.16 + 0.08); } },
+  miss: () => { tone(180, 0.4, 'sawtooth', 0.14); tone(140, 0.5, 'sawtooth', 0.12, 0.12); },
+  tick: () => tone(1200, 0.03, 'square', 0.04),
+  fanfare: () => { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, 'triangle', 0.15, i * 0.12)); }
+};
+
+// ---------- state ----------
+let S = null;
+const newTeam = (name, players) => ({ name, players, words: [], enc: 0, ints: 0, miss: 0, hist: [[], [], [], []], usedCodes: [] });
+function freshState() {
+  return {
+    phase: 'home',
+    cfg: { rounds: 8, timer: 0 },
+    teams: [newTeam('Team Falcon', ['', '']), newTeam('Team Viper', ['', ''])],
+    round: 1, first: 0, et: 0, dt: 0, sub: 'own', bi: 0, shown: false,
+    codes: [null, null], clues: [null, null], ig: [null, null], og: [null, null], encBy: ['', ''],
+    entry: [], draft: ['', '', ''], tEnd: 0,
+    log: [], result: null, tb: null, tbi: 0, games: 0
+  };
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } }
+function load() {
+  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.teams && s.phase) return s; } catch (e) { }
+  return null;
+}
+
+function dealWords() {
+  let used = [];
+  try { used = JSON.parse(localStorage.getItem(USED_KEY)) || []; } catch (e) { }
+  // reset the "recently used" list once any category runs low
+  if (CATS.some(c => DECK[c].filter(w => !used.includes(w)).length < 3)) used = [];
+  const picked = [];
+  for (const team of S.teams) {
+    const cats = shuffle(CATS).slice(0, 4);
+    team.words = cats.map(c => {
+      const pool = shuffle(DECK[c].filter(w => !used.includes(w) && !picked.some(p => overlaps(p, w))));
+      const w = pool[0] || shuffle(DECK[c].filter(w => !picked.some(p => overlaps(p, w))))[0];
+      picked.push(w);
+      return w;
+    });
+  }
+  used = used.concat(picked);
+  try { localStorage.setItem(USED_KEY, JSON.stringify(used)); } catch (e) { }
+}
+function drawCode(t) {
+  const team = S.teams[t];
+  if (team.usedCodes.length >= CODES.length) team.usedCodes = [];
+  const pool = CODES.filter(c => !team.usedCodes.includes(c.join('')));
+  const c = pool[rnd(pool.length)];
+  team.usedCodes.push(c.join(''));
+  return c;
+}
+const other = t => 1 - t;
+const encName = t => { const tm = S.teams[t]; return tm.players[tm.enc % tm.players.length]; };
+const order = () => [S.first, other(S.first)];
+
+function startGame() {
+  for (const tm of S.teams) { tm.ints = 0; tm.miss = 0; tm.hist = [[], [], [], []]; tm.usedCodes = []; }
+  S.round = 1; S.first = rnd(2); S.log = []; S.result = null; S.tb = null;
+  dealWords();
+  S.bi = S.first; S.shown = false; S.phase = 'brief';
+}
+function startRound() {
+  S.codes = [drawCode(0), drawCode(1)];
+  S.clues = [null, null]; S.ig = [null, null]; S.og = [null, null];
+  S.et = order()[0]; S.phase = 'round';
+}
+function beginEncrypt(t) { S.et = t; S.draft = ['', '', '']; S.shown = false; S.tEnd = 0; S.phase = 'encHand'; }
+function lockClues() {
+  const t = S.et;
+  S.clues[t] = S.draft.map(s => s.trim());
+  S.encBy[t] = encName(t);
+  S.teams[t].enc++;
+  SFX.lock();
+  if (t === order()[0]) beginEncrypt(order()[1]);
+  else beginDecode(order()[0]);
+}
+function beginDecode(t) { S.dt = t; S.sub = S.round > 1 ? 'int' : 'own'; S.entry = []; S.phase = 'decode'; }
+function lockGuess() {
+  const t = S.dt;
+  if (S.sub === 'int') { S.ig[t] = S.entry.slice(); S.sub = 'own'; S.entry = []; SFX.lock(); return; }
+  S.og[t] = S.entry.slice(); S.entry = [];
+  // score this transmission
+  const code = S.codes[t].join('');
+  const intercepted = !!S.ig[t] && S.ig[t].join('') === code;
+  const decoded = S.og[t].join('') === code;
+  if (intercepted) S.teams[other(t)].ints++;
+  if (!decoded) S.teams[t].miss++;
+  S.codes[t].forEach((d, i) => S.teams[t].hist[d - 1].push({ clue: S.clues[t][i], round: S.round }));
+  S.log.push({ round: S.round, t, code: S.codes[t].slice(), clues: S.clues[t].slice(), ig: S.ig[t], og: S.og[t].slice(), intercepted, decoded });
+  S.phase = 'reveal';
+  setTimeout(() => (intercepted ? SFX.intercept() : !decoded ? SFX.miss() : SFX.good()), 120);
+}
+function afterReveal() {
+  if (S.dt === order()[0]) { beginDecode(order()[1]); return; }
+  // end of round: check win conditions
+  const [A, B] = S.teams;
+  const trig = A.ints >= 2 || B.ints >= 2 || A.miss >= 2 || B.miss >= 2;
+  if (trig || S.round >= S.cfg.rounds) { decideEnd(trig); return; }
+  S.phase = 'roundEnd';
+}
+function decideEnd(trig) {
+  const T = S.teams;
+  const up = i => T[i].ints >= 2 || T[other(i)].miss >= 2; // things that make team i win
+  if (trig && up(0) !== up(1)) { finish(up(0) ? 0 : 1, T[up(0) ? 0 : 1].ints >= 2 ? 'two intercepts' : 'rival miscommunicated twice'); return; }
+  const sc = T.map(t => t.ints - t.miss);
+  if (sc[0] !== sc[1]) { const w = sc[0] > sc[1] ? 0 : 1; finish(w, 'score: intercepts minus miscommunications'); return; }
+  S.tb = { guesses: [null, null], hits: [0, 0] }; S.tbi = order()[0]; S.draft = ['', '', '', '']; S.phase = 'tiebreak';
+}
+function lockTiebreak() {
+  const t = S.tbi, rival = S.teams[other(t)];
+  S.tb.guesses[t] = S.draft.map(s => s.trim());
+  S.tb.hits[t] = S.tb.guesses[t].filter((g, i) => guessMatches(g, rival.words[i])).length;
+  SFX.lock();
+  if (S.tb.guesses[other(t)] == null) { S.tbi = other(t); S.draft = ['', '', '', '']; return; }
+  const h = S.tb.hits;
+  if (h[0] === h[1]) finish(-1, 'dead heat - even the keyword guesses tied');
+  else finish(h[0] > h[1] ? 0 : 1, 'tiebreak: more rival keywords guessed');
+}
+function finish(w, why) {
+  S.result = { w, why }; S.games++; S.phase = 'over';
+  setTimeout(() => SFX.fanfare(), 150);
+}
+
+// ---------- view pieces ----------
+const tc = t => (t === 0 ? 'ta' : 'tb');
+const tn = t => `<b class="${t === 0 ? 'tA' : 'tB'}">${esc(S.teams[t].name)}</b>`;
+const dots = (n, cls) => [0, 1].map(i => `<span class="dot ${cls}${i < n ? ' on' : ''}"></span>`).join('');
+function scoreHTML() {
+  return `<div class="score">${S.teams.map((tm, t) => `
+    <div class="sc ${tc(t)}">
+      <div class="nm ${t === 0 ? 'tA' : 'tB'}">${esc(tm.name)}</div>
+      <div class="tok">${dots(tm.ints, 'int')} Intercepts</div>
+      <div class="tok">${dots(tm.miss, 'mis')} Miscomms</div>
+    </div>`).join('')}</div>`;
+}
+function codeHTML(code, cls = '') {
+  return `<div class="code ${cls}">${code.map(d => `<div class="d">${d}</div>`).join('')}</div>`;
+}
+function kwHTML(t) {
+  return `<div class="kw">${S.teams[t].words.map((w, i) => `<div class="k"><span class="n">${i + 1}</span><span class="w">${esc(w)}</span></div>`).join('')}</div>`;
+}
+function logHTML(t, showWords = false, hiRound = 0) {
+  const tm = S.teams[t];
+  return `<div class="log">${tm.hist.map((col, i) => `
+    <div class="col"><div class="h">${i + 1}${showWords ? `<small>${esc(tm.words[i])}</small>` : ''}</div>
+      ${col.length ? col.map(e => `<div class="e${e.round === hiRound ? ' new' : ''}">${esc(e.clue)}</div>`).join('') : '<div class="none">—</div>'}
+    </div>`).join('')}</div>`;
+}
+const peekBtn = t => `<button class="btn ghost sm hold" data-peek="${t}">Hold to peek: ${esc(S.teams[t].name)} keywords</button>`;
+function pickerHTML() {
+  return `<div class="pick">${[1, 2, 3, 4].map(d => `<button data-dig="${d}" ${S.entry.includes(d) || S.entry.length >= 3 ? 'disabled' : ''}>${d}</button>`).join('')}
+    <button class="clr" data-act="clr" ${S.entry.length ? '' : 'disabled'}>Clear</button></div>`;
+}
+const RULES = `
+  <h2>How to play Wiretap</h2>
+  <ul class="rules">
+    <li>Two teams. Each team gets <b>4 secret keywords</b>, numbered 1–4, that stay theirs all game.</li>
+    <li>Each round, one <b>Encryptor</b> per team privately draws a <b>3-digit code</b> like 3·1·4 and types one clue for each digit, hinting at that keyword (clue for 3, then 1, then 4).</li>
+    <li>The clues go up on the shared screen. From round 2, the <b>rival team tries to intercept</b> the code first, using the wiretap log of every clue ever filed under each number.</li>
+    <li>Then the Encryptor's own team decodes. The Encryptor must stay silent!</li>
+    <li>Correct intercept = <b class="tA">intercept token</b>. Your team gets its own code wrong = <b style="color:var(--bad)">miscommunication token</b>.</li>
+    <li><b>2 intercepts wins. 2 miscommunications loses.</b> If the rounds run out (or both happen at once): intercepts minus miscomms; still tied, each team guesses the rival's keywords.</li>
+    <li>Clues can't be, contain or be part of your keyword, no spelling, no numbers pointing at positions. Any word, name or short phrase that the table could know is fair.</li>
+    <li>Trick: be obvious to your team, cryptic to the eavesdroppers. Every clue you give leaks a little more.</li>
+  </ul>`;
+
+// ---------- views ----------
+const V = {};
+V.home = () => {
+  const live = !['home', 'setup', 'over'].includes(S.phase);
+  return {
+    top: false,
+    main: `
+      <h1 class="title">WIRETAP</h1>
+      <p class="sub">Team code-breaking word game. Send clues your team can read and the other team can't — and listen in on theirs.</p>
+      <div class="meta"><span class="pill">4–12 players · 2 teams</span><span class="pill">~25–40 min</span><span class="pill">One phone, passed &amp; shared</span></div>
+      <div class="card">
+        <h3>The one-line rule</h3>
+        <p>Your Encryptor gives three clues for a secret 3-digit code that points at your team's 4 keywords. Your team must crack it; the rival team tries to <b>intercept</b> it first.</p>
+      </div>
+      <div class="card">
+        <h3>Win / lose</h3>
+        <p><b style="color:var(--good)">2 intercepts</b> wins it. <b style="color:var(--bad)">2 miscommunications</b> loses it.</p>
+      </div>
+      <button class="btn ghost" data-act="rules">How to play</button>`,
+    bar: `${live ? '<button class="btn ghost" data-act="resume">Resume game</button>' : ''}<button class="btn" data-act="setup">New game</button>`
+  };
+};
+V.setup = () => ({
+  top: false,
+  main: `
+    <h2>Mission setup</h2>
+    <div class="wide2">${S.teams.map((tm, t) => `
+      <div class="card ${tc(t)}">
+        <div class="row"><input class="field" data-tname="${t}" maxlength="18" value="${esc(tm.name)}" aria-label="Team name"></div>
+        <h3>Agents (encryptor order)</h3>
+        ${tm.players.map((p, i) => `<div class="row"><input class="field" data-pname="${t}:${i}" maxlength="16" placeholder="Agent ${i + 1}" value="${esc(p)}">
+          ${tm.players.length > 2 ? `<button class="x" data-del="${t}:${i}" aria-label="Remove">×</button>` : ''}</div>`).join('')}
+        ${tm.players.length < 6 ? `<button class="btn ghost sm" data-add="${t}">+ Add agent</button>` : ''}
+      </div>`).join('')}</div>
+    <div class="card">
+      <h3>Rounds (max)</h3>
+      <div class="seg">${[6, 8, 10].map(n => `<button data-rounds="${n}" class="${S.cfg.rounds === n ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <h3>Encryptor clock</h3>
+      <div class="seg">${[[0, 'Off'], [60, '60 s'], [90, '90 s']].map(([n, l]) => `<button data-timer="${n}" class="${S.cfg.timer === n ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <p class="sub" style="font-size:13px">2–6 agents per team. Blank names become "Agent 1", "Agent 2"…</p>
+    </div>`,
+  bar: `<button class="btn ghost" data-act="home">Back</button><button class="btn" data-act="start">Start mission</button>`
+});
+V.brief = () => {
+  const t = S.bi;
+  if (!S.shown) return {
+    main: `<div class="card ${tc(t)} center">
+        <h3>Keyword briefing ${t === S.first ? '1' : '2'} of 2</h3>
+        <h2>${tn(t)} only</h2>
+        <p>${tn(other(t))}: look away now!</p>
+        <p>${tn(t)}: huddle round the screen. These 4 keywords are yours for the whole game.</p>
+      </div>`,
+    bar: `<button class="btn ${tc(t)}" data-act="showKw">Show ${esc(S.teams[t].name)}'s keywords</button>`
+  };
+  return {
+    main: `<div class="card ${tc(t)}"><h3>${esc(S.teams[t].name)} — your keywords</h3>${kwHTML(t)}
+      <p>Remember the numbers. You can peek again any time with the <b>Hold to peek</b> button (rivals look away).</p></div>`,
+    bar: `<button class="btn" data-act="hideKw">Hide &amp; continue</button>`
+  };
+};
+V.round = () => ({
+  main: `
+    <div class="banner">Round ${S.round}${S.round === S.cfg.rounds ? ' — final round' : ''}</div>
+    ${scoreHTML()}
+    <div class="card">
+      <h3>Encryptors this round</h3>
+      ${order().map(t => `<p>${tn(t)}: <b>${esc(encName(t))}</b></p>`).join('')}
+      <p class="sub" style="text-align:left">${S.round === 1 ? 'Round 1: no intercepts yet — everyone is just listening in.' : 'Rivals may now intercept. Mind what you leak!'}</p>
+    </div>
+    <div class="card"><h3>Need a reminder?</h3>${peekBtn(0)}${peekBtn(1)}</div>`,
+  bar: `<button class="btn" data-act="encStart">Start encrypting</button>`
+});
+V.encHand = () => {
+  const t = S.et;
+  return {
+    main: `<div class="card ${tc(t)} center">
+      <h3>${esc(S.teams[t].name)} Encryptor</h3>
+      <h2>Pass the phone to <span class="${t === 0 ? 'tA' : 'tB'}">${esc(encName(t))}</span></h2>
+      <p>Everyone else: eyes off the screen.</p>
+      ${S.cfg.timer ? `<p>Your clock (${S.cfg.timer} s) starts when you open the code.</p>` : ''}
+    </div>`,
+    bar: `<button class="btn ${tc(t)}" data-act="encOpen">I'm ${esc(encName(t))} — show my code</button>`
+  };
+};
+V.encWrite = () => {
+  const t = S.et, code = S.codes[t], words = S.teams[t].words;
+  return {
+    main: `
+      <div class="card ${tc(t)}">
+        <h3>Your secret code</h3>
+        ${codeHTML(code)}
+        ${S.cfg.timer ? `<div class="timer" id="tmr"></div>` : ''}
+      </div>
+      <div class="card">
+        <h3>One clue per digit, in order</h3>
+        ${code.map((d, i) => `<div class="clue"><div class="tag"><b>${d}</b><span>${esc(words[d - 1])}</span></div>
+          <input class="field" data-clue="${i}" maxlength="30" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Clue for ${d}" value="${esc(S.draft[i])}"></div>`).join('')}
+        <div class="err" id="err"></div>
+        <p class="sub" style="text-align:left;font-size:13px">Clear to your team, foggy to the rivals. No saying, containing or spelling the keyword.</p>
+      </div>`,
+    bar: `<button class="btn ${tc(t)}" data-act="lockClues">Lock clues &amp; hide</button>`
+  };
+};
+V.decode = () => {
+  const t = S.dt, r = other(t), clues = S.clues[t];
+  const step = S.sub === 'int'
+    ? `<div class="card ${tc(r)}"><h3>Step 1 · Intercept</h3>
+        <p>${tn(r)}: agree on the code you think ${tn(t)}'s Encryptor drew, using their wiretap log below. ${tn(t)}: stay quiet.</p>${pickerHTML()}</div>`
+    : `<div class="card ${tc(t)}"><h3>${S.round > 1 ? 'Step 2 · ' : ''}Decode</h3>
+        ${S.ig[t] ? `<div class="res"><span class="lbl">${tn(r)} intercept locked</span>${codeHTML(['•', '•', '•'], 'small masked')}</div>` : ''}
+        <p>${tn(t)}: crack your own code. <b>${esc(S.encBy[t])}</b>, not a word!</p>${pickerHTML()}${peekBtn(t)}</div>`;
+  return {
+    main: `
+      <h3>Transmission from ${tn(t)}</h3>
+      <div class="tx">${clues.map((c, i) => `<div class="c"><span class="i">${i + 1}.</span><span class="t">${esc(c)}</span><span class="g">${S.entry[i] || '?'}</span></div>`).join('')}</div>
+      ${step}
+      <div class="card"><h3>${esc(S.teams[t].name)} wiretap log</h3>${logHTML(t)}</div>`,
+    bar: `<button class="btn ${tc(S.sub === 'int' ? r : t)}" data-act="lockGuess" ${S.entry.length === 3 ? '' : 'disabled'}>${S.sub === 'int' ? 'Lock intercept' : 'Lock decode'}</button>`
+  };
+};
+V.reveal = () => {
+  const L = S.log[S.log.length - 1], t = L.t, r = other(t);
+  const verdict = L.intercepted && !L.decoded ? ['INTERCEPTED & GARBLED', 'bad'] : L.intercepted ? ['INTERCEPTED!', 'bad'] : !L.decoded ? ['MISCOMMUNICATION', 'bad'] : ['CLEAN TRANSMISSION', 'good'];
+  return {
+    main: `
+      <h3>${tn(t)}'s code was</h3>
+      ${codeHTML(L.code)}
+      <div class="banner ${verdict[1]}">${verdict[0]}</div>
+      <div class="card">
+        ${L.ig ? `<div class="res"><span class="lbl">${tn(r)} intercept ${L.intercepted ? '✔ +1 intercept' : '✘'}</span>${codeHTML(L.ig, 'small ' + (L.intercepted ? 'hit' : 'miss'))}</div>` : `<p class="sub">Round 1 — no intercept attempt.</p>`}
+        <div class="res"><span class="lbl">${tn(t)} decode ${L.decoded ? '✔' : '✘ +1 miscomm'}</span>${codeHTML(L.og, 'small ' + (L.decoded ? 'hit' : 'miss'))}</div>
+      </div>
+      ${scoreHTML()}
+      <div class="card"><h3>${esc(S.teams[t].name)} wiretap log (new clues in yellow)</h3>${logHTML(t, false, S.round)}</div>`,
+    bar: `<button class="btn" data-act="next">${S.dt === order()[0] ? `Decode ${esc(S.teams[order()[1]].name)}` : 'End round'}</button>`
+  };
+};
+V.roundEnd = () => ({
+  main: `
+    <div class="banner">End of round ${S.round}</div>
+    ${scoreHTML()}
+    <div class="wide2">${[0, 1].map(t => `<div class="card ${tc(t)}"><h3>${esc(S.teams[t].name)} log</h3>${logHTML(t, false, S.round)}</div>`).join('')}</div>`,
+  bar: `<button class="btn" data-act="nextRound">Round ${S.round + 1}</button>`
+});
+V.tiebreak = () => {
+  const t = S.tbi, r = other(t);
+  return {
+    main: `
+      <div class="banner">Dead level!</div>
+      <div class="card ${tc(t)}"><h3>Tiebreak · ${esc(S.teams[t].name)}</h3>
+        <p>Guess ${tn(r)}'s four keywords from their log. Most right wins.</p>
+        ${[0, 1, 2, 3].map(i => `<div class="clue"><div class="tag"><b>${i + 1}</b><span>keyword</span></div>
+          <input class="field" data-tb="${i}" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(S.draft[i] || '')}"></div>`).join('')}
+      </div>
+      <div class="card"><h3>${esc(S.teams[r].name)} log</h3>${logHTML(r)}</div>`,
+    bar: `<button class="btn ${tc(t)}" data-act="lockTb">Lock guesses</button>`
+  };
+};
+V.over = () => {
+  const R = S.result, w = R.w;
+  const tbRow = t => S.tb && S.tb.guesses[t] ? `<p>Tiebreak: ${S.tb.hits[t]}/4 — ${S.tb.guesses[t].map((g, i) => `<span style="color:${guessMatches(g, S.teams[other(t)].words[i]) ? 'var(--good)' : 'var(--muted)'}">${esc(g || '—')}</span>`).join(', ')}</p>` : '';
+  const stats = t => {
+    const mine = S.log.filter(l => l.t === t), stolen = S.log.filter(l => l.t !== t && l.intercepted).length;
+    return `<p>${mine.filter(l => l.decoded).length}/${mine.length} codes decoded · ${stolen} intercepted from rivals</p>`;
+  };
+  return {
+    main: `
+      <div class="big-emoji">${w < 0 ? '🤝' : '🕵️'}</div>
+      <div class="banner ${w < 0 ? '' : 'good'}">${w < 0 ? 'Stalemate!' : `${esc(S.teams[w].name)} wins!`}</div>
+      <p class="sub">${esc(R.why)}</p>
+      ${scoreHTML()}
+      <div class="wide2">${[0, 1].map(t => `<div class="card ${tc(t)}"><h3>${esc(S.teams[t].name)} — keywords revealed</h3>${logHTML(t, true)}${stats(t)}${tbRow(t)}</div>`).join('')}</div>`,
+    bar: `<button class="btn ghost" data-act="setup">New teams</button><button class="btn" data-act="again">Rematch</button>`
+  };
+};
+
+// ---------- render ----------
+let atHome = true;
+function render() {
+  const v = atHome ? V.home() : V[S.phase]();
+  const top = v.top === false ? '' : `<div class="top"><span class="brand">WIRETAP</span>
+    <span class="rnd">Round ${S.round}/${S.cfg.rounds}</span>
+    <button class="iconbtn" data-act="rules" aria-label="How to play">?</button>
+    <button class="iconbtn" data-act="home" aria-label="Home">⌂</button></div>`;
+  $('#app').innerHTML = `${top}<div class="main">${v.main}</div><div class="bar">${v.bar}</div>`;
+  $('.main').scrollTop = 0;
+  tickTimer();
+  save();
+}
+let toastT = 0;
+function toast(msg) {
+  const el = $('#toast'); el.textContent = msg; el.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2200);
+}
+
+// encryptor clock: updates only the #tmr text so typing is never wiped
+let lastSec = -1;
+function tickTimer() {
+  const el = $('#tmr');
+  if (!el || atHome || S.phase !== 'encWrite' || !S.tEnd) return;
+  const left = Math.max(0, Math.ceil((S.tEnd - Date.now()) / 1000));
+  el.textContent = left > 0 ? `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'TIME! Lock it in';
+  el.classList.toggle('low', left <= 10);
+  if (left !== lastSec) {
+    if (left > 0 && left <= 5) SFX.tick();
+    if (left === 0 && lastSec > 0) SFX.miss();
+    lastSec = left;
+  }
+}
+setInterval(tickTimer, 250);
+
+// ---------- peek overlay (hold to reveal; also used for the rules card) ----------
+const peekEl = $('#peek');
+function showPeek(t) {
+  peekEl.innerHTML = `<h3 class="${t === 0 ? 'tA' : 'tB'}">${esc(S.teams[t].name)} keywords</h3>${kwHTML(t)}<p class="sub">Let go to hide</p>`;
+  peekEl.classList.add('on'); peekEl.dataset.mode = 'peek';
+}
+function hidePeek() {
+  if (peekEl.dataset.mode !== 'peek') return;
+  peekEl.classList.remove('on'); peekEl.innerHTML = ''; peekEl.dataset.mode = '';
+}
+function showRules() {
+  peekEl.innerHTML = `<div class="card" style="max-width:640px;max-height:80vh;overflow-y:auto">${RULES}</div><button class="btn" data-close="1" style="min-width:200px">Got it</button>`;
+  peekEl.classList.add('on'); peekEl.dataset.mode = 'rules';
+}
+peekEl.addEventListener('click', e => {
+  if (e.target.closest('[data-close]')) { peekEl.classList.remove('on'); peekEl.innerHTML = ''; peekEl.dataset.mode = ''; }
+});
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest('[data-peek]');
+  if (b) { e.preventDefault(); showPeek(+b.dataset.peek); }
+});
+['pointerup', 'pointercancel', 'blur'].forEach(ev => window.addEventListener(ev, hidePeek));
+document.addEventListener('contextmenu', e => { if (e.target.closest('[data-peek]')) e.preventDefault(); });
+
+// ---------- actions ----------
+function validateSetup() {
+  S.teams.forEach((tm, t) => {
+    tm.name = tm.name.trim() || (t === 0 ? 'Team Falcon' : 'Team Viper');
+    tm.players = tm.players.map((p, i) => p.trim() || `Agent ${i + 1}`);
+  });
+  if (S.teams[0].name.toLowerCase() === S.teams[1].name.toLowerCase()) S.teams[1].name += ' 2';
+}
+const ACT = {
+  rules: showRules,
+  home: () => { atHome = true; },
+  resume: () => { atHome = false; },
+  setup: () => {
+    atHome = false;
+    if (S.phase !== 'setup') {
+      const keep = S.teams.map(t => ({ name: t.name, players: t.players.slice() }));
+      const cfg = S.cfg, games = S.games;
+      S = freshState(); S.cfg = cfg; S.games = games;
+      S.teams.forEach((t, i) => { t.name = keep[i].name; t.players = keep[i].players; });
+      S.phase = 'setup';
+    }
+  },
+  start: () => { validateSetup(); startGame(); SFX.good(); },
+  again: () => { startGame(); },
+  showKw: () => { S.shown = true; SFX.tap(); },
+  hideKw: () => {
+    S.shown = false;
+    if (S.bi === S.first) S.bi = other(S.first);
+    else startRound();
+  },
+  encStart: () => beginEncrypt(S.et),
+  encOpen: () => {
+    S.phase = 'encWrite'; lastSec = -1;
+    S.tEnd = S.cfg.timer ? Date.now() + S.cfg.timer * 1000 : 0;
+  },
+  lockClues: () => {
+    const words = S.teams[S.et].words, msgs = [];
+    document.querySelectorAll('[data-clue]').forEach(inp => {
+      const i = +inp.dataset.clue, p = clueProblem(S.draft[i], words);
+      inp.classList.toggle('bad', !!p);
+      if (p) msgs.push(`Clue ${i + 1} is ${p}`);
+    });
+    if (msgs.length) { $('#err').textContent = msgs.join(' · '); SFX.miss(); return false; }
+    lockClues();
+  },
+  clr: () => { S.entry = []; },
+  lockGuess: () => { if (S.entry.length === 3) lockGuess(); else return false; },
+  next: () => afterReveal(),
+  nextRound: () => { S.round++; S.first = other(S.first); startRound(); },
+  lockTb: () => lockTiebreak()
+};
+$('#app').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled || b.dataset.peek != null) return;
+  const d = b.dataset;
+  if (d.act) {
+    const fn = ACT[d.act];
+    if (fn && fn() === false) return;
+    if (d.act === 'rules') return;
+  } else if (d.dig) {
+    const n = +d.dig;
+    if (S.entry.length < 3 && !S.entry.includes(n)) { S.entry.push(n); SFX.tap(); }
+  } else if (d.add) {
+    const tm = S.teams[+d.add]; if (tm.players.length < 6) tm.players.push('');
+  } else if (d.del) {
+    const [t, i] = d.del.split(':').map(Number); S.teams[t].players.splice(i, 1);
+  } else if (d.rounds) S.cfg.rounds = +d.rounds;
+  else if (d.timer) S.cfg.timer = +d.timer;
+  else return;
+  render();
+});
+$('#app').addEventListener('input', e => {
+  const d = e.target.dataset, v = e.target.value;
+  if (d.tname != null) S.teams[+d.tname].name = v;
+  else if (d.pname) { const [t, i] = d.pname.split(':').map(Number); S.teams[t].players[i] = v; }
+  else if (d.clue != null) { S.draft[+d.clue] = v; e.target.classList.remove('bad'); }
+  else if (d.tb != null) S.draft[+d.tb] = v;
+  else return;
+  save();
+});
+$('#app').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || !e.target.matches('input')) return;
+  const ins = [...document.querySelectorAll('.main input')], i = ins.indexOf(e.target);
+  if (i >= 0 && i < ins.length - 1) ins[i + 1].focus(); else e.target.blur();
+});
+window.addEventListener('pagehide', save);
+
+// ---------- init ----------
+S = load() || freshState();
+if (!S.encBy) S.encBy = ['', ''];
+render();
+</script>
+</body>
+</html>
