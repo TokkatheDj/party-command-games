@@ -1,0 +1,246 @@
+<!-- CONCEPT: Sticker Scene Studio - pick a picture backdrop, stamp and drag emoji stickers around, wiggle them to life with Magic, and earn stars for decorating. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Sticker Scene Studio</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+html,body{margin:0;height:100%;font-family:"Comic Sans MS","Chalkboard SE","Trebuchet MS",sans-serif;background:#fff4d6;color:#4a2c6b;overflow:hidden}
+#app{display:flex;flex-direction:column;height:100%;max-width:1100px;margin:0 auto;padding:6px 8px;gap:6px}
+header{text-align:center;line-height:1.1}
+h1{margin:0;font-size:clamp(22px,4.5vw,36px);color:#ff5fa2;text-shadow:2px 2px 0 #fff,3px 3px 0 #ffd23f}
+.desc{margin:2px 0 0;font-size:clamp(12px,2.2vw,16px)}
+.bar{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center}
+button{font:inherit;border:0;border-radius:18px;padding:8px 12px;font-size:clamp(14px,2.6vw,20px);font-weight:bold;cursor:pointer;color:#fff;background:#7a5cff;box-shadow:0 4px 0 rgba(0,0,0,.25);transition:transform .08s}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+button.scene{background:#1c7f97}
+button.scene.on{background:#b05f00;outline:4px solid #fff}
+button.act{background:#4cc35a}
+button.warn{background:#ff6b6b}
+#stars{font-size:clamp(18px,3.4vw,26px);background:#fff;border-radius:16px;padding:4px 12px;box-shadow:inset 0 0 0 3px #ffd23f;min-width:90px;text-align:center}
+#stage{position:relative;flex:1;min-height:0;border-radius:24px;overflow:hidden;border:5px solid #fff;box-shadow:0 6px 0 rgba(0,0,0,.2);touch-action:none}
+#bg{position:absolute;inset:0}
+#items{position:absolute;inset:0}
+.st{position:absolute;transform:translate(-50%,-50%);line-height:1;cursor:grab;touch-action:none;filter:drop-shadow(0 4px 3px rgba(0,0,0,.3))}
+.st.sel{outline:4px dashed #fff;outline-offset:2px;border-radius:14px}
+.st.wig{animation:wig .5s ease-in-out infinite alternate}
+@keyframes wig{from{transform:translate(-50%,-50%) rotate(-12deg) scale(var(--f,1),1)}to{transform:translate(-50%,-58%) rotate(12deg) scale(var(--f,1),1)}}
+.st.pop{animation:pop .35s}
+@keyframes pop{0%{transform:translate(-50%,-50%) scale(.2)}70%{transform:translate(-50%,-50%) scale(1.3)}100%{transform:translate(-50%,-50%) scale(1)}}
+#hint{position:absolute;left:0;right:0;top:50%;text-align:center;font-size:clamp(18px,4vw,34px);color:rgba(255,255,255,.95);text-shadow:0 2px 6px rgba(0,0,0,.4);pointer-events:none;padding:0 20px}
+#tray{display:flex;gap:6px;overflow-x:auto;padding:6px;background:#fff;border-radius:20px;box-shadow:inset 0 0 0 3px #ffd23f}
+.tab{flex:0 0 auto;font-size:clamp(14px,2.4vw,18px);padding:6px 10px;background:#8d47ff}
+.tab.on{background:#e60060}
+#pal{display:flex;gap:4px;overflow-x:auto;padding:4px 2px;background:#fff;border-radius:20px;box-shadow:inset 0 0 0 3px #ffd23f}
+.pk{flex:0 0 auto;font-size:clamp(32px,7vw,52px);background:#fff8;border:3px solid transparent;border-radius:16px;padding:2px 6px;cursor:pointer;box-shadow:none;color:#000}
+.pk.on{border-color:#ff5fa2;background:#ffe3f1;transform:scale(1.12)}
+canvas#fx{position:absolute;inset:0;pointer-events:none}
+#win{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(255,255,255,.55);z-index:5}
+#win div{background:#fff;border-radius:28px;padding:20px 28px;text-align:center;box-shadow:0 8px 0 rgba(0,0,0,.25);border:6px solid #ffd23f;font-size:clamp(20px,4vw,32px)}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🎨 Sticker Scene Studio ✨</h1>
+    <p class="desc">Pick a picture, tap a sticker, then tap the scene to stick it! Drag to move. Hit Magic to make everything dance!</p>
+  </header>
+  <div class="bar" id="scenes"></div>
+  <div id="stage">
+    <div id="bg"></div>
+    <div id="items"></div>
+    <canvas id="fx"></canvas>
+    <div id="hint">👇 Pick a sticker, then tap here!</div>
+    <div id="win"><div><div style="font-size:60px">🌟🎉🌟</div>Wow! What an amazing picture!<br><br><button class="act" id="keep">Keep Decorating!</button></div></div>
+  </div>
+  <div class="bar">
+    <span id="stars">⭐ 0</span>
+    <button class="act" id="big">➕ Bigger</button>
+    <button class="act" id="small">➖ Smaller</button>
+    <button class="act" id="flip">↔️ Flip</button>
+    <button class="act" id="del">🗑️ Remove</button>
+    <button id="magic">🪄 Magic!</button>
+    <button class="warn" id="undo">↩️ Undo</button>
+    <button class="warn" id="clear">🧹 Clear</button>
+  </div>
+  <div id="tray"></div>
+  <div id="pal"></div>
+</div>
+<script>
+(function(){
+"use strict";
+// ---------- Audio ----------
+var AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+function tone(f,d,type,vol,when,slide){
+  var a=ac(); if(!a)return; var t=a.currentTime+(when||0);
+  var o=a.createOscillator(),g=a.createGain();
+  o.type=type||"sine"; o.frequency.setValueAtTime(f,t);
+  if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+d);
+  g.gain.setValueAtTime(vol||.2,t); g.gain.exponentialRampToValueAtTime(.001,t+d);
+  o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+d+.02);
+}
+var PENT=[523,587,659,784,880,1047,1175];
+function sPlace(y){ tone(200,.12,"sine",.3,0,500); tone(PENT[Math.floor((1-y)*6.99)],.2,"triangle",.2,.05); }
+function sPick(){ tone(700,.07,"square",.08); }
+function sMagic(){ for(var i=0;i<8;i++)tone(PENT[i%7]*(i>6?2:1),.18,"triangle",.18,i*.07); }
+function sRemove(){ tone(500,.18,"sine",.2,0,150); }
+function sWin(){ [523,659,784,1047,784,1047,1319].forEach(function(f,i){tone(f,.25,"triangle",.22,i*.11);}); }
+function sScene(){ tone(440,.1,"sine",.2); tone(660,.15,"sine",.2,.08); }
+
+// ---------- Data ----------
+var SCENES=[
+ {name:"🌳 Meadow",bg:"linear-gradient(#8fd8ff 0%,#d6f3ff 55%,#7ddc6a 55%,#4cae3c 100%)",deco:[["☀️",12,12,60],["☁️",40,14,70],["☁️",72,8,55],["🌳",88,52,90]]},
+ {name:"🏖️ Beach",bg:"linear-gradient(#7fd6ff 0%,#c8f0ff 45%,#4fc3e8 45%,#2aa5d6 62%,#ffe3a1 62%,#f6cf74 100%)",deco:[["☀️",85,12,60],["⛵",30,45,56],["☁️",20,12,60]]},
+ {name:"🚀 Space",bg:"radial-gradient(circle at 70% 30%,#5b3ca8,#241553 60%,#0e0a2b)",deco:[["🌙",14,16,60],["⭐",40,10,26],["✨",60,24,26],["⭐",80,14,22],["⭐",25,60,20],["✨",90,70,24],["🪐",75,60,60]]},
+ {name:"🏘️ Town",bg:"linear-gradient(#ffd6a5 0%,#ffe9c9 40%,#b9b9c9 40%,#b9b9c9 70%,#8a8a9b 70%,#8a8a9b 100%)",deco:[["🏠",15,40,70],["🏢",45,36,80],["🏡",78,40,70],["☁️",30,10,60],["🌈",70,14,70]]},
+ {name:"🌊 Ocean",bg:"linear-gradient(#aee9ff 0%,#2aa5d6 25%,#146aa8 70%,#0b3f78 100%)",deco:[["🪸",12,88,60],["🌿",35,90,50],["🪸",70,88,60],["🫧",50,30,30],["🫧",24,50,24],["🫧",80,40,28]]},
+ {name:"🎪 Party",bg:"repeating-linear-gradient(90deg,#ffb3d1 0 40px,#fff0f6 40px 80px)",deco:[["🎈",10,16,50],["🎈",90,20,50],["🎊",50,10,44],["🎂",50,80,70]]}
+];
+var CATS=[
+ {n:"🐶 Pets",s:["🐶","🐱","🐰","🐹","🐥","🐢","🐠","🦜"]},
+ {n:"🦁 Wild",s:["🦁","🐘","🦒","🐵","🐼","🦊","🐸","🦄"]},
+ {n:"🌸 Nature",s:["🌸","🌻","🌳","🍄","🦋","🐝","🌈","⛄"]},
+ {n:"🚗 Rides",s:["🚗","🚌","🚒","🚜","🚂","✈️","🚁","🚀"]},
+ {n:"🍎 Yummy",s:["🍎","🍌","🍓","🍕","🍦","🧁","🍪","🍩"]},
+ {n:"🎉 Fun",s:["⭐","❤️","🎈","🎁","👑","🎸","⚽","🏰"]}
+];
+var SOUND_BY_CAT=0;
+
+// ---------- State ----------
+var scene=0,cat=0,pick=null,items=[],uid=0,sel=null,stars=0,wonOnce=false;
+var stage=document.getElementById("stage"),bg=document.getElementById("bg"),layer=document.getElementById("items"),hint=document.getElementById("hint");
+var scenesEl=document.getElementById("scenes"),tray=document.getElementById("tray"),pal=document.getElementById("pal"),starsEl=document.getElementById("stars");
+
+function buildScenes(){
+  scenesEl.innerHTML="";
+  SCENES.forEach(function(s,i){
+    var b=document.createElement("button"); b.className="scene"+(i===scene?" on":""); b.textContent=s.name;
+    b.onclick=function(){ scene=i; sScene(); drawBg(); buildScenes(); };
+    scenesEl.appendChild(b);
+  });
+}
+function drawBg(){
+  var s=SCENES[scene]; bg.style.background=s.bg; bg.innerHTML="";
+  s.deco.forEach(function(d){
+    var e=document.createElement("div"); e.textContent=d[0];
+    e.style.cssText="position:absolute;left:"+d[1]+"%;top:"+d[2]+"%;transform:translate(-50%,-50%);font-size:"+d[3]+"px;opacity:.95;pointer-events:none";
+    bg.appendChild(e);
+  });
+}
+function buildTray(){
+  tray.innerHTML="";
+  CATS.forEach(function(c,i){
+    var b=document.createElement("button"); b.className="tab"+(i===cat?" on":""); b.textContent=c.n;
+    b.onclick=function(){ cat=i; sPick(); buildTray(); buildPal(); };
+    tray.appendChild(b);
+  });
+}
+function buildPal(){
+  pal.innerHTML="";
+  CATS[cat].s.forEach(function(e){
+    var b=document.createElement("button"); b.className="pk"+(pick===e?" on":""); b.textContent=e;
+    b.onclick=function(){ pick=e; sPick(); setSel(null); hint.textContent="👆 Now tap the scene!"; hint.style.display="block"; buildPal(); };
+    pal.appendChild(b);
+  });
+}
+
+// ---------- Stickers ----------
+function render(it){
+  var el=it.el; el.style.left=it.x+"%"; el.style.top=it.y+"%";
+  el.style.fontSize=it.size+"px"; el.style.setProperty("--f",it.flip);
+  el.style.transform="translate(-50%,-50%) scaleX("+it.flip+")";
+}
+function addSticker(emoji,xp,yp){
+  var it={id:++uid,e:emoji,x:xp,y:yp,size:72,flip:1,el:document.createElement("div")};
+  it.el.className="st pop"; it.el.textContent=emoji;
+  it.el.addEventListener("animationend",function(){it.el.classList.remove("pop");});
+  attachDrag(it); layer.appendChild(it.el); items.push(it); render(it);
+  setSel(it); sPlace(yp/100); burst(xp,yp,10);
+  hint.style.display="none";
+  stars=Math.min(items.length,99); starsEl.textContent="⭐ "+stars;
+  if(items.length>=10&&!wonOnce){ wonOnce=true; setTimeout(win,500); }
+}
+function setSel(it){
+  sel=it; items.forEach(function(i){i.el.classList.toggle("sel",i===it);});
+}
+function attachDrag(it){
+  var el=it.el,drag=false,moved=false;
+  el.addEventListener("pointerdown",function(ev){
+    ev.stopPropagation(); ev.preventDefault();
+    ac(); drag=true; moved=false; el.setPointerCapture(ev.pointerId);
+    setSel(it); layer.appendChild(el); sPick();
+  });
+  el.addEventListener("pointermove",function(ev){
+    if(!drag)return; moved=true;
+    var r=stage.getBoundingClientRect();
+    it.x=Math.max(2,Math.min(98,(ev.clientX-r.left)/r.width*100));
+    it.y=Math.max(2,Math.min(98,(ev.clientY-r.top)/r.height*100));
+    el.style.left=it.x+"%"; el.style.top=it.y+"%";
+  });
+  function up(){ if(drag&&moved){ tone(400,.08,"sine",.15); } drag=false; }
+  el.addEventListener("pointerup",up); el.addEventListener("pointercancel",up);
+}
+stage.addEventListener("pointerdown",function(ev){
+  if(ev.target!==stage&&ev.target!==bg&&ev.target!==layer&&ev.target.id!=="fx"&&ev.target.parentNode!==bg)return;
+  ac();
+  if(!pick){ hint.textContent="👇 Pick a sticker first!"; hint.style.display="block"; tone(300,.15,"sine",.15); setSel(null); return; }
+  var r=stage.getBoundingClientRect();
+  addSticker(pick,(ev.clientX-r.left)/r.width*100,(ev.clientY-r.top)/r.height*100);
+});
+
+// ---------- Buttons ----------
+function on(id,fn){ document.getElementById(id).onclick=function(){ ac(); fn(); }; }
+on("big",function(){ if(sel){ sel.size=Math.min(200,sel.size+18); render(sel); sPick(); } else tone(300,.1); });
+on("small",function(){ if(sel){ sel.size=Math.max(30,sel.size-18); render(sel); sPick(); } else tone(300,.1); });
+on("flip",function(){ if(sel){ sel.flip*=-1; render(sel); sPick(); } else tone(300,.1); });
+on("del",function(){ if(sel){ removeItem(sel); } else tone(300,.1); });
+on("undo",function(){ if(items.length){ removeItem(items[items.length-1]); } });
+on("clear",function(){ while(items.length)removeItem(items[0],true); sRemove(); showEmptyHint(); });
+function removeItem(it,quiet){
+  if(!quiet){ sRemove(); burst(it.x,it.y,6); }
+  if(it.el.parentNode)it.el.parentNode.removeChild(it.el);
+  items.splice(items.indexOf(it),1); if(sel===it)sel=null;
+  stars=items.length; starsEl.textContent="⭐ "+stars;
+  if(!items.length)showEmptyHint();
+}
+function showEmptyHint(){ hint.textContent=pick?"👆 Tap the scene to stick it!":"👇 Pick a sticker, then tap here!"; hint.style.display="block"; }
+on("magic",function(){
+  if(!items.length){ tone(300,.1); hint.textContent="Add some stickers first!"; hint.style.display="block"; return; }
+  sMagic();
+  items.forEach(function(it,i){
+    it.el.style.animationDelay=(i*0.05)+"s";
+    it.el.classList.add("wig");
+    burst(it.x,it.y,4);
+    setTimeout(function(){ it.el.classList.remove("wig"); it.el.style.animationDelay=""; },2600);
+  });
+});
+document.getElementById("keep").onclick=function(){ document.getElementById("win").style.display="none"; };
+function win(){ document.getElementById("win").style.display="flex"; sWin(); for(var i=0;i<8;i++)setTimeout(function(){burst(10+Math.random()*80,10+Math.random()*60,16);},i*150); }
+
+// ---------- Confetti / sparkles ----------
+var fx=document.getElementById("fx"),cx=fx.getContext("2d"),parts=[],running=false;
+function fit(){ fx.width=stage.clientWidth; fx.height=stage.clientHeight; }
+window.addEventListener("resize",fit); fit();
+var COLS=["#ff5fa2","#ffd23f","#4cc35a","#27b3d6","#7a5cff","#ff8a00"];
+function burst(xp,yp,n){
+  var x=xp/100*fx.width,y=yp/100*fx.height;
+  for(var i=0;i<n;i++){ var a=Math.random()*6.28,s=2+Math.random()*4;
+    parts.push({x:x,y:y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,l:40+Math.random()*20,c:COLS[i%6],r:3+Math.random()*4}); }
+  if(!running){ running=true; requestAnimationFrame(loop); }
+}
+function loop(){
+  cx.clearRect(0,0,fx.width,fx.height);
+  parts=parts.filter(function(p){return p.l>0;});
+  parts.forEach(function(p){ p.x+=p.vx; p.y+=p.vy; p.vy+=.15; p.l--; cx.globalAlpha=Math.min(1,p.l/20); cx.fillStyle=p.c; cx.beginPath(); cx.arc(p.x,p.y,p.r,0,6.28); cx.fill(); });
+  cx.globalAlpha=1;
+  if(parts.length)requestAnimationFrame(loop); else running=false;
+}
+
+buildScenes(); drawBg(); buildTray(); buildPal();
+})();
+</script>
+</body>
+</html>
