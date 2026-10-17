@@ -231,7 +231,12 @@ def queue_arcade_step(known):
         q = json.load(open(qpath, encoding="utf-8"))
     except (OSError, ValueError):
         return
-    ok = sorted((k, v) for k, v in known.items() if v.get("ok") and not v.get("a11y"))
+    from add_to_arcade import section_for
+    passed = sorted((k, v) for k, v in known.items() if v.get("ok") and not v.get("a11y"))
+    # Only apps add_to_arcade.py --waiting will really add: one whose folder has no Arcade
+    # section made the whole step stop on "which section?" (16 Oct, an Action Games app).
+    ok = [(k, v) for k, v in passed if section_for(k)]
+    unplaced = [v["title"][:40] for k, v in passed if not section_for(k)]
     steps = [st for st in q.get("steps", []) if not (st.get("id", "").startswith("arcade-add-") and st.get("status") == "waiting")]
     if ok:
         names = ", ".join(v["title"][:40] for _, v in ok)
@@ -239,7 +244,9 @@ def queue_arcade_step(known):
             "id": "arcade-add-" + time.strftime("%Y-%m-%d-%H%M"),
             "title": "Put on the Games Arcade - only once you've played them: " + names,
             "why": "The nightly check played these and found nothing wrong. This commits them, adds their tiles "
-                   "to the Arcade, pushes, and waits for the live site. PUBLIC.",
+                   "to the Arcade, pushes, and waits for the live site. PUBLIC."
+                   + (" Not included - their folder has no Arcade section, so ask Claude to place them: "
+                      + ", ".join(unplaced) + "." if unplaced else ""),
             "from": "new_app_check.py",
             "guard": {"cwd": HERE, "run": '"%s" add_to_arcade.py --waiting --dry' % sys.executable.replace("pythonw", "python"),
                       "explain": "something waiting didn't pass the nightly check, or nothing is waiting"},
@@ -248,6 +255,8 @@ def queue_arcade_step(known):
                         "contains": "src: '%s'" % "/".join(x.replace(" ", "%20") for x in k.split("/")), "patience": 120}
                        for k, v in ok],
             "status": "waiting", "done_at": None, "error": None})
+    if unplaced:
+        log("passed but not on the Arcade step - no section for their folder: " + ", ".join(unplaced))
     if steps == q.get("steps", []):
         return
     q["steps"] = steps

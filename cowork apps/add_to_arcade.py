@@ -26,8 +26,8 @@ README = os.path.join(REPO, "README.md")
 PROFILE = os.path.join(REPO, "portfolio-profile", "README.md")
 STATE = os.path.join(HERE, "test_reports", "new-apps.json")
 LIVE = "https://tokkathedj.github.io/party-command-games/"
-SECTION_OF = {"party_apps": "party", "kids_apps": "kids", "action_games": "kids", "art_apps": "kids",
-              "music_apps": "kids", "music_game_apps": "kids", "educational_apps": "kids",
+SECTION_OF = {"party_apps": "party", "kids_apps": "kids", "action_games": "kids", "Action Games": "kids",
+              "art_apps": "kids", "music_apps": "kids", "music_game_apps": "kids", "educational_apps": "kids",
               "Educational Apps": "kids", "table_games_apps": "party", "card_games_apps": "party"}
 EMOJI = [("puzzle", "🧩"), ("draw", "✏️"), ("doodle", "✏️"), ("paint", "🖌️"), ("color", "🎨"),
          ("pup", "🐶"), ("dog", "🐶"), ("cat", "🐱"), ("dragon", "🐉"), ("bingo", "🙋"), ("word", "🔠"),
@@ -58,6 +58,21 @@ def emoji_for(rel, name):
     return next((e for w, e in EMOJI if w in k), "🎮")
 
 
+def section_for(rel):
+    """The Arcade section an app's folder belongs to, or None if the folder has none
+    (the VR folders, review-kit, ... - not Arcade games, or not placed yet)."""
+    return SECTION_OF.get(rel.replace("\\", "/").split("/")[0])
+
+
+def waiting_ready(checked):
+    """(placeable, unplaced) among the apps the nightly check has waiting and passed.
+    --waiting adds only the placeable ones: on 16 Oct an Action Games app made the
+    whole SHIP IT step stop on 'which section?' before adding anything."""
+    ready = [k for k, v in sorted(checked.items())
+             if v.get("ok") and not v.get("a11y") and v.get("waiting", True) and v.get("public", True)]
+    return [k for k in ready if section_for(k)], [k for k in ready if not section_for(k)]
+
+
 def section_block(hub, key):
     """(start, end) of the games list of SECTIONS entry `key` - end is the index of its '    ],'."""
     m = re.search(r"key: '%s'.*?games: \[\r?\n" % key, hub, re.S)
@@ -86,9 +101,12 @@ def main():
     apps = [x.replace("\\", "/").split(FOLDER + "/")[-1] for x in a.apps]
     if a.waiting:
         # public apps waiting to be committed - not the private ones the check also plays
-        # (and not ones failing the accessibility scan - the Arcade is kept clean)
-        apps += [k for k, v in sorted(checked.items())
-                 if v.get("ok") and not v.get("a11y") and v.get("waiting", True) and v.get("public", True)]
+        # (and not ones failing the accessibility scan - the Arcade is kept clean), and only
+        # those whose folder has a section; the rest are named and left for a --section call
+        placeable, unplaced = waiting_ready(checked)
+        apps += placeable
+        for k in unplaced:
+            print("not added: %s - its folder has no Arcade section; add it with --section party or --section kids" % k)
     apps = list(dict.fromkeys(apps))
     if not apps:
         sys.exit("nothing to add - no apps given, and nothing waiting that passed the nightly check")
@@ -113,7 +131,7 @@ def main():
             sys.exit("%s: fails the accessibility scan the Arcade is held to (%s) - fix it, then let the "
                      "nightly check play it again" % (rel, "; ".join(checked[rel]["a11y"][:2])))
         src = "/".join(p.replace(" ", "%20") for p in rel.split("/"))
-        sec = a.section or SECTION_OF.get(rel.split("/")[0])
+        sec = a.section or section_for(rel)
         if not sec:
             sys.exit("%s: which section? add --section party or --section kids" % rel)
         name = a.name or tile_name(rel)
