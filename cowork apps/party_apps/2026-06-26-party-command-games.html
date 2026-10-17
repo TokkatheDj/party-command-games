@@ -5916,6 +5916,7 @@ let fpLives     = 3;
 let fpRound     = 0;
 let fpBest      = 0;
 let fpBusy      = false;
+let fpGen       = 0;     // bumped on every start/leave; a sleeping loop from an older game quits when it wakes
 
 function fpGetTiming(round) {
   if (round <= 3)  return { flash:480, gap:220 };
@@ -5948,6 +5949,7 @@ function fpRenderLives() {
 }
 
 function fpLoad() {
+  fpGen++;
   fpState = 'idle'; fpBusy = false;
   fpRound = 1; fpLives = 3; fpSequence = []; fpPlayerIdx = 0;
   fpRenderLives();
@@ -5960,6 +5962,7 @@ function fpLoad() {
 
 async function fpStart() {
   if (fpBusy) return;
+  const gen = ++fpGen;
   fpBusy = true; fpState = 'playing';
   fpRound = 1; fpLives = 3; fpSequence = []; fpPlayerIdx = 0;
   fpRenderLives();
@@ -5967,7 +5970,7 @@ async function fpStart() {
   if (btn) btn.disabled = true;
   fpAddStep();
   await fpShowSequence();
-  fpBusy = false;
+  if (gen === fpGen) fpBusy = false;
 }
 
 function fpAddStep() {
@@ -5978,19 +5981,21 @@ function fpAddStep() {
 }
 
 async function fpShowSequence() {
+  const gen = fpGen;
   fpState = 'showing';
   const r = document.getElementById('fp-round'); if (r) r.textContent = `Round ${fpRound}`;
   fpSetStatus(`👀 Round ${fpRound} — watch!`);
   const { flash, gap } = fpGetTiming(fpRound);
   await fpSleep(350);
-  for (const idx of fpSequence) {
-    if (fpState !== 'showing') return; // aborted (user left / fpStop) — stop flashing & beeping
+  for (const idx of fpSequence.slice()) {
+    if (gen !== fpGen || fpState !== 'showing') return; // aborted (user left / restarted) — stop flashing & beeping
     fpLitTile(idx, true);
     playChime([FP_FREQS[idx]]);
     await fpSleep(flash);
     fpLitTile(idx, false);
     await fpSleep(gap);
   }
+  if (gen !== fpGen) return;
   fpState = 'input'; fpPlayerIdx = 0;
   fpSetStatus('🎯 Your turn!');
 }
@@ -5998,11 +6003,13 @@ async function fpShowSequence() {
 async function fpTap(idx) {
   if (fpState !== 'input' || fpBusy) return;
   fpBusy = true;
+  const gen = fpGen;
 
   fpLitTile(idx, true);
   playChime([FP_FREQS[idx]]);
   await fpSleep(130);
   fpLitTile(idx, false);
+  if (gen !== fpGen) return;
 
   if (idx === fpSequence[fpPlayerIdx]) {
     fpPlayerIdx++;
@@ -6015,11 +6022,12 @@ async function fpTap(idx) {
       fpSetStatus('✅ Nice one!');
       playChime([523,659,784]);
       await fpSleep(700);
+      if (gen !== fpGen) return;
       fpRound++;
       fpAddStep();
       await fpShowSequence();
     }
-    fpBusy = false;
+    if (gen === fpGen) fpBusy = false;
   } else {
     // Wrong
     fpLives--;
@@ -6032,24 +6040,27 @@ async function fpTap(idx) {
     playChime([220,180]);
     await fpSleep(380);
     if (el) { el.style.background=''; el.style.boxShadow=''; el.classList.remove('fp-wrong-anim'); }
+    if (gen !== fpGen) return;
 
     if (fpLives <= 0) {
       fpState = 'gameover';
       if (fpRound > fpBest) { fpBest = fpRound; const b=document.getElementById('fp-best'); if(b) b.textContent=`Best: ${fpBest}`; }
       fpSetStatus(`💀 Game Over — Round ${fpRound}`);
       await fpSleep(1200);
+      if (gen !== fpGen) return;
       const btn = document.getElementById('fp-btn');
       if (btn) { btn.disabled=false; btn.textContent='🔄 PLAY AGAIN!'; }
     } else {
       fpSetStatus(`❌ Wrong! ${fpLives} ${fpLives===1?'life':'lives'} left — replaying…`);
       await fpSleep(900);
+      if (gen !== fpGen) return;
       await fpShowSequence();
     }
-    fpBusy = false;
+    if (gen === fpGen) fpBusy = false;
   }
 }
 
-function fpStop() { fpState='idle'; fpBusy=false; }
+function fpStop() { fpGen++; fpState='idle'; fpBusy=false; }
 
 // ══════════════════════════════════════════════════════════
 // SHELL GAME
