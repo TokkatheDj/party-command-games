@@ -1,0 +1,222 @@
+<!-- CONCEPT: Improv/Creative - Mad-libs "Fill-In Fiasco": pass the device, each player secretly supplies words for a story they can't see, then the story is revealed and read aloud and the room crowns the funniest word -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fill-In Fiasco</title>
+<style>
+:root{--bg:#1b1140;--card:#2c1d6b;--ink:#fff;--y:#ffd93d;--p:#ff4fa3;--c:#3de0d0;--g:#7dff7a}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 20% 0,#4a2a9e,var(--bg) 60%);color:var(--ink);font-family:"Trebuchet MS",Verdana,sans-serif;display:flex;flex-direction:column;align-items:center}
+header{text-align:center;padding:14px 12px 4px}
+h1{margin:0;font-size:clamp(34px,6vw,64px);letter-spacing:1px;color:var(--y);text-shadow:4px 4px 0 var(--p)}
+.sub{font-size:clamp(15px,2.2vw,22px);opacity:.9;margin:4px 0}
+main{width:min(1000px,100%);padding:10px 16px 40px}
+.card{background:var(--card);border:4px solid var(--y);border-radius:22px;padding:22px;margin:12px 0;box-shadow:0 8px 0 rgba(0,0,0,.35)}
+button{font:inherit;font-weight:900;font-size:clamp(20px,3vw,30px);padding:16px 26px;border:0;border-radius:16px;background:var(--p);color:#fff;cursor:pointer;box-shadow:0 6px 0 #a02163;margin:6px;touch-action:manipulation}
+button:active{transform:translateY(4px);box-shadow:0 2px 0 #a02163}
+button.alt{background:var(--c);color:#06302c;box-shadow:0 6px 0 #1b8b80}
+button.y{background:var(--y);color:#3a2d00;box-shadow:0 6px 0 #b08f00}
+button.small{font-size:18px;padding:10px 16px}
+input[type=text]{font:inherit;font-size:clamp(22px,3.4vw,34px);width:100%;padding:14px;border-radius:14px;border:4px solid var(--c);background:#fff;color:#222;text-align:center}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center}
+.big{font-size:clamp(26px,4.4vw,48px);font-weight:900;text-align:center}
+.type{font-size:clamp(34px,6vw,64px);font-weight:900;color:var(--y);text-align:center;margin:6px 0}
+.hint{font-size:clamp(18px,2.6vw,26px);text-align:center;opacity:.9}
+.story{font-size:clamp(22px,3.4vw,38px);line-height:1.6;font-family:Georgia,serif}
+.w{background:var(--y);color:#2a1d00;border-radius:8px;padding:1px 8px;font-weight:900;font-family:"Trebuchet MS",sans-serif;display:inline-block;animation:pop .35s}
+.w.hid{background:#4b3a95;color:#4b3a95;animation:none;min-width:70px}
+@keyframes pop{from{transform:scale(.3) rotate(-8deg)}to{transform:none}}
+.pl{display:flex;align-items:center;gap:6px;background:#3d2a8a;border-radius:12px;padding:6px 10px;font-size:22px;font-weight:700}
+.pl button{padding:2px 10px;font-size:20px;box-shadow:none;margin:0;background:#c0392b}
+table{width:100%;border-collapse:collapse;font-size:clamp(20px,3vw,32px)}
+td{padding:8px 12px;border-bottom:2px solid #4b3a95}td.n{text-align:right;color:var(--y);font-weight:900}
+.bar{height:14px;background:#4b3a95;border-radius:8px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:var(--g);transition:width .3s}
+.cover{text-align:center}
+.pill{display:inline-block;background:var(--p);padding:2px 14px;border-radius:20px;font-weight:900}
+label{font-size:22px;font-weight:700}
+select{font:inherit;font-size:22px;padding:8px;border-radius:10px}
+.note{font-size:16px;opacity:.75;text-align:center}
+</style></head><body>
+<header><h1>FILL-IN FIASCO</h1>
+<div class="sub">A mad-libs story built by everyone's secret words &mdash; then read aloud and judged by the room!</div>
+<div class="sub" style="font-size:16px;opacity:.75">3&ndash;10 players &bull; pass-the-device &bull; about 15&ndash;25 minutes</div></header>
+<main id="app"></main>
+<script>
+// ---------- audio ----------
+let AC=null;
+function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}return AC}
+function tone(f,d,t,v,when){const a=ac();if(!a)return;const o=a.createOscillator(),g=a.createGain();o.type=t||'square';o.frequency.value=f;const s=a.currentTime+(when||0);g.gain.setValueAtTime(v||.15,s);g.gain.exponentialRampToValueAtTime(.001,s+d);o.connect(g);g.connect(a.destination);o.start(s);o.stop(s+d)}
+const sfx={tap:()=>tone(520,.08,'square',.1),pop:()=>{tone(660,.1,'triangle',.2);tone(880,.12,'triangle',.2,.08)},
+ win:()=>[523,659,784,1047].forEach((f,i)=>tone(f,.25,'triangle',.22,i*.12)),
+ fanfare:()=>[392,392,523,659,784,659,784,1047].forEach((f,i)=>tone(f,.22,'sawtooth',.14,i*.13)),
+ boop:()=>tone(200,.2,'sawtooth',.2)};
+// ---------- content ----------
+const HINTS={
+ noun:["Noun (a thing you can hold)","Noun (something in a kitchen)","Noun (an object at school)","Noun (something you'd find at a beach)","Noun (a thing in a toolbox)","Noun (something in a backpack)","Noun (a household item)","Noun (a thing at a playground)"],
+ pnoun:["Plural noun (things in a drawer)","Plural noun (animals at a zoo)","Plural noun (snacks)","Plural noun (things that are round)","Plural noun (clothes)","Plural noun (things with wheels)","Plural noun (tiny things)"],
+ adj:["Adjective (describes a smell)","Adjective (something squishy would be...)","Adjective (a very dramatic one)","Adjective (fancy!)","Adjective (a color or shade)","Adjective (describes weather)","Adjective (a grumpy one)","Adjective (how a monster feels)"],
+ verb:["Verb (an action, like 'juggle')","Verb (something you do at a party)","Verb (an energetic one)","Verb (a sneaky one)","Verb (something done in a pool)","Verb (a silly dance move)"],
+ ving:["Verb ending in -ING","-ING verb (like 'hopping')","-ING verb (something noisy)","-ING verb (a hobby)","-ING verb (a very slow one)"],
+ ved:["Past-tense verb (like 'splashed')","Past-tense verb (something clumsy)","Past-tense verb (a loud one)","Past-tense verb (ended in -ed)"],
+ adv:["Adverb (ends in -ly)","Adverb (how a sloth moves)","Adverb (how you'd whisper)","Adverb (a proud one)"],
+ animal:["Animal","Animal (a tiny one)","Animal (a huge one)","Animal (from a farm)","Animal (from the ocean)","Animal (a bird)"],
+ food:["Food","Food (a dessert)","Food (something you'd put on a pizza)","Food (a veggie)","Food (a breakfast item)","Food (something sticky)"],
+ place:["Place (a city or country)","Place (a room in a house)","Place (a store)","Place (somewhere outdoors)","Place (somewhere far, far away)"],
+ name:["A friend's first name","A famous person (family friendly)","A silly made-up name","A teacher's name (invented)","A grandparent's nickname"],
+ num:["A number","A big number","A tiny number","A number between 3 and 99","A very specific number"],
+ body:["Body part","Body part (a small one)","Body part (a bendy one)"],
+ sound:["A sound effect (like 'BOING')","A funny noise","An exclamation (like 'Yikes!')","A sound a robot makes"],
+ job:["A job or occupation","A silly occupation","A job in a hospital or school"],
+ vehicle:["A vehicle","A way to travel","A big machine"],
+ emotion:["A feeling","An emotion (a big one)","A mood"]
+};
+// token: {type}  -> filled by players
+const STORIES=[
+["The Great Pancake Disaster","This morning I decided to make {adj} pancakes for the whole {place}. I grabbed a {noun}, three cups of {food}, and {num} {pnoun}. When I started {ving}, the batter began to {verb} all over my {body}! My pet {animal} yelled \"{sound}!\" and ran {adv} out the door. In the end we ate {food} for breakfast and everyone declared it the most {adj} meal ever."],
+["A Day at the Zoo","Our class took a {vehicle} to the zoo. First we saw a {adj} {animal} that was {ving} in a pile of {pnoun}. The zookeeper, {name}, told us to never {verb} near the {animal}. Suddenly a {adj} {animal} {ved} right past us yelling \"{sound}!\" Everyone {ved} {adv}. We finished the day with a {food} sundae and {num} souvenir {pnoun}."],
+["Hero Wanted","WANTED: one {adj} hero to save the town of {place} from the evil {job} named {name}. Must be able to {verb} {adv} and carry a giant {noun}. Previous heroes have been defeated by {pnoun}, {ving}, and a very angry {animal}. The reward is {num} bags of {food} and a lifetime supply of {pnoun}. Apply today by shouting \"{sound}!\""],
+["The Substitute Teacher","Our new substitute was a {adj} {job} called Mr. {name}. He walked in {ving} and wrote {num} {pnoun} on the board. \"Today,\" he announced, \"we will learn to {verb} with a {noun}!\" Then a {animal} {ved} through the window. The class screamed \"{sound}!\" and he calmly ate some {food}. Best. School. Day. Ever."],
+["Camping Catastrophe","We set up our tent in {place} and it was {adj}. At night I heard a {adj} noise like \"{sound}!\" It was a {animal} {ving} near our {noun}! My cousin {name} tried to {verb} it away with a stick of {food}. We all {ved} {adv} into the {vehicle} and drove home with {num} {pnoun} still in our sleeping bags."],
+["Restaurant Review","I visited the {adj} Restaurant of {place} and ordered the {food} surprise. The waiter, a {adj} {animal} in a tiny hat, {ved} to our table {adv}. My {body} tingled when I tasted the {noun}-flavored {food}. Chef {name} came out {ving} and shouted \"{sound}!\" I give it {num} stars. Would {verb} there again."],
+["Space Mission Report","Captain {name} blasted off from {place} in a {adj} rocket shaped like a {noun}. After {num} days we landed on a planet made of {food}. The locals were giant {pnoun} who liked to {verb} all night. One {ved} {adv} onto our ship, so we tried {ving} to calm it. It worked! They gave us {num} {adj} {pnoun} to take back to Earth."],
+["Birthday Party Chaos","For my birthday, I invited {num} friends to {place}. We played pin the {noun} on the {animal}, and {name} won by {ving} {adv}. The cake tasted like {food} and had {num} candles shaped like {pnoun}. Then a {adj} clown {ved} in on a {vehicle} and yelled \"{sound}!\" We all felt {emotion}. Next year, I want to {verb} at the zoo."],
+["Pirate Treasure Map","Ahoy, ye {adj} sailors! Captain {name} be seeking the lost {noun} of {place}. First, {verb} {num} steps toward the giant {animal}. Then dig under the {adj} {food} tree. Beware of the {pnoun} that {verb} at night! If ye hear \"{sound}!\", ye be {ving} in the wrong place. The treasure be {num} chests of {pnoun}."],
+["Weather Report","Good evening! This is {name} with your {adj} forecast for {place}. Expect a {num} percent chance of falling {pnoun}, followed by {adj} winds that will {verb} your {noun}. A big {animal} is {ving} toward the coast on a {vehicle}. Residents should stay inside and eat {food}. If you feel {emotion}, just shout \"{sound}!\" Back to you."],
+["Ancient Recipe for Wizard Soup","To make Wizard Soup, take one {adj} {noun} and {verb} it {adv} in a pot from {place}. Add {num} spoonfuls of {food} and a handful of {pnoun}. Stir while {ving}. If the soup goes \"{sound}!\", add a {animal} tail. Serve it to {name} the {job}, who will feel very {emotion}. Warning: may cause {body} to glow."],
+["Superhero Origin","I was an ordinary {job} until a {adj} {animal} {ved} on my {body} in {place}. Suddenly I could {verb} {adv}! They call me Captain {food}, and my sidekick is {name}. My weakness is {pnoun}. I fight crime by {ving} and shouting \"{sound}!\" My secret hideout is a giant {noun} with {num} secret doors."],
+["Dear Diary","Dear Diary, today was {adj}. I woke up {ving} because a {animal} was sitting on my {body}. At school {name} gave me {num} {pnoun} and a {noun}. I tried to {verb} in the cafeteria and spilled {food} everywhere. Everyone yelled \"{sound}!\" I felt so {emotion}. Tomorrow I'm going to {verb} to {place} on a {vehicle}."],
+["Robot Instruction Manual","Thank you for buying the Robo-{noun} 3000! To start, press the {adj} button {num} times. Your robot can {verb}, {verb}, and even {verb} {adv}. Do NOT feed it {food} or {pnoun}. If it begins {ving}, say \"{sound}!\" and call {name} the {job}. Warranty void if it turns {adj} or visits {place}."],
+["Haunted House Tour","Welcome to the {adj} Mansion of {place}! On your left, a ghost {ving} in the {noun} room. On your right, {num} {adj} {pnoun} {verb} on the stairs. Our guide, {name}, will serve {food} in the dining room. If you hear \"{sound}!\", a {animal} has {ved} {adv} into the attic. Please keep your {body} inside the {vehicle} at all times."],
+["Sports Announcer","Welcome, folks, to the Championship of {place}! {name} {ved} onto the field {ving} with a {adj} {noun}. The crowd goes \"{sound}!\" Now the {animal} mascot is trying to {verb} {adv}! That's {num} points for the {pnoun}! The coach eats a {food} sandwich and looks {emotion}. What a {adj} game!"],
+["Invention Pitch","Introducing the {adj} {noun}-O-Matic! It can {verb} {adv} and even make {food} while {ving}. Inventor {name} spent {num} years in {place} perfecting it. Side effects include {adj} {body} and sudden urges to shout \"{sound}!\" It replaces your {noun}, your {pnoun}, and your {animal}. Order now and get {num} free {pnoun}!"],
+["Fairy Tale Remix","Once upon a time in {place}, a {adj} {job} named {name} found a magic {noun}. A talking {animal} said, \"{sound}! You must {verb} {num} times to break the spell!\" So they went {ving} through the forest of {pnoun}, where a dragon {ved} {adv}. They shared {food} and felt {emotion}. And they all lived {adj}-ly ever after."],
+["Road Trip Rules","Rule one: nobody may {verb} in the {vehicle}. Rule two: if you see a {animal}, shout \"{sound}!\" Rule three: {name} controls the {adj} music and the {food} snacks. Rule four: we stop in {place} exactly {num} times for {pnoun}. Rule five: if anyone starts {ving}, they must {verb} {adv} home. Everybody feels {emotion}."],
+["Detective Case File","Case #{num}: The Missing {noun}. Detective {name}, a {adj} {job}, arrived at {place} and found {pnoun} everywhere. The only clue was a {adj} {food} stain and a faint \"{sound}!\" The suspect, a {animal}, was last seen {ving} {adv}. The detective had to {verb} to catch him with a {vehicle}. Case closed. Everyone felt {emotion}."]
+];
+// ---------- state ----------
+const S={screen:'setup',players:[],rounds:3,tts:false,round:0,order:[],story:null,slots:[],cur:0,revealed:0,used:[],hintUsed:{},scores:{},votes:{}};
+const app=document.getElementById('app');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function pick(a){return a[Math.floor(Math.random()*a.length)]}
+const render=()=>{({setup,pass,input,reveal,vote,results,final}[S.screen])()};
+// ---------- setup ----------
+function setup(){
+ app.innerHTML=`<div class="card"><div class="big">How to play</div>
+ <p class="hint">Everyone secretly gives silly words for a story you can't see. Then the device reveals the story &mdash; read it out loud and the room picks the funniest word!</p></div>
+ <div class="card"><div class="big">Players (3&ndash;10)</div>
+ <div class="row" style="margin:12px 0"><input type="text" id="nm" placeholder="Type a name, press Enter" maxlength="14" style="max-width:420px"><button class="y" id="add">Add</button></div>
+ <div class="row" id="pls"></div>
+ <div class="row" style="margin-top:14px"><label>Rounds: <select id="rds">${[2,3,4,5,6].map(n=>`<option ${n==S.rounds?'selected':''}>${n}</option>`).join('')}</select></label>
+ <label style="margin-left:18px"><input type="checkbox" id="tts" ${S.tts?'checked':''}> Read stories aloud (voice)</label></div>
+ <p class="note">Family friendly, please! One person holds the device and is the host.</p></div>
+ <div class="row"><button id="go">Start the Fiasco!</button></div>`;
+ const pls=document.getElementById('pls');
+ const draw=()=>{pls.innerHTML=S.players.map((p,i)=>`<div class="pl">${esc(p)} <button data-i="${i}">x</button></div>`).join('')||'<span class="note">No players yet</span>';
+  pls.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.players.splice(+b.dataset.i,1);sfx.tap();draw()})};
+ const add=()=>{const el=document.getElementById('nm');const v=el.value.trim();if(!v)return;if(S.players.length>=10){alert('Max 10 players');return}if(S.players.includes(v)){alert('That name is taken');return}S.players.push(v);el.value='';sfx.pop();draw();el.focus()};
+ document.getElementById('add').onclick=add;
+ document.getElementById('nm').onkeydown=e=>{if(e.key==='Enter')add()};
+ document.getElementById('go').onclick=()=>{ac();if(S.players.length<3){alert('Need at least 3 players');return}
+  S.rounds=+document.getElementById('rds').value;S.tts=document.getElementById('tts').checked;
+  S.scores={};S.players.forEach(p=>S.scores[p]=0);S.round=0;S.used=[];sfx.fanfare();newRound()};
+ draw();
+}
+// ---------- round ----------
+function newRound(){
+ S.round++;
+ let avail=STORIES.map((_,i)=>i).filter(i=>!S.used.includes(i));
+ if(!avail.length){S.used=[];avail=STORIES.map((_,i)=>i)}
+ const si=pick(avail);S.used.push(si);S.story=STORIES[si];
+ const toks=[...S.story[1].matchAll(/\{(\w+)\}/g)].map(m=>m[1]);
+ // owners spread evenly, shuffled
+ const owners=shuffle(S.players);
+ S.slots=toks.map((t,i)=>({type:t,owner:owners[i%owners.length],word:'',hint:pick(HINTS[t])}));
+ // order of asking: group by owner in player order
+ S.order=[];const po=shuffle(S.players);
+ po.forEach(p=>{const mine=S.slots.map((s,i)=>s.owner===p?i:-1).filter(i=>i>=0);if(mine.length)S.order.push({player:p,idx:mine})});
+ S.cur=0;S.revealed=0;S.votes={};S.screen='pass';render();
+}
+function pass(){
+ const o=S.order[S.cur];
+ app.innerHTML=`<div class="card cover"><div class="pill">Round ${S.round} of ${S.rounds}</div>
+ <div class="hint" style="margin-top:14px">Pass the device to</div><div class="type" style="font-size:clamp(46px,9vw,110px)">${esc(o.player)}</div>
+ <div class="hint">You'll give ${o.idx.length} secret word${o.idx.length>1?'s':''}. Everyone else: don't peek!</div>
+ <button class="y" id="ok">I'm ${esc(o.player)} &mdash; show me!</button></div>`;
+ document.getElementById('ok').onclick=()=>{sfx.tap();S.sub=0;S.screen='input';render()};
+}
+function input(){
+ const o=S.order[S.cur],slot=S.slots[o.idx[S.sub]];
+ app.innerHTML=`<div class="card cover"><div class="pill">${esc(o.player)} &bull; word ${S.sub+1} of ${o.idx.length}</div>
+ <div class="type">${esc(slot.hint)}</div>
+ <div class="hint">Type something funny! (Story is hidden &mdash; that's the fun.)</div>
+ <div style="margin:18px auto;max-width:600px"><input type="text" id="w" maxlength="30" autocomplete="off" autofocus></div>
+ <button id="sub">Lock it in</button> <button class="alt small" id="rnd">Surprise me</button></div>`;
+ const w=document.getElementById('w');w.focus();
+ const surprise=["banana","wobbly","kazoo","glitter","moose","sneezing","pickle","spaghetti","trampoline","zigzag","yodel","pudding","cactus","flamingo","bubble"];
+ const go=()=>{const v=w.value.trim();if(!v){w.style.borderColor='#f33';sfx.boop();return}
+  slot.word=v;sfx.pop();S.sub++;
+  if(S.sub>=o.idx.length){S.cur++;if(S.cur>=S.order.length){S.screen='reveal';S.revealed=0;}else S.screen='pass'}
+  render()};
+ document.getElementById('sub').onclick=go;
+ document.getElementById('rnd').onclick=()=>{w.value=pick(surprise);sfx.tap()};
+ w.onkeydown=e=>{if(e.key==='Enter')go()};
+}
+// ---------- reveal ----------
+function storyHTML(upto){
+ let i=-1;
+ return S.story[1].replace(/\{(\w+)\}/g,()=>{i++;const s=S.slots[i];return i<upto?`<span class="w">${esc(s.word)}</span>`:`<span class="w hid">&nbsp;</span>`}).replace(/\n/g,'<br>');
+}
+function speak(t){if(!S.tts||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.95;speechSynthesis.speak(u)}catch(e){}}
+function plain(){let i=-1;return S.story[1].replace(/\{(\w+)\}/g,()=>S.slots[++i].word)}
+function reveal(){
+ const total=S.slots.length;
+ app.innerHTML=`<div class="card"><div class="pill">Round ${S.round} of ${S.rounds}</div><div class="big" style="margin:8px 0">${esc(S.story[0])}</div>
+ <div class="story" id="st">${storyHTML(S.revealed)}</div>
+ <div class="bar"><i style="width:${S.revealed/total*100}%"></i></div></div>
+ <div class="row"><button id="nx">${S.revealed<total?'Reveal next word':'Done reading &rarr; Vote!'}</button>
+ ${S.revealed<total?'<button class="alt" id="all">Reveal all</button>':''}
+ ${S.tts&&S.revealed>=total?'<button class="y small" id="say">Read it to me</button>':''}</div>
+ <p class="note">Host: reveal word by word and let a player read the story out loud with a dramatic voice.</p>`;
+ document.getElementById('nx').onclick=()=>{if(S.revealed<total){S.revealed++;sfx.pop();if(S.revealed===total)speak(plain())}else{sfx.tap();S.screen='vote'}render()};
+ const all=document.getElementById('all');if(all)all.onclick=()=>{S.revealed=total;sfx.win();speak(plain());render()};
+ const say=document.getElementById('say');if(say)say.onclick=()=>speak(plain());
+}
+// ---------- vote ----------
+function vote(){
+ const by={};S.slots.forEach(s=>{(by[s.owner]=by[s.owner]||[]).push(s.word)});
+ app.innerHTML=`<div class="card"><div class="big">Applause time! Which player gave the FUNNIEST word?</div>
+ <p class="hint">Room cheers &mdash; host taps the winner (+3 pts). Tap a second player for "Honorable Mention" (+1).</p></div>
+ <div class="row" id="vb"></div><div class="row"><button class="alt" id="sk">Nobody &mdash; skip</button></div>`;
+ const vb=document.getElementById('vb');
+ S.players.filter(p=>by[p]).forEach(p=>{
+  const b=document.createElement('button');b.className=(S.votes.win===p?'y':S.votes.hm===p?'alt':'');
+  b.innerHTML=`${esc(p)}<br><span style="font-size:18px;font-weight:700">${by[p].map(esc).join(' / ')}</span>`;
+  b.onclick=()=>{sfx.pop();if(!S.votes.win||S.votes.win===p){S.votes.win=S.votes.win===p?null:p}else S.votes.hm=S.votes.hm===p?null:p;
+   if(S.votes.win&&S.votes.hm===S.votes.win)S.votes.hm=null;vote()};
+  vb.appendChild(b)});
+ const c=document.createElement('div');c.className='row';c.style.width='100%';
+ c.innerHTML=`<button id="fin" ${S.votes.win?'':'disabled style="opacity:.4"'}>Award points</button>`;
+ app.appendChild(c);
+ document.getElementById('fin').onclick=()=>{if(!S.votes.win)return;S.scores[S.votes.win]+=3;if(S.votes.hm)S.scores[S.votes.hm]+=1;sfx.win();S.screen='results';render()};
+ document.getElementById('sk').onclick=()=>{S.votes={};S.screen='results';render()};
+}
+function sorted(){return S.players.slice().sort((a,b)=>S.scores[b]-S.scores[a])}
+function board(){return `<table>${sorted().map((p,i)=>`<tr><td>${i==0?'👑 ':''}${esc(p)}</td><td class="n">${S.scores[p]}</td></tr>`).join('')}</table>`}
+function results(){
+ const last=S.round>=S.rounds;
+ app.innerHTML=`<div class="card"><div class="big">${S.votes.win?esc(S.votes.win)+' wins the round! 🎉':'No winner this round'}</div>${board()}</div>
+ <div class="row"><button id="nx">${last?'See final results':'Next round &rarr;'}</button></div>`;
+ document.getElementById('nx').onclick=()=>{sfx.tap();if(last){S.screen='final';render()}else newRound()};
+}
+function final(){
+ const s=sorted(),top=S.scores[s[0]],champs=s.filter(p=>S.scores[p]===top);
+ sfx.fanfare();
+ app.innerHTML=`<div class="card cover"><div class="hint">Fiasco Champion${champs.length>1?'s':''}</div>
+ <div class="type" style="font-size:clamp(46px,9vw,110px)">🏆 ${champs.map(esc).join(' & ')}</div>${board()}</div>
+ <div class="row"><button id="same">Play again (same players)</button><button class="alt" id="new">New game</button></div>`;
+ document.getElementById('same').onclick=()=>{S.players.forEach(p=>S.scores[p]=0);S.round=0;S.used=[];newRound()};
+ document.getElementById('new').onclick=()=>{S.players=[];S.screen='setup';render()};
+}
+render();
+</script></body></html>
