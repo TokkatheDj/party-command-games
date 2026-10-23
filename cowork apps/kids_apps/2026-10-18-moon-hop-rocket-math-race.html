@@ -1,0 +1,276 @@
+<!-- CONCEPT: Rocket math race - answer easy add/subtract questions to blast your rocket up to the moon ahead of a friendly alien rocket. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Moon Hop Rocket Race</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;height:100%;font-family:"Trebuchet MS","Comic Sans MS",system-ui,sans-serif;color:#fff;overflow:hidden;background:#1b1550}
+body{background:radial-gradient(ellipse at 50% 120%,#5b3fd0 0%,#2a1f7a 45%,#120d3d 100%)}
+#stars{position:fixed;inset:0;z-index:0}
+.screen{position:fixed;inset:0;z-index:2;display:none;flex-direction:column;align-items:center;justify-content:center;padding:14px;text-align:center}
+.screen.on{display:flex}
+h1{font-size:clamp(34px,7vw,64px);margin:0 0 6px;text-shadow:0 4px 0 #ff5fa2,0 8px 14px rgba(0,0,0,.4);letter-spacing:1px}
+.desc{font-size:clamp(16px,2.8vw,24px);max-width:640px;margin:6px 0 18px;line-height:1.35;color:#ffe9a8}
+.btn{font:inherit;font-weight:800;font-size:clamp(22px,4vw,34px);color:#fff;border:0;border-radius:26px;padding:14px 34px;margin:8px;cursor:pointer;background:linear-gradient(#ff8a3d,#ff4f7b);box-shadow:0 8px 0 #a52a55,0 14px 20px rgba(0,0,0,.35);transition:transform .08s}
+.btn:active{transform:translateY(5px);box-shadow:0 3px 0 #a52a55}
+.btn.green{background:linear-gradient(#5be37d,#1fb35a);box-shadow:0 8px 0 #0c7a3a,0 14px 20px rgba(0,0,0,.35)}
+.btn.blue{background:linear-gradient(#5ec8ff,#2f7bff);box-shadow:0 8px 0 #1a4aa8,0 14px 20px rgba(0,0,0,.35)}
+.btn.purple{background:linear-gradient(#c58bff,#8a4dff);box-shadow:0 8px 0 #5a2bb0,0 14px 20px rgba(0,0,0,.35)}
+.btn small{display:block;font-size:.5em;font-weight:600;opacity:.9}
+.btn.sel,.btn:focus-visible{outline:6px solid #fff36b;outline-offset:3px}
+.big-rocket{font-size:clamp(70px,14vw,130px);animation:bob 2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-14px) rotate(4deg)}}
+#game{flex-direction:row;gap:12px;align-items:stretch;justify-content:center}
+#trackWrap{flex:0 0 min(34vw,260px);display:flex;flex-direction:column;align-items:center;max-height:100%}
+#track{position:relative;flex:1;width:100%;min-height:200px;border-radius:24px;background:linear-gradient(#0c0830,#3b2a98 70%,#6a4bd8);border:4px solid #ffffff55;overflow:hidden}
+.moon{position:absolute;top:4px;left:50%;transform:translateX(-50%);font-size:clamp(34px,7vw,60px)}
+.lane{position:absolute;bottom:0;top:0;width:50%}
+.lane.me{left:0}.lane.rival{left:50%}
+.rk{position:absolute;left:50%;transform:translateX(-50%);font-size:clamp(34px,7vw,56px);transition:bottom .9s cubic-bezier(.2,1.3,.4,1);filter:drop-shadow(0 4px 6px #0008)}
+.rk.me::after{content:"YOU";position:absolute;left:50%;top:100%;transform:translateX(-50%);font-size:11px;font-weight:900;background:#ffd23f;color:#432;border-radius:8px;padding:0 5px;margin-top:-4px}
+.rk.boost{animation:shake .5s}
+@keyframes shake{25%{transform:translateX(-50%) rotate(-12deg)}75%{transform:translateX(-50%) rotate(12deg)}}
+.tick{position:absolute;left:0;right:0;height:2px;background:#ffffff1f}
+#qWrap{flex:1;max-width:620px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+#hud{font-size:clamp(16px,2.6vw,22px);font-weight:800;margin-bottom:6px;color:#ffe9a8}
+#visual{min-height:clamp(54px,10vh,90px);font-size:clamp(22px,4.2vw,36px);display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px 4px;margin-bottom:6px;max-width:100%}
+#visual .op{font-size:1.3em;font-weight:900;margin:0 8px;color:#ffd23f}
+#visual .grp{display:inline-flex;flex-wrap:wrap;justify-content:center;max-width:42%}
+#visual .gone{opacity:.28;filter:grayscale(1)}
+#visual.hint .grp span{animation:pop .6s ease-in-out infinite alternate}
+@keyframes pop{to{transform:scale(1.25)}}
+#question{font-size:clamp(46px,10vw,92px);font-weight:900;text-shadow:0 5px 0 #ff5fa2,0 10px 14px rgba(0,0,0,.4);margin:2px 0 12px}
+#answers{display:flex;gap:clamp(8px,2vw,18px);flex-wrap:wrap;justify-content:center}
+.ans{min-width:clamp(86px,20vw,150px);font-size:clamp(34px,7vw,60px);padding:12px 18px}
+.ans.wrong{animation:wob .45s;background:linear-gradient(#9aa,#678);box-shadow:0 4px 0 #345;opacity:.55;pointer-events:none}
+.ans.right{background:linear-gradient(#5be37d,#1fb35a);box-shadow:0 8px 0 #0c7a3a}
+.ans.glow{animation:glow .7s infinite alternate}
+@keyframes wob{20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+@keyframes glow{to{box-shadow:0 0 0 8px #fff36b,0 8px 0 #a52a55}}
+#msg{height:clamp(30px,5vh,44px);font-size:clamp(20px,3.6vw,30px);font-weight:800;margin-top:12px;color:#fff7b0}
+#back{position:fixed;top:8px;right:10px;z-index:5;font-size:20px;padding:6px 16px;border-radius:18px;box-shadow:0 5px 0 #a52a55}
+.conf{position:fixed;z-index:9;top:-20px;font-size:28px;pointer-events:none;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+@media (max-width:640px) and (orientation:portrait){
+  #game{flex-direction:column}
+  #trackWrap{flex:0 0 34vh;width:100%}
+  #track{min-height:120px}
+  .lane.me{left:0}
+}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+
+<div id="title" class="screen on">
+  <div class="big-rocket">🚀</div>
+  <h1>Moon Hop Rocket Race</h1>
+  <div class="desc">Solve the number puzzles to zoom your rocket up to the moon! Race the friendly alien rocket 👽 — pick your level to start.</div>
+  <div>
+    <button class="btn green" data-lv="1">⭐ Easy<small>add up to 5</small></button>
+    <button class="btn blue" data-lv="2">⭐⭐ Medium<small>add up to 10</small></button>
+    <button class="btn purple" data-lv="3">⭐⭐⭐ Big<small>add &amp; take away</small></button>
+  </div>
+  <div class="desc" style="font-size:16px;margin-top:4px">Tap an answer, or use ← → arrows and Enter.</div>
+</div>
+
+<div id="game" class="screen">
+  <button id="back" class="btn blue">🏠</button>
+  <div id="trackWrap"><div id="track"><div class="moon">🌙</div></div></div>
+  <div id="qWrap">
+    <div id="hud"></div>
+    <div id="visual"></div>
+    <div id="question"></div>
+    <div id="answers"></div>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<div id="end" class="screen">
+  <div class="big-rocket" id="endIcon">🌙</div>
+  <h1 id="endTitle">You made it!</h1>
+  <div class="desc" id="endText"></div>
+  <div>
+    <button class="btn green" id="again">Fly again! 🚀</button>
+    <button class="btn blue" id="menu">Change level</button>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+var STEPS=10, RIVAL_CAP=9, level=1, myStep=0, rivalStep=0, qCount=0, streak=0, wrongs=0, cur=null, locked=false, rivalTimer=null, sel=0, playing=false, gotWrongThisQ=false, firstTry=0;
+var $=function(id){return document.getElementById(id)};
+
+/* ---------- audio ---------- */
+var AC=null;
+function ac(){ if(!AC){ try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(AC&&AC.state==="suspended")AC.resume(); return AC; }
+function tone(f,t,d,type,vol,slide){
+  var a=ac(); if(!a)return;
+  var o=a.createOscillator(), g=a.createGain(), s=a.currentTime+(t||0);
+  o.type=type||"sine"; o.frequency.setValueAtTime(f,s);
+  if(slide) o.frequency.exponentialRampToValueAtTime(slide,s+d);
+  g.gain.setValueAtTime(0.0001,s); g.gain.exponentialRampToValueAtTime(vol||0.2,s+0.02); g.gain.exponentialRampToValueAtTime(0.0001,s+d);
+  o.connect(g); g.connect(a.destination); o.start(s); o.stop(s+d+0.05);
+}
+function noise(t,d,vol){
+  var a=ac(); if(!a)return;
+  var n=a.sampleRate*d, b=a.createBuffer(1,n,a.sampleRate), c=b.getChannelData(0);
+  for(var i=0;i<n;i++) c[i]=(Math.random()*2-1)*(1-i/n);
+  var s=a.createBufferSource(), g=a.createGain(), f=a.createBiquadFilter();
+  f.type="lowpass"; f.frequency.setValueAtTime(400,a.currentTime+t); f.frequency.exponentialRampToValueAtTime(3000,a.currentTime+t+d);
+  g.gain.value=vol||0.2; s.buffer=b; s.connect(f); f.connect(g); g.connect(a.destination); s.start(a.currentTime+t);
+}
+function sCorrect(){ [523,659,784,1047].forEach(function(f,i){tone(f,i*0.08,0.25,"triangle",0.22)}); }
+function sWhoosh(){ noise(0,0.8,0.18); tone(200,0,0.8,"sawtooth",0.07,900); }
+function sOops(){ tone(330,0,0.25,"sine",0.18,220); }
+function sWin(){ [523,659,784,1047,784,1047,1319].forEach(function(f,i){tone(f,i*0.13,0.3,"square",0.14)}); }
+function sTry(){ [392,440,523].forEach(function(f,i){tone(f,i*0.14,0.3,"triangle",0.2)}); }
+function sClick(){ tone(660,0,0.08,"square",0.1); }
+function sRival(){ tone(300,0,0.15,"sine",0.08,500); }
+
+/* ---------- starry background ---------- */
+var cv=$("stars"), cx=cv.getContext("2d"), sts=[];
+function sizeBg(){ cv.width=innerWidth; cv.height=innerHeight; sts=[]; for(var i=0;i<90;i++) sts.push({x:Math.random()*cv.width,y:Math.random()*cv.height,r:Math.random()*2+.5,p:Math.random()*6}); }
+sizeBg(); addEventListener("resize",sizeBg);
+(function twinkle(t){
+  cx.clearRect(0,0,cv.width,cv.height);
+  for(var i=0;i<sts.length;i++){ var s=sts[i]; cx.globalAlpha=.4+.6*Math.abs(Math.sin(t/700+s.p)); cx.fillStyle="#fff"; cx.beginPath(); cx.arc(s.x,s.y,s.r,0,6.3); cx.fill(); }
+  requestAnimationFrame(twinkle);
+})(0);
+
+/* ---------- track ---------- */
+var track=$("track"), meEl, rivEl;
+function buildTrack(){
+  track.innerHTML='<div class="moon">🌙</div>';
+  for(var i=1;i<STEPS;i++){ var t=document.createElement("div"); t.className="tick"; t.style.bottom=(i/STEPS*82+4)+"%"; track.appendChild(t); }
+  meEl=document.createElement("div"); meEl.className="rk me"; meEl.textContent="🚀"; meEl.style.left="27%";
+  rivEl=document.createElement("div"); rivEl.className="rk"; rivEl.textContent="🛸"; rivEl.style.left="73%";
+  track.appendChild(meEl); track.appendChild(rivEl); place();
+}
+function pos(step){ return (step/STEPS*82+4)+"%"; }
+function place(){ meEl.style.bottom=pos(myStep); rivEl.style.bottom=pos(rivalStep); }
+
+/* ---------- question making ---------- */
+function rnd(a,b){ return a+Math.floor(Math.random()*(b-a+1)); }
+function makeQ(){
+  var a,b,op="+",ans,max;
+  if(level===1){ max=5; a=rnd(0,max); b=rnd(1,max-a||1); if(a+b>max){b=max-a; if(b<1){a=rnd(0,3);b=rnd(1,2);}} ans=a+b; }
+  else if(level===2){ max=10; a=rnd(1,9); b=rnd(1,max-a); ans=a+b; }
+  else {
+    if(Math.random()<0.5){ a=rnd(3,15); b=rnd(1,20-a>0?Math.min(20-a,9):1); ans=a+b; }
+    else { op="-"; a=rnd(4,15); b=rnd(1,Math.min(a,9)); ans=a-b; }
+  }
+  if(cur&&cur.text===a+" "+op+" "+b) return makeQ();
+  var opts=[ans], tries=0;
+  while(opts.length<3&&tries<60){ tries++; var d=ans+rnd(-3,3); if(d<0||opts.indexOf(d)>=0)continue; opts.push(d); }
+  while(opts.length<3){ var e=ans+opts.length+1; if(opts.indexOf(e)<0)opts.push(e); }
+  opts.sort(function(){return Math.random()-.5});
+  return {a:a,b:b,op:op,ans:ans,opts:opts,text:a+" "+op+" "+b};
+}
+var ITEMS=["⭐","🍎","🐟","🎈","🍪","🐞","🍓","🐥"];
+function groupHTML(n,cls,item){ var h='<span class="grp">'; for(var i=0;i<n;i++) h+='<span class="'+(cls&&i>=cls?'gone':'')+'">'+item+'</span>'; return h+'</span>'; }
+function showVisual(q){
+  var v=$("visual"); v.classList.remove("hint");
+  var item=ITEMS[rnd(0,ITEMS.length-1)];
+  if(q.op==="+"){
+    if(q.a+q.b<=12) v.innerHTML=groupHTML(q.a,0,item)+'<span class="op">+</span>'+groupHTML(q.b,0,item);
+    else v.innerHTML="";
+  } else {
+    if(q.a<=15) v.innerHTML=groupHTML(q.a,q.a-q.b,item); else v.innerHTML="";
+  }
+}
+
+/* ---------- game flow ---------- */
+function show(id){ ["title","game","end"].forEach(function(s){ $(s).classList.toggle("on",s===id); }); }
+function startGame(lv){
+  level=lv; myStep=0; rivalStep=0; qCount=0; streak=0; firstTry=0; playing=true; cur=null;
+  buildTrack(); show("game"); clearInterval(rivalTimer);
+  var speed = level===1?10500:level===2?9000:8000;
+  rivalTimer=setInterval(function(){ if(playing&&rivalStep<RIVAL_CAP&&rivalStep<myStep+3){ rivalStep++; place(); sRival(); } },speed);
+  nextQ();
+}
+function nextQ(){
+  locked=false; gotWrongThisQ=false; wrongs=0; qCount++;
+  cur=makeQ();
+  $("hud").textContent="Step "+Math.min(myStep+1,STEPS)+" of "+STEPS+(streak>=3?"   🔥 "+streak+" in a row!":"");
+  $("question").textContent=cur.text+" = ?";
+  showVisual(cur);
+  var box=$("answers"); box.innerHTML="";
+  cur.opts.forEach(function(n,i){
+    var b=document.createElement("button"); b.className="btn ans "+["blue","purple","green"][i%3]; b.textContent=n; b.dataset.n=n;
+    b.addEventListener("click",function(){ pick(b,n); });
+    box.appendChild(b);
+  });
+  sel=0; markSel();
+  $("msg").textContent="";
+}
+function markSel(){ var bs=document.querySelectorAll(".ans"); for(var i=0;i<bs.length;i++) bs[i].classList.toggle("sel",i===sel&&usingKeys); }
+var usingKeys=false;
+function pick(btn,n){
+  if(locked||!playing) return;
+  ac();
+  if(n===cur.ans){
+    locked=true; btn.classList.add("right"); sCorrect(); streak++; if(!gotWrongThisQ) firstTry++;
+    var cheers=["Great job!","You got it!","Super!","Zoom zoom!","Awesome!","Brilliant!"];
+    $("msg").textContent=cheers[rnd(0,cheers.length-1)];
+    setTimeout(function(){
+      myStep++; place(); meEl.classList.remove("boost"); void meEl.offsetWidth; meEl.classList.add("boost"); sWhoosh();
+      if(myStep>=STEPS) setTimeout(finish,1100); else setTimeout(nextQ,1200);
+    },500);
+  } else {
+    gotWrongThisQ=true; wrongs++; streak=0; btn.classList.add("wrong"); sOops();
+    $("msg").textContent=wrongs>=2?"Almost! Look at the glowing one 👀":"Oops, try again!";
+    $("hud").textContent="Step "+(myStep+1)+" of "+STEPS;
+    if(wrongs>=2){
+      $("visual").classList.add("hint");
+      var bs=document.querySelectorAll(".ans"); for(var i=0;i<bs.length;i++) if(+bs[i].dataset.n===cur.ans) bs[i].classList.add("glow");
+    }
+  }
+}
+function finish(){
+  playing=false; clearInterval(rivalTimer); sWin();
+  var stars=firstTry>=8?3:firstTry>=5?2:1;
+  $("endIcon").textContent="🌙";
+  $("endTitle").textContent="You reached the moon! 🎉";
+  $("endText").innerHTML="You got "+firstTry+" of "+STEPS+" on the first try.<br><span style='font-size:2em'>"+"⭐".repeat(stars)+"</span><br>The alien says: \"Wow, great flying!\" 👽";
+  show("end"); confetti();
+}
+function confetti(){
+  var E=["🎉","⭐","🎈","✨","🌟","🍬"];
+  for(var i=0;i<40;i++){ (function(i){ setTimeout(function(){
+    var c=document.createElement("div"); c.className="conf"; c.textContent=E[rnd(0,E.length-1)];
+    c.style.left=rnd(0,95)+"vw"; c.style.animationDuration=(2+Math.random()*2)+"s"; document.body.appendChild(c);
+    setTimeout(function(){c.remove()},4200);
+  },i*60); })(i); }
+}
+
+/* ---------- wiring ---------- */
+Array.prototype.forEach.call(document.querySelectorAll("[data-lv]"),function(b){ b.addEventListener("click",function(){ ac(); sClick(); startGame(+b.dataset.lv); }); });
+$("back").addEventListener("click",function(){ playing=false; clearInterval(rivalTimer); sClick(); show("title"); });
+$("again").addEventListener("click",function(){ sClick(); startGame(level); });
+$("menu").addEventListener("click",function(){ sClick(); show("title"); });
+
+addEventListener("keydown",function(e){
+  var k=e.key;
+  if($("game").classList.contains("on")&&playing){
+    var bs=document.querySelectorAll(".ans:not(.wrong)");
+    if(k==="ArrowLeft"||k==="ArrowRight"||k==="ArrowUp"||k==="ArrowDown"){
+      e.preventDefault(); usingKeys=true;
+      var all=Array.prototype.slice.call(document.querySelectorAll(".ans"));
+      var dir=(k==="ArrowLeft"||k==="ArrowUp")?-1:1, n=0;
+      do{ sel=(sel+dir+all.length)%all.length; n++; } while(all[sel].classList.contains("wrong")&&n<5);
+      markSel(); sClick();
+    } else if(k==="Enter"||k===" "){
+      e.preventDefault(); var all2=document.querySelectorAll(".ans"); usingKeys=true; if(all2[sel]) pick(all2[sel],+all2[sel].dataset.n);
+    }
+  } else if($("end").classList.contains("on")&&(k==="Enter"||k===" ")){ e.preventDefault(); startGame(level); }
+});
+addEventListener("pointerdown",function(){ usingKeys=false; markSel(); });
+})();
+</script>
+</body>
+</html>

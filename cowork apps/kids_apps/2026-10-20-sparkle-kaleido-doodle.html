@@ -1,0 +1,562 @@
+<!-- CONCEPT: Symmetry kaleidoscope doodle toy — draw with a glowing pen/stamps and every stroke is mirrored into a flower pattern that plays pentatonic notes; fill the sparkle meter to bloom a magic flower. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Sparkle Kaleido Doodle</title>
+<style>
+  :root{
+    --bg1:#2b1370; --bg2:#0e0a2e; --card:#ffffff; --ink:#2a1a5e;
+    --pink:#ff4d9d; --yellow:#ffd23f; --teal:#2ee6c5;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg2);
+    font-family:"Comic Sans MS","Chalkboard SE","Trebuchet MS","Segoe UI",sans-serif;color:#fff;
+    user-select:none;-webkit-user-select:none;touch-action:none}
+  body{background:radial-gradient(ellipse at 50% 30%,var(--bg1),var(--bg2) 75%);display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:10px;padding:8px 12px 2px;flex-wrap:wrap;justify-content:center}
+  h1{margin:0;font-size:clamp(20px,4.2vw,34px);letter-spacing:.5px;
+    background:linear-gradient(90deg,#ff7eb3,#ffd23f,#2ee6c5,#7aa2ff,#ff7eb3);-webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:none;white-space:nowrap}
+  .meterwrap{display:flex;align-items:center;gap:8px;flex:1;min-width:150px;max-width:340px}
+  .meter{flex:1;height:20px;border-radius:12px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.4);overflow:hidden}
+  #fill{height:100%;width:0%;border-radius:10px;background:linear-gradient(90deg,#ff7eb3,#ffd23f,#2ee6c5);transition:width .25s}
+  .badge{font-size:20px;font-weight:700;background:rgba(255,255,255,.14);border-radius:16px;padding:2px 12px;min-width:70px;text-align:center}
+  #stage{position:relative;flex:1;min-height:0}
+  #stage canvas{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%}
+  #art{box-shadow:0 0 0 5px rgba(255,255,255,.55),0 0 40px 8px rgba(160,120,255,.55)}
+  #fx{touch-action:none;cursor:crosshair}
+  #hint{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:clamp(16px,3vw,24px);font-weight:700;
+    pointer-events:none;text-shadow:0 2px 6px #000;transition:opacity .6s;animation:bob 1.6s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateY(-6px)}}
+  #banner{position:absolute;left:0;right:0;top:36%;text-align:center;font-size:clamp(30px,8vw,72px);font-weight:900;pointer-events:none;
+    color:#fff;text-shadow:0 0 18px #ff7eb3,0 0 40px #ffd23f,0 4px 0 #8a3fd1;opacity:0;transform:scale(.4)}
+  #banner.show{animation:pop 2.6s ease-out}
+  @keyframes pop{0%{opacity:0;transform:scale(.3) rotate(-6deg)}15%{opacity:1;transform:scale(1.15) rotate(2deg)}25%{transform:scale(1) rotate(0)}80%{opacity:1}100%{opacity:0;transform:scale(1.05)}}
+  .tools{display:flex;flex-direction:column;gap:6px;align-items:center;padding:6px 8px 10px;background:rgba(10,6,40,.55);border-top:3px solid rgba(255,255,255,.2)}
+  .row{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center}
+  .grp{display:flex;gap:6px;align-items:center;padding:3px 6px;border-radius:18px;background:rgba(255,255,255,.08)}
+  button{font:inherit;cursor:pointer;border:none;outline:none}
+  .btn{min-width:50px;height:50px;border-radius:16px;background:#fff;color:var(--ink);font-size:24px;font-weight:800;
+    box-shadow:0 4px 0 #b9a8ee;transition:transform .08s;display:flex;align-items:center;justify-content:center;padding:0 8px}
+  .btn:active{transform:translateY(3px);box-shadow:0 1px 0 #b9a8ee}
+  .btn.on{background:var(--yellow);box-shadow:0 4px 0 #d19a00,0 0 0 3px #fff}
+  .btn:disabled{opacity:.4}
+  .btn.act{background:#7affd9;box-shadow:0 4px 0 #1fa88b}
+  .btn.danger{background:#ffb3c7;box-shadow:0 4px 0 #d9547b}
+  .sw{width:42px;height:42px;border-radius:50%;border:4px solid #fff;box-shadow:0 3px 0 rgba(0,0,0,.35);transition:transform .1s}
+  .sw.on{transform:scale(1.25);box-shadow:0 0 0 4px var(--yellow),0 3px 0 rgba(0,0,0,.35)}
+  .dot{display:block;border-radius:50%;background:var(--ink)}
+  #intro{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 50% 40%,rgba(80,40,170,.92),rgba(10,6,40,.97));padding:16px}
+  #intro .card{max-width:520px;text-align:center}
+  #intro h2{font-size:clamp(34px,9vw,64px);margin:0 0 6px;line-height:1.05;
+    background:linear-gradient(90deg,#ff7eb3,#ffd23f,#2ee6c5,#7aa2ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  #intro p{font-size:clamp(17px,3.6vw,24px);margin:8px 0 22px;line-height:1.35}
+  #go{font-size:clamp(26px,6vw,40px);padding:14px 38px;border-radius:30px;background:linear-gradient(180deg,#ffe36e,#ffb300);color:#5a2d00;
+    font-weight:900;box-shadow:0 7px 0 #b36b00;animation:pulse 1.2s ease-in-out infinite}
+  #go:active{transform:translateY(5px);box-shadow:0 2px 0 #b36b00}
+  @keyframes pulse{50%{transform:scale(1.07)}}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>✨ Sparkle Kaleido Doodle ✨</h1>
+  <div class="meterwrap" title="Sparkle meter"><span style="font-size:22px">🌟</span><div class="meter"><div id="fill"></div></div></div>
+  <div class="badge" id="flowers">🌸 0</div>
+</header>
+
+<div id="stage">
+  <canvas id="art"></canvas>
+  <canvas id="fx"></canvas>
+  <div id="hint">Draw on the circle! ✨</div>
+  <div id="banner">Magic Flower! 🌸</div>
+</div>
+
+<div class="tools">
+  <div class="row" id="colors"></div>
+  <div class="row">
+    <div class="grp" id="symGrp" title="How many mirrors">
+      <button class="btn" data-sym="4">4</button>
+      <button class="btn on" data-sym="8">8</button>
+      <button class="btn" data-sym="12">12</button>
+    </div>
+    <div class="grp" id="modeGrp">
+      <button class="btn on" data-mode="pen" aria-label="Glow pen">✏️</button>
+      <button class="btn" data-mode="star" aria-label="Star stamps">⭐</button>
+      <button class="btn" data-mode="heart" aria-label="Heart stamps">💖</button>
+    </div>
+    <div class="grp" id="sizeGrp">
+      <button class="btn" data-size="s" aria-label="Thin"><span class="dot" style="width:8px;height:8px"></span></button>
+      <button class="btn on" data-size="m" aria-label="Medium"><span class="dot" style="width:15px;height:15px"></span></button>
+      <button class="btn" data-size="l" aria-label="Fat"><span class="dot" style="width:25px;height:25px"></span></button>
+    </div>
+    <div class="grp">
+      <button class="btn act" id="surprise" aria-label="Surprise me">🪄</button>
+      <button class="btn" id="undo" aria-label="Undo">↩️</button>
+      <button class="btn danger" id="clear" aria-label="Clear">🗑️</button>
+      <button class="btn" id="snd" aria-label="Sound">🔊</button>
+    </div>
+  </div>
+</div>
+
+<div id="intro">
+  <div class="card">
+    <h2>Sparkle Kaleido Doodle</h2>
+    <p>Draw on the magic circle and your doodle copies itself into a glowing flower — and it sings! Fill the star meter to make a Magic Flower.</p>
+    <button id="go">Let's Doodle! ✨</button>
+    <p style="font-size:16px;opacity:.8;margin-top:18px">Mouse, finger, or arrow keys to draw</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const art = document.getElementById('art'), fx = document.getElementById('fx'), stage = document.getElementById('stage');
+  const actx = art.getContext('2d'), fctx = fx.getContext('2d');
+  const baked = document.createElement('canvas'), bctx = baked.getContext('2d');
+  const $ = id => document.getElementById(id);
+
+  let S = 400, DPR = 1;
+  let sym = 8, mode = 'pen', sizeKey = 'm', color = 'rainbow';
+  const SIZES = { s: 5, m: 10, l: 18 };
+  const PALETTE = ['#ff4d6d', '#ff9f1c', '#ffd60a', '#4cd964', '#00d4ff', '#5b6cff', '#c77dff', '#ffffff'];
+  let strokes = [], cur = null, backup = null;
+  let ink = 0; const GOAL = 4; let flowerCount = 0;
+  let soundOn = true, started = false;
+  let hover = null, auto = null;
+  const parts = [];
+  const TAU = Math.PI * 2;
+
+  /* ---------- AUDIO ---------- */
+  let AC = null, master = null;
+  function ensureAudio() {
+    if (!AC) {
+      try {
+        AC = new (window.AudioContext || window.webkitAudioContext)();
+        master = AC.createGain(); master.gain.value = 0.55; master.connect(AC.destination);
+      } catch (e) { AC = null; }
+    }
+    if (AC && AC.state === 'suspended') AC.resume();
+  }
+  function tone(freq, dur = 0.4, type = 'triangle', vol = 0.1, when = 0) {
+    if (!AC || !soundOn) return;
+    const t = AC.currentTime + when;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(master);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  const PENTA = [0, 2, 4, 7, 9];
+  function noteFreq(idx) { const oct = Math.floor(idx / 5); return 261.63 * Math.pow(2, (12 * oct + PENTA[idx % 5]) / 12); }
+  let lastNoteT = 0, travel = 0;
+  function penNote(p, dist) {
+    travel += dist;
+    const now = performance.now();
+    if (travel < 0.012 || now - lastNoteT < 80) return;
+    travel = 0; lastNoteT = now;
+    const r = Math.hypot(p.x, p.y);
+    const idx = Math.max(0, Math.min(14, Math.floor(r / 0.5 * 15)));
+    tone(noteFreq(idx), 0.38, 'triangle', 0.085);
+  }
+  function chime(p) {
+    const r = Math.hypot(p.x, p.y);
+    const idx = Math.max(0, Math.min(12, Math.floor(r / 0.5 * 13)));
+    tone(noteFreq(idx), 0.5, 'sine', 0.13);
+    tone(noteFreq(idx + 2), 0.5, 'sine', 0.08, 0.07);
+  }
+  function blip(f = 660) { tone(f, 0.12, 'sine', 0.07); }
+  function fanfare() {
+    [0, 2, 4, 5, 7, 9, 10, 12, 14].forEach((n, i) => tone(noteFreq(n), 0.55, 'triangle', 0.13, i * 0.09));
+    tone(noteFreq(14), 1.1, 'sine', 0.1, 0.9);
+    tone(noteFreq(11), 1.1, 'sine', 0.08, 0.9);
+  }
+  function swoosh() { [12, 10, 7, 4, 2, 0].forEach((n, i) => tone(noteFreq(n), 0.25, 'sine', 0.07, i * 0.05)); }
+
+  /* ---------- DRAWING ---------- */
+  function colorFor(s, i) { return s.color === 'rainbow' ? `hsl(${(s.h0 + i * 7) % 360},100%,62%)` : s.color; }
+
+  function symLoop(c, n, fn) {
+    for (let k = 0; k < n; k++) for (let f = 1; f >= -1; f -= 2) {
+      c.save(); c.translate(S / 2, S / 2); c.rotate(k * TAU / n); c.scale(f, 1); fn(); c.restore();
+    }
+  }
+  function drawPen(c, s, i) {
+    const col = colorFor(s, i), w = s.w * S;
+    const p1 = s.pts[i], p0 = i > 0 ? s.pts[i - 1] : p1;
+    c.save();
+    c.globalCompositeOperation = 'source-over';
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    symLoop(c, s.n, () => {
+      if (i === 0) {
+        c.fillStyle = col;
+        c.globalAlpha = 0.3; c.beginPath(); c.arc(p1.x * S, p1.y * S, w * 1.3, 0, TAU); c.fill();
+        c.globalAlpha = 0.6; c.beginPath(); c.arc(p1.x * S, p1.y * S, w * 0.75, 0, TAU); c.fill();
+        c.globalAlpha = 0.9; c.fillStyle = '#fff'; c.beginPath(); c.arc(p1.x * S, p1.y * S, w * 0.25, 0, TAU); c.fill();
+        return;
+      }
+      c.strokeStyle = col;
+      c.beginPath(); c.moveTo(p0.x * S, p0.y * S); c.lineTo(p1.x * S, p1.y * S);
+      c.globalAlpha = 0.25; c.lineWidth = w * 2.6; c.stroke();
+      c.globalAlpha = 0.5; c.lineWidth = w * 1.5; c.stroke();
+      c.globalAlpha = 0.8; c.strokeStyle = '#fff'; c.lineWidth = w * 0.45; c.stroke();
+    });
+    c.restore();
+  }
+  function starPath(c, x, y, r) {
+    c.beginPath();
+    for (let j = 0; j < 10; j++) {
+      const rr = j % 2 ? r * 0.46 : r, a = -Math.PI / 2 + j * Math.PI / 5;
+      const px = x + Math.cos(a) * rr, py = y + Math.sin(a) * rr;
+      j ? c.lineTo(px, py) : c.moveTo(px, py);
+    }
+    c.closePath();
+  }
+  function heartPath(c, x, y, r) {
+    c.beginPath();
+    c.moveTo(x, y + r * 0.95);
+    c.bezierCurveTo(x + r * 1.45, y + r * 0.1, x + r * 0.75, y - r * 0.95, x, y - r * 0.3);
+    c.bezierCurveTo(x - r * 0.75, y - r * 0.95, x - r * 1.45, y + r * 0.1, x, y + r * 0.95);
+    c.closePath();
+  }
+  function drawStamp(c, s, i) {
+    const col = colorFor(s, i), r = Math.max(s.w, 0.016) * S * 2.4;
+    const p = s.pts[i];
+    c.save();
+    c.globalCompositeOperation = 'source-over';
+    symLoop(c, s.n, () => {
+      const path = s.type === 'star' ? starPath : heartPath;
+      c.fillStyle = col;
+      c.globalAlpha = 0.28; path(c, p.x * S, p.y * S, r * 1.5); c.fill();
+      c.globalAlpha = 0.65; path(c, p.x * S, p.y * S, r); c.fill();
+      c.globalAlpha = 0.75; c.fillStyle = '#fff'; path(c, p.x * S, p.y * S, r * 0.42); c.fill();
+    });
+    c.restore();
+  }
+  function drawItem(c, s, i) { s.type === 'pen' ? drawPen(c, s, i) : drawStamp(c, s, i); }
+  function drawFull(c, s) { for (let i = 0; i < s.pts.length; i++) drawItem(c, s, i); }
+
+  function drawBg() {
+    actx.save();
+    actx.globalCompositeOperation = 'source-over';
+    actx.clearRect(0, 0, S, S);
+    const g = actx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+    g.addColorStop(0, '#34208a'); g.addColorStop(0.7, '#150d45'); g.addColorStop(1, '#0a0626');
+    actx.fillStyle = g; actx.fillRect(0, 0, S, S);
+    actx.strokeStyle = 'rgba(255,255,255,.07)'; actx.lineWidth = 2;
+    for (let k = 0; k < sym; k++) {
+      const a = k * TAU / sym;
+      actx.beginPath(); actx.moveTo(S / 2, S / 2);
+      actx.lineTo(S / 2 + Math.cos(a) * S / 2, S / 2 + Math.sin(a) * S / 2); actx.stroke();
+    }
+    actx.strokeStyle = 'rgba(255,255,255,.06)';
+    [0.15, 0.3, 0.45].forEach(r => { actx.beginPath(); actx.arc(S / 2, S / 2, r * S, 0, TAU); actx.stroke(); });
+    actx.restore();
+  }
+  function redraw() {
+    drawBg();
+    actx.save(); actx.globalCompositeOperation = 'source-over'; actx.drawImage(baked, 0, 0, S, S); actx.restore();
+    strokes.forEach(s => drawFull(actx, s));
+  }
+  function bakeOld() { while (strokes.length > 40) drawFull(bctx, strokes.shift()); }
+
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    const newS = Math.max(180, Math.floor(Math.min(r.width, r.height) - 14));
+    const newDPR = Math.min(window.devicePixelRatio || 1, 2);
+    const tmp = document.createElement('canvas'); tmp.width = baked.width; tmp.height = baked.height;
+    tmp.getContext('2d').drawImage(baked, 0, 0);
+    S = newS; DPR = newDPR;
+    [art, fx, baked].forEach(cv => { cv.width = cv.height = Math.floor(S * DPR); });
+    art.style.width = art.style.height = fx.style.width = fx.style.height = S + 'px';
+    actx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    fctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    bctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    if (tmp.width) bctx.drawImage(tmp, 0, 0, S, S);
+    redraw();
+  }
+
+  /* ---------- STROKES ---------- */
+  function newStroke(p) {
+    return { type: mode, pts: [], color, h0: Math.random() * 360, w: SIZES[sizeKey] / 500, n: sym };
+  }
+  function inCircle(p) { return Math.hypot(p.x, p.y) <= 0.5; }
+  function symImages(p) {
+    const out = [];
+    for (let k = 0; k < sym; k++) for (let f = 1; f >= -1; f -= 2) {
+      const a = k * TAU / sym, x = f * p.x, y = p.y;
+      out.push({ x: Math.cos(a) * x - Math.sin(a) * y, y: Math.sin(a) * x + Math.cos(a) * y });
+    }
+    return out;
+  }
+  function addInk(v) {
+    ink += v;
+    $('fill').style.width = Math.min(100, ink / GOAL * 100) + '%';
+    if (ink >= GOAL) bloom();
+  }
+  function beginStroke(p, forceMode) {
+    ensureAudio();
+    if (!started) return;
+    auto = null;
+    const s = newStroke(p);
+    if (forceMode) s.type = forceMode;
+    s.pts.push(p);
+    strokes.push(s); cur = s; backup = null;
+    drawItem(actx, s, 0);
+    if (s.type === 'pen') penNote(p, 1); else chime(p);
+    addInk(s.type === 'pen' ? 0.02 : 0.25);
+    sparkleAt(p);
+    $('hint').style.opacity = 0; hintGone = true;
+    updateUndo();
+  }
+  let hintGone = false;
+  function extendStroke(p) {
+    if (!cur || !inCircle(p)) return;
+    const last = cur.pts[cur.pts.length - 1];
+    const d = Math.hypot(p.x - last.x, p.y - last.y);
+    const minD = cur.type === 'pen' ? 3 / S : 0.1;
+    if (d < minD) return;
+    cur.pts.push(p);
+    drawItem(actx, cur, cur.pts.length - 1);
+    if (cur.type === 'pen') { penNote(p, d); addInk(d); } else { chime(p); addInk(0.25); }
+    if (Math.random() < 0.5) sparkleAt(p);
+  }
+  function endStroke() { cur = null; bakeOld(); updateUndo(); }
+
+  function sparkleAt(p) {
+    const imgs = symImages(p);
+    const q = imgs[Math.floor(Math.random() * imgs.length)];
+    const col = color === 'rainbow' ? `hsl(${Math.random() * 360},100%,70%)` : color;
+    parts.push({ x: S / 2 + q.x * S, y: S / 2 + q.y * S, vx: (Math.random() - .5) * 40, vy: (Math.random() - .5) * 40 - 15,
+      life: 1, dec: 1.4 + Math.random(), sz: 4 + Math.random() * 5, col, t: 's', g: 0 });
+  }
+  function confetti() {
+    for (let i = 0; i < 160; i++) {
+      const a = Math.random() * TAU, sp = 150 + Math.random() * 450;
+      parts.push({ x: S / 2, y: S / 2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 150, life: 1, dec: 0.4 + Math.random() * 0.3,
+        sz: 6 + Math.random() * 8, col: `hsl(${Math.random() * 360},100%,62%)`, t: Math.random() < .5 ? 'c' : 's', g: 520, rot: Math.random() * TAU, vr: (Math.random() - .5) * 10 });
+    }
+  }
+  function bloom() {
+    ink = Math.max(0, ink - GOAL);
+    $('fill').style.width = Math.min(100, ink / GOAL * 100) + '%';
+    flowerCount++; $('flowers').textContent = '🌸 ' + flowerCount;
+    const b = $('banner'); b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+    confetti(); fanfare();
+  }
+
+  /* ---------- SURPRISE (auto draw) ---------- */
+  function surprise() {
+    if (!started) return;
+    ensureAudio();
+    if (cur) endStroke();
+    const k = 2 + Math.floor(Math.random() * 6), R = 0.26 + Math.random() * 0.2, wob = Math.random() * 0.12;
+    const span = (k % 2 ? 1 : 2) * Math.PI, N = 300, pts = [];
+    for (let i = 0; i <= N; i++) {
+      const th = i / N * span, r = R * (Math.cos(k * th) + wob * Math.cos(3 * k * th));
+      pts.push({ x: r * Math.cos(th), y: r * Math.sin(th) });
+    }
+    const s = { type: 'pen', pts: [], color: Math.random() < 0.7 ? 'rainbow' : PALETTE[Math.floor(Math.random() * 7)],
+      h0: Math.random() * 360, w: SIZES[Math.random() < .5 ? 'm' : 's'] / 500, n: sym };
+    strokes.push(s); backup = null;
+    auto = { s, all: pts, i: 0 };
+    $('hint').style.opacity = 0; hintGone = true;
+    updateUndo();
+  }
+  function stepAuto() {
+    if (!auto) return;
+    for (let j = 0; j < 4 && auto && auto.i < auto.all.length; j++) {
+      const p = auto.all[auto.i++];
+      auto.s.pts.push(p);
+      drawItem(actx, auto.s, auto.s.pts.length - 1);
+      if (auto.s.pts.length > 1) {
+        const q = auto.s.pts[auto.s.pts.length - 2];
+        const d = Math.hypot(p.x - q.x, p.y - q.y);
+        penNote(p, d); addInk(d * 0.25);
+      }
+      if (Math.random() < 0.15) sparkleAt(p);
+    }
+    if (auto && auto.i >= auto.all.length) { auto = null; bakeOld(); updateUndo(); }
+  }
+
+  /* ---------- UNDO / CLEAR ---------- */
+  function updateUndo() { $('undo').disabled = !(strokes.length || backup); }
+  function undo() {
+    if (!started) return;
+    if (cur) endStroke();
+    auto = null;
+    if (strokes.length) { strokes.pop(); redraw(); blip(520); }
+    else if (backup) {
+      strokes = backup.strokes; bctx.save(); bctx.setTransform(1, 0, 0, 1, 0, 0);
+      bctx.clearRect(0, 0, baked.width, baked.height); bctx.drawImage(backup.img, 0, 0, baked.width, baked.height); bctx.restore();
+      backup = null; redraw(); blip(780);
+    }
+    updateUndo();
+  }
+  function clearAll() {
+    if (!started || (!strokes.length && !baked.width)) return;
+    if (cur) endStroke(); auto = null;
+    if (!strokes.length) {
+      // might still hold baked art; check by trying anyway
+    }
+    const img = document.createElement('canvas'); img.width = baked.width; img.height = baked.height;
+    img.getContext('2d').drawImage(baked, 0, 0);
+    backup = { strokes: strokes.slice(), img };
+    strokes = [];
+    bctx.save(); bctx.setTransform(1, 0, 0, 1, 0, 0); bctx.clearRect(0, 0, baked.width, baked.height); bctx.restore();
+    redraw(); swoosh(); updateUndo();
+    for (let i = 0; i < 30; i++) {
+      const a = Math.random() * TAU, sp = 60 + Math.random() * 200;
+      parts.push({ x: S / 2, y: S / 2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, dec: 1.2, sz: 5 + Math.random() * 5,
+        col: `hsl(${Math.random() * 360},100%,75%)`, t: 's', g: 0 });
+    }
+  }
+
+  /* ---------- INPUT ---------- */
+  function pos(e) {
+    const r = fx.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width - 0.5, y: (e.clientY - r.top) / r.height - 0.5 };
+  }
+  fx.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (!started) return;
+    kb.shown = false;
+    const p = pos(e);
+    hover = p;
+    if (!inCircle(p)) return;
+    try { fx.setPointerCapture(e.pointerId); } catch (_) {}
+    beginStroke(p);
+  });
+  fx.addEventListener('pointermove', e => {
+    const p = pos(e);
+    hover = p;
+    if (cur && !kb.stroke) extendStroke(p);
+  });
+  const up = e => {
+    if (cur && !kb.stroke) endStroke();
+    if (e.pointerType && e.pointerType !== 'mouse') hover = null;
+  };
+  fx.addEventListener('pointerup', up);
+  fx.addEventListener('pointercancel', up);
+  fx.addEventListener('pointerleave', e => { if (!cur) hover = null; });
+
+  // keyboard: arrows draw, space stamps
+  const kb = { x: 0.12, y: 0, keys: {}, stroke: false, shown: false };
+  document.addEventListener('keydown', e => {
+    if (!started) return;
+    if (e.key.startsWith('Arrow')) {
+      e.preventDefault(); kb.keys[e.key] = true; kb.shown = true;
+    } else if ((e.key === ' ' || e.key === 'Enter') && !(e.target && e.target.tagName === 'BUTTON')) {
+      e.preventDefault(); kb.shown = true;
+      const m = mode === 'pen' ? 'star' : mode;
+      const hold = cur; if (!hold) { beginStroke({ x: kb.x, y: kb.y }, m); endStroke(); }
+    }
+  });
+  document.addEventListener('keyup', e => { if (e.key.startsWith('Arrow')) delete kb.keys[e.key]; });
+  window.addEventListener('blur', () => { kb.keys = {}; });
+
+  function stepKeyboard(dt) {
+    const k = kb.keys;
+    const dx = (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0), dy = (k.ArrowDown ? 1 : 0) - (k.ArrowUp ? 1 : 0);
+    if (!dx && !dy) { if (kb.stroke) { kb.stroke = false; endStroke(); } return; }
+    const len = Math.hypot(dx, dy), sp = 0.32 * dt;
+    let nx = kb.x + dx / len * sp, ny = kb.y + dy / len * sp;
+    const r = Math.hypot(nx, ny); if (r > 0.48) { nx *= 0.48 / r; ny *= 0.48 / r; }
+    kb.x = nx; kb.y = ny;
+    if (!kb.stroke) {
+      if (cur) return;
+      kb.stroke = true; beginStroke({ x: kb.x, y: kb.y });
+    } else extendStroke({ x: kb.x, y: kb.y });
+  }
+
+  /* ---------- UI ---------- */
+  const colorsEl = $('colors');
+  function addSwatch(c, bg) {
+    const b = document.createElement('button');
+    b.className = 'sw' + (c === color ? ' on' : ''); b.style.background = bg; b.dataset.c = c;
+    b.setAttribute('aria-label', 'Color ' + c);
+    colorsEl.appendChild(b);
+  }
+  PALETTE.forEach(c => addSwatch(c, c));
+  addSwatch('rainbow', 'conic-gradient(#ff4d6d,#ffd60a,#4cd964,#00d4ff,#c77dff,#ff4d6d)');
+  colorsEl.addEventListener('click', e => {
+    const b = e.target.closest('.sw'); if (!b) return;
+    ensureAudio(); color = b.dataset.c;
+    colorsEl.querySelectorAll('.sw').forEach(x => x.classList.toggle('on', x === b));
+    blip(700);
+  });
+  function group(id, attr, set) {
+    $(id).addEventListener('click', e => {
+      const b = e.target.closest('.btn'); if (!b) return;
+      ensureAudio(); set(b.dataset[attr]);
+      $(id).querySelectorAll('.btn').forEach(x => x.classList.toggle('on', x === b));
+      blip(600 + Math.random() * 200);
+    });
+  }
+  group('symGrp', 'sym', v => { sym = +v; redraw(); });
+  group('modeGrp', 'mode', v => { mode = v; });
+  group('sizeGrp', 'size', v => { sizeKey = v; });
+  $('surprise').addEventListener('click', surprise);
+  $('undo').addEventListener('click', () => { ensureAudio(); undo(); });
+  $('clear').addEventListener('click', () => { ensureAudio(); clearAll(); });
+  $('snd').addEventListener('click', () => {
+    ensureAudio(); soundOn = !soundOn; $('snd').textContent = soundOn ? '🔊' : '🔇'; if (soundOn) blip(800);
+  });
+  $('go').addEventListener('click', () => {
+    ensureAudio(); started = true; $('intro').classList.add('hidden');
+    [0, 4, 7, 9, 12].forEach((n, i) => tone(noteFreq(n), 0.4, 'triangle', 0.1, i * 0.08));
+    setTimeout(surprise, 350);
+  });
+
+  /* ---------- ANIMATION LOOP ---------- */
+  let lastT = performance.now();
+  function loop(t) {
+    const dt = Math.min(0.05, (t - lastT) / 1000); lastT = t;
+    stepKeyboard(dt); stepAuto();
+    fctx.clearRect(0, 0, S, S);
+    // guide dots showing where the mirrors will draw
+    const guide = hover || (kb.shown ? { x: kb.x, y: kb.y } : null);
+    if (guide && started && inCircle(guide)) {
+      fctx.fillStyle = cur ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.55)';
+      symImages(guide).forEach(q => { fctx.beginPath(); fctx.arc(S / 2 + q.x * S, S / 2 + q.y * S, 4, 0, TAU); fctx.fill(); });
+    }
+    if (kb.shown && started) {
+      fctx.strokeStyle = '#ffd23f'; fctx.lineWidth = 3;
+      fctx.beginPath(); fctx.arc(S / 2 + kb.x * S, S / 2 + kb.y * S, 11, 0, TAU); fctx.stroke();
+    }
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += (p.g || 0) * dt; p.life -= p.dec * dt;
+      if (p.life <= 0) { parts.splice(i, 1); continue; }
+      fctx.globalAlpha = Math.min(1, p.life * 1.5); fctx.fillStyle = p.col;
+      if (p.t === 'c') {
+        p.rot += p.vr * dt;
+        fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.rot); fctx.fillRect(-p.sz / 2, -p.sz / 3, p.sz, p.sz * 0.66); fctx.restore();
+      } else {
+        const s = p.sz * (0.5 + p.life * 0.6);
+        fctx.beginPath();
+        fctx.moveTo(p.x, p.y - s); fctx.quadraticCurveTo(p.x, p.y, p.x + s, p.y);
+        fctx.quadraticCurveTo(p.x, p.y, p.x, p.y + s); fctx.quadraticCurveTo(p.x, p.y, p.x - s, p.y);
+        fctx.quadraticCurveTo(p.x, p.y, p.x, p.y - s); fctx.fill();
+      }
+    }
+    fctx.globalAlpha = 1;
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', resize);
+  document.addEventListener('contextmenu', e => e.preventDefault());
+  resize(); updateUndo();
+  requestAnimationFrame(loop);
+  // expose tiny hook for self-tests only
+  window.__kaleido = { get strokes() { return strokes.length; }, get flowers() { return flowerCount; } };
+})();
+</script>
+</body>
+</html>

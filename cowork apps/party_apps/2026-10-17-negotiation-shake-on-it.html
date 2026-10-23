@@ -1,0 +1,831 @@
+<!-- CONCEPT: NEGOTIATION/TRUST - "Shake On It": a split-or-steal party game where two Dealmakers talk out loud over a growing pot of coins under a ticking clock, then secretly lock SPLIT or STEAL on a passed phone. Both split and they share it, one steals and takes it all, both steal and it rolls over into a bigger pot. The rest of the room predicts the outcome for coins. Everyone's public split/steal record follows them round to round, side deals are settled (or welshed on) at the Settle-Up desk, and Deal Cards bend each round (Hostage stakes, Lone Wolf bonus, Safety Net, Silent Deal, Crowd Wager, Whisper Only), with a double-points Grand Pot to finish | Players: 3-10 | ~15-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Shake On It</title>
+<style>
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+:root {
+  --bg: #0e1220;
+  --bg2: #151b2e;
+  --panel: #1b2238;
+  --panel2: #232c47;
+  --line: #2f3a5c;
+  --text: #eef1fa;
+  --muted: #9aa5c4;
+  --gold: #f5c542;
+  --gold2: #ff9f2e;
+  --split: #35d39a;
+  --split2: #1fae7c;
+  --steal: #ff5468;
+  --steal2: #d6304a;
+  --blue: #5aa8ff;
+  --violet: #a77bff;
+  --radius: 16px;
+  --gap: clamp(8px, 2.4vw, 14px);
+}
+html, body {
+  margin: 0; padding: 0;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  height: 100%;
+  background: radial-gradient(ellipse at 50% -10%, #24305a 0%, var(--bg) 60%) fixed, var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  overflow-x: hidden;
+}
+body { overflow-y: auto; }
+button { font: inherit; color: inherit; cursor: pointer; border: none; }
+input { font: inherit; }
+#app {
+  max-width: 560px; margin: 0 auto;
+  min-height: 100%;
+  padding: clamp(10px, 3vw, 18px) clamp(12px, 4vw, 20px) 28px;
+  display: flex; flex-direction: column; gap: var(--gap);
+}
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.brand {
+  margin: 0;
+  font-size: clamp(24px, 7vw, 34px); font-weight: 900; letter-spacing: .5px;
+  background: linear-gradient(90deg, var(--gold), var(--gold2) 45%, var(--steal));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.small-btn {
+  min-height: 44px; min-width: 44px; padding: 0 14px;
+  border-radius: 12px; background: var(--panel); border: 1px solid var(--line);
+  font-size: 14px; font-weight: 600; color: var(--muted);
+}
+.panel {
+  background: linear-gradient(180deg, var(--panel), var(--bg2));
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: clamp(12px, 3.5vw, 18px);
+}
+.panel h2 { margin: 0 0 8px; font-size: clamp(17px, 4.8vw, 21px); }
+.muted { color: var(--muted); }
+.center { text-align: center; }
+.sub { font-size: clamp(13px, 3.6vw, 15px); line-height: 1.45; }
+.big-btn {
+  width: 100%; min-height: 58px; border-radius: 14px;
+  font-size: clamp(17px, 4.8vw, 20px); font-weight: 800; letter-spacing: .3px;
+  background: linear-gradient(90deg, var(--gold), var(--gold2)); color: #2a1a00;
+  box-shadow: 0 6px 18px rgba(245, 160, 50, .25);
+}
+.big-btn.alt { background: var(--panel2); color: var(--text); border: 1px solid var(--line); box-shadow: none; }
+.big-btn:disabled { opacity: .4; cursor: default; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > * { flex: 1; }
+.name-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.name-row input {
+  flex: 1; min-width: 0; min-height: 48px; padding: 0 12px;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text);
+  font-size: 16px; user-select: text; -webkit-user-select: text;
+}
+.name-row button { width: 48px; min-height: 48px; border-radius: 12px; background: var(--panel2); font-size: 20px; color: var(--muted); }
+.opt-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.opt {
+  flex: 1 1 auto; min-height: 44px; padding: 0 12px; border-radius: 12px;
+  background: var(--bg); border: 1px solid var(--line); font-weight: 700; font-size: 15px; color: var(--muted);
+}
+.opt.on { background: var(--panel2); border-color: var(--gold); color: var(--gold); }
+.label { font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin: 12px 0 6px; font-weight: 700; }
+.pot {
+  font-size: clamp(46px, 15vw, 72px); font-weight: 900; line-height: 1;
+  background: linear-gradient(180deg, #fff3b8, var(--gold) 50%, var(--gold2));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.potline { display: flex; align-items: baseline; justify-content: center; gap: 10px; }
+.coin-ico { font-size: clamp(30px, 9vw, 44px); }
+.vs { display: flex; align-items: stretch; gap: 8px; }
+.vs .who {
+  flex: 1; min-width: 0; overflow-wrap: anywhere; text-align: center; padding: 12px 6px; border-radius: 14px;
+  background: var(--panel2); border: 1px solid var(--line);
+}
+.vs .who .nm { font-size: clamp(18px, 5.2vw, 23px); font-weight: 800; word-break: break-word; }
+.vs .mid { align-self: center; font-weight: 900; color: var(--gold); font-size: 20px; flex: 0 0 auto; }
+.record { display: flex; gap: 4px; justify-content: center; margin-top: 6px; flex-wrap: wrap; min-height: 14px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.dot.s { background: var(--split); }
+.dot.t { background: var(--steal); }
+.deal-card {
+  border-radius: 14px; padding: 12px 14px;
+  background: linear-gradient(135deg, rgba(167,123,255,.18), rgba(90,168,255,.12));
+  border: 1px solid rgba(167,123,255,.45);
+}
+.deal-card .t { font-weight: 900; font-size: clamp(17px, 4.8vw, 20px); color: #d6c4ff; }
+.deal-card .d { margin-top: 4px; font-size: clamp(13px, 3.6vw, 15px); line-height: 1.4; }
+.timer {
+  font-size: clamp(64px, 22vw, 110px); font-weight: 900; text-align: center; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.timer.low { color: var(--steal); }
+.bar { height: 10px; border-radius: 6px; background: var(--bg); overflow: hidden; border: 1px solid var(--line); }
+.bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--steal)); width: 100%; }
+.choices { display: flex; gap: 10px; }
+.choice {
+  flex: 1; min-height: clamp(150px, 44vw, 210px); border-radius: 18px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  font-weight: 900; font-size: clamp(22px, 6.5vw, 30px); letter-spacing: 1px;
+  border: 3px solid transparent; transition: transform .12s, border-color .12s;
+}
+.choice .em { font-size: clamp(44px, 13vw, 64px); }
+.choice.split { background: linear-gradient(180deg, var(--split), var(--split2)); color: #032a1b; }
+.choice.steal { background: linear-gradient(180deg, var(--steal), var(--steal2)); color: #2b0007; }
+.choice.picked { border-color: #fff; transform: scale(1.03); box-shadow: 0 0 0 4px rgba(255,255,255,.18); }
+.choice.dim { opacity: .35; }
+.pass-card { text-align: center; padding: 28px 16px; }
+.pass-card .em { font-size: 64px; }
+.pass-card .nm { font-size: clamp(26px, 8vw, 38px); font-weight: 900; margin: 8px 0 6px; word-break: break-word; }
+.pred-list { display: flex; flex-direction: column; gap: 10px; }
+.pred-row .pn { font-weight: 700; margin-bottom: 4px; }
+.pred-opts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.pred-opts button { min-width: 0; overflow-wrap: anywhere; }
+.pred-opts button {
+  min-height: 52px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line);
+  font-size: 12px; font-weight: 700; color: var(--muted); line-height: 1.15; padding: 4px 2px;
+}
+.pred-opts button b { display: block; font-size: 18px; }
+.pred-opts button.on { border-color: var(--gold); color: var(--gold); background: var(--panel2); }
+.reveal-row { display: flex; gap: 10px; perspective: 800px; }
+.flip { flex: 1; height: clamp(150px, 42vw, 200px); position: relative; transform-style: preserve-3d; transition: transform .7s cubic-bezier(.3,1.4,.5,1); }
+.flip.go { transform: rotateY(180deg); }
+.flip .face {
+  position: absolute; inset: 0; border-radius: 16px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px;
+  font-weight: 900; text-align: center;
+}
+.flip .front { background: repeating-linear-gradient(45deg, var(--panel2) 0 10px, var(--panel) 10px 20px); border: 2px solid var(--line); }
+.flip .front .nm, .flip .back .nm { font-size: clamp(15px, 4.4vw, 19px); word-break: break-word; }
+.flip .back { transform: rotateY(180deg); font-size: clamp(22px, 6.5vw, 30px); }
+.flip .back.split { background: linear-gradient(180deg, var(--split), var(--split2)); color: #032a1b; }
+.flip .back.steal { background: linear-gradient(180deg, var(--steal), var(--steal2)); color: #2b0007; }
+.flip .back .em { font-size: clamp(38px, 11vw, 54px); }
+.verdict { text-align: center; font-size: clamp(22px, 6.5vw, 30px); font-weight: 900; min-height: 1.3em; }
+.verdict.pop { animation: pop .45s ease-out; }
+@keyframes pop { 0% { opacity: 0; transform: scale(.6); } 70% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
+.ledger { display: flex; flex-direction: column; gap: 4px; font-size: 15px; }
+.ledger .l { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.ledger .l:last-child { border-bottom: none; }
+.plus { color: var(--split); font-weight: 800; }
+.minus { color: var(--steal); font-weight: 800; }
+.board { display: flex; flex-direction: column; gap: 6px; }
+.brow {
+  display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px;
+}
+.brow.lead { border-color: var(--gold); }
+.brow .rk { font-weight: 900; color: var(--muted); text-align: center; }
+.brow .bn { font-weight: 700; word-break: break-word; }
+.brow .bn .record { justify-content: flex-start; margin-top: 3px; }
+.brow .bc { font-weight: 900; font-size: 20px; color: var(--gold); white-space: nowrap; }
+.settle { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: center; }
+.settle select {
+  width: 100%; min-width: 0; min-height: 48px; border-radius: 12px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--line); padding: 0 8px; font-size: 15px;
+}
+.stepper { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; }
+.stepper button { width: 52px; height: 52px; border-radius: 12px; background: var(--panel2); font-size: 24px; font-weight: 900; }
+.stepper .v { min-width: 70px; text-align: center; font-size: 28px; font-weight: 900; color: var(--gold); }
+.chip-tag { display: inline-block; padding: 2px 10px; border-radius: 99px; background: var(--panel2); border: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--muted); }
+.awards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.award { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+.award .em { font-size: 30px; }
+.award .at { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); font-weight: 700; margin-top: 2px; }
+.award .an { font-weight: 800; margin-top: 2px; word-break: break-word; }
+.toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  background: var(--panel2); border: 1px solid var(--gold); color: var(--text);
+  padding: 10px 16px; border-radius: 12px; font-weight: 700; font-size: 14px;
+  opacity: 0; pointer-events: none; transition: opacity .25s; max-width: 90vw; text-align: center; z-index: 5;
+}
+.toast.on { opacity: 1; }
+.rules p { margin: 6px 0; }
+.rules b { color: var(--gold); }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 6px; }
+.tbl td { padding: 6px 4px; border-bottom: 1px dashed var(--line); }
+.hold-btn { position: relative; overflow: hidden; }
+.hold-btn .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(255,255,255,.28); }
+.hint-line { font-size: 13px; color: var(--muted); text-align: center; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+<script>
+(() => {
+'use strict';
+const KEY = 'cowork-shakeonit-state';
+const NKEY = 'cowork-shakeonit-setup';
+const SKEY = 'cowork-shakeonit-sound';
+const $app = document.getElementById('app');
+const $toast = document.getElementById('toast');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const rnd = n => Math.floor(Math.random() * n);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+const CARDS = {
+  plain:    { t: '🤝 Plain Handshake', d: 'No tricks. Talk it out, then choose.' },
+  hostage:  { t: '⛓️ Hostage', d: 'Both Dealmakers throw 3 of their own coins into the pot before the clock starts. Walk away empty and those coins are gone.' },
+  lonewolf: { t: '🐺 Lone Wolf', d: 'A lone stealer takes 1.5× the pot. The bank pays the bonus.' },
+  safety:   { t: '🪂 Safety Net', d: 'If you BOTH steal, each of you still gets a quarter of the pot, and nothing rolls over.' },
+  sweet:    { t: '🍯 Sweetener', d: 'If you BOTH split, the bank adds +2 coins each on top.' },
+  silent:   { t: '🤐 Silent Deal', d: 'No words at all: faces, nods, gestures and pleading eyes only. 40 seconds.', time: 40 },
+  whisper:  { t: '🤫 Whisper Only', d: 'Lean in and whisper. The room must not hear a word, so spectators predict blind.' },
+  crowd:    { t: '📣 Crowd Wager', d: 'Spectator predictions pay +4 instead of +2, but a wrong call costs 1 coin.' },
+  mystery:  { t: '❓ Mystery Pot', d: 'Nobody knows how big the pot is until the reveal.' },
+  rush:     { t: '⚡ Rush Job', d: 'Only 20 seconds to make a deal. Talk fast.', time: 20 },
+  grand:    { t: '👑 Grand Pot', d: 'The final deal, and the pot is doubled. Nothing rolls over after this: if you both steal, the house keeps it.' }
+};
+const DECK = ['hostage', 'lonewolf', 'safety', 'sweet', 'silent', 'whisper', 'crowd', 'mystery', 'rush'];
+
+// ---------- persistence ----------
+let S = null;          // live game state
+let draft = { names: ['', '', ''], laps: 2, talk: 60, cards: true, start: 5 };
+try { const d = JSON.parse(localStorage.getItem(NKEY) || 'null'); if (d && Array.isArray(d.names)) draft = Object.assign(draft, d); } catch (e) {}
+try { const g = JSON.parse(localStorage.getItem(KEY) || 'null'); if (g && g.v === 1 && g.phase && g.phase !== 'final') S = g; } catch (e) {}
+let resumeOffer = !!S;
+const save = () => {
+  try {
+    if (S) localStorage.setItem(KEY, JSON.stringify(S)); else localStorage.removeItem(KEY);
+    localStorage.setItem(NKEY, JSON.stringify(draft));
+  } catch (e) {}
+};
+addEventListener('pagehide', save);
+
+// ---------- runtime-only UI state ----------
+let showRules = false;
+let tmpPick = null;
+let revealShown = -1;      // round whose reveal animation already played
+let timerId = null, paused = false, endAt = 0, lastTickSec = -1;
+let settle = { from: 0, to: 1, amt: 1 };
+let soundOn = localStorage.getItem(SKEY) !== '0';
+
+// ---------- audio ----------
+let AC = null;
+function tone(f, d = 0.12, type = 'sine', vol = 0.14, when = 0) {
+  if (!soundOn) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const t = AC.currentTime + when;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + d);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t); o.stop(t + d + 0.03);
+  } catch (e) {}
+}
+const sfx = {
+  tap: () => tone(660, 0.06, 'triangle', 0.08),
+  tick: () => tone(1200, 0.05, 'square', 0.06),
+  buzz: () => { tone(180, 0.5, 'sawtooth', 0.12); tone(120, 0.5, 'sawtooth', 0.1, 0.05); },
+  lock: () => { tone(440, 0.08, 'triangle', 0.1); tone(880, 0.12, 'triangle', 0.1, 0.07); },
+  flip: () => tone(320, 0.09, 'triangle', 0.1),
+  split: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.25, 'sine', 0.12, i * 0.09)),
+  steal: () => { tone(220, 0.35, 'sawtooth', 0.12); tone(165, 0.5, 'sawtooth', 0.12, 0.18); },
+  coin: () => { tone(1320, 0.08, 'square', 0.05); tone(1760, 0.12, 'square', 0.05, 0.06); }
+};
+
+function toast(msg) {
+  $toast.textContent = msg; $toast.classList.add('on');
+  clearTimeout(toast.t); toast.t = setTimeout(() => $toast.classList.remove('on'), 1800);
+}
+
+// ---------- game setup ----------
+const pairKey = (x, y) => x < y ? x + '-' + y : y + '-' + x;
+
+function newGame(names) {
+  const n = names.length;
+  S = {
+    v: 1, phase: 'intro',
+    players: names.map(nm => ({ name: nm, coins: draft.start, rec: [], stolen: 0, hits: 0, deals: 0, gave: 0, coinsWon: 0 })),
+    opts: { laps: draft.laps, talk: draft.talk, cards: draft.cards, start: draft.start },
+    round: 1, total: Math.max(3, Math.ceil(n * draft.laps / 2)),
+    rollover: 0, pairs: {}, lastPair: [], deck: shuffle(DECK.slice()), cur: null, snap: null
+  };
+  setupRound();
+}
+
+function pickPair(avoidCurrent) {
+  const P = S.players, idx = P.map((_, i) => i);
+  const prev = avoidCurrent && S.cur ? [S.cur.a, S.cur.b] : S.lastPair;
+  const inPrev = i => prev.includes(i) ? 1 : 0;
+  const minD = Math.min(...P.map(p => p.deals));
+  let pool = idx.filter(i => P[i].deals === minD && !inPrev(i));
+  if (!pool.length) pool = idx.filter(i => P[i].deals === minD);
+  if (avoidCurrent && pool.length < 1) pool = idx.slice();
+  const a = shuffle(pool)[0];
+  const score = x => P[x].deals * 10 + (S.pairs[pairKey(a, x)] || 0) * 3 + inPrev(x);
+  const others = shuffle(idx.filter(i => i !== a));
+  others.sort((x, y) => score(x) - score(y));
+  let b = others[0];
+  if (avoidCurrent && S.cur && pairKey(a, b) === pairKey(S.cur.a, S.cur.b) && others.length > 1) b = others[1];
+  return rnd(2) ? [a, b] : [b, a];
+}
+
+function drawCard() {
+  if (S.round === 1) return 'plain';
+  if (S.round === S.total) return 'grand';
+  if (!S.opts.cards) return 'plain';
+  if (!S.deck.length) S.deck = shuffle(DECK.slice());
+  return S.deck.pop();
+}
+
+function setupRound() {
+  const [a, b] = pickPair(false);
+  const card = drawCard();
+  let base = 6 + 2 * (S.round - 1) + 2 * rnd(3);
+  if (card === 'grand') base *= 2;
+  const roll = S.rollover;
+  S.rollover = 0;
+  S.cur = {
+    a, b, card, base, roll, pot: base + roll,
+    choice: { a: null, b: null }, preds: {}, hostage: [0, 0], started: false,
+    layout: [rnd(2), rnd(2)], timeLeft: CARDS[card].time || S.opts.talk,
+    result: null, transfers: []
+  };
+  S.phase = 'intro';
+  tmpPick = null;
+  const copy = Object.assign({}, S); delete copy.snap;
+  S.snap = JSON.stringify(copy);
+  save();
+}
+
+function startTalk() {
+  const c = S.cur;
+  if (!c.started) {
+    c.started = true;
+    if (c.card === 'hostage') {
+      [c.a, c.b].forEach((pi, k) => {
+        const p = S.players[pi], amt = Math.min(3, p.coins);
+        p.coins -= amt; c.hostage[k] = amt; c.pot += amt;
+      });
+    }
+  }
+  S.phase = 'talk';
+  paused = false;
+  endAt = Date.now() + c.timeLeft * 1000;
+  save(); render(); runTimer();
+}
+
+function runTimer() {
+  clearInterval(timerId);
+  lastTickSec = -1;
+  timerId = setInterval(() => {
+    if (!S || S.phase !== 'talk') { clearInterval(timerId); return; }
+    if (paused) return;
+    const left = Math.max(0, (endAt - Date.now()) / 1000);
+    S.cur.timeLeft = left;
+    paintTimer();
+    const sec = Math.ceil(left);
+    if (sec <= 5 && sec > 0 && sec !== lastTickSec) { lastTickSec = sec; sfx.tick(); }
+    if (left <= 0) { clearInterval(timerId); sfx.buzz(); endTalk(); }
+  }, 200);
+}
+
+function paintTimer() {
+  const el = document.getElementById('tm'), bar = document.getElementById('tbar');
+  if (!el) return;
+  const left = S.cur.timeLeft, full = CARDS[S.cur.card].time || S.opts.talk;
+  el.textContent = Math.ceil(left);
+  el.classList.toggle('low', left <= 10);
+  if (bar) bar.style.width = Math.max(0, Math.min(100, left / full * 100)) + '%';
+}
+
+function endTalk() {
+  clearInterval(timerId);
+  S.phase = 'passA';
+  save(); render();
+}
+
+function lockChoice() {
+  if (!tmpPick) return;
+  const who = S.phase === 'chooseA' ? 'a' : 'b';
+  S.cur.choice[who] = tmpPick;
+  tmpPick = null;
+  sfx.lock();
+  S.phase = who === 'a' ? 'passB' : 'predict';
+  save(); render();
+}
+
+const OUTS = ['SS', 'AT', 'BT', 'TT'];
+function outLabel(o, c) {
+  const A = S.players[c.a].name, B = S.players[c.b].name;
+  return { SS: 'Both split', AT: A + ' steals', BT: B + ' steals', TT: 'Both steal' }[o];
+}
+
+function resolve() {
+  const c = S.cur;
+  if (c.result) return;
+  const P = S.players, A = P[c.a], B = P[c.b];
+  const ca = c.choice.a, cb = c.choice.b;
+  const out = ca === 'split' && cb === 'split' ? 'SS' : ca === 'steal' && cb === 'split' ? 'AT' : ca === 'split' && cb === 'steal' ? 'BT' : 'TT';
+  const lines = [];
+  const give = (pi, amt, why) => { if (!amt) return; P[pi].coins += amt; if (amt > 0) P[pi].coinsWon += amt; lines.push({ i: pi, amt, why }); };
+  let potNote = '';
+  let verdict = '';
+  if (out === 'SS') {
+    const half = Math.floor(c.pot / 2);
+    give(c.a, half, 'half the pot'); give(c.b, half, 'half the pot');
+    if (c.card === 'sweet') { give(c.a, 2, 'Sweetener'); give(c.b, 2, 'Sweetener'); }
+    if (c.pot % 2) { S.rollover += 1; potNote = 'The odd coin rolls over.'; }
+    verdict = '🤝 A deal is a deal!';
+  } else if (out === 'AT' || out === 'BT') {
+    const thief = out === 'AT' ? c.a : c.b, mark = out === 'AT' ? c.b : c.a;
+    const take = c.card === 'lonewolf' ? Math.ceil(c.pot * 1.5) : c.pot;
+    give(thief, take, c.card === 'lonewolf' ? 'the whole pot + Lone Wolf bonus' : 'the whole pot');
+    P[mark].stolen += 1;
+    lines.push({ i: mark, amt: 0, why: 'trusted… and got nothing' });
+    verdict = '🗡️ ' + P[thief].name + ' stole it!';
+  } else {
+    if (c.card === 'safety') {
+      const q = Math.floor(c.pot / 4);
+      give(c.a, q, 'Safety Net'); give(c.b, q, 'Safety Net');
+      potNote = 'The Safety Net caught you. The rest of the pot is gone.';
+    } else if (S.round >= S.total) {
+      potNote = 'Final deal, so the house keeps all ' + c.pot + ' coins.';
+    } else {
+      S.rollover += c.pot;
+      potNote = 'All ' + c.pot + ' coins roll over into the next pot!';
+    }
+    verdict = '💥 Both stole. Nobody wins!';
+  }
+  // spectator predictions
+  const win = c.card === 'crowd' ? 4 : 2;
+  Object.keys(c.preds).forEach(k => {
+    const pi = +k, guess = c.preds[k];
+    if (guess === out) { give(pi, win, 'called it: ' + outLabel(out, c)); P[pi].hits += 1; }
+    else if (c.card === 'crowd' && P[pi].coins > 0) { P[pi].coins -= 1; lines.push({ i: pi, amt: -1, why: 'Crowd Wager miss' }); }
+  });
+  A.rec.push(ca === 'split' ? 's' : 't');
+  B.rec.push(cb === 'split' ? 's' : 't');
+  A.deals += 1; B.deals += 1;
+  S.pairs[pairKey(c.a, c.b)] = (S.pairs[pairKey(c.a, c.b)] || 0) + 1;
+  S.lastPair = [c.a, c.b];
+  c.result = { out, lines, potNote, verdict };
+}
+
+function doReveal() {
+  resolve();
+  S.phase = 'reveal';
+  save(); render();
+}
+
+function undoRound() {
+  if (!S.snap) return;
+  if (!confirm('Replay this deal from the start? Coins and choices from this deal will be undone.')) return;
+  const snap = S.snap;
+  S = JSON.parse(snap);
+  S.snap = snap;
+  revealShown = -1; tmpPick = null;
+  save(); render();
+}
+
+function nextRound() {
+  if (S.round >= S.total) { S.phase = 'final'; save(); render(); localStorage.removeItem(KEY); return; }
+  S.round += 1;
+  setupRound();
+  render();
+}
+
+// ---------- view helpers ----------
+const dots = rec => '<div class="record">' + rec.slice(-12).map(r => '<span class="dot ' + r + '"></span>').join('') + '</div>';
+const coinsOf = pi => S.players[pi].coins;
+const potText = c => (c.card === 'mystery' && !c.result) ? '?' : c.pot;
+function standings() {
+  return S.players.map((p, i) => ({ p, i })).sort((x, y) => y.p.coins - x.p.coins || x.p.name.localeCompare(y.p.name));
+}
+const rankOf = (list, k) => 1 + list.filter(o => o.p.coins > list[k].p.coins).length;
+function boardHtml() {
+  const list = standings();
+  return '<div class="board">' + list.map((o, k) => {
+    const r = rankOf(list, k);
+    return '<div class="brow' + (r === 1 ? ' lead' : '') + '"><div class="rk">' + (r === 1 ? '👑' : r) + '</div>' +
+      '<div class="bn">' + esc(o.p.name) + dots(o.p.rec) + '</div><div class="bc">🪙 ' + o.p.coins + '</div></div>';
+  }).join('') + '</div>';
+}
+function dealHeader() {
+  return '<div class="row" style="justify-content:space-between"><span class="chip-tag" style="flex:0 0 auto">Deal ' + S.round + ' of ' + S.total + '</span>' +
+    (S.round === S.total ? '<span class="chip-tag" style="flex:0 0 auto;color:var(--gold);border-color:var(--gold)">FINAL</span>' : '') + '</div>';
+}
+function vsHtml(showCoins) {
+  const c = S.cur, P = S.players;
+  const who = pi => '<div class="who"><div class="nm">' + esc(P[pi].name) + '</div>' +
+    (showCoins ? '<div class="muted sub">🪙 ' + P[pi].coins + '</div>' : '') + dots(P[pi].rec) + '</div>';
+  return '<div class="vs">' + who(c.a) + '<div class="mid">VS</div>' + who(c.b) + '</div>';
+}
+function cardHtml(card) { return '<div class="deal-card"><div class="t">' + CARDS[card].t + '</div><div class="d">' + CARDS[card].d + '</div></div>'; }
+
+function topbar() {
+  return '<div class="topbar"><h1 class="brand">Shake On It</h1><div class="row" style="flex:0 0 auto;gap:6px">' +
+    '<button class="small-btn" data-act="sound" aria-label="Toggle sound">' + (soundOn ? '🔊' : '🔇') + '</button>' +
+    '<button class="small-btn" data-act="rules" aria-label="Rules">' + (showRules ? '✕' : '❓') + '</button>' +
+    (S && S.phase !== 'final' && !resumeOffer ? '<button class="small-btn" data-act="quit" aria-label="Quit game">⏏</button>' : '') +
+    '</div></div>';
+}
+function rulesHtml() {
+  return '<div class="panel rules sub"><h2>How to play</h2>' +
+    '<p>Each deal, two <b>Dealmakers</b> face a pot of coins. They get a ticking clock to talk: promise, plead, threaten, swear on their grandmother.</p>' +
+    '<p>Then the phone goes to each of them in secret and they lock in <b style="color:var(--split)">SPLIT</b> or <b style="color:var(--steal)">STEAL</b>.</p>' +
+    '<table class="tbl"><tr><td>🤝 + 🤝</td><td>Each takes half</td></tr><tr><td>🗡️ + 🤝</td><td>The stealer takes it ALL</td></tr><tr><td>🗡️ + 🗡️</td><td>Nobody wins, the pot rolls over</td></tr></table>' +
+    '<p>Everyone else <b>predicts</b> the outcome after the choices are locked (+2 coins if right).</p>' +
+    '<p>Every choice goes on your public record (🟢 split, 🔴 steal), so the room remembers.</p>' +
+    '<p>Promised someone a cut? The <b>Settle-Up desk</b> after each reveal moves coins between players. Nothing forces you to pay up.</p>' +
+    '<p>Deal Cards twist the rules each round, and the last deal is a doubled <b>Grand Pot</b>. Most coins wins.</p></div>';
+}
+
+// ---------- views ----------
+const V = {};
+V.setup = () => {
+  let h = '';
+  if (resumeOffer && S) {
+    h += '<div class="panel center"><h2>Game in progress</h2><div class="sub muted">Deal ' + S.round + ' of ' + S.total + ' · ' + S.players.map(p => esc(p.name)).join(', ') + '</div>' +
+      '<div class="row" style="margin-top:10px"><button class="big-btn" data-act="resume">Resume</button><button class="big-btn alt" data-act="discard">New game</button></div></div>';
+    return h;
+  }
+  h += '<div class="panel"><div class="sub muted center" style="margin-bottom:6px">Two players. One pot. Will you split it, or steal it?</div>' +
+    '<div class="label">Players (3–10)</div><div id="names">' +
+    draft.names.map((n, i) => '<div class="name-row"><input maxlength="14" placeholder="Player ' + (i + 1) + '" value="' + esc(n) + '" data-name="' + i + '" autocomplete="off">' +
+      (draft.names.length > 3 ? '<button data-act="delName" data-arg="' + i + '" aria-label="Remove player">✕</button>' : '') + '</div>').join('') +
+    '</div>' + (draft.names.length < 10 ? '<button class="big-btn alt" data-act="addName" style="min-height:48px">+ Add player</button>' : '') +
+    '<div class="label">Game length</div><div class="opt-group">' +
+    [[1, 'Quick'], [2, 'Standard'], [3, 'Long']].map(([v, l]) => '<button class="opt' + (draft.laps === v ? ' on' : '') + '" data-act="laps" data-arg="' + v + '">' + l + '</button>').join('') +
+    '</div><div class="hint-line" style="margin-top:4px">' + lengthHint() + '</div>' +
+    '<div class="label">Talk time</div><div class="opt-group">' +
+    [30, 45, 60, 90].map(v => '<button class="opt' + (draft.talk === v ? ' on' : '') + '" data-act="talk" data-arg="' + v + '">' + v + 's</button>').join('') +
+    '</div><div class="label">Starting coins</div><div class="opt-group">' +
+    [0, 5, 10].map(v => '<button class="opt' + (draft.start === v ? ' on' : '') + '" data-act="start" data-arg="' + v + '">🪙 ' + v + '</button>').join('') +
+    '</div><div class="label">Deal Cards</div><div class="opt-group">' +
+    '<button class="opt' + (draft.cards ? ' on' : '') + '" data-act="cards" data-arg="1">On: twist each deal</button>' +
+    '<button class="opt' + (!draft.cards ? ' on' : '') + '" data-act="cards" data-arg="0">Off: pure split or steal</button></div>' +
+    '</div><button class="big-btn" data-act="begin">Start the game 🤝</button>';
+  return h;
+};
+function lengthHint() {
+  const n = Math.max(3, draft.names.length);
+  const r = Math.max(3, Math.ceil(n * draft.laps / 2));
+  return r + ' deals for ' + n + ' players, so everyone is a Dealmaker about ' + draft.laps + '× (~' + Math.round(r * 2.2) + ' min)';
+}
+V.intro = () => {
+  const c = S.cur, t = CARDS[c.card].time || S.opts.talk;
+  return dealHeader() +
+    '<div class="panel center"><div class="label" style="margin-top:0">Tonight\'s Dealmakers</div>' + vsHtml(true) +
+    '<div class="label">The pot</div><div class="potline"><span class="coin-ico">🪙</span><span class="pot">' + potText(c) + '</span></div>' +
+    (c.roll && c.card !== 'mystery' ? '<div class="sub" style="color:var(--gold)">includes ' + c.roll + ' rolled-over coins!</div>' : '') +
+    (c.card === 'hostage' ? '<div class="sub muted">+ up to 3 hostage coins from each of you</div>' : '') +
+    '</div>' + cardHtml(c.card) +
+    '<div class="sub muted center">Everyone else: listen in, heckle, and get ready to predict.</div>' +
+    '<button class="big-btn" data-act="go">Start the clock · ' + t + 's</button>' +
+    '<button class="big-btn alt" data-act="repair" style="min-height:46px;font-size:15px">Someone\'s away? Pick a different pair</button>';
+};
+V.talk = () => {
+  const c = S.cur, full = CARDS[c.card].time || S.opts.talk;
+  return dealHeader() + vsHtml(false) +
+    '<div class="panel center"><div class="potline"><span class="coin-ico">🪙</span><span class="pot" style="font-size:clamp(34px,11vw,52px)">' + potText(c) + '</span></div>' +
+    '<div id="tm" class="timer' + (c.timeLeft <= 10 ? ' low' : '') + '">' + Math.ceil(c.timeLeft) + '</div>' +
+    '<div class="bar"><i id="tbar" style="width:' + Math.max(0, c.timeLeft / full * 100) + '%"></i></div>' +
+    '<div class="sub muted" style="margin-top:8px">' + (c.card === 'silent' ? 'Not one word!' : c.card === 'whisper' ? 'Whispers only!' : 'Make your case. Promises are free, but are they true?') + '</div></div>' +
+    '<div class="sub center" style="color:#d6c4ff">' + CARDS[c.card].t + '</div>' +
+    '<div class="row"><button class="big-btn alt" data-act="pause">' + (paused ? '▶ Resume' : '⏸ Pause') + '</button><button class="big-btn alt" data-act="plus">+15s</button></div>' +
+    '<button class="big-btn" data-act="endTalk">Deal\'s done: lock it in 🔒</button>';
+};
+function passView(pi) {
+  const nm = esc(S.players[pi].name);
+  return dealHeader() + '<div class="panel pass-card"><div class="em">📱</div><div class="muted">Hand the phone to</div><div class="nm">' + nm + '</div>' +
+    '<div class="sub muted">Only ' + nm + ' may look. Everyone else, eyes off the screen!</div></div>' +
+    '<button class="big-btn" data-act="open">I\'m ' + nm + ': show my choice</button>';
+}
+V.passA = () => passView(S.cur.a);
+V.passB = () => passView(S.cur.b);
+function chooseView(who) {
+  const c = S.cur, pi = c[who], other = S.players[who === 'a' ? c.b : c.a].name;
+  const flip = c.layout[who === 'a' ? 0 : 1];
+  const btn = k => '<button class="choice ' + k + (tmpPick === k ? ' picked' : tmpPick ? ' dim' : '') + '" data-act="pick" data-arg="' + k + '">' +
+    '<span class="em">' + (k === 'split' ? '🤝' : '🗡️') + '</span>' + k.toUpperCase() + '</button>';
+  const order = flip ? ['steal', 'split'] : ['split', 'steal'];
+  return dealHeader() + '<div class="panel center"><h2>' + esc(S.players[pi].name) + ', it\'s your call</h2>' +
+    '<div class="sub muted">The pot is 🪙 ' + potText(c) + ' · your rival is ' + esc(other) + '</div>' +
+    '<div class="sub" style="margin-top:4px;color:#d6c4ff">' + CARDS[c.card].t + '</div></div>' +
+    '<div class="choices">' + order.map(btn).join('') + '</div>' +
+    '<button class="big-btn" data-act="lock"' + (tmpPick ? '' : ' disabled') + '>Lock it in 🔒</button>' +
+    '<div class="hint-line">Shield the screen. Buttons swap sides every time, so nobody can read your thumb.</div>';
+}
+V.chooseA = () => chooseView('a');
+V.chooseB = () => chooseView('b');
+V.predict = () => {
+  const c = S.cur, P = S.players;
+  const spec = P.map((p, i) => i).filter(i => i !== c.a && i !== c.b);
+  const win = c.card === 'crowd' ? 4 : 2;
+  const A = esc(P[c.a].name), B = esc(P[c.b].name);
+  const optsLbl = { SS: ['🤝🤝', 'Both split'], AT: ['🗡️🤝', A + ' steals'], BT: ['🤝🗡️', B + ' steals'], TT: ['🗡️🗡️', 'Both steal'] };
+  return dealHeader() + '<div class="panel center"><h2>Both locked in 🔒</h2><div class="sub muted">Hand the phone back to the room. Spectators, call it now: right pays <b style="color:var(--gold)">+' + win + '</b>' +
+    (c.card === 'crowd' ? ', wrong costs 1' : '') + '. Skipping is allowed.</div></div>' +
+    '<div class="panel pred-list">' + spec.map(i => '<div class="pred-row"><div class="pn">' + esc(P[i].name) + '</div><div class="pred-opts">' +
+      OUTS.map(o => '<button class="' + (c.preds[i] === o ? 'on' : '') + '" data-act="pred" data-arg="' + i + ':' + o + '"><b>' + optsLbl[o][0] + '</b>' + optsLbl[o][1] + '</button>').join('') +
+      '</div></div>').join('') + '</div>' +
+    '<button class="big-btn" data-act="reveal">Reveal! 🎭</button>';
+};
+V.reveal = () => {
+  const c = S.cur, P = S.players, r = c.result;
+  const instant = revealShown === S.round;
+  const face = (pi, ch) => '<div class="flip' + (instant ? ' go' : '') + '" id="f' + pi + '"><div class="face front"><div class="em" style="font-size:40px">❔</div><div class="nm">' + esc(P[pi].name) + '</div></div>' +
+    '<div class="face back ' + ch + '"><span class="em">' + (ch === 'split' ? '🤝' : '🗡️') + '</span>' + ch.toUpperCase() + '<div class="nm">' + esc(P[pi].name) + '</div></div></div>';
+  const lines = r.lines.map(l => '<div class="l"><span>' + esc(P[l.i].name) + ' <span class="muted">· ' + esc(l.why) + '</span></span><span class="' + (l.amt > 0 ? 'plus' : l.amt < 0 ? 'minus' : 'muted') + '">' +
+    (l.amt > 0 ? '+' + l.amt : l.amt < 0 ? String(l.amt) : '0') + '</span></div>').join('');
+  return dealHeader() + '<div class="reveal-row">' + face(c.a, c.choice.a) + face(c.b, c.choice.b) + '</div>' +
+    '<div id="after"' + (instant ? '' : ' hidden') + '>' +
+    '<div class="verdict' + (instant ? '' : ' pop') + '">' + r.verdict + '</div>' +
+    '<div class="panel" style="margin-top:8px"><div class="sub muted center" style="margin-bottom:6px">The pot was 🪙 ' + c.pot + (c.hostage[0] + c.hostage[1] ? ' (with ' + (c.hostage[0] + c.hostage[1]) + ' hostage coins)' : '') + '</div>' +
+    '<div class="ledger">' + (lines || '<div class="l muted">No coins moved.</div>') + '</div>' +
+    (r.potNote ? '<div class="sub center" style="margin-top:8px;color:var(--gold)">' + esc(r.potNote) + '</div>' : '') + '</div>' +
+    '<div class="row" style="margin-top:10px"><button class="big-btn alt" data-act="settle">Settle-Up desk 💸</button><button class="big-btn" data-act="board">Scores ▶</button></div>' +
+    '<button class="small-btn" data-act="undo" style="width:100%;margin-top:10px">↺ Mis-tap? Replay this deal</button></div>';
+};
+V.settle = () => {
+  const P = S.players, c = S.cur;
+  if (settle.from >= P.length) settle.from = 0;
+  if (settle.to >= P.length) settle.to = 1;
+  const max = P[settle.from].coins;
+  settle.amt = Math.max(max ? 1 : 0, Math.min(settle.amt, max));
+  const sel = (field, v) => '<select data-field="' + field + '">' + P.map((p, i) => '<option value="' + i + '"' + (i === v ? ' selected' : '') + '>' + esc(p.name) + ' (🪙' + p.coins + ')</option>').join('') + '</select>';
+  const ok = settle.from !== settle.to && settle.amt > 0 && max >= settle.amt;
+  return dealHeader() + '<div class="panel"><h2>💸 Settle-Up desk</h2><div class="sub muted">Promised someone a cut? Pay it here, or don\'t. The room will remember either way.</div>' +
+    '<div class="label">Who pays → who gets it</div><div class="settle">' + sel('from', settle.from) + '<div style="font-size:22px;text-align:center">→</div>' + sel('to', settle.to) + '</div>' +
+    '<div class="stepper"><button data-act="amt" data-arg="-1" aria-label="Less">−</button><div class="v">🪙 ' + settle.amt + '</div><button data-act="amt" data-arg="1" aria-label="More">+</button></div>' +
+    '<button class="big-btn" data-act="pay" style="margin-top:10px"' + (ok ? '' : ' disabled') + '>Pay up</button>' +
+    (settle.from === settle.to ? '<div class="hint-line" style="margin-top:6px">Pick two different players.</div>' : '') +
+    (c.transfers.length ? '<div class="label">Paid this deal</div><div class="ledger">' + c.transfers.map(t => '<div class="l"><span>' + esc(P[t.f].name) + ' → ' + esc(P[t.t].name) + '</span><span class="plus">🪙 ' + t.a + '</span></div>').join('') + '</div>' +
+      '<button class="small-btn" data-act="unpay" style="width:100%;margin-top:8px">↺ Undo last payment</button>' : '') +
+    '</div><button class="big-btn alt" data-act="board">Done ▶ Scores</button>';
+};
+V.board = () => {
+  const last = S.round >= S.total;
+  return dealHeader() + '<div class="panel"><h2>Standings</h2>' + boardHtml() +
+    (S.rollover ? '<div class="sub center" style="margin-top:10px;color:var(--gold)">🪙 ' + S.rollover + ' rolling into the next pot</div>' : '') +
+    '<div class="hint-line" style="margin-top:8px">🟢 split · 🔴 steal: everyone\'s record, in order</div></div>' +
+    '<div class="row"><button class="big-btn alt" data-act="settle">💸 Settle</button><button class="big-btn" data-act="next">' + (last ? 'Final results 🏆' : 'Next deal ▶') + '</button></div>';
+};
+function awards() {
+  const P = S.players, out = [];
+  const best = (fn, min = 1) => {
+    let top = -Infinity, who = [];
+    P.forEach(p => { const v = fn(p); if (v > top) { top = v; who = [p]; } else if (v === top) who.push(p); });
+    return top >= min ? { v: top, who } : null;
+  };
+  const add = (em, title, res, fmt) => { if (res) out.push({ em, title, names: res.who.map(p => p.name).join(' & '), v: fmt(res.v) }); };
+  add('😇', 'Most Trusted', best(p => p.rec.filter(r => r === 's').length), v => v + ' splits');
+  add('🐍', 'The Snake', best(p => p.rec.filter(r => r === 't').length), v => v + ' steals');
+  add('🔮', 'Oracle', best(p => p.hits), v => v + ' correct calls');
+  add('💔', 'Heartbroken', best(p => p.stolen), v => 'robbed ' + v + '×');
+  add('🎁', 'Paid Their Debts', best(p => p.gave), v => v + ' coins paid out');
+  add('💰', 'Biggest Haul', best(p => p.coinsWon), v => v + ' coins won');
+  return out;
+}
+V.final = () => {
+  const list = standings();
+  const topCoins = list[0].p.coins;
+  const winners = list.filter(o => o.p.coins === topCoins).map(o => esc(o.p.name));
+  const aw = awards();
+  return '<div class="panel center"><div style="font-size:56px">🏆</div><div class="label" style="margin-top:0">' + (winners.length > 1 ? 'Shared victory' : 'Winner') + '</div>' +
+    '<div style="font-size:clamp(28px,9vw,42px);font-weight:900;color:var(--gold);word-break:break-word">' + winners.join(' & ') + '</div><div class="sub muted">with 🪙 ' + topCoins + '</div></div>' +
+    '<div class="panel"><h2>Final standings</h2>' + boardHtml() + '</div>' +
+    (aw.length ? '<div class="panel"><h2>Awards</h2><div class="awards">' + aw.map(a => '<div class="award"><div class="em">' + a.em + '</div><div class="at">' + a.title + '</div><div class="an">' + esc(a.names) + '</div><div class="muted sub">' + esc(a.v) + '</div></div>').join('') + '</div></div>' : '') +
+    '<button class="big-btn" data-act="again">Play again, same players 🔁</button><button class="big-btn alt" data-act="toSetup">Change players</button>';
+};
+
+// ---------- render ----------
+function render() {
+  const ph = (!S || resumeOffer) ? 'setup' : S.phase;
+  $app.innerHTML = topbar() + (showRules ? rulesHtml() : '') + (V[ph] || V.setup)();
+  if (ph === 'reveal' && revealShown !== S.round) animateReveal();
+}
+
+function animateReveal() {
+  const c = S.cur, r = c.result, rnum = S.round;
+  revealShown = rnum;
+  const fa = document.getElementById('f' + c.a), fb = document.getElementById('f' + c.b), af = document.getElementById('after');
+  setTimeout(() => { if (fa && fa.isConnected) { fa.classList.add('go'); sfx.flip(); } }, 500);
+  setTimeout(() => { if (fb && fb.isConnected) { fb.classList.add('go'); sfx.flip(); } }, 1400);
+  setTimeout(() => {
+    if (af && af.isConnected) af.hidden = false;
+    if (r.out === 'SS') sfx.split(); else sfx.steal();
+  }, 2300);
+}
+
+// ---------- events ----------
+$app.addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.name != null) { draft.names[+t.dataset.name] = t.value; save(); }
+});
+$app.addEventListener('change', e => {
+  const t = e.target;
+  if (t.dataset.field) { settle[t.dataset.field] = +t.value; settle.amt = 1; render(); }
+});
+$app.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b || b.disabled) return;
+  const act = b.dataset.act, arg = b.dataset.arg;
+  const fn = ACT[act];
+  if (fn) { sfx.tap(); fn(arg); }
+});
+
+const ACT = {
+  sound: () => { soundOn = !soundOn; localStorage.setItem(SKEY, soundOn ? '1' : '0'); render(); },
+  rules: () => { showRules = !showRules; render(); if (showRules) scrollTo(0, 0); },
+  quit: () => { if (confirm('Quit this game? Progress will be lost.')) { clearInterval(timerId); S = null; save(); render(); } },
+  resume: () => {
+    resumeOffer = false;
+    if (S.phase === 'talk') { paused = true; endAt = Date.now() + S.cur.timeLeft * 1000; render(); runTimer(); return; }
+    if (S.phase === 'chooseA' || S.phase === 'chooseB') S.phase = S.phase === 'chooseA' ? 'passA' : 'passB';
+    if (S.phase === 'reveal') revealShown = S.round;
+    render();
+  },
+  discard: () => { resumeOffer = false; S = null; save(); render(); },
+  addName: () => { if (draft.names.length < 10) { draft.names.push(''); save(); render(); const ins = $app.querySelectorAll('[data-name]'); if (ins.length) ins[ins.length - 1].focus(); } },
+  delName: a => { if (draft.names.length > 3) { draft.names.splice(+a, 1); save(); render(); } },
+  laps: a => { draft.laps = +a; save(); render(); },
+  talk: a => { draft.talk = +a; save(); render(); },
+  start: a => { draft.start = +a; save(); render(); },
+  cards: a => { draft.cards = a === '1'; save(); render(); },
+  begin: () => {
+    const names = draft.names.map((n, i) => (n || '').trim() || 'Player ' + (i + 1));
+    const seen = new Set();
+    for (const n of names) { const k = n.toLowerCase(); if (seen.has(k)) { toast('Two players are both called "' + n + '"'); return; } seen.add(k); }
+    newGame(names);
+    settle = { from: 0, to: 1, amt: 1 };
+    render(); scrollTo(0, 0);
+  },
+  go: () => startTalk(),
+  repair: () => {
+    const [a, b] = pickPair(true);
+    S.cur.a = a; S.cur.b = b;
+    const copy = Object.assign({}, S); delete copy.snap; S.snap = JSON.stringify(copy);
+    save(); render(); toast('New Dealmakers: ' + S.players[a].name + ' & ' + S.players[b].name);
+  },
+  pause: () => {
+    if (paused) { paused = false; endAt = Date.now() + S.cur.timeLeft * 1000; }
+    else { paused = true; }
+    render();
+  },
+  plus: () => { S.cur.timeLeft += 15; endAt += 15000; paintTimer(); save(); },
+  endTalk: () => endTalk(),
+  open: () => { tmpPick = null; S.phase = S.phase === 'passA' ? 'chooseA' : 'chooseB'; save(); render(); },
+  pick: a => { tmpPick = a; render(); },
+  lock: () => lockChoice(),
+  pred: a => {
+    const [i, o] = a.split(':');
+    const c = S.cur;
+    if (c.preds[i] === o) delete c.preds[i]; else c.preds[i] = o;
+    save(); render();
+  },
+  reveal: () => doReveal(),
+  undo: () => undoRound(),
+  settle: () => {
+    const c = S.cur;
+    // sensible default: a winner pays the other dealmaker
+    if (c.result && !c.transfers.length) {
+      const P = S.players;
+      const from = P[c.a].coins >= P[c.b].coins ? c.a : c.b;
+      settle = { from, to: from === c.a ? c.b : c.a, amt: 1 };
+    }
+    S.phase = 'settle'; save(); render(); scrollTo(0, 0);
+  },
+  amt: a => { const max = S.players[settle.from].coins; settle.amt = Math.max(1, Math.min(max, settle.amt + (+a))); render(); },
+  pay: () => {
+    const P = S.players, f = settle.from, t = settle.to, a = settle.amt;
+    if (f === t || a < 1 || P[f].coins < a) return;
+    P[f].coins -= a; P[t].coins += a; P[f].gave += a;
+    S.cur.transfers.push({ f, t, a });
+    sfx.coin(); toast(P[f].name + ' paid ' + P[t].name + ' 🪙 ' + a);
+    settle.amt = 1;
+    save(); render();
+  },
+  unpay: () => {
+    const tr = S.cur.transfers.pop();
+    if (!tr) return;
+    const P = S.players;
+    P[tr.f].coins += tr.a; P[tr.t].coins -= tr.a; P[tr.f].gave -= tr.a;
+    save(); render();
+  },
+  board: () => { S.phase = 'board'; save(); render(); scrollTo(0, 0); },
+  next: () => { nextRound(); scrollTo(0, 0); },
+  again: () => {
+    draft.names = S.players.map(p => p.name);
+    newGame(draft.names.slice());
+    revealShown = -1; settle = { from: 0, to: 1, amt: 1 };
+    render(); scrollTo(0, 0);
+  },
+  toSetup: () => { draft.names = S.players.map(p => p.name); S = null; save(); render(); }
+};
+
+// Test hook for automated drives (read-only peek at state)
+window.__shake = { get state() { return S; } };
+
+render();
+})();
+</script>
+</body>
+</html>

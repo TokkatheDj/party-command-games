@@ -1,0 +1,648 @@
+<!-- CONCEPT: LEARNING (rhyming / early phonics) - Rio's Rhyme Island: Rio the parrot says picture words out loud and kids use their ears to play four rhyme islands - Rhyme or Not? (thumbs up or down for two pictures), Find the Rhyme (pick the picture that rhymes from three), Rhyme Houses (post each picture into the house whose word it rhymes with) and Finish the Song (pick the rhyming picture that ends a silly sing-song line) - with the matching ending letters lighting up after every answer, a Rhyme Machine where tapping any picture makes its whole rhyme family sing, and a saved Rhyme Book of every pair found. No timer, no losing - a wrong pick just wobbles, Rio says both words so the different endings can be heard, and the right card starts to glow. Ages 4-8. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Rio's Rhyme Island</title>
+<style>
+:root{
+  --sea1:#38c9e8; --sea2:#1e8fd6; --sand:#ffe7a3; --leaf:#3cc46b; --leaf2:#22a455;
+  --sun:#ffd23f; --coral:#ff6b6b; --orange:#ff9f1c; --purple:#9b5de5; --pink:#f15bb5;
+  --ink:#24324a; --card:#ffffff; --rime:#ff3d7f; --glow:#ffe14d;
+  --radius:22px; --gap:clamp(8px,2.4vw,16px);
+  --font:"Comic Sans MS","Trebuchet MS",system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+body{font-family:var(--font);color:var(--ink);background:linear-gradient(180deg,#8be3ff 0%,var(--sea1) 45%,var(--sea2) 100%)}
+button{font-family:inherit;color:inherit;cursor:pointer;border:none;touch-action:manipulation}
+#app{position:relative;height:100%;height:100dvh;display:flex;flex-direction:column;max-width:820px;margin:0 auto}
+.bar{display:flex;align-items:center;gap:8px;padding:8px 10px;flex:0 0 auto}
+.iconBtn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.9);font-size:24px;box-shadow:0 3px 0 rgba(0,0,0,.15);flex:0 0 auto}
+.iconBtn:active{transform:translateY(2px);box-shadow:none}
+.title{flex:1;margin:0;text-align:center;font-size:clamp(20px,5.6vw,34px);line-height:1.1;
+  background:linear-gradient(90deg,var(--pink),var(--orange),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent;
+  -webkit-text-stroke:0;filter:drop-shadow(0 2px 0 rgba(255,255,255,.9))}
+.screen{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:0 10px 10px}
+.screen[hidden],.overlay[hidden],[hidden]{display:none!important}
+
+/* ---------- home ---------- */
+#home{overflow-y:auto;gap:var(--gap)}
+.hero{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.85);border-radius:var(--radius);padding:10px 14px}
+.hero .rio{font-size:clamp(54px,15vw,84px)}
+.hero p{margin:0;font-size:clamp(16px,4.2vw,22px)}
+.islands{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap)}
+.island{position:relative;min-height:clamp(120px,30vw,170px);border-radius:var(--radius);padding:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  background:radial-gradient(ellipse at 50% 85%,var(--sand) 0 45%,transparent 46%),linear-gradient(180deg,#bdf3ff,#7fdcf5);box-shadow:0 5px 0 rgba(0,0,0,.18)}
+.island:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.island .ie{font-size:clamp(36px,10vw,56px);line-height:1}
+.island .in{font-weight:bold;font-size:clamp(15px,4vw,21px);text-align:center}
+.island .is{font-size:clamp(13px,3.4vw,17px);letter-spacing:1px}
+.island .lock{position:absolute;top:8px;right:10px;font-size:20px}
+.island.done{outline:4px solid var(--sun)}
+.extras{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap)}
+.bigBtn{min-height:64px;border-radius:var(--radius);font-size:clamp(17px,4.4vw,22px);font-weight:bold;padding:10px;box-shadow:0 5px 0 rgba(0,0,0,.2);color:#fff}
+.bigBtn:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.2)}
+.b-purple{background:var(--purple)} .b-pink{background:var(--pink)} .b-green{background:var(--leaf2)} .b-orange{background:var(--orange)} .b-blue{background:#3a86ff}
+
+/* ---------- play ---------- */
+#play{gap:8px}
+.playTop{display:flex;align-items:center;gap:8px}
+.dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+.dot{width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.5);border:2px solid #fff}
+.dot.on{background:var(--sun)} .dot.cur{transform:scale(1.3);background:#fff}
+.rioRow{display:flex;align-items:flex-end;gap:8px;flex:0 0 auto}
+.rioBig{font-size:clamp(52px,14vw,80px);line-height:1;animation:bob 2.2s ease-in-out infinite;transform-origin:50% 90%}
+.rioBig.happy{animation:hop .5s ease 3}
+.rioBig.think{animation:tilt .6s ease 2}
+.bubble{position:relative;flex:1;background:#fff;border-radius:18px;padding:10px 14px;font-size:clamp(16px,4.3vw,22px);min-height:clamp(54px,13vw,70px);display:flex;align-items:center;box-shadow:0 3px 0 rgba(0,0,0,.12)}
+.bubble::before{content:"";position:absolute;left:-12px;bottom:14px;border:8px solid transparent;border-right:12px solid #fff;border-left:0}
+#stage{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--gap);background:rgba(255,255,255,.28);border-radius:var(--radius);padding:var(--gap);position:relative}
+.row{display:flex;justify-content:center;align-items:stretch;gap:var(--gap);width:100%}
+.card{position:relative;background:var(--card);border-radius:20px;padding:8px 6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  width:clamp(92px,28vw,160px);min-height:clamp(110px,30vw,170px);box-shadow:0 5px 0 rgba(0,0,0,.18);transition:transform .15s}
+.card:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.18)}
+.card .emo{font-size:clamp(46px,13vw,76px);line-height:1.1}
+.card .word{font-size:clamp(17px,4.6vw,24px);font-weight:bold;letter-spacing:.5px}
+.card.big{width:clamp(130px,40vw,200px);min-height:clamp(140px,38vw,210px)}
+.card.big .emo{font-size:clamp(64px,18vw,100px)}
+.card.target{background:#fff6cf}
+.card.glow{animation:glow 1s ease-in-out infinite}
+.card.right{background:#d6ffd9;animation:pop .5s ease}
+.card.wob{animation:wob .5s ease}
+.card.fade{opacity:.45}
+.rime{transition:color .3s}
+.show .rime{color:var(--rime);text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:3px}
+.and{align-self:center;font-size:clamp(28px,8vw,44px);font-weight:bold;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.2)}
+.yn{display:flex;gap:var(--gap);width:100%;justify-content:center}
+.yn button{flex:1;max-width:220px;min-height:clamp(70px,18vw,96px);border-radius:var(--radius);font-size:clamp(20px,5.4vw,28px);font-weight:bold;color:#fff;box-shadow:0 5px 0 rgba(0,0,0,.2)}
+.yn button:active{transform:translateY(3px);box-shadow:0 2px 0 rgba(0,0,0,.2)}
+.yes{background:var(--leaf2)} .no{background:var(--orange)}
+.yn button.glow{animation:glow 1s ease-in-out infinite}
+.yn button.wob{animation:wob .5s ease}
+.song{background:#fff;border-radius:18px;padding:10px 14px;font-size:clamp(19px,5.2vw,28px);text-align:center;line-height:1.5;box-shadow:0 3px 0 rgba(0,0,0,.12);width:100%;max-width:560px}
+.song .ce{font-size:1.4em;vertical-align:middle}
+.song .blank{display:inline-block;min-width:3.4em;border-bottom:4px dashed var(--purple);color:var(--purple)}
+.houses{display:flex;gap:var(--gap);width:100%;justify-content:center}
+.house{position:relative;flex:1;max-width:220px;min-height:clamp(120px,32vw,170px);margin-top:clamp(34px,9vw,52px);border-radius:0 0 18px 18px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 5px 0 rgba(0,0,0,.18);padding:6px}
+.house::before{content:"";position:absolute;left:-8px;right:-8px;bottom:100%;height:clamp(34px,9vw,52px);clip-path:polygon(50% 0,100% 100%,0 100%);background:inherit;filter:brightness(.85)}
+.house .emo{font-size:clamp(44px,12vw,66px);line-height:1.1}
+.house .word{font-size:clamp(16px,4.4vw,22px);font-weight:bold;background:rgba(255,255,255,.85);border-radius:10px;padding:0 8px}
+.house .cnt{font-size:clamp(18px,5vw,26px);min-height:1.3em}
+.h0{background:#ffb4c8} .h1{background:#b8e1ff}
+.house.wob{animation:wob .5s ease} .house.glow{animation:glow 1s ease-in-out infinite} .house.yay{animation:pop .5s ease}
+.flyer{position:fixed;z-index:30;pointer-events:none;font-size:56px;transition:transform .55s cubic-bezier(.5,-0.3,.6,1),opacity .55s}
+.left{font-size:clamp(14px,3.8vw,18px);color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.3)}
+
+/* ---------- machine / book ---------- */
+#machine,#book{overflow-y:auto;gap:var(--gap)}
+.panel{background:rgba(255,255,255,.88);border-radius:var(--radius);padding:10px 14px;font-size:clamp(15px,4vw,20px)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px}
+.mcard{background:#fff;border-radius:16px;min-height:88px;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 4px 0 rgba(0,0,0,.15);padding:4px}
+.mcard .emo{font-size:38px;line-height:1.1}
+.mcard .word{font-size:15px;font-weight:bold}
+.mcard.sing{animation:pop .45s ease;background:#fff1a8}
+.mcard.sing .rime{color:var(--rime);text-decoration:underline}
+.mcard:active{transform:translateY(2px)}
+.pairs{display:flex;flex-wrap:wrap;gap:8px}
+.pair{background:#fff;border-radius:14px;padding:6px 10px;font-size:clamp(15px,4vw,19px);box-shadow:0 3px 0 rgba(0,0,0,.12)}
+.pair .rime{color:var(--rime)}
+.empty{opacity:.7;font-style:italic}
+
+/* ---------- overlay ---------- */
+.overlay{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:rgba(20,40,80,.45);padding:16px}
+.ocard{background:#fff;border-radius:28px;padding:18px;text-align:center;max-width:420px;width:100%;box-shadow:0 8px 0 rgba(0,0,0,.2)}
+.ocard .rio{font-size:72px;animation:hop .6s ease infinite}
+.ocard h2{margin:6px 0;font-size:clamp(24px,7vw,34px);color:var(--purple)}
+.ocard .ostars{font-size:clamp(26px,7vw,36px);letter-spacing:2px}
+.ocard p{font-size:clamp(16px,4.4vw,20px);margin:6px 0 12px}
+.obtns{display:flex;flex-direction:column;gap:10px}
+#fx{position:absolute;inset:0;pointer-events:none;z-index:25;width:100%;height:100%}
+
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-3deg)}50%{transform:translateY(-6px) rotate(3deg)}}
+@keyframes hop{0%,100%{transform:translateY(0)}40%{transform:translateY(-18px) rotate(-8deg)}70%{transform:translateY(-6px) rotate(6deg)}}
+@keyframes tilt{0%,100%{transform:rotate(0)}50%{transform:rotate(-14deg)}}
+@keyframes pop{0%{transform:scale(1)}40%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes wob{0%,100%{transform:translateX(0) rotate(0)}20%{transform:translateX(-10px) rotate(-5deg)}40%{transform:translateX(9px) rotate(4deg)}60%{transform:translateX(-6px) rotate(-3deg)}80%{transform:translateX(4px)}}
+@keyframes glow{0%,100%{box-shadow:0 5px 0 rgba(0,0,0,.18),0 0 0 0 var(--glow)}50%{box-shadow:0 5px 0 rgba(0,0,0,.18),0 0 0 9px var(--glow)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="bar">
+    <button class="iconBtn" id="homeBtn" aria-label="Home">🏠</button>
+    <h1 class="title">Rio's Rhyme Island</h1>
+    <button class="iconBtn" id="sndBtn" aria-label="Sound on or off">🔊</button>
+  </header>
+
+  <section class="screen" id="home">
+    <div class="hero"><div class="rio">🦜</div><p id="heroTxt">Hello! I'm <b>Rio</b>. Words that <b>rhyme</b> sound the same at the end - like <b>cat</b> and <b>hat</b>! Pick an island!</p></div>
+    <div class="islands" id="islands"></div>
+    <div class="extras">
+      <button class="bigBtn b-purple" id="machineBtn">🎶 Rhyme Machine</button>
+      <button class="bigBtn b-pink" id="bookBtn">📖 Rhyme Book</button>
+    </div>
+  </section>
+
+  <section class="screen" id="play" hidden>
+    <div class="playTop">
+      <div class="dots" id="dots"></div>
+      <button class="iconBtn" id="againBtn" aria-label="Hear it again">👂</button>
+    </div>
+    <div class="rioRow"><div class="rioBig" id="rio">🦜</div><div class="bubble" id="bubble">...</div></div>
+    <div id="stage"></div>
+  </section>
+
+  <section class="screen" id="machine" hidden>
+    <div class="panel">🎶 Tap any picture and its whole <b>rhyme family</b> sings along!</div>
+    <div class="grid" id="mgrid"></div>
+  </section>
+
+  <section class="screen" id="book" hidden>
+    <div class="panel" id="bookHead"></div>
+    <div class="pairs" id="pairs"></div>
+    <button class="bigBtn b-orange" id="resetBtn" style="margin-top:8px">🧹 Start Fresh</button>
+  </section>
+
+  <div class="overlay" id="win" hidden>
+    <div class="ocard">
+      <div class="rio">🦜</div>
+      <h2 id="winTitle">Island Done!</h2>
+      <div class="ostars" id="winStars"></div>
+      <p id="winTxt"></p>
+      <div class="obtns">
+        <button class="bigBtn b-green" id="nextBtn">Next Island ➡️</button>
+        <button class="bigBtn b-blue" id="replayBtn">Play Again 🔁</button>
+        <button class="bigBtn b-purple" id="winHomeBtn">Home 🏠</button>
+      </div>
+    </div>
+  </div>
+  <canvas id="fx"></canvas>
+</div>
+
+<script>
+/* ================= words ================= */
+// [word, emoji, family, rime spelling]; family starting "-" = no rhyme friends here
+const WORDS = [
+  ['cat','🐱','at','at'],['hat','🎩','at','at'],['bat','🦇','at','at'],['rat','🐀','at','at'],
+  ['dog','🐶','og','og'],['frog','🐸','og','og'],['log','🪵','og','og'],
+  ['bee','🐝','ee','ee'],['tree','🌳','ee','ee'],['key','🔑','ee','ey'],
+  ['cake','🎂','ake','ake'],['snake','🐍','ake','ake'],
+  ['sock','🧦','ock','ock'],['clock','⏰','ock','ock'],['rock','🪨','ock','ock'],['lock','🔒','ock','ock'],
+  ['car','🚗','ar','ar'],['star','⭐','ar','ar'],['guitar','🎸','ar','ar'],
+  ['moon','🌙','oon','oon'],['spoon','🥄','oon','oon'],['balloon','🎈','oon','oon'],
+  ['train','🚂','ain','ain'],['rain','🌧️','ain','ain'],['plane','✈️','ain','ane'],['chain','⛓️','ain','ain'],
+  ['box','📦','ox','ox'],['fox','🦊','ox','ox'],
+  ['house','🏠','ouse','ouse'],['mouse','🐭','ouse','ouse'],
+  ['bear','🐻','air','ear'],['pear','🍐','air','ear'],['chair','🪑','air','air'],
+  ['snail','🐌','ail','ail'],['whale','🐳','ail','ale'],['mail','📬','ail','ail'],
+  ['ring','💍','ing','ing'],['king','🤴','ing','ing'],
+  ['bell','🔔','ell','ell'],['shell','🐚','ell','ell'],
+  ['dice','🎲','ice','ice'],['rice','🍚','ice','ice'],['ice','🧊','ice','ice'],
+  ['fish','🐟','ish','ish'],['dish','🍽️','ish','ish'],
+  ['duck','🦆','uck','uck'],['truck','🚚','uck','uck'],
+  ['goat','🐐','oat','oat'],['boat','⛵','oat','oat'],['coat','🧥','oat','oat'],
+  ['bed','🛏️','ed','ed'],['bread','🍞','ed','ead'],['sled','🛷','ed','ed'],
+  ['ant','🐜','ant','ant'],['plant','🪴','ant','ant'],
+  ['pig','🐷','-pig',''],['sun','☀️','-sun',''],['apple','🍎','-apple',''],['banana','🍌','-banana',''],
+  ['horse','🐴','-horse',''],['lion','🦁','-lion',''],['penguin','🐧','-penguin',''],['carrot','🥕','-carrot','']
+].map(([w,e,f,r])=>({w,e,f,r}));
+const byWord = Object.fromEntries(WORDS.map(o=>[o.w,o]));
+const FAMS = {};
+WORDS.forEach(o=>{(FAMS[o.f] ||= []).push(o)});
+const RHYME_FAMS = Object.keys(FAMS).filter(f=>FAMS[f].length>=2);
+const BIG_FAMS = Object.keys(FAMS).filter(f=>FAMS[f].length>=3);
+const ALL_PAIRS = RHYME_FAMS.reduce((n,f)=>n+FAMS[f].length*(FAMS[f].length-1)/2,0);
+
+const SONGS = [
+  ['A {fox} is hiding in a','box'],['The {bee} is buzzing in the','tree'],['A {frog} is sitting on a','log'],
+  ['A {mouse} lives in a tiny','house'],['My red {balloon} floats up to the','moon'],['A {goat} goes sailing in a','boat'],
+  ['The {snail} is reading all the','mail'],['A big brown {bear} sat on a','chair'],['The {king} lost his shiny gold','ring'],
+  ['A {snake} ate a yummy birthday','cake'],['The {cat} is wearing a funny','hat'],['A {duck} is driving a big red','truck'],
+  ['The {fish} is napping on a','dish'],['I saw a {star} from my little','car'],['The {ant} is dancing on a','plant'],
+  ['Wave to the {train} out in the','rain'],['I lost my {sock} behind the','clock'],['I eat my {bread} in my cozy','bed'],
+  ['I hear a {bell} inside the','shell'],['A {bat} is napping on a','hat'],['My {coat} is on the','goat']
+];
+
+const ISLANDS = [
+  {name:'Rhyme or Not?', emo:'👍', rounds:6, kind:'yn'},
+  {name:'Find the Rhyme', emo:'🔍', rounds:6, kind:'find'},
+  {name:'Rhyme Houses', emo:'🏠', rounds:3, kind:'houses'},
+  {name:'Finish the Song', emo:'🎵', rounds:6, kind:'song'}
+];
+
+/* ================= helpers ================= */
+const $ = id=>document.getElementById(id);
+const rnd = n=>Math.floor(Math.random()*n);
+const pick = a=>a[rnd(a.length)];
+const shuffle = a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+const wait = ms=>new Promise(r=>setTimeout(r,ms));
+const rhymes = (a,b)=>a.f===b.f && !a.f.startsWith('-');
+function wordHTML(o){
+  if(!o.r) return o.w;
+  const i = o.w.length-o.r.length;
+  return o.w.slice(0,i)+'<span class="rime">'+o.w.slice(i)+'</span>';
+}
+// n distinct words that do not rhyme with any word in `avoid` or each other
+function distractors(avoid,n){
+  const bad = new Set(avoid.map(o=>o.f));
+  const out = [];
+  for(const o of shuffle(WORDS)){
+    if(bad.has(o.f)) continue;
+    out.push(o); bad.add(o.f);
+    if(out.length===n) break;
+  }
+  return out;
+}
+
+/* ================= save ================= */
+const KEY = 'cowork-riorhyme-save';
+let SAVE = {stars:[0,0,0,0], best:[0,0,0,0], pairs:{}};
+try{ const s = JSON.parse(localStorage.getItem(KEY)); if(s && Array.isArray(s.best)) SAVE = Object.assign(SAVE,s); }catch(e){}
+const persist = ()=>{ try{localStorage.setItem(KEY,JSON.stringify(SAVE))}catch(e){} };
+function addPair(a,b){
+  if(!rhymes(a,b) || a.w===b.w) return;
+  const k = [a.w,b.w].sort().join('+');
+  if(!SAVE.pairs[k]){ SAVE.pairs[k]=1; persist(); }
+}
+
+/* ================= sound ================= */
+let soundOn = localStorage.getItem('cowork-riorhyme-sound')!=='off';
+let AC = null;
+function ac(){ if(!AC){ try{AC = new (window.AudioContext||window.webkitAudioContext)()}catch(e){} } if(AC && AC.state==='suspended') AC.resume(); return AC; }
+function tone(f,t0,dur,type='sine',vol=.18){
+  const c = ac(); if(!c||!soundOn) return;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,c.currentTime+t0);
+  g.gain.setValueAtTime(0.0001,c.currentTime+t0);
+  g.gain.exponentialRampToValueAtTime(vol,c.currentTime+t0+.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,c.currentTime+t0+dur);
+  o.connect(g).connect(c.destination); o.start(c.currentTime+t0); o.stop(c.currentTime+t0+dur+.05);
+}
+const sfx = {
+  chime(){ [659,784,1047].forEach((f,i)=>tone(f,i*.09,.3,'triangle')); [659,784,1047].forEach((f,i)=>tone(f,.4+i*.09,.3,'triangle',.1)); },
+  boing(){ const c=ac(); if(!c||!soundOn) return; const o=c.createOscillator(),g=c.createGain(); o.type='sine';
+    o.frequency.setValueAtTime(320,c.currentTime); o.frequency.exponentialRampToValueAtTime(140,c.currentTime+.25);
+    o.frequency.exponentialRampToValueAtTime(260,c.currentTime+.4); g.gain.setValueAtTime(.2,c.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+.45); o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime+.5); },
+  tap(){ tone(880,0,.08,'square',.05); },
+  whoosh(){ tone(500,0,.15,'sine',.08); tone(900,.08,.15,'sine',.06); },
+  fanfare(){ [523,659,784,1047,784,1047].forEach((f,i)=>tone(f,i*.13,.35,'triangle',.16)); },
+  note(i){ const sc=[523,587,659,784,880,1047,1175]; tone(sc[i%sc.length],0,.35,'triangle',.14); }
+};
+
+/* speech: every word is also printed, so it still plays muted or without voices */
+let VOICE = null;
+function pickVoice(){
+  if(!('speechSynthesis' in window)) return;
+  const vs = speechSynthesis.getVoices();
+  VOICE = vs.find(v=>/^en[-_]US/i.test(v.lang) && /samantha|zira|aria|jenny|female|google us/i.test(v.name))
+       || vs.find(v=>/^en[-_](US|GB|AU|CA)/i.test(v.lang)) || vs.find(v=>/^en/i.test(v.lang)) || null;
+}
+if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+let lastSaid = '';
+function say(txt){
+  lastSaid = txt;
+  if(!soundOn || !('speechSynthesis' in window)) return;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(txt.replace(/<[^>]+>/g,''));
+    if(VOICE) u.voice = VOICE;
+    u.rate = .85; u.pitch = 1.25;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function rioSays(html, speech){ $('bubble').innerHTML = '<span>'+html+'</span>'; say(speech ?? html); }
+function rioMood(m){ const r=$('rio'); r.className='rioBig'; void r.offsetWidth; if(m) r.classList.add(m); }
+
+/* ================= confetti ================= */
+const fx = $('fx'), fctx = fx.getContext('2d');
+let parts = [], fxOn = false;
+function confetti(n=90){
+  const r = fx.getBoundingClientRect(); fx.width=r.width; fx.height=r.height;
+  const cols=['#ff6b6b','#ffd23f','#3cc46b','#9b5de5','#f15bb5','#38c9e8'];
+  for(let i=0;i<n;i++) parts.push({x:r.width/2+(Math.random()-.5)*r.width*.6,y:r.height*.35,vx:(Math.random()-.5)*9,vy:-Math.random()*10-4,
+    s:6+Math.random()*7,c:pick(cols),a:Math.random()*6,va:(Math.random()-.5)*.3,life:120+rnd(60)});
+  if(!fxOn){ fxOn=true; requestAnimationFrame(fxLoop); }
+}
+function fxLoop(){
+  fctx.clearRect(0,0,fx.width,fx.height);
+  parts.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.vy+=.3; p.vx*=.99; p.a+=p.va; p.life--;
+    fctx.save(); fctx.translate(p.x,p.y); fctx.rotate(p.a); fctx.fillStyle=p.c; fctx.fillRect(-p.s/2,-p.s/4,p.s,p.s/2); fctx.restore(); });
+  parts = parts.filter(p=>p.life>0 && p.y<fx.height+20);
+  if(parts.length) requestAnimationFrame(fxLoop); else { fxOn=false; fctx.clearRect(0,0,fx.width,fx.height); }
+}
+
+/* ================= screens ================= */
+let G = null;          // current game
+let token = 0;         // bumps on every screen change so old timers stop
+function show(id){
+  token++;
+  parts = []; fctx.clearRect(0,0,fx.width,fx.height);
+  ['home','play','machine','book'].forEach(s=>$(s).hidden = s!==id);
+  $('win').hidden = true;
+  $('homeBtn').style.visibility = id==='home' ? 'hidden' : 'visible';
+  if('speechSynthesis' in window) try{speechSynthesis.cancel()}catch(e){}
+}
+function starStr(n,of){ return '⭐'.repeat(n)+'☆'.repeat(Math.max(0,of-n)); }
+function renderHome(){
+  show('home');
+  const box = $('islands'); box.innerHTML='';
+  ISLANDS.forEach((isl,i)=>{
+    const b = document.createElement('button');
+    b.className = 'island'+(SAVE.best[i]>0?' done':'');
+    b.innerHTML = `<div class="ie">${isl.emo}</div><div class="in">${i+1}. ${isl.name}</div><div class="is">${starStr(Math.min(3,SAVE.best[i]),3)}</div>`;
+    b.onclick = ()=>{ sfx.tap(); startIsland(i); };
+    box.appendChild(b);
+  });
+  const done = SAVE.best.filter(x=>x>0).length;
+  $('heroTxt').innerHTML = done===4
+    ? 'You rhymed your way round <b>every island</b>! Play again or open the <b>Rhyme Machine</b>!'
+    : 'Hello! I\'m <b>Rio</b>. Words that <b>rhyme</b> sound the same at the end - like <b>cat</b> and <b>hat</b>! Pick an island!';
+}
+
+/* ================= game flow ================= */
+function startIsland(i){
+  show('play');
+  const isl = ISLANDS[i];
+  G = {i, isl, round:0, firstTry:0, wrong:0, locked:false, tok:token, usedSongs:[]};
+  renderDots();
+  nextRound();
+}
+function renderDots(){
+  const d=$('dots'); d.innerHTML='';
+  for(let k=0;k<G.isl.rounds;k++){ const s=document.createElement('div'); s.className='dot'+(k<G.round?' on':'')+(k===G.round?' cur':''); d.appendChild(s); }
+}
+function alive(t){ return t===token; }
+async function roundDone(perfect){
+  if(perfect) G.firstTry++;
+  G.round++;
+  renderDots();
+  const t = token;
+  await wait(1700);
+  if(!alive(t)) return;
+  if(G.round>=G.isl.rounds) finishIsland(); else nextRound();
+}
+function nextRound(){
+  G.wrong=0; G.locked=false; rioMood('');
+  const k = G.isl.kind;
+  if(k==='yn') roundYN(); else if(k==='find') roundFind(); else if(k==='houses') roundHouses(); else roundSong();
+}
+function finishIsland(){
+  const i=G.i, r=G.isl.rounds;
+  const stars = G.firstTry>=r ? 3 : G.firstTry>=Math.ceil(r/2) ? 2 : 1;
+  SAVE.best[i] = Math.max(SAVE.best[i]||0, stars); persist();
+  const all = SAVE.best.every(x=>x>0);
+  $('winTitle').textContent = all && i===3 ? 'Rhyme Champion!' : 'Island Done!';
+  $('winStars').textContent = starStr(stars,3);
+  const msg = stars===3 ? 'Super ears! Every one right first time!' : stars===2 ? 'Great rhyming! Your ears are getting strong!' : 'You did it! Every try makes your ears stronger!';
+  $('winTxt').textContent = msg;
+  $('nextBtn').hidden = i>=3;
+  $('win').hidden = false;
+  sfx.fanfare(); confetti(140);
+  say((all && i===3 ? 'Rhyme champion! ' : 'Island done! ') + msg);
+}
+
+/* card factory */
+function card(o, cls=''){
+  const b = document.createElement('button');
+  b.className = 'card '+cls;
+  b.innerHTML = `<div class="emo">${o.e}</div><div class="word">${wordHTML(o)}</div>`;
+  b.setAttribute('aria-label',o.w);
+  b._o = o;
+  return b;
+}
+function reveal(...els){ els.forEach(e=>e && e.classList.add('show')); }
+function wobble(el){ el.classList.remove('wob'); void el.offsetWidth; el.classList.add('wob'); }
+
+/* ---------- 1. Rhyme or Not? ---------- */
+function roundYN(){
+  const st=$('stage'); st.innerHTML='';
+  const fam = pick(RHYME_FAMS);
+  const a = pick(FAMS[fam]);
+  const yes = Math.random()<.5;
+  const b = yes ? pick(FAMS[fam].filter(o=>o!==a)) : distractors([a],1)[0];
+  const row = document.createElement('div'); row.className='row';
+  const ca = card(a,'big'), cb = card(b,'big');
+  const amp = document.createElement('div'); amp.className='and'; amp.textContent='+';
+  row.append(ca,amp,cb);
+  ca.onclick=()=>{ sfx.tap(); say(a.w); };
+  cb.onclick=()=>{ sfx.tap(); say(b.w); };
+  const yn = document.createElement('div'); yn.className='yn';
+  const by = document.createElement('button'); by.className='yes'; by.textContent='👍 Rhyme!';
+  const bn = document.createElement('button'); bn.className='no'; bn.textContent='👎 Nope!';
+  yn.append(by,bn);
+  st.append(row,yn);
+  G.again = ()=>rioSays(`<b>${a.w}</b> ... <b>${b.w}</b>. Do they rhyme?`, `${a.w}. ${b.w}. Do they rhyme?`);
+  G.again();
+  const answer = (saidYes, btn)=>{
+    if(G.locked) return;
+    if(saidYes===yes){
+      G.locked=true; sfx.chime(); rioMood('happy'); btn.classList.remove('glow');
+      if(yes){ reveal(ca,cb); ca.classList.add('right'); cb.classList.add('right'); addPair(a,b);
+        rioSays(`Yes! <b>${a.w}</b> and <b>${b.w}</b> rhyme! 🎉`, `Yes! ${a.w}, ${b.w}. They rhyme!`); confetti(40);
+      } else { reveal(ca); rioSays(`Right! <b>${a.w}</b> and <b>${b.w}</b> don't rhyme. Good ears!`, `Right! ${a.w}, ${b.w}. They don't rhyme. Good ears!`); }
+      roundDone(G.wrong===0);
+    } else {
+      G.wrong++; sfx.boing(); rioMood('think'); wobble(btn);
+      if(yes) rioSays(`Listen again: <b>${a.w}</b> ... <b>${b.w}</b>. Same sound at the end!`, `Listen again. ${a.w}. ${b.w}. Same sound at the end!`);
+      else rioSays(`Listen: <b>${a.w}</b> ... <b>${b.w}</b>. Different endings!`, `Listen. ${a.w}. ${b.w}. Different endings!`);
+      (yes?by:bn).classList.add('glow');
+    }
+  };
+  by.onclick=()=>answer(true,by);
+  bn.onclick=()=>answer(false,bn);
+}
+
+/* ---------- 2. Find the Rhyme ---------- */
+function roundFind(){
+  const st=$('stage'); st.innerHTML='';
+  const fam = pick(RHYME_FAMS);
+  const [a,b] = shuffle(FAMS[fam]);
+  const opts = shuffle([b, ...distractors([a],2)]);
+  const ca = card(a,'big target');
+  ca.onclick=()=>{ sfx.tap(); say(a.w); };
+  const row = document.createElement('div'); row.className='row';
+  const cards = opts.map(o=>card(o));
+  row.append(...cards);
+  st.append(ca,row);
+  G.again = ()=>rioSays(`What rhymes with <b>${a.w}</b>?`, `What rhymes with ${a.w}? ${opts.map(o=>o.w).join('? ')}?`);
+  G.again();
+  cards.forEach(c=>c.onclick=()=>{
+    if(G.locked) return;
+    const o=c._o;
+    if(o===b){
+      G.locked=true; sfx.chime(); rioMood('happy'); c.classList.remove('glow');
+      reveal(ca,c); c.classList.add('right'); cards.forEach(x=>x!==c && x.classList.add('fade')); addPair(a,b);
+      rioSays(`<b>${a.w}</b> ... <b>${b.w}</b>! They rhyme! 🎉`, `${a.w}, ${b.w}! They rhyme!`); confetti(40);
+      roundDone(G.wrong===0);
+    } else {
+      G.wrong++; sfx.boing(); rioMood('think'); wobble(c);
+      rioSays(`<b>${a.w}</b> ... <b>${o.w}</b>? Different endings. Try again!`, `${a.w}. ${o.w}. Different endings. Try again!`);
+      if(G.wrong>=2) cards.find(x=>x._o===b).classList.add('glow');
+    }
+  });
+}
+
+/* ---------- 3. Rhyme Houses ---------- */
+function roundHouses(){
+  const st=$('stage'); st.innerHTML='';
+  const [f1,f2] = shuffle(BIG_FAMS);
+  const m1 = shuffle(FAMS[f1]), m2 = shuffle(FAMS[f2]);
+  const keys = [m1[0], m2[0]];
+  const queue = shuffle([...m1.slice(1,3), ...m2.slice(1,3)]);
+  const hs = document.createElement('div'); hs.className='houses';
+  const houses = keys.map((k,i)=>{
+    const h=document.createElement('button'); h.className='house h'+i; h._o=k; h._n=0;
+    h.innerHTML=`<div class="emo">${k.e}</div><div class="word">${wordHTML(k)}</div><div class="cnt"></div>`;
+    h.setAttribute('aria-label',k.w+' house'); hs.appendChild(h); return h;
+  });
+  const slot = document.createElement('div'); slot.className='row';
+  const left = document.createElement('div'); left.className='left';
+  st.append(hs,slot,left);
+  let cur=null, curCard=null, perfect=true;
+  const next = ()=>{
+    slot.innerHTML='';
+    if(!queue.length){ roundDone(perfect); return; }
+    cur = queue.shift(); curCard = card(cur,'big target'); slot.appendChild(curCard);
+    curCard.onclick=()=>{ sfx.tap(); say(cur.w); };
+    left.textContent = queue.length ? `${queue.length} more after this one` : 'Last one!';
+    G.wrong=0; G.locked=false; houses.forEach(h=>h.classList.remove('glow'));
+    G.again();
+  };
+  G.again = ()=>cur && rioSays(`Which house rhymes with <b>${cur.w}</b>? <b>${keys[0].w}</b> or <b>${keys[1].w}</b>?`,
+    `${cur.w}. Which house does it rhyme with? ${keys[0].w}, or ${keys[1].w}?`);
+  houses.forEach(h=>h.onclick=async()=>{
+    if(G.locked || !cur) return;
+    if(rhymes(h._o,cur)){
+      G.locked=true; const t=token; sfx.whoosh(); rioMood('happy');
+      reveal(curCard,h); addPair(h._o,cur);
+      // fly the picture into the house
+      const a=curCard.getBoundingClientRect(), b=h.getBoundingClientRect();
+      const fl=document.createElement('div'); fl.className='flyer'; fl.textContent=cur.e;
+      fl.style.left=(a.left+a.width/2-28)+'px'; fl.style.top=(a.top+a.height/2-36)+'px';
+      document.body.appendChild(fl); curCard.style.visibility='hidden';
+      requestAnimationFrame(()=>{ fl.style.transform=`translate(${b.left+b.width/2-(a.left+a.width/2)}px,${b.top+b.height/2-(a.top+a.height/2)}px) scale(.5)`; fl.style.opacity='.2'; });
+      rioSays(`<b>${cur.w}</b> goes in the <b>${h._o.w}</b> house! 🎉`, `${cur.w}, ${h._o.w}. They rhyme!`);
+      await wait(600); fl.remove();
+      if(!alive(t)) return;
+      sfx.chime(); h._n++; h.querySelector('.cnt').textContent+=cur.e;
+      h.classList.remove('yay'); void h.offsetWidth; h.classList.add('yay');
+      await wait(1300); if(!alive(t)) return;
+      next();
+    } else {
+      perfect=false; G.wrong++; sfx.boing(); rioMood('think'); wobble(h);
+      rioSays(`<b>${cur.w}</b> ... <b>${h._o.w}</b>? Different endings! Try the other house.`, `${cur.w}. ${h._o.w}. Different endings! Try the other house.`);
+      houses.find(x=>x!==h).classList.add('glow');
+    }
+  });
+  next();
+}
+
+/* ---------- 4. Finish the Song ---------- */
+function roundSong(){
+  const st=$('stage'); st.innerHTML='';
+  let pool = SONGS.filter(s=>!G.usedSongs.includes(s));
+  const s = pick(pool); G.usedSongs.push(s);
+  const cueW = s[0].match(/\{(\w+)\}/)[1], cue = byWord[cueW], ans = byWord[s[1]];
+  const opts = shuffle([ans, ...distractors([ans],2)]);
+  const line = document.createElement('div'); line.className='song';
+  const lineHTML = s[0].replace(/\{(\w+)\}/, `<span class="ce">${cue.e}</span> <b>${wordHTML(cue)}</b>`);
+  line.innerHTML = lineHTML+' <span class="blank">?</span>';
+  const row = document.createElement('div'); row.className='row';
+  const cards = opts.map(o=>card(o)); row.append(...cards);
+  st.append(line,row);
+  const plain = s[0].replace(/[{}]/g,'');
+  G.again = ()=>rioSays(`Finish my song! Which one rhymes with <b>${cue.w}</b>?`, `${plain}... hmm! Which one rhymes with ${cue.w}?`);
+  G.again();
+  cards.forEach(c=>c.onclick=()=>{
+    if(G.locked) return;
+    const o=c._o;
+    if(o===ans){
+      G.locked=true; sfx.chime(); rioMood('happy'); c.classList.remove('glow');
+      line.innerHTML = lineHTML+` <span class="ce">${ans.e}</span> <b>${wordHTML(ans)}</b>!`;
+      reveal(line,c); c.classList.add('right'); cards.forEach(x=>x!==c && x.classList.add('fade')); addPair(cue,ans);
+      rioSays(`🎵 ${plain} <b>${ans.w}</b>! 🎵`, `${plain} ${ans.w}!`);
+      [0,1,2,3].forEach(k=>setTimeout(()=>sfx.note(k*2),300+k*180)); confetti(40);
+      roundDone(G.wrong===0);
+    } else {
+      G.wrong++; sfx.boing(); rioMood('think'); wobble(c);
+      rioSays(`${plain} <b>${o.w}</b>? Silly! <b>${cue.w}</b> ... <b>${o.w}</b> don't rhyme.`, `${plain} ${o.w}? Silly! ${cue.w}, ${o.w}. They don't rhyme.`);
+      if(G.wrong>=2) cards.find(x=>x._o===ans).classList.add('glow');
+    }
+  });
+}
+
+/* ================= Rhyme Machine ================= */
+function renderMachine(){
+  show('machine');
+  const g=$('mgrid'); g.innerHTML='';
+  const order = Object.keys(FAMS).flatMap(f=>FAMS[f]);
+  const cells = order.map(o=>{
+    const b=document.createElement('button'); b.className='mcard'; b._o=o;
+    b.innerHTML=`<div class="emo">${o.e}</div><div class="word">${wordHTML(o)}</div>`;
+    g.appendChild(b); return b;
+  });
+  cells.forEach(c=>c.onclick=async()=>{
+    const t=token, o=c._o;
+    cells.forEach(x=>x.classList.remove('sing'));
+    if(o.f.startsWith('-')){
+      c.classList.add('sing'); sfx.boing();
+      say(`${o.w}! Hmm, no ${o.w} rhymes on my island yet. Can you think of one?`);
+      return;
+    }
+    const fam = FAMS[o.f];
+    say(fam.map(x=>x.w).join(', ')+'. They all rhyme!');
+    for(let k=0;k<fam.length;k++){
+      if(!alive(t)) return;
+      const cell = cells.find(x=>x._o===fam[k]);
+      cell.classList.remove('sing'); void cell.offsetWidth; cell.classList.add('sing'); sfx.note(k);
+      if(k) addPair(fam[0],fam[k]);
+      await wait(380);
+    }
+  });
+}
+
+/* ================= Rhyme Book ================= */
+let resetArmed=false;
+function renderBook(){
+  show('book');
+  resetArmed=false; $('resetBtn').textContent='🧹 Start Fresh';
+  const keys = Object.keys(SAVE.pairs);
+  $('bookHead').innerHTML = `📖 <b>My Rhyme Book</b> - you've found <b>${keys.length}</b> of <b>${ALL_PAIRS}</b> rhyming pairs!`;
+  const p=$('pairs'); p.innerHTML='';
+  if(!keys.length){ p.innerHTML='<div class="panel empty">No pairs yet - play an island or try the Rhyme Machine!</div>'; return; }
+  keys.sort((x,y)=>byWord[x.split('+')[0]].f.localeCompare(byWord[y.split('+')[0]].f)).forEach(k=>{
+    const [a,b]=k.split('+').map(w=>byWord[w]);
+    const d=document.createElement('div'); d.className='pair';
+    d.innerHTML=`${a.e} ${wordHTML(a)} + ${b.e} ${wordHTML(b)}`;
+    p.appendChild(d);
+  });
+}
+$('resetBtn').onclick=()=>{
+  if(!resetArmed){ resetArmed=true; $('resetBtn').textContent='Tap again to wipe stars & book'; return; }
+  SAVE={stars:[0,0,0,0],best:[0,0,0,0],pairs:{}}; persist(); renderBook();
+};
+
+/* ================= wiring ================= */
+$('homeBtn').onclick=()=>{ sfx.tap(); renderHome(); };
+$('machineBtn').onclick=()=>{ sfx.tap(); renderMachine(); say('Tap a picture and its rhyme family sings!'); };
+$('bookBtn').onclick=()=>{ sfx.tap(); renderBook(); };
+$('againBtn').onclick=()=>{ sfx.tap(); G && G.again && G.again(); };
+$('nextBtn').onclick=()=>{ sfx.tap(); startIsland(Math.min(3,G.i+1)); };
+$('replayBtn').onclick=()=>{ sfx.tap(); startIsland(G.i); };
+$('winHomeBtn').onclick=()=>{ sfx.tap(); renderHome(); };
+function paintSnd(){ $('sndBtn').textContent = soundOn?'🔊':'🔇'; }
+$('sndBtn').onclick=()=>{
+  soundOn=!soundOn; localStorage.setItem('cowork-riorhyme-sound',soundOn?'on':'off'); paintSnd();
+  if(!soundOn && 'speechSynthesis' in window) try{speechSynthesis.cancel()}catch(e){}
+  if(soundOn){ sfx.tap(); say('Sound on!'); }
+};
+document.addEventListener('pointerdown',()=>ac(),{once:true});
+paintSnd();
+renderHome();
+</script>
+</body>
+</html>

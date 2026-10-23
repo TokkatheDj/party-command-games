@@ -1,0 +1,779 @@
+<!-- CONCEPT: LATERAL-THINKING / SITUATION PUZZLES - "Why Though?": a host-run party game where a rotating Keeper secretly holds the explanation behind a baffling scene ("a man asks for water, the bartender roars at him, he says thank you and leaves happy") and the room fires yes/no questions out loud; the Keeper answers on big shared buttons, and every question that uncovers one of the case's hidden KEY FACTS is claimed by whoever asked it and pinned to the public board, so rivals race each other for facts while those same facts help everyone close in - anyone can call SOLVE to tell the whole story (a wrong guess costs a point and a lockout), the solve value drains 5-3-2 as timed hints leak facts the Keeper didn't give up, and Twist cards bend cases (Lightning, Rapid Fire turn order, Double Facts, Jackpot, High Stakes, Silent Keeper, Short Questions). What's deduced is an EXPLANATION, not a thing or a person. 45 family-safe cases in 4 decks, no-penalty "I know this one" swap, used cases remembered across sessions, resumable saves, awards | Players: 3-10 | ~15-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Why Though? — Lateral Mysteries</title>
+<style>
+:root{
+  --bg:#0d1020; --bg2:#151a30; --panel:#1b2140; --panel2:#232a50; --line:#2f3866;
+  --ink:#eef0ff; --dim:#a3a9d1; --mute:#6f77a6;
+  --a:#ffb347; --b:#ff5fa2; --c:#7c8cff;
+  --yes:#2fd38a; --no:#ff5468; --sort:#ffc845; --irr:#8a93c7;
+  --fact:#36d6c3; --hint:#ffb347;
+  --r:16px; --gap:10px;
+  --font:'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(120% 80% at 50% 0%,#1d2350 0%,var(--bg) 60%);color:var(--ink);font-family:var(--font)}
+button{font-family:inherit;color:inherit;cursor:pointer;border:0;min-height:44px;border-radius:12px;font-size:clamp(14px,3.8vw,17px)}
+button:disabled{opacity:.4;cursor:default}
+input{font-family:inherit}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;max-width:720px;margin:0 auto;padding:12px 14px calc(12px + env(safe-area-inset-bottom))}
+.screen.on{display:flex}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch}
+h1{margin:4px 0 2px;font-size:clamp(30px,9vw,52px);line-height:1.05;text-align:center;letter-spacing:.5px;
+  background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+.tag{text-align:center;color:var(--dim);font-size:clamp(13px,3.6vw,16px);margin:0 0 10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:var(--gap)}
+.card h3{margin:0 0 8px;font-size:clamp(14px,3.8vw,17px);color:var(--a);letter-spacing:.4px;text-transform:uppercase}
+.row{display:flex;gap:8px;align-items:center}
+.wrap{flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+.btn{background:var(--panel2);border:1px solid var(--line);padding:10px 14px;font-weight:600}
+.btn.pri{background:linear-gradient(90deg,var(--a),var(--b));border:0;color:#1a0f1f;font-weight:800}
+.btn.ghost{background:transparent}
+.btn.small{min-height:44px;padding:6px 12px;font-size:14px}
+.big{min-height:56px;font-size:clamp(17px,4.6vw,21px);width:100%}
+.pl-row{display:flex;gap:8px;margin-bottom:8px}
+.pl-row input{flex:1;min-width:0;min-height:44px;border-radius:12px;border:1px solid var(--line);background:var(--bg2);color:var(--ink);padding:0 12px;font-size:16px;user-select:text;-webkit-user-select:text}
+.x{width:44px;flex:0 0 44px;background:var(--bg2);border:1px solid var(--line);color:var(--dim)}
+.chipset{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--bg2);border:1px solid var(--line);padding:8px 12px;border-radius:999px;font-size:14px;min-height:44px}
+.chip.on{background:var(--c);border-color:var(--c);color:#0d1020;font-weight:700}
+.stepper{display:flex;align-items:center;gap:10px}
+.stepper b{min-width:44px;text-align:center;font-size:20px}
+.stepper button{width:44px;background:var(--bg2);border:1px solid var(--line);font-size:22px}
+.note{color:var(--dim);font-size:13px;line-height:1.4}
+.how{color:var(--dim);font-size:14px;line-height:1.5}
+.how b{color:var(--ink)}
+.how p{margin:6px 0}
+
+/* handoff / peek */
+.center{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:12px}
+.keeper-name{font-size:clamp(28px,8vw,44px);font-weight:800;text-align:center;color:var(--a)}
+.peekbox{min-height:200px;border:2px dashed var(--line);border-radius:var(--r);display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;color:var(--dim);touch-action:none}
+.peekbox.open{border-style:solid;border-color:var(--a);background:var(--panel);color:var(--ink);display:block;text-align:left;overflow-y:auto;font-size:15px;line-height:1.35}
+/* while the Keeper holds, the case takes the whole screen */
+#sPeek.peeking .center>*:not(#peekBox){display:none}
+#sPeek.peeking .peekbox{flex:1;max-height:none}
+.peekbox .lbl{font-size:12px;color:var(--a);letter-spacing:1px;text-transform:uppercase;margin:8px 0 4px}
+.peekbox .lbl:first-child{margin-top:0}
+.peekbox ol{margin:4px 0 0;padding-left:0;list-style:none}
+.peekbox li{margin:3px 0}
+.peekbox li.core{color:var(--fact);font-weight:700}
+.twist{border-radius:var(--r);padding:10px 12px;background:linear-gradient(90deg,rgba(255,179,71,.18),rgba(255,95,162,.18));border:1px solid rgba(255,179,71,.5)}
+.twist b{color:var(--a)}
+
+/* board */
+.top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.top .case{font-size:12px;color:var(--dim);letter-spacing:.6px;text-transform:uppercase}
+.top .title{font-weight:800;font-size:clamp(15px,4.2vw,19px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.timer{font-variant-numeric:tabular-nums;font-weight:800;font-size:clamp(20px,6vw,28px);min-width:76px;text-align:right}
+.timer.low{color:var(--no)}
+.timer.paused{color:var(--mute)}
+.iconbtn{width:44px;flex:0 0 44px;background:var(--panel2);border:1px solid var(--line);font-size:18px;padding:0}
+.situ{flex:1 1 auto;min-height:80px;overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-bottom:8px}
+.situ .s{font-size:clamp(16px,4.6vw,21px);line-height:1.4;margin:0 0 8px}
+.facts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.facts li{border-radius:10px;padding:7px 10px;font-size:clamp(13px,3.7vw,16px);line-height:1.3}
+.facts li.found{background:rgba(54,214,195,.14);border:1px solid rgba(54,214,195,.5)}
+.facts li.hint{background:rgba(255,179,71,.12);border:1px solid rgba(255,179,71,.45)}
+.facts li.locked{background:var(--bg2);border:1px dashed var(--line);color:var(--mute)}
+.facts .who{font-size:12px;font-weight:700;color:var(--fact);margin-left:6px;white-space:nowrap}
+.facts li.hint .who{color:var(--hint)}
+.meta{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.pill{border-radius:999px;padding:4px 10px;font-size:13px;font-weight:700;background:var(--panel2);border:1px solid var(--line);white-space:nowrap}
+.pill.val{background:linear-gradient(90deg,var(--a),var(--b));color:#1a0f1f;border:0}
+.pill.tw{color:var(--a);border-color:rgba(255,179,71,.5)}
+.askers{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none}
+.askers::-webkit-scrollbar{display:none}
+.asker{flex:0 0 auto;min-height:44px;padding:4px 12px;border-radius:999px;background:var(--bg2);border:1px solid var(--line);font-size:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.asker small{font-size:11px;color:var(--dim)}
+.asker.on{background:var(--c);border-color:var(--c);color:#0d1020;font-weight:800}
+.asker.on small{color:#0d1020}
+.asker.lock{opacity:.45;text-decoration:line-through}
+.answers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.answers button{min-height:52px;font-weight:800;font-size:clamp(16px,4.6vw,20px);color:#0d1020}
+.a-yes{background:var(--yes)} .a-no{background:var(--no)} .a-sort{background:var(--sort)} .a-irr{background:var(--irr)}
+.actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.actions .btn{padding:6px 4px;font-size:clamp(13px,3.6vw,16px)}
+.solve{background:linear-gradient(90deg,var(--a),var(--b));color:#1a0f1f;font-weight:900;border:0}
+.flash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .15s;z-index:40}
+.flash.show{opacity:1}
+.flash span{font-size:clamp(56px,20vw,140px);font-weight:900;letter-spacing:2px;padding:10px 26px;border-radius:24px;color:#0d1020;box-shadow:0 10px 60px rgba(0,0,0,.5);text-align:center;line-height:1;white-space:pre-line}
+
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(5,6,15,.78);display:none;align-items:flex-end;justify-content:center;z-index:30;padding:10px}
+.modal.on{display:flex}
+.sheet{width:100%;max-width:560px;max-height:86vh;overflow-y:auto;background:var(--bg2);border:1px solid var(--line);border-radius:20px;padding:14px}
+.sheet h2{margin:0 0 4px;font-size:clamp(18px,5vw,22px)}
+.sheet .eyes{color:var(--no);font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+.opt{display:block;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);padding:10px 12px;margin-bottom:8px;line-height:1.3}
+.opt.on{border-color:var(--fact);background:rgba(54,214,195,.16)}
+.opt.core::before{content:"★ ";color:var(--fact)}
+.check{display:flex;gap:10px;align-items:center;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:8px;min-height:44px;cursor:pointer;line-height:1.3}
+.check .box{flex:0 0 26px;height:26px;border-radius:8px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:900;color:#0d1020}
+.check.on .box{background:var(--fact);border-color:var(--fact)}
+.check.core{border-color:rgba(54,214,195,.5)}
+.secret{background:var(--panel);border:1px solid var(--a);border-radius:12px;padding:10px 12px;margin-bottom:10px;line-height:1.4}
+
+/* reveal + scores */
+.answer-big{font-size:clamp(17px,4.8vw,22px);line-height:1.45;background:var(--panel);border:1px solid var(--a);border-radius:var(--r);padding:14px;margin-bottom:10px}
+.res{font-size:clamp(20px,6vw,30px);font-weight:900;text-align:center;margin:6px 0 10px}
+.deltas{list-style:none;padding:0;margin:0}
+.deltas li{display:flex;justify-content:space-between;padding:6px 2px;border-bottom:1px solid var(--line);font-size:15px}
+.deltas li b.p{color:var(--yes)} .deltas li b.m{color:var(--no)}
+.board{list-style:none;padding:0;margin:0}
+.board li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:var(--panel);margin-bottom:6px;border:1px solid var(--line)}
+.board li .rk{width:28px;text-align:center;font-weight:900;color:var(--dim)}
+.board li .nm{flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.board li .sc{font-weight:900;font-size:20px;font-variant-numeric:tabular-nums}
+.board li.lead{border-color:var(--a)}
+.award{display:flex;gap:10px;align-items:center;padding:10px;border-radius:12px;background:var(--panel);border:1px solid var(--line);margin-bottom:8px}
+.award .ic{font-size:28px}
+.award small{display:block;color:var(--dim)}
+.footer{display:flex;gap:8px;margin-top:8px}
+.footer .btn{flex:1}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<section class="screen on scroll" id="sSetup">
+  <h1>Why Though?</h1>
+  <p class="tag">Lateral mysteries for the whole room — ask yes/no questions, claim the clues, solve the story.</p>
+  <div id="resumeBox"></div>
+  <div class="card">
+    <h3>Players</h3>
+    <div id="plList"></div>
+    <div class="row"><button class="btn small" id="addPl">+ Add player</button><span class="note grow" id="plNote"></span></div>
+  </div>
+  <div class="card">
+    <h3>Game</h3>
+    <div class="row wrap" style="justify-content:space-between;margin-bottom:10px">
+      <span>Cases</span>
+      <div class="stepper"><button id="caseMinus" aria-label="fewer cases">−</button><b id="caseN">4</b><button id="casePlus" aria-label="more cases">+</button></div>
+    </div>
+    <div style="margin-bottom:6px">Clock per case</div>
+    <div class="chipset" id="timeChips" style="margin-bottom:10px"></div>
+    <div style="margin-bottom:6px">Decks</div>
+    <div class="chipset" id="deckChips" style="margin-bottom:6px"></div>
+    <div class="note" id="deckNote" style="margin-bottom:10px"></div>
+    <div class="chipset"><button class="chip on" id="twistToggle">🎴 Twist cards: ON</button></div>
+  </div>
+  <div class="card how">
+    <h3>How to play</h3>
+    <p>Each case has a <b>Keeper</b> who secretly reads the true story behind a strange scene. Everyone else asks <b>yes/no questions</b> out loud; the Keeper taps the answer so the whole room sees it.</p>
+    <p>Every case hides 3–5 <b>key facts</b>. Ask a question that uncovers one and the Keeper taps <b>🔑 Fact</b> — you score it and it goes up on the board for everyone. ★ facts are the heart of the story.</p>
+    <p>Think you've got it? Shout <b>SOLVE</b> and tell the whole story. Right = <b>5 / 3 / 2 points</b> (it drops each time a hint leaks). Wrong = −1 and you're frozen out for a minute. The Keeper earns +2 when their case gets solved, so answer clearly!</p>
+    <p>Already know a case? The Keeper can swap it before showing the room — no penalty.</p>
+  </div>
+  <button class="btn pri big" id="startBtn">Start the mysteries</button>
+  <div style="height:10px"></div>
+</section>
+
+<!-- HANDOFF / PEEK -->
+<section class="screen" id="sPeek">
+  <div class="center">
+    <div class="note" style="text-align:center" id="peekCase">CASE 1 OF 4</div>
+    <div style="text-align:center;color:var(--dim)">Hand the phone to this case's Keeper</div>
+    <div class="keeper-name" id="peekName">Keeper</div>
+    <div class="twist" id="peekTwist" hidden></div>
+    <div class="peekbox" id="peekBox">👁 Keeper only — press and HOLD here to read the case secretly</div>
+    <div class="row">
+      <button class="btn grow" id="swapBtn">🔄 I know this one — swap</button>
+    </div>
+    <button class="btn pri big" id="readyBtn" disabled>Show the room</button>
+  </div>
+</section>
+
+<!-- BOARD -->
+<section class="screen" id="sBoard">
+  <div class="top">
+    <div class="grow">
+      <div class="case" id="bCase">Case 1/4 · Keeper: —</div>
+      <div class="title" id="bTitle">—</div>
+    </div>
+    <div class="timer" id="bTimer">5:00</div>
+    <button class="iconbtn" id="pauseBtn" aria-label="pause">⏸</button>
+  </div>
+  <div class="meta" id="bMeta"></div>
+  <div class="situ" id="bSitu"></div>
+  <div class="askers" id="bAskers"></div>
+  <div class="answers">
+    <button class="a-yes" data-ans="yes">YES</button>
+    <button class="a-no" data-ans="no">NO</button>
+    <button class="a-sort" data-ans="sort">SORT OF</button>
+    <button class="a-irr" data-ans="irr">DOESN'T MATTER</button>
+  </div>
+  <div class="actions">
+    <button class="btn" id="factBtn">🔑 Fact</button>
+    <button class="btn" id="notesBtn">👁 Notes</button>
+    <button class="btn solve" id="solveBtn">🧠 SOLVE</button>
+  </div>
+</section>
+
+<!-- REVEAL -->
+<section class="screen scroll" id="sReveal">
+  <div class="res" id="rRes">Solved!</div>
+  <div class="note" style="text-align:center;margin-bottom:6px" id="rTitle"></div>
+  <div class="answer-big" id="rAnswer"></div>
+  <div class="card"><h3>This case</h3><ul class="deltas" id="rDeltas"></ul></div>
+  <div class="card"><h3>Scoreboard</h3><ul class="board" id="rBoard"></ul></div>
+  <button class="btn pri big" id="nextBtn">Next case</button>
+  <div style="height:10px"></div>
+</section>
+
+<!-- END -->
+<section class="screen scroll" id="sEnd">
+  <h1>Case Closed</h1>
+  <p class="tag" id="eWinner"></p>
+  <div class="card"><h3>Final scores</h3><ul class="board" id="eBoard"></ul></div>
+  <div class="card"><h3>Awards</h3><div id="eAwards"></div></div>
+  <div class="footer">
+    <button class="btn" id="againBtn">Same players again</button>
+    <button class="btn pri" id="newBtn">New game</button>
+  </div>
+  <div style="height:10px"></div>
+</section>
+
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+<div class="flash" id="flash"><span id="flashTxt">YES</span></div>
+
+<script>
+// Case format: id, deck, title, scene, true story, key facts (the first `core` facts are ★ heart-of-the-story)
+const DECKS = {
+  classic:  {name:'Classics',          icon:'🕰️'},
+  everyday: {name:'Everyday Oddities', icon:'☕'},
+  tricksy:  {name:'Tricksy',           icon:'🃏'},
+  spooky:   {name:'Spooky (mild)',     icon:'🕯️'}
+};
+const C = (id,deck,t,s,a,f,core=1)=>({id,deck,t,s,a,f,core});
+const CASES = [
+  C('hic','classic','The Grateful Customer','A man walks into a café and asks for a glass of water. The waiter leaps out from behind the counter, roars in his face and bangs a tray. The man says "Thank you!" and leaves happy without drinking anything.','The man had hiccups. He wanted water to cure them, but the waiter saw the hiccups and gave him a big fright instead, which cured them on the spot.',['He had hiccups','He wasn\'t really thirsty — the water was a cure','The waiter scared him on purpose','The scare stopped the hiccups']),
+  C('lift','classic','Floor Twelve','Ruth lives on the 20th floor. Every morning she takes the lift all the way down. Coming home she rides only to the 12th floor and walks up the rest — except on rainy days, when she rides all the way to 20.','Ruth is too short to reach any button above 12. On rainy days she carries an umbrella and uses it to press the 20 button.',['She is too short to reach the higher buttons','She can just reach the 12 button','On rainy days she has an umbrella with her','She pokes the 20 button with the umbrella']),
+  C('snow','classic','Field Evidence','In the middle of an empty field lie a carrot, two lumps of coal, an old scarf and a puddle of water. Nobody came and put them there.','They were a snowman. The weather warmed up and it melted, leaving only the carrot nose, coal eyes, scarf and meltwater.',['It used to be a snowman','The weather got warmer','The puddle is melted snow','The carrot was its nose']),
+  C('fish','classic','Goldie and Bubbles','Goldie and Bubbles lie motionless on the kitchen floor beside broken glass and a puddle. The cat looks extremely pleased with itself.','Goldie and Bubbles are goldfish. The cat knocked their bowl off the counter; it smashed and the water spilled out.',['Goldie and Bubbles are fish','The broken glass was their fishbowl','The cat knocked it over','The puddle was their water']),
+  C('mono','classic','Bankrupt at the Hotel','A man pushes his car up to a hotel and immediately announces that he is bankrupt.','He\'s playing Monopoly. His token is the little car, he landed on a property with a hotel on it, and he can\'t afford the rent.',['It\'s a board game — Monopoly','The car is his game piece','The hotel is on the board','He can\'t pay the rent']),
+  C('photo','tricksy','Shoot, Soak, Hang','A woman shoots her husband, holds him underwater for five minutes, then hangs him up. An hour later they go out for a lovely dinner together.','She\'s a photographer with an old film camera. She "shot" his photo, developed the print in a tray of chemicals, then hung it up to dry.',['"Shot" means she took his photo','Underwater = developing in a chemical tray','"Hung" = the photo hung up to dry','He was never hurt at all'],2),
+  C('fishers','classic','Three Fish','Two fathers and two sons go fishing. They catch exactly three fish, and each of them takes home a whole fish. Nobody shares.','There are only three people: a grandfather, his son and his grandson. The middle man is both a father and a son.',['There are only three people','One man is both a father AND a son','It\'s a grandfather, father and son','Nobody cut or shared a fish']),
+  C('leap','classic','Eighteen and Four','Anna has just turned eighteen, but she has only ever had four real birthdays.','Anna was born on 29 February. That date only exists in leap years, every four years, so she\'s only had four "real" birthdays.',['She was born on 29 February','That date only comes in leap years','Leap years come every four years','Most years she celebrates on a different day']),
+  C('friday','classic','Friday to Friday','A cowboy rides into town on Friday. He stays for three whole days, then rides out of town on Friday.','His horse is called Friday. He rode in on Friday and rode out on Friday.',['Friday is his horse\'s name','He rode in on the horse','He rode out on the same horse','He really did stay three days']),
+  C('braille','classic','Lights Out','Omar is reading a thick book when a power cut plunges the house into total darkness. He carries on reading without missing a word.','Omar is blind and the book is in Braille. He reads with his fingertips, so the light makes no difference.',['Omar is blind','The book is in Braille','He reads with his fingers','Light doesn\'t matter to him']),
+  C('plane','classic','No Parachute','A man jumps out of a plane with no parachute. He lands without a scratch.','The plane was parked on the ground. He just hopped out of the open door onto the runway.',['The plane wasn\'t flying','It was parked on the ground','He only dropped a short way','No water, nets or tricks were involved']),
+  C('soup','classic','Same Soup','A woman finds a fly in her soup and sends it back. The waiter brings a fresh bowl. She tastes it and shouts, "This is the same soup!"','Before she found the fly she had already sprinkled sugar into it by mistake. The new bowl tasted sweet too, so she knew the waiter had just fished the fly out.',['It really was the same soup','She had already added something to it','She recognised her own seasoning by taste','The waiter only removed the fly']),
+  C('pole','classic','Every Window South','A man builds a square house where every single window faces south. A bear wanders past. What colour is the bear?','The house is at the North Pole, where every direction is south. The only bears there are polar bears, so it\'s white.',['The house is at the North Pole','From the North Pole every direction is south','Only polar bears live there','So the bear is white'],2),
+  C('ladder','classic','Thirty-Foot Fall','Mei falls off a thirty-foot ladder onto concrete, dusts herself off and walks away completely unhurt.','She fell off the bottom rung. The ladder was thirty feet tall but she only dropped a few centimetres.',['She fell from the bottom rung','The ladder really was 30 feet tall','She only dropped a tiny distance','No mats, water or luck involved']),
+  C('chess','classic','Three Wins Each','Two girls played chess. They played five games, there were no draws, and each girl won three games.','They weren\'t playing against each other. Each girl was playing different opponents.',['They weren\'t playing each other','Each played other opponents','More than five games happened in total']),
+  C('triplets','classic','Not Twins','Two boys were born to the same mother on the same day, in the same hour, of the same year. But they are not twins.','They\'re two of a set of triplets — there\'s a third baby.',['They are triplets','There was a third baby','Same parents, same birth']),
+  C('barber','classic','The Scruffy Barber','A traveller arrives in a town with only two barbers. One has a neat, perfect haircut; the other\'s hair is a terrible mess. The traveller goes straight to the scruffy one.','The two barbers cut each other\'s hair. The scruffy barber gave the other one that perfect cut, so the scruffy one is the better barber.',['The barbers cut each other\'s hair','The neat haircut was done by the scruffy barber','So the scruffy barber is better','Nobody can cut their own hair well']),
+  C('coin','classic','The Ancient Coin','A man shows a museum an old coin stamped "46 B.C." The curator takes one look and calls the police.','It\'s a fake. Nobody in 46 B.C. could have known it was "Before Christ" — that dating system was invented centuries later.',['The coin is a fake','"B.C." dates were invented much later','Nobody then knew they were "before" anything']),
+  C('dog','everyday','Crossing the River','A dog crosses a wide river without a bridge, a boat or getting a single paw wet.','It was winter and the river was frozen solid. The dog walked across the ice.',['The river was frozen','It was winter','The dog walked on the ice']),
+  C('ring','everyday','Dry Ring','Lena drops her wedding ring into a full cup of coffee. When she fishes it out, it is completely dry.','The cup was full of dry coffee — ground coffee beans, not a drink.',['The coffee was dry','It was coffee grounds or beans','There was no liquid at all']),
+  C('truck','everyday','Stuck Under the Bridge','A lorry gets wedged under a low bridge. Engineers argue for an hour about cutting the bridge. A seven-year-old in the traffic queue solves it in one sentence.','"Let some air out of the tyres." The lorry sinks a few centimetres and drives out.',['Let air out of the tyres','The lorry is only slightly too tall','Softer tyres lower the lorry','No cutting or digging needed']),
+  C('rain','everyday','Dancing in the Downpour','A woman stands in the middle of a muddy field in pouring rain, soaked to the skin, laughing and dancing. She says it\'s the best day of her year.','She\'s a farmer. There had been months of drought and her crops were dying; the rain has saved her harvest.',['She is a farmer','There had been a long drought','Her crops desperately needed water','The rain saves her harvest']),
+  C('bell','everyday','Ringing His Own Bell','Every evening at 6, Mr Patel rings his own doorbell, waits a moment, then lets himself in with his key.','His wife is deaf. Their doorbell flashes the lights inside, so ringing it lets her know he\'s home without startling her.',['His wife is deaf','The doorbell flashes a light','He doesn\'t want to startle her','It\'s their "I\'m home" signal']),
+  C('night','everyday','No Headlights','A man drives down a country road with no streetlights and his headlights off. A dog dressed in a black coat runs out, and he stops in plenty of time.','It was the middle of the day. He didn\'t need headlights and could see the dog clearly.',['It was daytime','He didn\'t need headlights','He could see the dog perfectly']),
+  C('baseball','everyday','The Masked Man','A man leaves home, turns left three times and heads back home — where a man in a mask is waiting for him.','He\'s playing baseball. He ran round the bases (three left turns) back to home plate, where the catcher and umpire wear masks.',['He\'s playing baseball','"Home" is home plate','He ran around the bases','The masked man is the catcher or umpire']),
+  C('test','everyday','A Perfect Zero','Ben\'s results came back with a big fat zero. His parents hugged him and took him out for ice cream.','It wasn\'t a school test — it was a medical test, and zero meant he didn\'t have the thing they were worried about.',['It wasn\'t a school test','It was a medical test','Zero was a good result','His parents were relieved']),
+  C('numbers','everyday','One, Twelve, 144','At the hardware shop, 1 costs £2, 12 costs £4, and 144 costs £6.','He\'s buying the brass numbers for a front door. Each digit costs £2.',['He\'s buying house-number digits','You pay for each digit','144 has three digits']),
+  C('window','everyday','Thirtieth-Floor Fall','A window cleaner falls out of a window on the 30th floor of an office tower. He isn\'t hurt at all.','He was cleaning the inside of the window. He fell backwards off his little step into the office.',['He fell inward, into the building','He was cleaning the inside of the glass','He only fell a short way']),
+  C('socks','everyday','Odd Socks Prize','Leo walks into school wearing one red sock and one green sock with a dinosaur on it. By lunchtime he has won a prize.','It was Odd Socks Day. Everyone was meant to wear mismatched socks, and his were the boldest.',['It was a special "odd socks" day','Everyone was meant to wear mismatched socks','His pair was the wildest']),
+  C('model','everyday','Top in Seconds','A boy reaches the very top of a skyscraper in two seconds — no stairs, no lift, no climbing.','The skyscraper was a model. He just reached up and touched the top.',['The skyscraper is a model','It\'s small enough to reach','He simply reached up']),
+  C('umbrella','tricksy','Ten Under One','Ten people huddle under one small umbrella, and not a single one of them gets wet.','It wasn\'t raining.',['It wasn\'t raining','The umbrella wasn\'t keeping off water','Nobody was in any danger of getting wet']),
+  C('sleep','tricksy','Eight Days Awake','Captain Ruiz went eight whole days without sleep, yet he wasn\'t a bit tired.','He slept every night. He only went eight DAYS without sleep.',['He slept at night','"Days" means the daytime','Nobody stays awake for eight days straight']),
+  C('walk','tricksy','Wrong Way Down','A truck driver goes the wrong way down a one-way street, right past two police officers. They wave and do nothing.','He was walking, not driving.',['He was walking','He wasn\'t in his truck','Walking either way is allowed']),
+  C('calendar','tricksy','Locked In','Hungry Hugo is locked in a room with nothing but a calendar and a bed. He survives for a week. How?','Pun! He ate the dates from the calendar and drank from the bed\'s springs.',['It\'s a play on words','He ate the "dates" from the calendar','He drank from the bed\'s "springs"'],2),
+  C('tide','tricksy','The Rising Tide','A rope ladder hangs over the side of a ship with its bottom rung just touching the water. The tide rises 30 cm an hour. After five hours, the water still hasn\'t reached the second rung.','The ship floats. As the tide rises, the ship — and the ladder hanging from it — rise with it.',['The ship floats','The ship rises with the tide','The ladder rises with the ship']),
+  C('rooster','tricksy','Roof Egg','A rooster lays an egg right on the peak of the barn roof. The farmer knows exactly which side it will roll down.','Roosters don\'t lay eggs. There\'s no egg, so it doesn\'t roll anywhere.',['Roosters don\'t lay eggs','There was no egg','Nothing rolled at all']),
+  C('bald','tricksy','Not a Wet Hair','Mr Grant walks home for twenty minutes in pouring rain with no hat, hood or umbrella. His coat is soaked but not a single hair on his head gets wet.','Mr Grant is completely bald.',['He is bald','He has no hair at all','No hat or trick involved']),
+  C('surgeon','tricksy','The Surgeon\'s Son','A boy hurts his arm and is rushed to hospital while his dad waits outside. The surgeon looks at him and says, "I can\'t operate on this boy — he\'s my son!"','The surgeon is the boy\'s mum.',['The surgeon is a woman','The surgeon is his mother','The dad outside really is his father']),
+  C('midnight','tricksy','Different Birthdays','Twins are born just a few minutes apart in the same hospital room. Their birthdays are on different days.','One was born just before midnight and the other just after midnight.',['One was born just before midnight','The other was born just after midnight','Only minutes separate them']),
+  C('piano','spooky','The 3 A.M. Note','Every night at exactly 3 a.m., the old piano in Gran\'s empty living room plays one single note. Nobody is in the room.','Gran\'s cat sleeps on top of the warm piano. When the heating clicks off at 3 a.m. the piano cools, so the cat jumps down — straight across the keys.',['It\'s the cat','The cat sleeps on the piano','The heating switches off at 3 a.m.','The cat jumps down onto the keys']),
+  C('footprints','spooky','Vanishing Footprints','A single line of footprints leads across fresh snow into the middle of a field and simply stops. There is nobody there and nothing nearby.','Someone walked out and then walked back the same way, stepping carefully into their own footprints — a prank on their little brother.',['The person walked back the same way','They stepped in their own footprints','It was a prank','Nobody actually vanished']),
+  C('doll','spooky','The Wandering Doll','Every morning, Isla\'s doll is found standing at the bedroom window — even though she always tucks it into bed beside her at night.','Isla sleepwalks. In the night she gets up, carries the doll to the window, and goes back to bed without remembering.',['Isla sleepwalks','She carries the doll herself','She always stops at the window','She remembers nothing in the morning']),
+  C('lighthouse','spooky','Lights Off','A man switches off a light and goes to bed. The next morning he hears the news and realises he caused a shipwreck.','He was a lighthouse keeper. He turned off the lighthouse lamp, so a passing ship couldn\'t see the rocks and ran aground (everyone got safely ashore).',['He is a lighthouse keeper','He switched off the lighthouse lamp','The ship couldn\'t see the rocks','The ship hit the rocks']),
+  C('tapping','spooky','Tap, Tap, Tap','Alone in a cabin in the woods, Sam hears tap-tap-tapping on the window every windy night. He just rolls over and goes back to sleep.','It\'s a branch of the old tree outside. The wind blows it against the glass, and Sam knows it\'s there.',['It\'s a tree branch','The wind pushes it against the glass','It only happens on windy nights','Sam knows the tree is there']),
+  C('phone','spooky','Midnight Caller','At midnight Nora\'s phone rings. "HOME" flashes on the screen — but she\'s away at a hotel and there\'s no person in the house. She answers and hears only heavy breathing, then laughs.','Her dog was home with a sitter and stepped on the speed-dial button of the house phone. The breathing was the dog panting.',['It was her dog','The dog stepped on the house phone','The breathing was panting','Someone else was looking after the dog'])
+];
+const TWISTS = [
+  {k:'none',     n:'Calm Case',       d:'No twist this time. Just solve it.'},
+  {k:'lightning',n:'⚡ Lightning',     d:'The clock is cut to 3 minutes.'},
+  {k:'rapid',    n:'🔁 Rapid Fire',    d:'Questions go round the circle in order — the app moves to the next asker after every answer.'},
+  {k:'double',   n:'✌️ Double Facts',  d:'Every key fact is worth 2 points.'},
+  {k:'jackpot',  n:'💰 Jackpot',       d:'The solver also banks every key fact nobody found.'},
+  {k:'stakes',   n:'🎯 High Stakes',   d:'Solve is worth +3 more — but a wrong guess costs 3 and a 90-second freeze.'},
+  {k:'silent',   n:'🤐 Silent Keeper', d:'The Keeper may not speak — buttons only. Room: read the screen!'},
+  {k:'short',    n:'✂️ Short Questions',d:'Every question must be 6 words or fewer. Too long? Keeper taps DOESN\'T MATTER.'}
+];
+const $ = id => document.getElementById(id);
+const KEY = 'cowork-whythough-';
+const TIMES = [180, 300, 420];
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const byId = id => CASES.find(c => c.id === id);
+const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(KEY + k)); return v ?? d; } catch { return d; } };
+const store = (k, v) => { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch {} };
+
+// ---------- audio ----------
+let AC = null;
+function beep(freq, dur = .12, type = 'sine', vol = .15, when = 0) {
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+    const t = AC.currentTime + when, o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur + .02);
+  } catch {}
+}
+const SFX = {
+  yes: () => { beep(660, .1, 'triangle'); beep(880, .14, 'triangle', .15, .09); },
+  no: () => beep(180, .22, 'square', .08),
+  sort: () => { beep(520, .1, 'triangle'); beep(470, .14, 'triangle', .13, .1); },
+  irr: () => beep(330, .12, 'sine', .1),
+  fact: () => [523, 659, 784].forEach((f, i) => beep(f, .16, 'triangle', .14, i * .08)),
+  hint: () => [700, 520].forEach((f, i) => beep(f, .18, 'sine', .12, i * .12)),
+  win: () => [523, 659, 784, 1046].forEach((f, i) => beep(f, .22, 'triangle', .15, i * .1)),
+  wrong: () => [300, 220].forEach((f, i) => beep(f, .22, 'sawtooth', .07, i * .14)),
+  tick: () => beep(1200, .04, 'square', .05)
+};
+
+// ---------- settings / state ----------
+const settings = Object.assign({names: ['', '', '', ''], cases: 4, time: 300, decks: Object.keys(DECKS), twists: true}, load('settings', {}));
+let S = null;            // live game
+let tickT = null, lastNow = 0;
+
+function save() { if (S) store('save', S); }
+function saveSettings() { store('settings', settings); }
+
+// ---------- setup screen ----------
+function show(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
+
+function renderSetup() {
+  const list = $('plList');
+  list.innerHTML = settings.names.map((n, i) =>
+    `<div class="pl-row"><input data-i="${i}" maxlength="14" placeholder="Player ${i + 1}" value="${esc(n)}"><button class="x" data-del="${i}" aria-label="remove">✕</button></div>`).join('');
+  $('addPl').disabled = settings.names.length >= 10;
+  $('plNote').textContent = settings.names.length < 3 ? 'Need at least 3 players.' : `${settings.names.length} players · the Keeper rotates each case`;
+  $('caseN').textContent = settings.cases;
+  $('timeChips').innerHTML = TIMES.map(t => `<button class="chip ${settings.time === t ? 'on' : ''}" data-t="${t}">${t / 60} min</button>`).join('');
+  $('deckChips').innerHTML = Object.entries(DECKS).map(([k, d]) => {
+    const n = CASES.filter(c => c.deck === k).length;
+    return `<button class="chip ${settings.decks.includes(k) ? 'on' : ''}" data-d="${k}">${d.icon} ${d.name} (${n})</button>`;
+  }).join('');
+  const pool = CASES.filter(c => settings.decks.includes(c.deck)).length;
+  $('deckNote').textContent = settings.decks.length ? `${pool} cases in play` : 'Pick at least one deck.';
+  $('twistToggle').classList.toggle('on', settings.twists);
+  $('twistToggle').textContent = `🎴 Twist cards: ${settings.twists ? 'ON' : 'OFF'}`;
+  $('startBtn').disabled = settings.names.length < 3 || !settings.decks.length;
+  const sv = load('save', null);
+  $('resumeBox').innerHTML = sv && sv.phase && sv.phase !== 'end'
+    ? `<div class="card"><h3>Game in progress</h3><div class="note" style="margin-bottom:8px">Case ${sv.ci + 1} of ${sv.order.length} · ${sv.players.map(p => esc(p.n)).join(', ')}</div><div class="row"><button class="btn pri grow" id="resumeBtn">Resume</button><button class="btn" id="discardBtn">Discard</button></div></div>` : '';
+}
+
+$('plList').addEventListener('input', e => { const i = +e.target.dataset.i; if (!isNaN(i)) { settings.names[i] = e.target.value; saveSettings(); } });
+$('plList').addEventListener('click', e => {
+  const d = e.target.dataset.del; if (d === undefined) return;
+  if (settings.names.length <= 3) { settings.names[+d] = ''; } else settings.names.splice(+d, 1);
+  saveSettings(); renderSetup();
+});
+$('addPl').onclick = () => { if (settings.names.length < 10) { settings.names.push(''); saveSettings(); renderSetup(); const ins = $('plList').querySelectorAll('input'); ins[ins.length - 1].focus(); } };
+$('caseMinus').onclick = () => { settings.cases = Math.max(1, settings.cases - 1); saveSettings(); renderSetup(); };
+$('casePlus').onclick = () => { settings.cases = Math.min(12, settings.cases + 1); saveSettings(); renderSetup(); };
+$('timeChips').onclick = e => { const t = +e.target.dataset.t; if (t) { settings.time = t; saveSettings(); renderSetup(); } };
+$('deckChips').onclick = e => {
+  const d = e.target.dataset.d; if (!d) return;
+  settings.decks = settings.decks.includes(d) ? settings.decks.filter(x => x !== d) : [...settings.decks, d];
+  saveSettings(); renderSetup();
+};
+$('twistToggle').onclick = () => { settings.twists = !settings.twists; saveSettings(); renderSetup(); };
+$('resumeBox').addEventListener('click', e => {
+  if (e.target.id === 'resumeBtn') { S = load('save', null); if (S) resume(); }
+  if (e.target.id === 'discardBtn') { localStorage.removeItem(KEY + 'save'); renderSetup(); }
+});
+$('startBtn').onclick = () => newGame(settings.names.map((n, i) => n.trim() || `Player ${i + 1}`));
+
+// ---------- dealing ----------
+function dealOrder(count, exclude = []) {
+  const pool = CASES.filter(c => settings.decks.includes(c.deck) && !exclude.includes(c.id)).map(c => c.id);
+  let used = load('used', []);
+  let fresh = pool.filter(id => !used.includes(id));
+  if (fresh.length < count) {           // ran dry: forget the in-play decks' history
+    used = used.filter(id => !pool.includes(id)); store('used', used);
+    fresh = pool.slice();
+  }
+  shuffle(fresh);
+  const picked = fresh.slice(0, count);
+  while (picked.length < count && pool.length) picked.push(pool[Math.random() * pool.length | 0]); // tiny decks repeat
+  return picked;
+}
+function markUsed(id) { const u = load('used', []); if (!u.includes(id)) { u.push(id); store('used', u); } }
+function pickTwist() {
+  if (!S.twists) return 'none';
+  const r = Math.random();
+  if (r < .3) return 'none';
+  const ks = TWISTS.filter(t => t.k !== 'none' && !(t.k === 'rapid' && S.players.length < 3)).map(t => t.k);
+  return ks[Math.random() * ks.length | 0];
+}
+const twistOf = k => TWISTS.find(t => t.k === k) || TWISTS[0];
+
+function newGame(names) {
+  S = {
+    players: names.map(n => ({n, score: 0, facts: 0, solves: 0, qs: 0, wrong: 0, keepSolved: 0, fastest: null})),
+    time: settings.time, twists: settings.twists, decks: settings.decks.slice(),
+    order: dealOrder(settings.cases), ci: 0, k0: Math.random() * names.length | 0,
+    phase: 'peek', cur: null
+  };
+  startCase();
+}
+const keeperIdx = () => (S.k0 + S.ci) % S.players.length;
+
+function startCase() {
+  const id = S.order[S.ci], tw = pickTwist();
+  const total = (tw === 'lightning' ? 180 : S.time) * 1000;
+  S.cur = {id, twist: tw, total, left: total, paused: false, found: [], hints: [], asker: -1, locks: {}, q: 0, peeked: false, swaps: 0, deltas: {}, result: null, solver: -1};
+  S.phase = 'peek';
+  renderPeek(); show('sPeek'); save();
+}
+
+// ---------- peek ----------
+function renderPeek() {
+  const c = S.cur, k = S.players[keeperIdx()], tw = twistOf(c.twist);
+  $('peekCase').textContent = `CASE ${S.ci + 1} OF ${S.order.length}`;
+  $('peekName').textContent = '🗝️ ' + k.n;
+  $('peekTwist').hidden = c.twist === 'none';
+  $('peekTwist').innerHTML = `<b>Twist: ${esc(tw.n)}</b> — ${esc(tw.d)}`;
+  closePeek();
+  $('readyBtn').disabled = !c.peeked;
+  $('swapBtn').disabled = c.swaps >= 3;
+  $('swapBtn').textContent = c.swaps >= 3 ? 'No swaps left this case' : `🔄 I know this one — swap (${3 - c.swaps} left)`;
+}
+function openPeek() {
+  const c = byId(S.cur.id), b = $('peekBox');
+  b.classList.add('open'); $('sPeek').classList.add('peeking');
+  b.innerHTML = `<div class="lbl">The scene (${esc(c.t)})</div><div>${esc(c.s)}</div>
+    <div class="lbl">🤫 What really happened</div><div>${esc(c.a)}</div>
+    <div class="lbl">Key facts (★ = needed to solve)</div><ol>${c.f.map((f, i) => `<li class="${i < c.core ? 'core' : ''}">${i < c.core ? '★ ' : '• '}${esc(f)}</li>`).join('')}</ol>`;
+  if (!S.cur.peeked) { S.cur.peeked = true; save(); }
+  $('readyBtn').disabled = false;
+}
+function closePeek() {
+  const b = $('peekBox');
+  b.classList.remove('open'); $('sPeek').classList.remove('peeking');
+  b.innerHTML = '👁 Keeper only — press and HOLD here to read the case secretly';
+}
+$('peekBox').addEventListener('pointerdown', e => { e.preventDefault(); openPeek(); });
+['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => $('peekBox').addEventListener(ev, closePeek));
+$('peekBox').addEventListener('contextmenu', e => e.preventDefault());
+$('swapBtn').onclick = () => {
+  const c = S.cur; if (c.swaps >= 3) return;
+  markUsed(c.id);                        // they know it, so don't deal it again soon
+  const nid = dealOrder(1, [...S.order])[0];
+  if (nid && nid !== c.id) { S.order[S.ci] = c.id = nid; c.swaps++; c.peeked = false; }
+  renderPeek(); save();
+};
+$('readyBtn').onclick = () => {
+  S.phase = 'board'; markUsed(S.cur.id);
+  if (S.cur.twist === 'rapid') S.cur.asker = nextAsker(keeperIdx());
+  renderBoard(); show('sBoard'); startTick(); save();
+};
+// ---------- board ----------
+const isLocked = pi => S.cur.locks[pi] !== undefined && S.cur.left > S.cur.locks[pi];
+function nextAsker(from) {
+  const n = S.players.length, k = keeperIdx();
+  for (let s = 1; s <= n; s++) { const i = (from + s) % n; if (i !== k && !isLocked(i)) return i; }
+  return -1;
+}
+const factPts = () => S.cur.twist === 'double' ? 2 : 1;
+const solveVal = () => [5, 3, 2][Math.min(S.cur.hints.length, 2)] + (S.cur.twist === 'stakes' ? 3 : 0);
+function award(pi, pts, why) {
+  S.players[pi].score += pts;
+  (S.cur.deltas[pi] = S.cur.deltas[pi] || []).push([why, pts]);
+}
+const fmt = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${s / 60 | 0}:${String(s % 60).padStart(2, '0')}`; };
+
+function renderBoard() {
+  const c = S.cur, cs = byId(c.id), k = keeperIdx(), tw = twistOf(c.twist);
+  $('bCase').textContent = `Case ${S.ci + 1}/${S.order.length} · Keeper: ${S.players[k].n}`;
+  $('bTitle').textContent = cs.t;
+  $('bMeta').innerHTML = `<span class="pill val">🧠 Solve = ${solveVal()} pts</span><span class="pill">💡 Hints ${c.hints.length}/2</span><span class="pill">❓ ${c.q}</span>` +
+    (c.twist !== 'none' ? `<span class="pill tw" title="${esc(tw.d)}">${esc(tw.n)}</span>` : '');
+  const known = new Set([...c.found.map(f => f.i), ...c.hints]);
+  const items = cs.f.map((f, i) => {
+    const fd = c.found.find(x => x.i === i);
+    if (fd) return `<li class="found">🔑 ${esc(f)}<span class="who">${esc(S.players[fd.who].n)} +${fd.pts}</span></li>`;
+    if (c.hints.includes(i)) return `<li class="hint">💡 ${esc(f)}<span class="who">hint</span></li>`;
+    return null;
+  }).filter(Boolean);
+  const lockedN = cs.f.length - known.size;
+  for (let i = 0; i < lockedN; i++) items.push(`<li class="locked">🔒 Hidden key fact</li>`);
+  $('bSitu').innerHTML = `<p class="s">${esc(cs.s)}</p>${c.twist !== 'none' ? `<p class="note" style="margin:0 0 8px">${esc(tw.n)}: ${esc(tw.d)}</p>` : ''}<ul class="facts">${items.join('')}</ul>`;
+  renderAskers();
+  renderTimer();
+}
+function renderAskers() {
+  const c = S.cur, k = keeperIdx();
+  $('bAskers').innerHTML = S.players.map((p, i) => i === k ? '' :
+    `<button class="asker ${c.asker === i ? 'on' : ''} ${isLocked(i) ? 'lock' : ''}" data-p="${i}">${esc(p.n)}<small>${isLocked(i) ? '🧊 ' + fmt(c.left - c.locks[i]) : p.score + ' pts'}</small></button>`).join('');
+}
+function renderTimer() {
+  const c = S.cur, t = $('bTimer');
+  t.textContent = fmt(c.left);
+  t.classList.toggle('low', c.left <= 30000);
+  t.classList.toggle('paused', c.paused);
+  $('pauseBtn').textContent = c.paused ? '▶' : '⏸';
+}
+
+function startTick() {
+  stopTick(); lastNow = performance.now();
+  tickT = setInterval(tick, 200);
+}
+function stopTick() { if (tickT) clearInterval(tickT); tickT = null; }
+let lastSec = -1, lastSave = 0;
+function tick() {
+  const now = performance.now(), dt = now - lastNow; lastNow = now;
+  if (!S || S.phase !== 'board' || !S.cur || S.cur.paused || $('modal').classList.contains('on')) return;
+  const c = S.cur, before = c.left;
+  c.left = Math.max(0, c.left - dt);
+  const unlocked = Object.keys(c.locks).some(pi => before > c.locks[pi] && c.left <= c.locks[pi]);
+  // timed hints at 60% and 30% of the clock
+  [.6, .3].forEach((f, n) => { if (before > c.total * f && c.left <= c.total * f && c.hints.length <= n) dropHint(); });
+  const sec = Math.ceil(c.left / 1000);
+  if (sec !== lastSec) {
+    lastSec = sec;
+    if (sec <= 10 && sec > 0) SFX.tick();
+    if (unlocked || Object.keys(c.locks).some(pi => isLocked(+pi))) renderAskers();
+    renderTimer();
+  }
+  if (now - lastSave > 2000) { lastSave = now; save(); }
+  if (c.left <= 0) endCase('stumped');
+}
+function dropHint() {
+  const c = S.cur, cs = byId(c.id);
+  const free = cs.f.map((_, i) => i).filter(i => !c.hints.includes(i) && !c.found.some(f => f.i === i));
+  if (!free.length) return false;
+  // leak supporting facts before the ★ heart-of-the-story ones
+  const pick = free.find(i => i >= cs.core) ?? free[0];
+  c.hints.push(pick); SFX.hint(); flash('💡 HINT', 'var(--hint)');
+  renderBoard(); save();
+  return true;
+}
+
+let flashT = null;
+function flash(txt, bg) {
+  const f = $('flash'), s = $('flashTxt');
+  s.textContent = txt; s.style.background = bg;
+  f.classList.add('show'); clearTimeout(flashT);
+  flashT = setTimeout(() => f.classList.remove('show'), 750);
+}
+const ANS = {yes: ['YES', 'var(--yes)'], no: ['NO', 'var(--no)'], sort: ['SORT OF', 'var(--sort)'], irr: ["DOESN'T\nMATTER", 'var(--irr)']};
+document.querySelector('.answers').addEventListener('click', e => {
+  const a = e.target.dataset.ans; if (!a || S.phase !== 'board') return;
+  const c = S.cur;
+  c.q++;
+  if (c.asker >= 0) S.players[c.asker].qs++;
+  SFX[a](); flash(ANS[a][0], ANS[a][1]);
+  if (c.twist === 'rapid') c.asker = nextAsker(c.asker >= 0 ? c.asker : keeperIdx());
+  renderBoard(); save();
+});
+$('bAskers').addEventListener('click', e => {
+  const b = e.target.closest('.asker'); if (!b) return;
+  const i = +b.dataset.p; if (isLocked(i)) return;
+  S.cur.asker = S.cur.asker === i ? -1 : i;
+  renderBoard(); save();
+});
+$('pauseBtn').onclick = () => { S.cur.paused = !S.cur.paused; renderTimer(); save(); };
+
+// ---------- modals ----------
+function openModal(html) { $('sheet').innerHTML = html; $('modal').classList.add('on'); $('sheet').scrollTop = 0; }
+function closeModal() { $('modal').classList.remove('on'); $('sheet').innerHTML = ''; lastNow = performance.now(); }
+$('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+const playerPick = (sel, allowLocked = true) => S.players.map((p, i) => i === keeperIdx() ? '' :
+  `<button class="chip ${sel === i ? 'on' : ''}" data-pick="${i}" ${!allowLocked && isLocked(i) ? 'disabled' : ''}>${esc(p.n)}${isLocked(i) ? ' 🧊' : ''}</button>`).join('');
+
+// Fact claim: Keeper picks which hidden fact was uncovered, then who asked
+let mf = {fact: -1, who: -1};
+function openFact() {
+  mf = {fact: -1, who: S.cur.asker};
+  renderFact();
+}
+function renderFact() {
+  const c = S.cur, cs = byId(c.id);
+  const free = cs.f.map((f, i) => ({f, i})).filter(x => !c.hints.includes(x.i) && !c.found.some(y => y.i === x.i));
+  const last = c.found[c.found.length - 1];
+  openModal(`<h2>🔑 Key fact uncovered</h2><div class="eyes">Keeper's eyes only</div>
+    ${free.length ? free.map(x => `<button class="opt ${x.i < cs.core ? 'core' : ''} ${mf.fact === x.i ? 'on' : ''}" data-fact="${x.i}">${esc(x.f)}</button>`).join('')
+      : '<p class="note">Every key fact is already on the board — time for someone to SOLVE!</p>'}
+    <div style="margin:10px 0 6px">Who asked it? (+${factPts()})</div>
+    <div class="chipset" style="margin-bottom:12px">${playerPick(mf.who)}</div>
+    <div class="row"><button class="btn grow" data-act="close">Cancel</button><button class="btn pri grow" data-act="claim" ${mf.fact < 0 || mf.who < 0 ? 'disabled' : ''}>Pin it to the board</button></div>
+    ${last ? `<div style="margin-top:12px"><button class="btn small ghost" data-act="undo">↩ Undo last fact (${esc(S.players[last.who].n)})</button></div>` : ''}`);
+}
+$('factBtn').onclick = openFact;
+
+function openNotes() {
+  const c = S.cur, cs = byId(c.id);
+  openModal(`<h2>👁 Keeper notes</h2><div class="eyes">Keeper's eyes only — clock is paused</div>
+    <div class="secret"><b>What really happened:</b><br>${esc(cs.a)}</div>
+    <ol style="padding-left:20px;margin:0 0 12px">${cs.f.map((f, i) => `<li style="margin:3px 0;${i < cs.core ? 'color:var(--fact);font-weight:700' : ''}">${i < cs.core ? '★ ' : ''}${esc(f)}${c.found.some(x => x.i === i) ? ' ✅' : c.hints.includes(i) ? ' 💡' : ''}</li>`).join('')}</ol>
+    <button class="btn big" data-act="hint" ${c.hints.length + c.found.length >= cs.f.length ? 'disabled' : ''}>💡 Drop a hint now (solve value drops)</button>
+    <div style="height:8px"></div>
+    <button class="btn big" data-act="giveup">🏳️ Room gives up — reveal</button>
+    <div style="height:8px"></div>
+    <div class="row"><button class="btn grow" data-act="close">Back to the case</button><button class="btn ghost" data-act="quit">End game</button></div>`);
+}
+$('notesBtn').onclick = openNotes;
+
+// Solve: pick the solver, then the Keeper ticks the ★ facts they said
+let ms = {who: -1, ticks: []};
+function openSolve() { ms = {who: S.cur.asker >= 0 && !isLocked(S.cur.asker) ? S.cur.asker : -1, ticks: [], step: 1}; renderSolve(); }
+function renderSolve() {
+  const c = S.cur, cs = byId(c.id);
+  if (ms.step === 1) {
+    openModal(`<h2>🧠 Who's solving?</h2><p class="note">They tell the whole story out loud. Worth <b>${solveVal()}</b> — wrong costs ${c.twist === 'stakes' ? 3 : 1} and a ${c.twist === 'stakes' ? 90 : 60}s freeze.</p>
+      <div class="chipset" style="margin:10px 0 14px">${playerPick(ms.who, false)}</div>
+      <div class="row"><button class="btn grow" data-act="close">Cancel</button><button class="btn pri grow" data-act="tostep2" ${ms.who < 0 ? 'disabled' : ''}>They're telling it…</button></div>`);
+    return;
+  }
+  const allCore = cs.f.slice(0, cs.core).every((_, i) => ms.ticks.includes(i));
+  openModal(`<h2>${esc(S.players[ms.who].n)} is solving</h2><div class="eyes">Keeper's eyes only</div>
+    <div class="secret">${esc(cs.a)}</div>
+    <div class="note" style="margin-bottom:8px">Tick each ★ fact their story includes (in their own words is fine):</div>
+    ${cs.f.map((f, i) => i < cs.core ? `<div class="check core ${ms.ticks.includes(i) ? 'on' : ''}" data-tick="${i}"><span class="box">${ms.ticks.includes(i) ? '✓' : ''}</span><span>★ ${esc(f)}</span></div>` : '').join('')}
+    <div class="row" style="margin-top:10px"><button class="btn grow" data-act="wrong" style="background:var(--no);color:#0d1020;font-weight:800">✘ Not it</button><button class="btn pri grow" data-act="right" ${allCore ? '' : 'disabled'}>✔ Nailed it</button></div>
+    <div style="margin-top:8px"><button class="btn small ghost" data-act="close">Cancel — they backed out</button></div>`);
+}
+$('solveBtn').onclick = openSolve;
+
+$('sheet').addEventListener('click', e => {
+  const t = e.target.closest('[data-act],[data-fact],[data-pick],[data-tick]'); if (!t || t.disabled) return;
+  const c = S.cur;
+  if (t.dataset.fact !== undefined) { mf.fact = +t.dataset.fact; renderFact(); return; }
+  if (t.dataset.pick !== undefined) {
+    const i = +t.dataset.pick;
+    if (ms.step === 1 && $('sheet').querySelector('[data-act="tostep2"]')) { ms.who = i; renderSolve(); }
+    else { mf.who = i; renderFact(); }
+    return;
+  }
+  if (t.dataset.tick !== undefined) { const i = +t.dataset.tick; ms.ticks = ms.ticks.includes(i) ? ms.ticks.filter(x => x !== i) : [...ms.ticks, i]; renderSolve(); return; }
+  switch (t.dataset.act) {
+    case 'close': closeModal(); break;
+    case 'claim': {
+      const pts = factPts();
+      c.found.push({i: mf.fact, who: mf.who, pts});
+      S.players[mf.who].facts++;
+      award(mf.who, pts, 'Key fact');
+      closeModal(); SFX.fact(); flash('🔑 FACT!', 'var(--fact)'); renderBoard(); save(); break;
+    }
+    case 'undo': {
+      const l = c.found.pop(); if (!l) break;
+      S.players[l.who].facts--; S.players[l.who].score -= l.pts;
+      const d = c.deltas[l.who]; if (d) { const j = d.map(x => x[0]).lastIndexOf('Key fact'); if (j >= 0) d.splice(j, 1); }
+      renderFact(); renderBoard(); save(); break;
+    }
+    case 'hint': closeModal(); dropHint(); break;
+    case 'giveup': closeModal(); endCase('stumped'); break;
+    case 'quit':
+      openModal(`<h2>End the game?</h2><p class="note">Skips the remaining cases and goes straight to final scores.</p>
+        <div class="row"><button class="btn grow" data-act="close">Keep playing</button><button class="btn pri grow" data-act="quityes">End game</button></div>`); break;
+    case 'quityes': closeModal(); finishGame(); break;
+    case 'tostep2': ms.step = 2; renderSolve(); break;
+    case 'wrong': {
+      const hs = c.twist === 'stakes';
+      award(ms.who, hs ? -3 : -1, 'Wrong solve');
+      S.players[ms.who].wrong++;
+      c.locks[ms.who] = Math.max(0, c.left - (hs ? 90000 : 60000));
+      if (c.asker === ms.who) c.asker = c.twist === 'rapid' ? nextAsker(ms.who) : -1;
+      closeModal(); SFX.wrong(); flash('✘ NOPE', 'var(--no)'); renderBoard(); save(); break;
+    }
+    case 'right': {
+      c.solver = ms.who;
+      closeModal(); endCase('solved'); break;
+    }
+  }
+});
+
+// ---------- end of case ----------
+function endCase(result) {
+  if (S.phase !== 'board') return;
+  stopTick();
+  const c = S.cur, cs = byId(c.id), k = keeperIdx();
+  c.result = result;
+  if (result === 'solved') {
+    const v = solveVal();
+    award(c.solver, v, `Solved (${c.hints.length} hint${c.hints.length === 1 ? '' : 's'})`);
+    S.players[c.solver].solves++;
+    if (c.twist === 'jackpot') {
+      const left = cs.f.filter((_, i) => !c.found.some(f => f.i === i) && !c.hints.includes(i)).length;
+      if (left) award(c.solver, left, `Jackpot: ${left} unfound fact${left > 1 ? 's' : ''}`);
+    }
+    award(k, 2, 'Keeper: case cracked');
+    S.players[k].keepSolved++;
+    const used = c.total - c.left;
+    if (S.players[k].fastest === null || used < S.players[k].fastest) S.players[k].fastest = used;
+    SFX.win();
+  } else SFX.wrong();
+  S.phase = 'reveal';
+  renderReveal(); show('sReveal'); save();
+}
+function boardHTML(final) {
+  const ranked = S.players.map((p, i) => ({...p, i})).sort((a, b) => b.score - a.score);
+  const top = ranked[0].score;
+  return ranked.map((p, r) => `<li class="${p.score === top ? 'lead' : ''}"><span class="rk">${p.score === top ? '👑' : r + 1}</span><span class="nm">${esc(p.n)}</span>${final ? `<span class="note">${p.solves}🧠 ${p.facts}🔑</span>` : ''}<span class="sc">${p.score}</span></li>`).join('');
+}
+function renderReveal() {
+  const c = S.cur, cs = byId(c.id);
+  $('rRes').textContent = c.result === 'solved' ? `🧠 ${S.players[c.solver].n} cracked it!` : '🤯 The room was stumped';
+  $('rTitle').textContent = `Case ${S.ci + 1}: ${cs.t}`;
+  $('rAnswer').innerHTML = `<div class="note" style="margin-bottom:6px">${esc(cs.s)}</div><b>What really happened:</b> ${esc(cs.a)}`;
+  const rows = Object.entries(c.deltas).flatMap(([pi, arr]) => arr.map(([w, p]) => `<li><span>${esc(S.players[pi].n)} · ${esc(w)}</span><b class="${p >= 0 ? 'p' : 'm'}">${p >= 0 ? '+' : ''}${p}</b></li>`));
+  $('rDeltas').innerHTML = rows.join('') || '<li><span class="note">No points this case.</span></li>';
+  $('rBoard').innerHTML = boardHTML(false);
+  $('nextBtn').textContent = S.ci + 1 >= S.order.length ? 'Final scores' : `Next case → Keeper: ${S.players[(S.k0 + S.ci + 1) % S.players.length].n}`;
+}
+$('nextBtn').onclick = () => {
+  if (S.ci + 1 >= S.order.length) return finishGame();
+  S.ci++; startCase();
+};
+
+// ---------- end of game ----------
+function finishGame() {
+  stopTick();
+  S.phase = 'end'; save();
+  const ps = S.players, top = Math.max(...ps.map(p => p.score));
+  const winners = ps.filter(p => p.score === top).map(p => p.n);
+  $('eWinner').textContent = winners.length > 1 ? `It's a tie: ${winners.join(' & ')} with ${top}!` : `🏆 ${winners[0]} wins with ${top} points!`;
+  $('eBoard').innerHTML = boardHTML(true);
+  const best = (f, min = 1) => { const v = Math.max(...ps.map(f)); return v >= min ? ps.filter(p => f(p) === v).map(p => p.n).join(' & ') : null; };
+  const fastK = ps.filter(p => p.fastest !== null).sort((a, b) => a.fastest - b.fastest)[0];
+  const aw = [
+    ['🧠', 'Sharpest Mind', 'most cases solved', best(p => p.solves)],
+    ['🔑', 'Fact Finder', 'most key facts claimed', best(p => p.facts)],
+    ['❓', 'Question Machine', 'most questions asked', best(p => p.qs)],
+    ['🗝️', 'Clearest Keeper', 'fastest case cracked', fastK ? `${fastK.n} (${fmt(fastK.fastest)})` : null],
+    ['🧊', 'Bold Guesser', 'most wrong solves — fearless!', best(p => p.wrong)]
+  ].filter(a => a[3]);
+  $('eAwards').innerHTML = aw.map(a => `<div class="award"><span class="ic">${a[0]}</span><div><b>${esc(a[1])}: ${esc(a[3])}</b><small>${esc(a[2])}</small></div></div>`).join('') || '<p class="note">No awards — nobody asked anything!</p>';
+  show('sEnd');
+}
+$('againBtn').onclick = () => newGame(S.players.map(p => p.n));
+$('newBtn').onclick = () => { localStorage.removeItem(KEY + 'save'); S = null; renderSetup(); show('sSetup'); };
+
+// ---------- resume ----------
+function resume() {
+  if (S.phase === 'peek') { renderPeek(); show('sPeek'); }
+  else if (S.phase === 'board') { S.cur.paused = true; renderBoard(); show('sBoard'); startTick(); }
+  else if (S.phase === 'reveal') { renderReveal(); show('sReveal'); }
+  else finishGame();
+}
+window.addEventListener('pagehide', save);
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+renderSetup();
+</script>
+</body>
+</html>
