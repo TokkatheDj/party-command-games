@@ -1,0 +1,137 @@
+<!-- CONCEPT: Rhyme Time Train - pick the picture that rhymes with the engine's word to build a choo-choo train of rhyming pals (early phonics, ages 4-8) -->
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Rhyme Time Train</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;height:100%;font-family:"Trebuchet MS","Comic Sans MS",system-ui,sans-serif;background:linear-gradient(#8fdcff 0%,#d5f4ff 55%,#9be37a 55%,#6cc653 100%);overflow:hidden;color:#3a2a6b}
+#app{max-width:900px;margin:0 auto;height:100%;display:flex;flex-direction:column;align-items:center;padding:10px;position:relative}
+h1{margin:4px 0 0;font-size:clamp(26px,5vw,42px);color:#ff5a5f;text-shadow:0 3px 0 #fff,0 5px 0 #ffd23f}
+.desc{margin:2px 0 6px;font-size:clamp(14px,2.6vw,18px);text-align:center}
+.btn{font:inherit;font-weight:bold;font-size:clamp(20px,4vw,28px);padding:14px 34px;border:0;border-radius:40px;background:#ffb703;color:#3a2a6b;box-shadow:0 6px 0 #d98b00;cursor:pointer}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #d98b00}
+.btn.g{background:#5bd66b;box-shadow:0 6px 0 #34a844}
+#top{display:flex;gap:10px;align-items:center;width:100%;justify-content:space-between}
+.pill{background:#fff;border-radius:30px;padding:6px 16px;font-weight:bold;font-size:20px;box-shadow:0 3px 0 #0002}
+#mute{font-size:24px;padding:4px 14px;cursor:pointer;border:0}
+#track{width:100%;height:96px;position:relative;margin-top:6px;overflow:hidden}
+#rail{position:absolute;bottom:6px;left:0;right:0;height:8px;background:repeating-linear-gradient(90deg,#7a4a21 0 14px,#b9854f 14px 20px);border-radius:4px}
+#train{position:absolute;bottom:14px;left:6px;display:flex;align-items:flex-end;transition:transform 1.8s ease-in}
+.car{width:64px;height:62px;background:#ff8fab;border-radius:10px;margin-left:6px;display:flex;align-items:center;justify-content:center;font-size:34px;position:relative;box-shadow:0 4px 0 #c05a78;animation:pop .4s}
+.car:after,.car:before{content:"";position:absolute;bottom:-9px;width:16px;height:16px;border-radius:50%;background:#444;border:3px solid #ccc}
+.car:before{left:8px}.car:after{right:8px}
+.engine{width:92px;height:76px;background:#e63946;border-radius:14px 30px 10px 10px;margin-left:0;font-size:38px;box-shadow:0 4px 0 #a02030}
+.engine:after{right:12px}
+@keyframes pop{0%{transform:scale(0) rotate(-20deg)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
+#stage{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:0}
+#target{background:#fff;border-radius:28px;padding:10px 26px;text-align:center;box-shadow:0 6px 0 #0002;cursor:pointer}
+#target .em{font-size:clamp(60px,14vw,100px);line-height:1.1;display:block}
+#target .w{font-size:clamp(26px,6vw,40px);font-weight:bold}
+#prompt{font-size:clamp(18px,3.6vw,26px);font-weight:bold;background:#ffffffcc;border-radius:20px;padding:4px 16px;text-align:center}
+#choices{display:flex;gap:clamp(8px,2vw,22px);justify-content:center;flex-wrap:wrap}
+.card{width:clamp(96px,26vw,170px);background:#fff;border:5px solid #ffd23f;border-radius:26px;padding:8px 4px;text-align:center;cursor:pointer;box-shadow:0 6px 0 #0002;font:inherit;color:inherit}
+.card .em{font-size:clamp(44px,11vw,76px);display:block;line-height:1.15}
+.card .w{font-size:clamp(18px,4vw,26px);font-weight:bold}
+.card.sel{border-color:#ff5a5f;transform:scale(1.07)}
+.card.wrong{animation:shake .5s;opacity:.45}
+.card.right{animation:zoom .7s forwards}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-12px)}40%,80%{transform:translateX(12px)}}
+@keyframes zoom{to{transform:translateY(-200px) scale(.3);opacity:0}}
+#overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#fff9;backdrop-filter:blur(4px);z-index:5;text-align:center;padding:20px}
+.hidden{display:none!important}
+#big{font-size:clamp(60px,16vw,110px)}
+canvas#fx{position:absolute;inset:0;pointer-events:none;z-index:9}
+.hint{font-size:16px}
+</style></head>
+<body><div id="app">
+<div id="top"><div class="pill">⭐ <span id="score">0</span> / 10</div><h1>🚂 Rhyme Time Train</h1><button class="pill" id="mute" aria-label="sound">🔊</button></div>
+<p class="desc">Rhymes sound the same at the end — like <b>cat</b> and <b>hat</b>! Tap the picture that rhymes to add a car to the train.</p>
+<div id="track"><div id="rail"></div><div id="train"><div class="car engine">🚂</div></div></div>
+<div id="stage">
+ <div id="target" title="Tap to hear"><span class="em" id="tem"></span><span class="w" id="tw"></span></div>
+ <div id="prompt">What rhymes with this? 👇</div>
+ <div id="choices"></div>
+ <div class="hint">Tip: arrow keys ◀ ▶ + Enter work too!</div>
+</div>
+<div id="overlay"><div id="big">🚂🎶</div><div id="otitle" style="font-size:clamp(22px,5vw,34px);font-weight:bold">Help the train collect rhyming pals!</div><button class="btn g" id="go">▶ Let's Go!</button></div>
+<canvas id="fx"></canvas>
+</div>
+<script>
+const SETS=[
+ [["🐱","cat"],["🎩","hat"],["🦇","bat"],["🐀","rat"]],
+ [["🐶","dog"],["🪵","log"],["🐸","frog"],["🐖","hog"]],
+ [["🐝","bee"],["🌳","tree"],["🔑","key"],["🦵","knee"]],
+ [["⭐","star"],["🚗","car"],["🥫","jar"],["🍫","bar"]],
+ [["🌙","moon"],["🥄","spoon"],["🎈","balloon"],["🦝","raccoon"]],
+ [["🎂","cake"],["🐍","snake"],["🏞️","lake"],["🧁","bake"]],
+ [["🛶","boat"],["🧥","coat"],["🐐","goat"],["🎵","note"]],
+ [["🐻","bear"],["🪑","chair"],["🍐","pear"],["🐇","hare"]],
+ [["💍","ring"],["👑","king"],["🪽","wing"],["🧵","string"]],
+ [["🧦","sock"],["🕰️","clock"],["🪨","rock"],["🔒","lock"]],
+ [["🔔","bell"],["🐚","shell"],["🕳️","well"],["🧴","gel"]],
+ [["🐭","mouse"],["🏠","house"],["🦉","owl"],["🥣","bowl"]]
+].map(s=>s.filter(x=>x[1]!=="bake"&&x[1]!=="gel"&&x[1]!=="owl"&&x[1]!=="bowl"));
+const $=id=>document.getElementById(id);
+let ac,muted=false,score=0,round=0,cur,sel=0,locked=true,order=[];
+function A(){if(!ac){try{ac=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ac&&ac.state==="suspended")ac.resume();return ac}
+function tone(f,t,d,type="sine",v=.2){if(muted)return;const c=A();if(!c)return;const o=c.createOscillator(),g=c.createGain();o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,c.currentTime+t);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+t+d);o.connect(g);g.connect(c.destination);o.start(c.currentTime+t);o.stop(c.currentTime+t+d+.05)}
+const sfx={good(){[523,659,784,1047].forEach((f,i)=>tone(f,i*.1,.25,"triangle"))},bad(){tone(300,0,.2,"sine",.15);tone(240,.15,.25,"sine",.15)},choo(){for(let i=0;i<4;i++){tone(120,i*.18,.1,"sawtooth",.08)}tone(660,.8,.3,"square",.07);tone(880,.8,.3,"square",.05)},win(){[523,659,784,1047,784,1047,1319].forEach((f,i)=>tone(f,i*.13,.3,"triangle"))},tap(){tone(700,0,.06,"square",.07)}};
+function say(t){if(muted||!window.speechSynthesis)return;try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.rate=.85;u.pitch=1.2;speechSynthesis.speak(u)}catch(e){}}
+function shuf(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a}
+function start(){score=0;round=0;$("score").textContent=0;$("train").style.transition="none";$("train").style.transform="";$("train").innerHTML='<div class="car engine">🚂</div>';
+ order=shuf(SETS.map((_,i)=>i));$("overlay").classList.add("hidden");A();sfx.choo();next()}
+function next(){
+ if(round>=10)return finish();
+ const si=order[round%order.length],set=shuf(SETS[si]);
+ const tgt=set[0],right=set[1];
+ const others=shuf(SETS.filter((_,i)=>i!==si)).slice(0,2).map(s=>s[Math.random()*s.length|0]);
+ cur={tgt,right};sel=0;locked=false;
+ $("tem").textContent=tgt[0];$("tw").textContent=tgt[1];
+ const ch=shuf([right,...others]);
+ const box=$("choices");box.innerHTML="";
+ ch.forEach((c,i)=>{const b=document.createElement("button");b.className="card";b.innerHTML='<span class="em">'+c[0]+'</span><span class="w">'+c[1]+'</span>';
+  b.onclick=()=>pick(c,b,i);box.appendChild(b)});
+ hl();$("prompt").textContent="What rhymes with "+tgt[1]+"? 👇";
+ setTimeout(()=>say(tgt[1]),250);
+}
+function hl(){[...$("choices").children].forEach((b,i)=>b.classList.toggle("sel",i===sel))}
+function pick(c,b,i){
+ if(locked)return;sel=i;hl();
+ if(c===cur.right){
+  locked=true;sfx.good();b.classList.add("right");
+  say(cur.tgt[1]+" and "+c[1]+" rhyme!");
+  $("prompt").textContent="🎉 "+cur.tgt[1]+" & "+c[1]+" rhyme!";
+  const car=document.createElement("div");car.className="car";car.textContent=c[0];$("train").appendChild(car);
+  score++;round++;$("score").textContent=score;boom(b);
+  setTimeout(next,1900);
+ }else{
+  sfx.bad();b.classList.add("wrong");$("prompt").textContent="Hmm, try another one! 💛";say(c[1]+"... listen to the end sound!");
+  setTimeout(()=>{$("prompt").textContent="What rhymes with "+cur.tgt[1]+"? 👇"},1600);
+ }
+}
+function finish(){
+ locked=true;sfx.choo();const t=$("train");t.style.transition="transform 2.2s ease-in";t.style.transform="translateX(110vw)";
+ setTimeout(()=>{sfx.win();$("big").textContent="🏆🚂🌟";$("otitle").innerHTML="Choo-choo! You're a Rhyme Star!<br>You built a train of "+score+" rhyming pals!";$("go").textContent="🔁 Ride Again!";$("overlay").classList.remove("hidden");say("Great job! You are a rhyme star!");
+  for(let i=0;i<5;i++)setTimeout(()=>boom(null),i*300)},2300);
+}
+$("target").onclick=()=>{if(cur){sfx.tap();say(cur.tgt[1])}};
+$("go").onclick=start;
+$("mute").onclick=()=>{muted=!muted;$("mute").textContent=muted?"🔇":"🔊";if(muted&&window.speechSynthesis)speechSynthesis.cancel()};
+document.addEventListener("keydown",e=>{
+ if(!$("overlay").classList.contains("hidden")){if(e.key==="Enter"||e.key===" "){e.preventDefault();start()}return}
+ const n=$("choices").children.length;if(locked||!n)return;
+ if(e.key==="ArrowRight"){sel=(sel+1)%n;hl();sfx.tap()}
+ else if(e.key==="ArrowLeft"){sel=(sel+n-1)%n;hl();sfx.tap()}
+ else if(e.key==="Enter"||e.key===" "){e.preventDefault();$("choices").children[sel].click()}
+});
+// confetti
+const cv=$("fx"),cx=cv.getContext("2d");let ps=[];
+function rs(){cv.width=innerWidth;cv.height=innerHeight}rs();addEventListener("resize",rs);
+function boom(el){let x=innerWidth/2,y=innerHeight/2;if(el){const r=el.getBoundingClientRect();x=r.left+r.width/2;y=r.top}else{x=Math.random()*innerWidth;y=innerHeight*.3}
+ for(let i=0;i<45;i++)ps.push({x,y,vx:(Math.random()-.5)*9,vy:-Math.random()*9-2,c:`hsl(${Math.random()*360},90%,60%)`,s:5+Math.random()*7,l:80});
+ if(!raf)loop()}
+let raf=0;
+function loop(){cx.clearRect(0,0,cv.width,cv.height);ps=ps.filter(p=>p.l>0);ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.3;p.l--;cx.fillStyle=p.c;cx.fillRect(p.x,p.y,p.s,p.s)});
+ if(ps.length)raf=requestAnimationFrame(loop);else{raf=0;cx.clearRect(0,0,cv.width,cv.height)}}
+</script></body></html>

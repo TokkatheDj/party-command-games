@@ -1,0 +1,529 @@
+<!-- CONCEPT: WORD LADDERS / TEAM TUG - "Lock & Ladder": two teams share ONE word ladder on one screen and take turns changing a single letter of the current word to make a new real word, each racing to spell their own public target word (RED wants COLD, BLUE wants WARM) - drop your target letter into its slot and that tile LOCKS for your team for good, but drop the rival's letter and you've gifted them the lock; every rung is burned so the ladder can never loop, first team to lock 3 tiles ends the round with a bonus, two passes in a row (stuck or out of time) ends it early, and the start team alternates each round. App-checked 2,000-word dictionary with a Room Vote override for words it doesn't know, one hint per team per round, turn timer, ladder replay | Players: 2-12 in 2 teams | ~15-25 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Lock &amp; Ladder</title>
+<style>
+:root{
+  --bg:#0f1420; --panel:#182033; --panel2:#202a42; --line:#2c3854; --text:#e8eefc; --muted:#8e9bbb;
+  --red:#ff5a6e; --red-d:#5a1f2b; --blue:#4aa8ff; --blue-d:#173a5e; --gold:#ffd166; --ok:#3ddc97;
+  --a:#3ee0c8; --b:#4aa8ff; --r:12px; --gap:clamp(6px,1.6vw,10px);
+}
+*,*::before,*::after{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+html,body{ margin:0; padding:0; touch-action:manipulation; user-select:none; -webkit-user-select:none; overflow:hidden; height:100%;
+  background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; }
+button{ font:inherit; color:inherit; cursor:pointer; border:none; }
+.hide{ display:none !important; }
+#app{ height:100%; max-width:540px; margin:0 auto; display:flex; flex-direction:column; padding:8px 10px; gap:var(--gap); }
+h1{ margin:0; font-size:clamp(26px,8vw,40px); font-weight:900; letter-spacing:.5px;
+  background:linear-gradient(90deg,var(--red),var(--gold),var(--blue)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.btn{ min-height:46px; padding:0 16px; border-radius:var(--r); background:var(--panel2); border:1px solid var(--line); font-weight:700; font-size:clamp(14px,3.8vw,17px); }
+.btn.primary{ background:linear-gradient(90deg,var(--a),var(--b)); color:#06101c; border:none; }
+.btn:disabled{ opacity:.4; cursor:default; }
+.small{ font-size:clamp(12px,3.2vw,14px); color:var(--muted); }
+
+/* ---------- setup ---------- */
+#setup{ flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px; padding-bottom:12px; }
+.card{ background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:12px; }
+.card h2{ margin:0 0 8px; font-size:clamp(15px,4vw,18px); }
+.teamrow{ display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.teamrow .dot{ width:18px; height:18px; border-radius:50%; flex:none; }
+.teamrow input{ flex:1; min-width:0; min-height:46px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--text);
+  padding:0 12px; font:inherit; font-size:16px; user-select:text; -webkit-user-select:text; }
+.seg{ display:flex; gap:6px; flex-wrap:wrap; }
+.seg button{ flex:1; min-width:56px; min-height:44px; border-radius:10px; background:var(--panel2); border:1px solid var(--line); font-weight:700; }
+.seg button.on{ background:linear-gradient(90deg,var(--a),var(--b)); color:#06101c; border-color:transparent; }
+.rules{ margin:0; padding-left:18px; line-height:1.45; font-size:clamp(13px,3.5vw,15px); }
+.rules b{ color:var(--gold); }
+
+/* ---------- play ---------- */
+#play{ flex:1; min-height:0; display:flex; flex-direction:column; gap:var(--gap); }
+.topbar{ display:flex; align-items:center; gap:8px; }
+.topbar .ttl{ font-weight:900; font-size:clamp(17px,4.8vw,22px); background:linear-gradient(90deg,var(--red),var(--gold),var(--blue));
+  -webkit-background-clip:text; background-clip:text; color:transparent; white-space:nowrap; }
+.topbar .rnd{ flex:1; text-align:center; color:var(--muted); font-size:clamp(12px,3.3vw,14px); }
+.iconbtn{ width:44px; height:44px; border-radius:10px; background:var(--panel2); border:1px solid var(--line); font-size:18px; flex:none; }
+.targets{ display:flex; flex-direction:column; gap:6px; }
+.trow{ display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:12px; background:var(--panel); border:2px solid transparent; transition:border-color .2s, box-shadow .2s; }
+.trow.t0.active{ border-color:var(--red); box-shadow:0 0 14px #ff5a6e55; }
+.trow.t1.active{ border-color:var(--blue); box-shadow:0 0 14px #4aa8ff55; }
+.trow .nm{ flex:1; min-width:0; font-weight:800; font-size:clamp(13px,3.6vw,16px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.trow.t0 .nm{ color:var(--red); } .trow.t1 .nm{ color:var(--blue); }
+.trow .sc{ font-weight:900; font-size:clamp(18px,5vw,24px); min-width:30px; text-align:right; }
+.mini{ display:flex; gap:4px; }
+.mini span{ width:clamp(26px,7.4vw,34px); height:clamp(30px,8.4vw,38px); border-radius:7px; display:grid; place-items:center; font-weight:900;
+  text-transform:uppercase; font-size:clamp(15px,4.4vw,20px); background:var(--bg); border:1px solid var(--line); color:var(--muted); position:relative; }
+.t0 .mini span.got{ background:var(--red); color:#fff; border-color:var(--red); }
+.t1 .mini span.got{ background:var(--blue); color:#fff; border-color:var(--blue); }
+.mini span.lost{ opacity:.35; text-decoration:line-through; }
+.status{ text-align:center; font-weight:800; font-size:clamp(15px,4.2vw,19px); min-height:24px; }
+.status .tn0{ color:var(--red); } .status .tn1{ color:var(--blue); }
+.timer{ height:6px; border-radius:3px; background:var(--panel2); overflow:hidden; }
+.timer i{ display:block; height:100%; width:100%; background:var(--gold); transform-origin:left; }
+.word{ display:flex; justify-content:center; gap:clamp(6px,2vw,12px); }
+.tile{ width:clamp(60px,18vw,84px); height:clamp(66px,19vw,90px); border-radius:14px; background:var(--panel2); border:3px solid var(--line);
+  font-size:clamp(34px,10vw,50px); font-weight:900; text-transform:uppercase; display:grid; place-items:center; position:relative; transition:transform .15s; }
+.tile.sel{ border-color:var(--gold); transform:translateY(-4px); box-shadow:0 6px 18px #ffd16644; }
+.tile.pend{ color:var(--gold); }
+.tile.l0{ background:var(--red-d); border-color:var(--red); }
+.tile.l1{ background:var(--blue-d); border-color:var(--blue); }
+.tile .lk{ position:absolute; top:2px; right:5px; font-size:clamp(11px,3vw,14px); }
+.tile.pop{ animation:pop .45s ease; }
+@keyframes pop{ 0%{transform:scale(1)} 40%{transform:scale(1.18)} 100%{transform:scale(1)} }
+.word.shake{ animation:shake .35s; }
+@keyframes shake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+.ladder{ display:flex; gap:5px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none; min-height:30px; align-items:center; }
+.ladder::-webkit-scrollbar{ display:none; }
+.rung{ flex:none; padding:4px 8px; border-radius:8px; font-weight:800; font-size:clamp(12px,3.3vw,14px); text-transform:uppercase; letter-spacing:1px; background:var(--panel); border:1px solid var(--line); }
+.rung.r0{ border-color:var(--red); } .rung.r1{ border-color:var(--blue); } .rung.rp{ color:var(--muted); font-style:italic; text-transform:none; letter-spacing:0; }
+.rung u{ text-decoration:none; color:var(--gold); }
+.kb{ display:flex; flex-direction:column; gap:5px; margin-top:auto; }
+.kb .kr{ display:flex; gap:4px; justify-content:center; }
+.key{ flex:1; max-width:46px; min-height:46px; border-radius:8px; background:var(--panel2); border:1px solid var(--line); font-weight:800; font-size:clamp(15px,4.2vw,19px); text-transform:uppercase; padding:0; }
+.key:active{ background:var(--line); }
+.actions{ display:flex; gap:6px; }
+.actions .btn{ flex:1; padding:0 6px; }
+.actions .btn.play{ flex:1.6; }
+.toast{ width:100%; background:#2a1a24; border:1px solid var(--red);
+  border-radius:14px; padding:10px 12px; z-index:30; display:flex; gap:8px; align-items:center; font-weight:700; font-size:clamp(13px,3.6vw,15px); box-shadow:0 10px 30px #0008; }
+.toast.good{ background:#13281f; border-color:var(--ok); }
+.toast.info{ background:#1b2236; border-color:var(--gold); }
+.toast span{ flex:1; }
+.toast .btn{ min-height:44px; padding:0 10px; font-size:14px; }
+
+/* ---------- overlays ---------- */
+.ov{ position:fixed; inset:0; background:#05080fdd; z-index:20; display:flex; align-items:center; justify-content:center; padding:14px; }
+.ov .box{ width:min(100%,500px); max-height:100%; overflow-y:auto; background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:16px; display:flex; flex-direction:column; gap:10px; }
+.ov h2{ margin:0; font-size:clamp(22px,6.5vw,30px); text-align:center; }
+.bigsc{ display:flex; justify-content:space-around; text-align:center; }
+.bigsc div b{ display:block; font-size:clamp(30px,10vw,46px); }
+.bigsc .c0{ color:var(--red); } .bigsc .c1{ color:var(--blue); }
+.why{ text-align:center; color:var(--muted); font-size:clamp(13px,3.6vw,15px); }
+.chain{ display:flex; flex-wrap:wrap; gap:5px; justify-content:center; }
+.ov .row{ display:flex; gap:8px; }
+.ov .row .btn{ flex:1; }
+.help{ text-align:center; color:var(--muted); font-size:clamp(12px,3.3vw,14px); }
+@media (max-height:520px){ #app{ overflow-y:auto; } #play{ flex:none; } .kb{ margin-top:0; } }
+.confetti{ position:fixed; inset:0; pointer-events:none; z-index:25; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- SETUP -->
+  <div id="setup">
+    <div style="text-align:center;padding-top:6px">
+      <h1>Lock &amp; Ladder</h1>
+      <div class="small">One word. Two teams. Change a letter, steal the ladder.</div>
+    </div>
+    <div class="card">
+      <h2>Teams</h2>
+      <div class="teamrow"><span class="dot" style="background:var(--red)"></span><input id="n0" maxlength="14" value="Red Team" aria-label="Team 1 name"></div>
+      <div class="teamrow" style="margin:0"><span class="dot" style="background:var(--blue)"></span><input id="n1" maxlength="14" value="Blue Team" aria-label="Team 2 name"></div>
+    </div>
+    <div class="card">
+      <h2>Rounds <span class="small">(even, so both teams start equally often)</span></h2>
+      <div class="seg" id="segRounds"><button data-v="2">2</button><button data-v="4">4</button><button data-v="6">6</button></div>
+      <h2 style="margin-top:12px">Turn timer</h2>
+      <div class="seg" id="segTimer"><button data-v="0">Off</button><button data-v="30">30s</button><button data-v="45">45s</button><button data-v="60">60s</button></div>
+    </div>
+    <div class="card">
+      <h2>How to play</h2>
+      <ol class="rules">
+        <li>Both teams share <b>one word</b>. Each team has its own <b>target word</b> on screen.</li>
+        <li>On your turn, tap a tile and change <b>one letter</b> to make a new real word. Everyone shouts ideas!</li>
+        <li>Put <b>your</b> target letter in its slot and that tile <b>LOCKS</b> for you. Points for every lock.</li>
+        <li>Careful: drop the <b>rival's</b> letter in its slot and you've gifted them the lock.</li>
+        <li>Every word is used up once played. No going back.</li>
+        <li>First team to <b>3 locks</b> ends the round and gets <b>+1 bonus</b>. Two passes in a row (stuck or out of time) also ends it.</li>
+        <li>Word not in the dictionary? The room can vote to allow it.</li>
+      </ol>
+    </div>
+    <button class="btn primary" id="btnStart" style="min-height:56px;font-size:20px">Start Game</button>
+    <button class="btn hide" id="btnResume">Resume saved game</button>
+  </div>
+
+  <!-- PLAY -->
+  <div id="play" class="hide">
+    <div class="topbar">
+      <span class="ttl">Lock &amp; Ladder</span>
+      <span class="rnd" id="rndLbl">Round 1 / 4</span>
+      <button class="iconbtn" id="btnSnd" aria-label="Sound">🔊</button>
+      <button class="iconbtn" id="btnMenu" aria-label="Menu">☰</button>
+    </div>
+    <div class="targets">
+      <div class="trow t0" id="tr0"><span class="nm" id="tn0">Red</span><span class="mini" id="tm0"></span><span class="sc" id="ts0">0</span></div>
+      <div class="trow t1" id="tr1"><span class="nm" id="tn1">Blue</span><span class="mini" id="tm1"></span><span class="sc" id="ts1">0</span></div>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="timer" id="timerBar"><i id="timerFill"></i></div>
+    <div class="word" id="word"></div>
+    <div class="ladder" id="ladder"></div>
+    <div class="help" id="help"></div>
+    <div class="toast hide" id="toast"><span id="toastMsg"></span><button class="btn hide" id="toastBtn"></button></div>
+    <div class="kb" id="kb"></div>
+    <div class="actions">
+      <button class="btn" id="btnHint">💡 Hint</button>
+      <button class="btn" id="btnPass">Pass</button>
+      <button class="btn primary play" id="btnPlay">Play Rung ▶</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov hide" id="ovMenu"><div class="box">
+  <h2>Paused</h2>
+  <button class="btn primary" id="mResume">Resume</button>
+  <button class="btn" id="mRules">How to play</button>
+  <button class="btn" id="mNew">Restart game (back to setup)</button>
+</div></div>
+
+<div class="ov hide" id="ovRules"><div class="box">
+  <h2>How to play</h2>
+  <ol class="rules" id="rulesCopy"></ol>
+  <button class="btn primary" id="rulesOk">Got it</button>
+</div></div>
+
+<div class="ov hide" id="ovRound"><div class="box">
+  <h2 id="rdTitle">Round over</h2>
+  <div class="why" id="rdWhy"></div>
+  <div class="bigsc"><div class="c0"><span id="rdN0"></span><b id="rdS0">0</b><span class="small" id="rdG0"></span></div>
+       <div class="c1"><span id="rdN1"></span><b id="rdS1">0</b><span class="small" id="rdG1"></span></div></div>
+  <div class="small" style="text-align:center">The ladder:</div>
+  <div class="chain" id="rdChain"></div>
+  <div class="why" id="rdNext"></div>
+  <button class="btn primary" id="rdGo">Next round</button>
+</div></div>
+
+<div class="ov hide" id="ovEnd"><div class="box">
+  <h2 id="endTitle">Winner!</h2>
+  <div class="bigsc"><div class="c0"><span id="endN0"></span><b id="endS0">0</b></div><div class="c1"><span id="endN1"></span><b id="endS1">0</b></div></div>
+  <div class="why" id="endStats"></div>
+  <div class="row"><button class="btn" id="endSudden">Sudden-death round</button></div>
+  <div class="row"><button class="btn" id="endSetup">Change setup</button><button class="btn primary" id="endAgain">Play again</button></div>
+</div></div>
+
+<canvas class="confetti" id="confetti"></canvas>
+
+<script>
+/* 4-letter dictionary (shared with the Word Ladder Climb puzzle, profanity filtered below) */
+const WORDS4=("able ably ache acid acre aged ague aide akin alee ales alit ally aloe also alto amen amid amok amps anew ante anti ants apex aqua arch arcs area aria arid arms army aunt aura auto avid away awed awes axed axes axis baby back bade bags bail bait bake bald bale balk ball balm band bane bang bank bans barb bard bare bark barn bars base bash bask bass bath bats bawl bays bead beak beam bean bear beat beau beck beds beef been beep beer bees beet bell belt bend bent best beta bets bevy bias bide bike bile bill bind bird bite bits blab blah bled blew blip blob blot blow blue blur boar boas boat bode body bogs boil bold bole bolt bomb bond bone bony book boom boon boor boot bops bore born boss both bout bowl bows boxy boys brag bran brat bray bred brew brig brim brow buck buds buff bugs bulb bulk bull bump bums bunk buns bunt buoy burn burp burr bury bush bust busy butt buys buzz byte cabs cafe cage cake calf call calm came camp cane cans cape caps card care carp cars cart case cash cask cast cats cave cell cent chap char chat chef chew chic chin chip chit chop chow chub chug chum cite city clad clam clan clap claw clay clef clip clod clog clop clot club clue coal coat coax cobs code coil coin coke cola cold colt coma comb come cone cons cook cool coop cope cops copy cord core cork corn cost cots cove cowl cows cozy crab crag cram crew crib crop crow crud cube cubs cuff cull cult cums cups curb curd cure curl curs curt cusp cute cuts dabs dads daft dais dale dame damp dams dare dark darn dart dash data date dawn days daze dead deaf deal dean dear debt deck deed deem deep deer dell demo dens dent deny desk dews dial dice died dies diet digs dime dine ding dins dint dips dire dirt disc dish disk diva dive dock docs does doff dogs dole doll dolt dome done dons doom door dope dorm dose dote dots dour dove down doze drab drag dram draw dray drew drip drop drub drug drum dual dube duck duct dude duds duel duet dull duly dumb dump dune dung dunk duos dupe dusk dust duty dyed dyes earl earn ears ease east easy eats eave ebbs eddy edge edgy edit eels eggs egos eked ekes elks ells elms else emit emus ends envy epic eras euro even ever eves evil ewes exam exit eyed eyes face fact fade fads fail fair fake fall fame fang fans fare farm fast fate fawn fays faze fear feat feed feel fees feet fell felt fend fens fern fess fest feud fiat fibs fief fife figs file fill film find fine fink fins fire firm firs fish fist fits five fizz flab flag flak flap flat flaw flax flay flea fled flee flew flex flip flit floe flog flop flow flub flue flus foal foam foci foes fogs foil fold folk fond font food fool foot fops ford fore fork form fort foul four fowl foxy frat fray free fret frog from fuel full fume fund funk furl furs fury fuse fuss futz fuzz gabs gage gags gain gait gala gale gall game gang gaol gape gaps garb gash gasp gate gave gawk gays gaze gear geek gees geld gems gene gens gent germ gets ghee gift gigs gild gill gilt gins gird girl gist give glad glam gled glee glen glib glob glom glop glow glue glum gnat gnaw goad goal goat gobs gods goer goes gold golf gone gong good goof gook goon goop gore gory gosh gout gown grab gram gray grew grey grid grim grin grip grit grow grub gulf gull gulp gums guns guru gush gust guts guys gyms gyre hack haft hags hail hair hake hale half hall halo halt hams hand hang hard hare hark harm harp hart hash hasp hate hats haul have hawk hays haze hazy head heal heap hear heat heck heed heel heft heir held hell helm help hemp hems hens herb herd here hero hers hewn hews hick hide high hike hill hilt hind hint hips hire hiss hits hive hoax hobo hobs hock hoed hoes hogs hold hole holy home hone hong honk hood hoof hook hoop hoot hope hops horn hose host hots hour hove howl hows hubs hued hues huff huge hugs hulk hull hump hums hung hunk hunt hurl hurt hush husk huts hymn ibex ibis iced ices icky icon idea idle idly idol iffy ills imps inch info inks inky inns into ions iota ired ires iris irks iron isle itch item jabs jack jade jail jamb jams jane jars java jaws jays jazz jean jeep jeer jell jerk jest jets jibe jibs jiff jigs jilt jinx jive jobs jock jogs john join joke jolt josh jota jots joys judo jugs juju juke july jump junk jure jury just jute juts kale kava kayo keel keen keep kegs kelp kept keys kick kids kiln kilt kind kine king kink kirk kiss kite kits kiwi knee knew knit knob knot know koan kohl kola labs lace lack lacy lade lads lady lags laid lain lair lake lamb lame lamp land lane laps lard lark lash lass last late lath laud lava lawn laws lays laze lazy lead leaf leak lean leap left legs lend lens lent less lest lets levy lewd liar lice lick lids lied lief lien lies lieu life lift like lilt lily limb lime limn limo limp line link lint lion lips lira lisp list lite live load loaf loam loan lobe lobs loci lock loco lode loft loge logo logs loin loll lone long look loom loon loop loot lope lops lord lore lorn lose loss lost lots loud lout love lown lows luau lube luck luge lugs lull lump lung lure lurk lush lust lute lwei lych lyes lynx lyre mace made maid mail maim main make male mall malt mama mane mans many maps mare mark mars mart mash mask mass mast mate math mats matt maul maws maze mead meal mean meat meek meet meld melt memo mend menu meow mere mesa mesh mess mewl mews mica mice mild mile milk mill mils mime mind mine mini mink mint minx mire miss mist mite mitt moan moat mobs mock mode mods mojo mold mole molt moms monk mood moon moor moos moot mope mops more morn moss most mote moth move mown mows much muck muff mugs mule mull mums muse mush musk muss must mute mutt myna myth nabs nags nail name nape naps nard nary nave navy nays near neat neck need neem neon nerd ness nest nets news newt next nibs nice nick nigh nine nips nite nits node nods noel noes none nook noon nope norm nose nosh nosy note noun nous nova nubs nude nuke null numb nuns nuts oafs oaks oars oath oats obey oboe odds oder odes odor offs ogle ogre oils oily oink okay okra olds oleo omen omit once ones only onto onus onyx ooze oozy opal open opts opus oral orbs orca ores ouch ours oust outs oval oven over ovum owed owes owls owns oxen pace pack pact pads page paid pail pain pair pale pall palm pals pane pang pans pant papa paps para pard pare park pars part pass past pate path pats pave pawl pawn paws pays peak peal pear peas peat peck peek peel peep peer pegs pelt pens peon peps perk perm pert peso pest pets pews pica pick pied pier pies pigs pike pile pill pimp pine ping pink pins pint piny pion pipe pips pita pith pits pity plan play plea pleb pled plod plop plot plow ploy plug plum plus pock pods poem poet poke poky pole poll polo poly pomp pond pone pony pooh pool poop poor pope pops pore pork porn port pose posh post posy pots pour pout pows pram prat pray prep prey prig prim prod prof prom prop prow pubs puck puff pugs puke pull pulp puma pump punk puns punt puny pupa pups pure purl purr push puss puts putt pyre quad quay quid quip quit quiz race rack racy raft rage rags raid rail rain rake ramp rams rang rani rank rant rape raps rapt rare rash rasp rate rats rave rays raze read real ream reap rear redo reds reed reef reek reel rein rely rend rent reps rest revs rhea rial ribs rice rich rick ride rids rife riff rift rigs rile rill rime rims rind ring rink riot ripe rips rise risk rite road roam roan roar robe robs rock rode rods roes roil role roll romp rood roof rook room root rope ropy rose rosy rota rote rots roue roup rout rove rows rube rubs ruby rude rued rues ruff rugs ruin rule rump rune rung runs runt ruse rush rusk rust ruts ryes sack sacs safe saga sage sago sags said sail sake sale salt same sand sane sang sank saps sari sash sass sate save sawn saws says scab scad scam scan scar scat scot scow scud scum seal seam sear seas seat sect seed seek seem seen seep seer sees self sell semi send sent sera sere serf sets sewn sews sext shag shah sham shaw shay shed shes shew shim shin ship shit shod shoe shoo shop shot show shun shut sick side sift sigh sign silk sill silo silt sing sink sins sips sire sirs site sits size skat skew skid skim skin skip skit skua slab slag slam slap slat slaw slay sled slew slid slim slip slit slob sloe slog slop slot slow slug slum slur slut smit smog smug smut snag snap snip snit snob snot snow snub snug soak soap soar sobs sock soda sods sofa soft soil sold sole soli solo some sone song sons soon soot sops sora sore sort soul soup sour sown sows soya spam span spar spas spat spay spec sped spew spin spit spot spry spud spun spur stab stag star stat stay stem step stew stir stoa stop stow stub stud stum stun stye subs such suck suds sued sues suet suit sulk sumo sump sums sung sunk suns sups sure surf swab swag swam swan swap swat sway swig swim swob swop swot syce sync tabs tach tack taco tact tads tags tail take tale talk tall tame tamp tang tank tans tape taps tare tarn taro tarp tars tart task taut taxi teak teal team tear teas teat teed teem teen tees tell temp tend tens tent term tern test text than that thaw thee them then thew they thin this thou thud thug thus tick tics tide tidy tied tier ties tiff tile till tilt time tine ting tins tint tiny tips tire toad toed toes tofu toga togs toil toke told toll tomb tome toms tone tong tons took tool toon toot tops tore torn tort toss tost tote tots tour tout town toys tram trap tray tree trek tres trey trig trim trio trip trod trot troy true tsar tuba tube tubs tuck tufa tuff tuft tugs tule tump tuna tune tung turf turn tush tusk tutu twas twee twig twin twit twos tyke type typo tyre tzar ugly ulna umps undo unit unto upon urea urge uric urns used user uses utah vain vale vamp vane vans vary vase vast vats veal veer veil vein vend vent verb very vest veto vets vial vibe vice vied vies view vile vine viol visa vise vita void vole volt vote vows wade wadi wads waft wage wags waif wail wait wake wale walk wall wand wane wans want ward ware warm warn warp wars wart wary wash wasp watt wave wavy waxy ways weak weal wean wear webs weds weed week ween weep weft weir weld well welt wend went wept were wert west wets what when whet whew whey whim whip whir whit whiz whoa whom whop wick wide wife wigs wild wile will wilt wily wimp wind wine wing wink wino wins winy wipe wire wiry wise wish wisp wist with wits wive woes woke woks wold wolf womb wont wood woof wool woos word wore work worm worn wort wove wows wrap wren writ wych yack yaks yams yang yank yaps yard yare yarn yawl yawn yaws yeah year yeas yell yelp yens yeti yews yips yoga yoke yolk yore your yowl yuck yuks yule yurt zags zany zaps zeal zeds zero zest zeta zigs zinc zing zips zits zone zoom zoos").split(" ");
+/* Everyday words used for targets and starting words, so nobody has to ask "is AGUE a word?" */
+const COMMON=("able acid aged also area army away baby back bake ball band bank barn base bath bead beak beam bean bear beat beef bell belt bend best bike bill bird bite blue boat body bold bolt bone book boot born boss both bowl bulb bull bump burn bush busy cake calf call calm came camp card care cart case cash cast cave cell chat chin chip city clap claw clay coal coat code coin cold come cook cool cope copy cord core corn cost crab crew crop crow cube cure cute dark dart dash date dawn days dear deck deep deer desk dice dime dirt dish dive dock dogs doll dome done door dose dots dove down drag draw drip drop drum duck dust duty earn east easy edge face fact fail fair fall farm fast fear feed feel feet fell felt fern file fill film find fine fire firm fish fist five flag flat flip flow foam fold folk food fool foot fork form fort four free frog fuel full fund gain game gate gave gear gift girl give glad glow glue goal goat gold golf gone good grab gray grin grip grow gulp hair half hall hand hang hard harm harp hat hate have hawk head heal heap hear heat help herb herd here hero hide high hike hill hint hive hold hole home hood hook hoop hope horn hose hour huge hump hunt hurt idea iron jail jump just keep kept kick kind king kite knee knot know lace lake lamb lamp land lane last late lawn lead leaf lean left lend life lift like lime line lion list live load loaf lock long look loop lost loud love luck lump made mail main make mane many mark mask mate meal meat melt mild milk mill mind mine mint mist mole mood moon more most moth move much mule nail name neck need nest nice nose note oven pack page paid pail pain pair pale palm park part pass past path peak pear pest pick pile pine pink pipe plan play plot plum pole pond pony pool poor port pose post pour pull pump pure push race rain rake rank rare rest rice rich ride ring ripe rise road roar rock role roll roof room root rope rose ruby rule rush rust safe sail salt same sand save seal seat seed seen sell send ship shoe shop shot show sick side sign silk sing sink size skin slip slow snow soap sock soft soil some song soon sort soup spin spot star stay step stew stop such suit sung sure swim tail take tale talk tall tame tank tape task team tear tell tent test than that them then they thin tide tile time tiny tire toad told tone tool town tree trip true tube tune turn twin vase vest view vine vote wade wait wake walk wall wand want warm wash wave weak wear week well went west what when wide wife wild wind wine wing wink wipe wire wise wish with wolf wood wool word wore work worm wrap yard yarn year yell yolk zero zone zoom").split(" ");
+
+/* ======================= dictionary ======================= */
+const BLOCK=new Set(("shit porn rape slut pimp cums sext whore nazi homo dick piss crap damn hell twat tits cunt fags dyke kike gook coon spic wank turd boob nude lewd jane john utah java july").split(" "));
+const DICT=new Set(WORDS4.filter(w=>/^[a-z]{4}$/.test(w)&&!BLOCK.has(w)));
+COMMON.forEach(w=>DICT.add(w));
+const LS='cowork-lockladder-';
+let allowed=new Set();               // room-voted words, persisted with the game
+const isWord=w=>DICT.has(w)||allowed.has(w);
+function neighbours(w,locked,burned){
+  const out=[];
+  for(let p=0;p<4;p++){ if(locked[p]>=0) continue;
+    for(let c=97;c<123;c++){ const ch=String.fromCharCode(c); if(ch===w[p]) continue;
+      const n=w.slice(0,p)+ch+w.slice(p+1); if(isWord(n)&&!burned.includes(n)) out.push([n,p]); } }
+  return out;
+}
+const posFreq=[{},{},{},{}];
+DICT.forEach(w=>{ for(let i=0;i<4;i++) posFreq[i][w[i]]=(posFreq[i][w[i]]||0)+1; });
+const degree=w=>neighbours(w,[-1,-1,-1,-1],[]).length;
+const POOL=COMMON.filter(w=>DICT.has(w)&&degree(w)>=7&&[0,1,2,3].every(i=>posFreq[i][w[i]]>=30));
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+function makePuzzle(){
+  for(let t=0;t<5000;t++){
+    const R=rnd(POOL), B=rnd(POOL); let ok=true;
+    for(let i=0;i<4;i++) if(R[i]===B[i]) ok=false;
+    if(!ok) continue;
+    const st=rnd(POOL);
+    for(let i=0;i<4;i++) if(st[i]===R[i]||st[i]===B[i]) ok=false;
+    if(!ok||st===R||st===B) continue;
+    // both teams must have a lock within reach of the opening position (one or two rungs)
+    const reach=(tg)=>{ const n1=neighbours(st,[-1,-1,-1,-1],[st]);
+      if(n1.some(([n,p])=>n[p]===tg[p])) return true;
+      return n1.slice(0,40).some(([m])=>neighbours(m,[-1,-1,-1,-1],[st,m]).some(([n,p])=>n[p]===tg[p])); };
+    if(!reach(R)||!reach(B)) continue;
+    return {targets:[R,B], start:st};
+  }
+  return {targets:['cold','warm'], start:'bush'};
+}
+
+/* ======================= audio ======================= */
+let actx=null, sndOn=localStorage.getItem(LS+'snd')!=='0';
+function ac(){ if(!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(actx&&actx.state==='suspended') actx.resume(); return actx; }
+function tone(f,d=.12,type='triangle',v=.12,delay=0){
+  if(!sndOn) return; const c=ac(); if(!c) return; const t0=c.currentTime+delay;
+  const o=c.createOscillator(), g=c.createGain(); o.type=type; o.frequency.value=f;
+  g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(v,t0+.01); g.gain.exponentialRampToValueAtTime(.0001,t0+d);
+  o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0+d+.03);
+}
+const sTap=()=>tone(660,.05,'sine',.06);
+const sRung=()=>{ tone(523,.09); tone(659,.1,'triangle',.1,.06); };
+const sLock=()=>{ [523,659,784,1047].forEach((f,i)=>tone(f,.16,'triangle',.12,i*.07)); };
+const sGift=()=>{ tone(392,.15,'sawtooth',.07); tone(311,.25,'sawtooth',.07,.12); };
+const sBad=()=>tone(150,.2,'sawtooth',.09);
+const sTick=()=>tone(1200,.03,'square',.04);
+const sWin=()=>{ [523,659,784,1047,1319].forEach((f,i)=>tone(f,.25,'triangle',.12,i*.11)); };
+
+/* ======================= state ======================= */
+let S=null;                 // whole game, persisted
+let sel=-1, pend=null;      // UI only: selected tile + pending letter
+let setupOpts={rounds:+(localStorage.getItem(LS+'rounds')||4), timer:+(localStorage.getItem(LS+'timer')||45)};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function save(){ if(S){ S.allowed=[...allowed]; localStorage.setItem(LS+'state',JSON.stringify(S)); } }
+function clearSave(){ localStorage.removeItem(LS+'state'); }
+
+function newGame(){
+  const nm=i=>($('n'+i).value.trim()||(i?'Blue Team':'Red Team')).slice(0,14);
+  S={ names:[nm(0),nm(1)], rounds:setupOpts.rounds, timer:setupOpts.timer, roundNo:0, scores:[0,0],
+      totals:{locks:[0,0],gifts:[0,0],rungs:[0,0]}, sudden:false, r:null, phase:'play', allowed:[] };
+  allowed=new Set();
+  newRound();
+}
+function newRound(){
+  S.roundNo++;
+  const pz=makePuzzle();
+  const starter=(S.roundNo-1)%2;      // alternates every round
+  S.r={ targets:pz.targets, word:pz.start, locked:[-1,-1,-1,-1], burned:[pz.start],
+        ladder:[{w:pz.start,t:-1}], turn:starter, starter, passes:0, locks:[0,0], gifts:[0,0], hints:[1,1],
+        left:S.timer*1000, end:null };
+  S.phase='play'; sel=-1; pend=null;
+  save(); show('play'); render();
+  checkStuck();
+}
+
+/* ======================= moves ======================= */
+function tryPlay(force=false){
+  const r=S.r; if(S.phase!=='play') return;
+  if(sel<0||!pend){ toast('Tap a tile, then a letter.','info'); bad(); return; }
+  const nw=r.word.slice(0,sel)+pend+r.word.slice(sel+1);
+  if(r.burned.includes(nw)){ toast(`${nw.toUpperCase()} is already on the ladder.`); bad(); return; }
+  if(!isWord(nw)&&!force){
+    toast(`${nw.toUpperCase()} isn't in our dictionary.`,'bad',`Room says it's a word ✓`,()=>{ allowed.add(nw); hideToast(); tryPlay(true); });
+    bad(); return;
+  }
+  commit(nw,sel);
+}
+function commit(nw,pos){
+  const r=S.r, t=r.turn, o=1-t;
+  r.word=nw; r.burned.push(nw);
+  let claim=-1;
+  if(nw[pos]===r.targets[t][pos]){ claim=t; }
+  else if(nw[pos]===r.targets[o][pos]){ claim=o; }
+  r.ladder.push({w:nw,t,pos,claim});
+  S.totals.rungs[t]++;
+  r.passes=0; sel=-1; pend=null;
+  if(claim>=0){
+    r.locked[pos]=claim; r.locks[claim]++; S.scores[claim]++; S.totals.locks[claim]++;
+    if(claim===t){ sLock(); toast(`🔒 ${S.names[t]} locks the ${nw[pos].toUpperCase()}!`,'good'); }
+    else { r.gifts[t]++; S.totals.gifts[t]++; sGift(); toast(`🎁 Oops! That ${nw[pos].toUpperCase()} is a gift lock for ${S.names[o]}.`); }
+    popTile=pos;
+  } else { sRung(); hideToast(); }
+  if(r.locks[0]>=3||r.locks[1]>=3){ const w=r.locks[0]>=3?0:1; S.scores[w]++; return endRound('three',w); }
+  if(r.ladder.length>=33) return endRound('cap');
+  nextTurn();
+}
+function pass(reason){
+  const r=S.r; if(S.phase!=='play') return;
+  r.ladder.push({w:reason==='time'?'⏱ time':reason==='stuck'?'🚫 stuck':'pass',t:r.turn,pass:true});
+  r.passes++; sel=-1; pend=null;
+  toast(reason==='time'?`⏱ Time! ${S.names[r.turn]} passes.`:reason==='stuck'?`🚫 ${S.names[r.turn]} has no legal rung and must pass.`:`${S.names[r.turn]} passes.`,'info');
+  if(r.passes>=2) return endRound('passes');
+  nextTurn();
+}
+function nextTurn(){
+  const r=S.r; r.turn=1-r.turn; r.left=S.timer*1000; save(); render(); checkStuck();
+}
+function checkStuck(){
+  const r=S.r; if(S.phase!=='play') return;
+  if(r.locked.every(x=>x>=0)) return setTimeout(()=>{ if(S.phase==='play'&&S.r===r) endRound('full'); },700);
+  if(!neighbours(r.word,r.locked,r.burned).length){ setTimeout(()=>{ if(S.phase==='play'&&S.r===r&&!neighbours(r.word,r.locked,r.burned).length) pass('stuck'); },900); }
+}
+function hint(){
+  const r=S.r, t=r.turn; if(S.phase!=='play') return;
+  if(r.hints[t]<1){ toast('Hint already used this round.','info'); return; }
+  const moves=neighbours(r.word,r.locked,r.burned);
+  const mine=moves.filter(([n,p])=>n[p]===r.targets[t][p]);
+  r.hints[t]--; save(); render();
+  if(mine.length){ const [,p]=rnd(mine); toast(`💡 A lock is possible right now: put ${r.targets[t][p].toUpperCase()} in tile ${p+1}.`,'info'); }
+  else if(moves.length){ const safe=moves.filter(([n,p])=>n[p]!==r.targets[1-t][p]); const [n]=rnd(safe.length?safe:moves);
+    toast(`💡 No lock this turn. A safe rung: ${n.toUpperCase()} (${moves.length} legal rungs in all).`,'info'); }
+  else toast('💡 No legal rungs at all, so you must pass.','info');
+}
+function endRound(why,winner){
+  const r=S.r; r.end={why,winner}; S.phase='round'; save(); render(); hideToast();
+  const gm=S.roundNo>=S.rounds && !(S.sudden&&S.scores[0]===S.scores[1]);
+  $('rdTitle').textContent=why==='three'?`${S.names[winner]} locks 3!`:'Round over';
+  $('rdWhy').textContent=why==='three'?'+1 lock-out bonus':why==='full'?'All four tiles are locked. Split ladder!':why==='passes'?'Two passes in a row: the ladder is stuck.':'The ladder hit its 32-rung limit.';
+  for(let i=0;i<2;i++){ $('rdN'+i).textContent=S.names[i]; $('rdS'+i).textContent=S.scores[i];
+    $('rdG'+i).textContent=`+${r.locks[i]+(why==='three'&&winner===i?1:0)} this round`; }
+  $('rdChain').innerHTML=ladderHTML(r,true);
+  $('rdNext').textContent=gm?'':`Next round: ${S.names[S.roundNo%2]} starts.`;
+  $('rdGo').textContent=gm?'Final scores':'Next round';
+  open('ovRound');
+  if(why==='three') { sWin(); confetti(winner); }
+}
+function nextFromRound(){
+  closeOv('ovRound');
+  const done=S.roundNo>=S.rounds && !(S.sudden&&S.scores[0]===S.scores[1]);
+  if(done) return endGame();
+  if(S.sudden&&S.roundNo>=S.rounds) S.rounds=S.roundNo+1;   // still tied after sudden death: go again
+  newRound();
+}
+function endGame(){
+  S.phase='end'; save();
+  const [a,b]=S.scores, w=a===b?-1:(a>b?0:1);
+  $('endTitle').textContent=w<0?"It's a tie!":`${S.names[w]} wins!`;
+  for(let i=0;i<2;i++){ $('endN'+i).textContent=S.names[i]; $('endS'+i).textContent=S.scores[i]; }
+  const T=S.totals;
+  $('endStats').innerHTML=`Locks: ${T.locks[0]} – ${T.locks[1]} · Gift locks given: ${T.gifts[0]} – ${T.gifts[1]}<br>Rungs played: ${T.rungs[0]} – ${T.rungs[1]}`+(allowed.size?`<br>Room-voted words: ${[...allowed].map(x=>x.toUpperCase()).join(', ')}`:'');
+  $('endSudden').parentElement.classList.toggle('hide',w>=0);
+  open('ovEnd');
+  if(w>=0){ sWin(); confetti(w); }
+}
+
+/* ======================= render ======================= */
+let popTile=-1;
+const KEYS=['qwertyuiop','asdfghjkl','zxcvbnm'];
+function buildKb(){
+  $('kb').innerHTML=KEYS.map(row=>`<div class="kr">${[...row].map(k=>`<button class="key" data-k="${k}">${k}</button>`).join('')}</div>`).join('');
+}
+function ladderHTML(r,all){
+  const items=r.ladder.map(x=>{
+    if(x.pass) return `<span class="rung rp r${x.t}">${esc(x.w)}</span>`;
+    const w=x.w.toUpperCase(); const html=x.pos!=null&&x.claim>=0?w.slice(0,x.pos)+`<u>${w[x.pos]}</u>`+w.slice(x.pos+1):w;
+    return `<span class="rung ${x.t<0?'':'r'+x.t}">${html}${x.claim>=0?(x.claim===x.t?'🔒':'🎁'):''}</span>`;
+  });
+  return all?items.join(''):items.join('<span class="small">›</span>');
+}
+function render(){
+  if(!S||!S.r) return; const r=S.r;
+  $('rndLbl').textContent=S.sudden&&S.roundNo===S.rounds?`Sudden death!`:`Round ${S.roundNo} / ${S.rounds}`;
+  for(let i=0;i<2;i++){
+    $('tn'+i).textContent=S.names[i]; $('ts'+i).textContent=S.scores[i];
+    $('tr'+i).classList.toggle('active',S.phase==='play'&&r.turn===i);
+    $('tm'+i).innerHTML=[...r.targets[i]].map((c,p)=>`<span class="${r.locked[p]===i?'got':r.locked[p]>=0?'lost':''}">${c}</span>`).join('');
+  }
+  const t=r.turn;
+  $('status').innerHTML=S.phase==='play'?`<span class="tn${t}">${esc(S.names[t])}</span>: change one letter`:'';
+  $('word').innerHTML=[...r.word].map((c,p)=>{
+    const lk=r.locked[p]; const show=(p===sel&&pend)?pend:c;
+    return `<button class="tile ${lk>=0?'l'+lk:''} ${p===sel?'sel':''} ${p===sel&&pend?'pend':''} ${p===popTile?'pop':''}" data-p="${p}" aria-label="Tile ${p+1}">${show}${lk>=0?'<span class="lk">🔒</span>':''}</button>`;
+  }).join('');
+  popTile=-1;
+  const lad=$('ladder'); lad.innerHTML=ladderHTML(r,false); lad.scrollLeft=lad.scrollWidth;
+  $('btnHint').textContent=`💡 Hint${r.hints[t]?'':' (used)'}`; $('btnHint').disabled=!r.hints[t];
+  $('btnPlay').disabled=!(sel>=0&&pend);
+  $('help').innerHTML=S.phase!=='play'?'':sel<0?`Tap a tile to change it · first to <b>3 🔒</b> takes the round`
+    :pend?`Play <b>${esc(r.word.slice(0,sel)+pend+r.word.slice(sel+1)).toUpperCase()}</b>? ${pend===r.targets[t][sel]?'🔒 That locks it!':pend===r.targets[1-t][sel]?'⚠️ That gifts a lock to the rival!':''}`
+    :`Now pick a new letter for tile ${sel+1}`;
+  $('timerBar').classList.toggle('hide',!S.timer);
+  drawTimer();
+}
+function drawTimer(){ if(!S||!S.r||!S.timer) return; $('timerFill').style.transform=`scaleX(${Math.max(0,S.r.left/(S.timer*1000))})`;
+  $('timerFill').style.background=S.r.left<10000?'var(--red)':'var(--gold)'; }
+
+function tapTile(p){
+  const r=S.r; if(S.phase!=='play') return;
+  if(r.locked[p]>=0){ toast(`Tile ${p+1} is locked by ${S.names[r.locked[p]]}.`,'info'); bad(); return; }
+  sTap(); if(sel===p){ sel=-1; pend=null; } else { sel=p; pend=null; } render();
+}
+function tapKey(k){
+  if(!S||S.phase!=='play') return;
+  if(sel<0){ // auto-pick: if exactly one unlocked tile, use it
+    const free=[0,1,2,3].filter(p=>S.r.locked[p]<0);
+    if(free.length===1) sel=free[0]; else { toast('Tap a tile first, then a letter.','info'); bad(); return; }
+  }
+  sTap(); pend=(k===S.r.word[sel])?null:k; render();
+}
+function bad(){ sBad(); const w=$('word'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); }
+
+/* ======================= toast / overlays ======================= */
+let toastT=0;
+function toast(msg,kind='bad',btn,fn){
+  const el=$('toast'); el.className='toast'+(kind==='good'?' good':kind==='info'?' info':'');
+  $('toastMsg').textContent=msg; const b=$('toastBtn');
+  if(btn){ b.textContent=btn; b.classList.remove('hide'); b.onclick=fn; } else { b.classList.add('hide'); b.onclick=null; }
+  clearTimeout(toastT); toastT=setTimeout(hideToast,btn?6000:2600);
+}
+function hideToast(){ $('toast').classList.add('hide'); }
+function open(id){ $(id).classList.remove('hide'); }
+function closeOv(id){ $(id).classList.add('hide'); }
+const anyOverlay=()=>['ovMenu','ovRules','ovRound','ovEnd'].some(id=>!$(id).classList.contains('hide'));
+function show(which){ $('setup').classList.toggle('hide',which!=='setup'); $('play').classList.toggle('hide',which!=='play'); }
+
+/* ======================= timer loop ======================= */
+let lastT=performance.now(), lastSec=99;
+setInterval(()=>{
+  const now=performance.now(), dt=now-lastT; lastT=now;
+  if(!S||S.phase!=='play'||!S.timer||anyOverlay()||document.hidden||$('play').classList.contains('hide')) return;
+  S.r.left-=dt;
+  const sec=Math.ceil(S.r.left/1000); if(sec<=5&&sec>0&&sec!==lastSec) sTick(); lastSec=sec;
+  drawTimer();
+  if(S.r.left<=0){ S.r.left=0; pass('time'); }
+},100);
+
+/* ======================= confetti ======================= */
+function confetti(team){
+  const cv=$('confetti'), x=cv.getContext('2d'); cv.width=innerWidth; cv.height=innerHeight;
+  const cols=team?['#4aa8ff','#9fd2ff','#ffd166','#fff']:['#ff5a6e','#ffb3bd','#ffd166','#fff'];
+  const P=Array.from({length:120},()=>({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.5,vx:(Math.random()-.5)*3,vy:2+Math.random()*3,s:5+Math.random()*6,a:Math.random()*6,c:rnd(cols)}));
+  let f=0; (function step(){ x.clearRect(0,0,cv.width,cv.height); P.forEach(p=>{ p.x+=p.vx; p.y+=p.vy; p.a+=.1; x.save(); x.translate(p.x,p.y); x.rotate(p.a); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/4,p.s,p.s/2); x.restore(); });
+    if(++f<150) requestAnimationFrame(step); else x.clearRect(0,0,cv.width,cv.height); })();
+}
+
+/* ======================= wiring ======================= */
+function seg(id,key){
+  const el=$(id); const paint=()=>el.querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.v===setupOpts[key]));
+  el.addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; setupOpts[key]=+b.dataset.v; localStorage.setItem(LS+key,setupOpts[key]); paint(); });
+  paint();
+}
+seg('segRounds','rounds'); seg('segTimer','timer');
+const savedNames=JSON.parse(localStorage.getItem(LS+'names')||'null'); if(savedNames){ $('n0').value=savedNames[0]; $('n1').value=savedNames[1]; }
+buildKb();
+$('rulesCopy').innerHTML=document.querySelector('#setup .rules').innerHTML;
+
+$('btnStart').onclick=()=>{ ac(); localStorage.setItem(LS+'names',JSON.stringify([$('n0').value,$('n1').value])); newGame(); };
+$('btnResume').onclick=()=>{ ac(); resume(); };
+$('word').addEventListener('click',e=>{ const b=e.target.closest('.tile'); if(b) tapTile(+b.dataset.p); });
+$('kb').addEventListener('click',e=>{ const b=e.target.closest('.key'); if(b) tapKey(b.dataset.k); });
+$('btnPlay').onclick=()=>tryPlay();
+$('btnPass').onclick=()=>pass('pass');
+$('btnHint').onclick=hint;
+$('btnSnd').onclick=()=>{ sndOn=!sndOn; localStorage.setItem(LS+'snd',sndOn?'1':'0'); $('btnSnd').textContent=sndOn?'🔊':'🔇'; };
+$('btnSnd').textContent=sndOn?'🔊':'🔇';
+$('btnMenu').onclick=()=>open('ovMenu');
+$('mResume').onclick=()=>closeOv('ovMenu');
+$('mRules').onclick=()=>{ closeOv('ovMenu'); open('ovRules'); };
+$('rulesOk').onclick=()=>closeOv('ovRules');
+$('mNew').onclick=()=>{ closeOv('ovMenu'); clearSave(); S=null; hideToast(); show('setup'); $('btnResume').classList.add('hide'); };
+$('rdGo').onclick=nextFromRound;
+$('endAgain').onclick=()=>{ closeOv('ovEnd'); newGame(); };
+$('endSetup').onclick=()=>{ closeOv('ovEnd'); clearSave(); S=null; show('setup'); $('btnResume').classList.add('hide'); };
+$('endSudden').onclick=()=>{ closeOv('ovEnd'); S.sudden=true; S.rounds=S.roundNo+1; newRound(); };
+
+document.addEventListener('keydown',e=>{
+  if(!S||S.phase!=='play'||anyOverlay()||e.target.tagName==='INPUT') return;
+  const k=e.key.toLowerCase();
+  if(/^[1-4]$/.test(k)){ tapTile(+k-1); e.preventDefault(); }
+  else if(/^[a-z]$/.test(k)){ tapKey(k); }
+  else if(k==='enter'){ tryPlay(); e.preventDefault(); }
+  else if(k==='backspace'||k==='escape'){ sel=-1; pend=null; render(); }
+});
+addEventListener('pagehide',save);
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) save(); });
+
+function resume(){
+  allowed=new Set(S.allowed||[]); show('play'); render();
+  if(S.phase==='round'){ const e=S.r.end; S.phase='play'; endRound(e.why,e.winner); }
+  else if(S.phase==='end') endGame();
+  else checkStuck();
+}
+(function boot(){
+  try{ const raw=localStorage.getItem(LS+'state'); if(raw){ const s=JSON.parse(raw); if(s&&s.r&&s.names){ S=s; $('btnResume').classList.remove('hide'); } } }catch(e){ clearSave(); }
+})();
+</script>
+</body>
+</html>

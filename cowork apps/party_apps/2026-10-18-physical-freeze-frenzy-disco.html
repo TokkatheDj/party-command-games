@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<!-- CONCEPT: Physical/Music - Freeze-dance party where the host starts a synthesized beat, players dance to wacky style cards, the music cuts at a random moment (with sneaky fake-outs!) and everyone must freeze in a silly pose card while the host judges wobbles and the best pose -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Freeze Frenzy Disco</title>
+<style>
+:root{--bg:#1a0b3b;--bg2:#2b1260;--pink:#ff3d9a;--yellow:#ffe14d;--cyan:#38e8ff;--green:#4dff9d;--red:#ff4d5e;--ink:#fff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;overflow:hidden}
+body{background:radial-gradient(circle at 50% 0%,var(--bg2),var(--bg) 70%)}
+#app{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2vmin;text-align:center;position:relative;overflow-y:auto}
+.screen{display:none;width:100%;max-width:1100px;flex-direction:column;align-items:center;gap:2vmin}
+.screen.on{display:flex}
+h1{font-size:clamp(2.4rem,8vw,5.5rem);margin:0;line-height:1;letter-spacing:1px;text-shadow:0 0 20px var(--pink),0 4px 0 #000}
+h1 span{color:var(--yellow)}
+.sub{font-size:clamp(1rem,2.6vw,1.6rem);max-width:800px;margin:0;opacity:.95}
+.meta{font-size:clamp(.9rem,2vw,1.2rem);color:var(--cyan);font-weight:bold}
+.card{background:#ffffff14;border:3px solid #ffffff55;border-radius:24px;padding:2.5vmin 3vmin;width:100%}
+button{font:inherit;font-weight:900;border:0;border-radius:18px;padding:1.6vmin 3.4vmin;font-size:clamp(1.1rem,2.8vw,1.8rem);cursor:pointer;color:#1a0b3b;background:var(--yellow);box-shadow:0 6px 0 #0007;transition:transform .08s;touch-action:manipulation}
+button:active{transform:translateY(4px);box-shadow:0 2px 0 #0007}
+button.pink{background:var(--pink);color:#fff}
+button.cyan{background:var(--cyan)}
+button.green{background:var(--green)}
+button.ghost{background:#ffffff22;color:#fff;box-shadow:none}
+button.big{font-size:clamp(1.6rem,5vw,3.2rem);padding:2.4vmin 6vmin}
+.row{display:flex;flex-wrap:wrap;gap:1.6vmin;justify-content:center;align-items:center}
+input[type=text]{font:inherit;font-size:clamp(1.1rem,2.6vw,1.6rem);padding:1.4vmin 2vmin;border-radius:14px;border:3px solid var(--cyan);background:#0004;color:#fff;width:min(320px,70vw)}
+.chip{display:inline-flex;align-items:center;gap:.6em;background:var(--cyan);color:#1a0b3b;font-weight:900;border-radius:999px;padding:.5em 1em;font-size:clamp(1rem,2.4vw,1.5rem)}
+.chip b{cursor:pointer;background:#0002;border-radius:50%;width:1.5em;height:1.5em;display:inline-grid;place-items:center}
+.pill{font-weight:900;font-size:clamp(1rem,2.4vw,1.5rem);color:var(--yellow)}
+.bigtext{font-size:clamp(2rem,7vw,5rem);font-weight:900;line-height:1.1;margin:0;text-shadow:0 4px 0 #0008}
+.label{font-size:clamp(1rem,2.4vw,1.6rem);letter-spacing:3px;text-transform:uppercase;font-weight:900}
+#danceScreen.on{animation:bgpulse .6s infinite alternate}
+@keyframes bgpulse{from{filter:hue-rotate(0)}to{filter:hue-rotate(40deg)}}
+.emoji{font-size:clamp(4rem,14vw,10rem);line-height:1;display:block}
+.bounce{animation:bounce .5s infinite alternate ease-in-out}
+@keyframes bounce{from{transform:translateY(0) rotate(-6deg)}to{transform:translateY(-3vmin) rotate(6deg)}}
+.freezeBox{background:var(--red);border-radius:30px;padding:3vmin;border:6px solid #fff;animation:flash .35s infinite alternate}
+@keyframes flash{from{background:var(--red)}to{background:#b0102a}}
+.timer{font-size:clamp(4rem,16vw,11rem);font-weight:900;color:var(--yellow);text-shadow:0 0 30px #000;line-height:1}
+.players{display:flex;flex-wrap:wrap;gap:1.4vmin;justify-content:center}
+.pbtn{min-width:clamp(120px,22vw,220px);background:#ffffff1f;border:4px solid #ffffff66;color:#fff;box-shadow:none;padding:1.8vmin 2vmin;position:relative}
+.pbtn.out{background:var(--red);border-color:#fff;text-decoration:line-through}
+.pbtn.best{background:var(--green);color:#1a0b3b;border-color:#fff}
+.pbtn small{display:block;font-size:.55em;opacity:.85;text-decoration:none}
+.score{display:flex;align-items:center;gap:2vmin;width:100%;font-weight:900;font-size:clamp(1.2rem,3vw,2rem);background:#ffffff18;border-radius:16px;padding:1.2vmin 2vmin}
+.score .nm{flex:0 0 28%;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.score .bar{flex:1;height:2.6vmin;background:#0005;border-radius:99px;overflow:hidden}
+.score .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--pink),var(--yellow));width:0;transition:width .8s}
+.score .pt{flex:0 0 3.2em;text-align:right;color:var(--yellow)}
+.hint{font-size:clamp(.85rem,1.8vw,1.1rem);opacity:.8;margin:0}
+#topbar{position:fixed;top:1vmin;left:1vmin;right:1vmin;display:flex;justify-content:space-between;gap:1vmin;pointer-events:none;font-weight:900;font-size:clamp(.9rem,2vw,1.3rem)}
+#topbar>*{pointer-events:auto}
+#mute{background:#ffffff22;color:#fff;box-shadow:none;padding:.8vmin 1.6vmin;font-size:1rem}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:9}
+.rules{text-align:left;font-size:clamp(1rem,2.3vw,1.4rem);line-height:1.5}
+.rules li{margin:.3em 0}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div id="topbar"><span id="roundInfo"></span><button id="mute" title="Toggle sound">🔊 Sound on</button></div>
+<div id="app">
+
+<!-- SETUP -->
+<section class="screen on" id="setup">
+  <h1>FREEZE <span>FRENZY</span> DISCO</h1>
+  <p class="sub">Dance like crazy while the beat plays. When the music cuts — FREEZE in the pose on the card! Wobble and you're out of the round. Watch out for fake-outs!</p>
+  <p class="meta">3–10 players • about 15 minutes • needs a little room to wiggle • one host runs the screen</p>
+  <div class="card">
+    <div class="row" style="margin-bottom:1.6vmin">
+      <input type="text" id="nameIn" maxlength="14" placeholder="Add a player name" autocomplete="off">
+      <button class="cyan" id="addBtn">Add</button>
+    </div>
+    <div class="row" id="chips" style="min-height:6vmin"></div>
+    <p class="hint" id="setupHint">Add at least 3 players.</p>
+  </div>
+  <div class="row">
+    <span class="pill">Rounds:</span>
+    <button class="ghost" id="rMinus">−</button><span class="pill" id="rVal" style="min-width:2ch">6</span><button class="ghost" id="rPlus">+</button>
+    <button class="ghost" id="rulesBtn">How to play</button>
+  </div>
+  <button class="pink big" id="startBtn">Start the Party!</button>
+</section>
+
+<!-- RULES -->
+<section class="screen" id="rules">
+  <h1>HOW TO <span>PLAY</span></h1>
+  <div class="card"><ol class="rules">
+    <li><b>Host</b> runs the screen (that's whoever is holding the laptop or phone).</li>
+    <li>A <b>Dance Style</b> card appears. Hit the button — music starts. Everyone dances that style!</li>
+    <li>At a secret random moment the music <b>CUTS</b>. FREEZE in the <b>Pose card</b> and hold until the timer ends.</li>
+    <li><b>Fake-out!</b> Sometimes the music stutters for a second and comes back. Freeze during a fake-out and you're out!</li>
+    <li>Host taps anyone who wobbled, laughed, moved, or froze at a fake-out. Everyone else scores <b>+1</b>.</li>
+    <li>Host also picks the <b>Best Pose</b> for a <b>+2</b> bonus. Most points after the last round wins!</li>
+  </ol></div>
+  <button id="backSetup">Got it!</button>
+</section>
+
+<!-- READY -->
+<section class="screen" id="ready">
+  <div class="label" style="color:var(--cyan)">Dance Style</div>
+  <span class="emoji bounce" id="rdEmoji"></span>
+  <p class="bigtext" id="rdText"></p>
+  <p class="sub" id="rdSub"></p>
+  <button class="green big" id="danceBtn">▶ Drop the Beat!</button>
+  <p class="hint">Host: players get on their feet first, then tap the button.</p>
+</section>
+
+<!-- DANCE -->
+<section class="screen" id="danceScreen">
+  <div class="label" style="color:var(--cyan)">Keep dancing!</div>
+  <span class="emoji bounce" id="dnEmoji"></span>
+  <p class="bigtext" id="dnText"></p>
+  <p class="sub" id="dnSub">🎵 Music is playing… the cut could come ANY second 🎵</p>
+  <button class="ghost" id="cutNow">Cut the music now (host)</button>
+</section>
+
+<!-- FREEZE -->
+<section class="screen" id="freezeScreen">
+  <div class="freezeBox">
+    <div class="label">🥶 FREEZE! 🥶</div>
+    <span class="emoji" id="fzEmoji"></span>
+    <p class="bigtext" id="fzText"></p>
+  </div>
+  <div class="timer" id="fzTimer">5</div>
+  <p class="sub">Hold it! Host: watch for wobbles, giggles and movement.</p>
+</section>
+
+<!-- JUDGE -->
+<section class="screen" id="judge">
+  <div class="label" style="color:var(--yellow)">Judging Time</div>
+  <p class="sub"><b>Step 1:</b> tap anyone who wobbled, moved, laughed, or froze at a fake-out. <span id="fakeNote"></span></p>
+  <div class="players" id="outList"></div>
+  <p class="sub"><b>Step 2:</b> tap the BEST pose for +2 bonus (optional)</p>
+  <div class="players" id="bestList"></div>
+  <button class="pink big" id="scoreBtn">Award Points →</button>
+</section>
+
+<!-- SCORES -->
+<section class="screen" id="scores">
+  <h1 id="scTitle">SCOREBOARD</h1>
+  <p class="sub" id="scNote"></p>
+  <div class="card" id="scList" style="display:flex;flex-direction:column;gap:1.2vmin"></div>
+  <button class="green big" id="nextBtn">Next Round →</button>
+</section>
+
+<!-- FINAL -->
+<section class="screen" id="final">
+  <div class="label" style="color:var(--yellow)">Dance Floor Champion</div>
+  <span class="emoji bounce" id="fnEmoji">🏆</span>
+  <h1 id="fnName"></h1>
+  <p class="sub" id="fnNote"></p>
+  <div class="card" id="fnList" style="display:flex;flex-direction:column;gap:1.2vmin"></div>
+  <div class="row">
+    <button class="pink" id="againBtn">Play Again (same players)</button>
+    <button class="ghost" id="newBtn">New Game</button>
+  </div>
+</section>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- CONTENT ---------- */
+var DANCES=[
+["🏖️","Hot sand beach walk","Dance like the sand is scorching your feet"],
+["🤖","Robot with a loose bolt","Jerky, glitchy, and dramatic"],
+["🧊","Ice skater in slow motion","Glide gracefully across the room"],
+["🐔","Chicken at a disco","Flap, strut and bob your head"],
+["🍝","Wet spaghetti noodle","Floppy arms, wobbly legs"],
+["🦸","Superhero landing","Every beat is a heroic pose"],
+["🌊","Ocean wave","Ripple your whole body like water"],
+["🐧","Penguin on parade","Waddle with your arms by your sides"],
+["🎣","Fisherman reeling in a giant fish","Wrestle that fish to the beat"],
+["🧁","Baker kneading dough","Dance while mixing and baking"],
+["🚀","Astronaut with no gravity","Float and tumble in zero-G"],
+["🦖","Tiny-armed dinosaur","Stomp and chomp on the beat"],
+["🎤","Pop star on stage","Wave to the crowd and sing along"],
+["🌪️","Tornado","Spin and whirl around"],
+["🐙","Octopus with eight arms","Wiggle every limb you have"],
+["🧟","Dancing zombie","Shuffle and groan to the groove"],
+["🕺","Classic 70s disco","Point to the sky and strut"],
+["🥁","Drummer in a rock band","Air drum like your life depends on it"],
+["🦘","Kangaroo","Bounce in place with your hands up"],
+["🐝","Busy bee","Buzz around and flap your elbows"],
+["🏄","Surfer riding a big wave","Keep your balance and hang ten"],
+["🧙","Wizard casting spells","Wave your wand with every beat"],
+["🐻","Bear scratching its back","Rub your back on an invisible tree"],
+["🎻","Violin virtuoso","Play the fanciest solo ever"],
+["🚜","Farmer on a bumpy tractor","Bounce and steer with gusto"],
+["🦩","Flamingo party","Balance on one leg, flap the other"],
+["🥶","Shivering in a blizzard","Teeth chattering, still grooving"],
+["🍕","Pizza chef tossing dough","Toss, spin, catch!"],
+["🦥","Sleepy sloth","Super slow-motion boogie"],
+["🕵️","Secret agent sneaking","Tiptoe dance, look around suspiciously"],
+["🐶","Excited puppy","Wag, hop and pant"],
+["🪁","Kite in the wind","Swoop and swirl with arms wide"],
+["🏋️","Weightlifter","Lift invisible weights in rhythm"],
+["🧸","Wind-up toy","Stiff steps until you 'run down'"],
+["🌮","Taco shaking","Shake it like salsa in a bowl"],
+["🛼","Roller disco skater","Glide and spin on invisible wheels"],
+["🦆","Duck waddle","Quack and flap your tail feathers"],
+["🎬","Dramatic movie star","Every move is an Oscar-worthy scene"],
+["🐍","Snake charmer's snake","Slither up and down"],
+["🍦","Melting ice cream","Slowly melt toward the floor, then rise again"],
+["🥷","Ninja in a hurry","Chop, kick and dodge to the beat"],
+["🐒","Monkey in a jungle","Swing, scratch and hoot"],
+["🧹","Janitor sweeping the dance floor","Sweep and mop in style"],
+["🎳","Bowling champion","Roll, strike, celebrate, repeat"],
+["⛏️","Gold miner","Dig, find gold, do a happy jig"],
+["🎠","Carousel horse","Gallop up and down in a circle"],
+["🧃","Juice-box squeeze","Squish yourself small and pop up tall"],
+["🦇","Bat upside-down vibes","Hang your arms like wings and sway"],
+["🚓","Police siren","Spin and flash like you're on patrol"],
+["🌻","Sunflower following the sun","Sway and turn to the light"],
+["🏇","Cowboy on a bucking bronco","Hold on tight with one hand up"],
+["🎅","Santa stuck in a chimney","Wiggle your way through"],
+["🧑‍🍳","Chef flipping pancakes","Flip, catch and bow"],
+["🐸","Frog jumping lily pads","Hop from spot to spot, ribbit"],
+["🦁","King of the jungle","Strut proudly and shake your mane"],
+["🎪","Circus tightrope walker","Arms out, wobble, don't fall"],
+["🕸️","Spider spinning a web","Spin your hands and crawl around"],
+["📺","Old TV with bad reception","Glitch, freeze and jitter"],
+["🍿","Popcorn popping","Crouch low and pop up randomly"],
+["🚂","Choo-choo train","Chug in a line with arm pistons"]
+];
+var POSES=[
+["🦩","Flamingo","Stand on one leg with arms like a neck"],
+["🗽","Statue of Liberty","One arm up high, hold a torch"],
+["🦖","T-Rex","Tiny arms, big scary face"],
+["🏄","Surfer","Knees bent, arms out for balance"],
+["🤸","Superhero","Fists on hips, chin up"],
+["🌳","Tree","Arms branching up, feet planted"],
+["🐔","Chicken","Flap elbows, beak out"],
+["🎤","Rock star","Guitar solo on your knees"],
+["🧘","Yoga master","One-foot balance, hands together"],
+["🐱","Grumpy cat","Hands as paws, scowl"],
+["⛏️","Lumberjack","Mid-chop, axe overhead"],
+["🕺","Saturday Night Fever","One finger pointing up and across"],
+["🦸","Flying superhero","Lean forward, one fist in front"],
+["🤖","Robot","Stiff arms and a blank face"],
+["🏌️","Golfer","Mid-swing follow-through"],
+["🧎","Dramatic proposal","Down on one knee, hand on heart"],
+["📸","Selfie pose","Duck face and peace sign"],
+["🥊","Boxer","Fists up, ready to fight"],
+["🐊","Crocodile","Arms together like giant jaws"],
+["🧛","Vampire","Cape raised, scary fangs"],
+["🏹","Archer","Draw the bow, aim far away"],
+["🪑","Invisible chair sitter","Sit on air, hold it steady"],
+["🦵","Karate crane","One leg up, hands ready"],
+["🎭","Opera singer","Chest out, big note, hand on chest"],
+["🏃","Sprinter at the starting line","Crouched and ready to blast off"],
+["🦒","Giraffe","Stretch your neck up high"],
+["🐘","Elephant","One arm as a trunk, stomp a foot"],
+["🕴️","Mysterious spy","Back to the wall, looking sideways"],
+["⚾","Baseball pitcher","Wind-up with leg lifted"],
+["🧊","Frozen in shock","Hands on cheeks, mouth wide open"],
+["🎬","Action movie explosion walk","Walk away from the 'boom' without looking"],
+["🐕","Dog begging for a treat","Paws up, tongue out"],
+["💪","Bodybuilder","Flex every muscle you've got"],
+["🕊️","Peace dove","Arms wide like wings, calm face"],
+["🍕","Pizza delivery","Carry a giant invisible pizza stack"],
+["🤺","Fencer","Lunge forward, sword out"],
+["🙆","Big stretch","Arms over head, mid-yawn"],
+["🛹","Skateboard trick","Crouched mid-air, arms out"],
+["📞","Phone call","Hold the phone, look shocked"],
+["🦅","Eagle","Arms spread, fierce eyes"],
+["🎅","Santa 'Ho ho ho'","Hold your belly, big laugh"],
+["🤷","Shrug of confusion","Palms up, scrunched face"],
+["🧜","Mermaid","Legs together, hair flip pose"],
+["🥷","Ninja strike","Mid-kick, mean face"],
+["🏆","Champion","Hold a trophy overhead, victory face"],
+["💃","Flamenco dancer","Arms curved, one foot forward"],
+["🎣","Fisherman's catch","Hold up a HUGE invisible fish"],
+["🐒","Monkey","Scratch your head and armpit"],
+["🌶️","Too much hot sauce","Fan your open mouth, tears in eyes"],
+["🧗","Rock climber","Reach for a handhold, feet braced"],
+["🪞","Mirror model","Pout, hand on hip, hair flip"],
+["🐢","Turtle","Tuck your head into your 'shell'"],
+["🎩","Magician","Pull a rabbit from a hat — ta-da!"],
+["🚶","Awkward walk","Mid-step, arms out of sync"],
+["🤠","Cowboy quick-draw","Hands at hips, steely stare"],
+["🍌","Banana","Lean sideways in a curve, arms overhead"],
+["🪂","Skydiver","Arms and legs spread, windblown face"],
+["🦢","Swan","Graceful curved neck and one leg back"]
+];
+var NAMES_BY_SCORE=["Two-Left-Feet Rookie","Groove Apprentice","Disco Dynamo","Freeze Master"];
+
+/* ---------- STATE ---------- */
+var $=function(id){return document.getElementById(id)};
+var S={players:[],rounds:6,round:0,scores:{},out:{},best:null,fake:false,
+       deck:[],pdeck:[],cur:null,pose:null,phase:"setup",timers:[],muted:false};
+
+function show(id){
+  var ss=document.querySelectorAll(".screen");
+  for(var i=0;i<ss.length;i++)ss[i].classList.remove("on");
+  $(id).classList.add("on");S.phase=id;
+}
+function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t}return a}
+function clearTimers(){S.timers.forEach(function(t){clearTimeout(t);clearInterval(t)});S.timers=[]}
+function later(fn,ms){var t=setTimeout(fn,ms);S.timers.push(t);return t}
+
+/* ---------- AUDIO ---------- */
+var AC=null,master=null,sched=null,beatN=0,nextT=0,playing=false,tempo=120,groove=0,gapUntil=0;
+function ensureAudio(){
+  if(!AC){
+    try{AC=new (window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.8;master.connect(AC.destination)}catch(e){AC=null}
+  }
+  if(AC&&AC.state==="suspended")AC.resume();
+}
+function tone(freq,t,dur,type,vol,dest){
+  if(!AC||S.muted)return;
+  var o=AC.createOscillator(),g=AC.createGain();
+  o.type=type;o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.01);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g);g.connect(dest||master);o.start(t);o.stop(t+dur+.05);
+}
+function kick(t){
+  if(!AC||S.muted)return;
+  var o=AC.createOscillator(),g=AC.createGain();
+  o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(40,t+.14);
+  g.gain.setValueAtTime(.9,t);g.gain.exponentialRampToValueAtTime(.001,t+.2);
+  o.connect(g);g.connect(master);o.start(t);o.stop(t+.25);
+}
+function noise(t,dur,vol,hp){
+  if(!AC||S.muted)return;
+  var n=Math.floor(AC.sampleRate*dur),b=AC.createBuffer(1,n,AC.sampleRate),d=b.getChannelData(0);
+  for(var i=0;i<n;i++)d[i]=Math.random()*2-1;
+  var s=AC.createBufferSource();s.buffer=b;
+  var f=AC.createBiquadFilter();f.type="highpass";f.frequency.value=hp;
+  var g=AC.createGain();g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(.001,t+dur);
+  s.connect(f);f.connect(g);g.connect(master);s.start(t);
+}
+var SCALE=[0,3,5,7,10,12,15,17]; // minor pentatonic-ish
+var BASSLINES=[[0,0,7,0,5,5,3,5],[0,3,5,7,5,3,0,-2],[0,0,0,7,0,0,10,7],[5,5,3,3,0,0,3,5]];
+function midi(m){return 440*Math.pow(2,(m-69)/12)}
+function step(t,n){
+  var s=n%16;
+  if(s%4===0)kick(t);
+  if(s%4===2)noise(t,.06,.25,7000);
+  if(s===4||s===12){noise(t,.14,.35,1800)}
+  var bl=BASSLINES[groove];
+  if(s%2===0){tone(midi(36+bl[(s/2)%8]),t,60/tempo/2*1.6,"sawtooth",.28)}
+  if(s%4===1||s%8===6){var nn=SCALE[(Math.random()*SCALE.length)|0];tone(midi(60+nn),t,.16,"square",.12)}
+  if(s===0&&(Math.floor(n/16)%2===0)){tone(midi(72),t,.3,"triangle",.14)}
+}
+function startMusic(){
+  ensureAudio();if(!AC)return;
+  stopMusic(true);
+  tempo=104+Math.floor(Math.random()*40);groove=Math.floor(Math.random()*BASSLINES.length);
+  beatN=0;nextT=AC.currentTime+.08;playing=true;gapUntil=0;
+  sched=setInterval(function(){
+    if(!playing)return;
+    var stepLen=60/tempo/4;
+    while(nextT<AC.currentTime+.2){
+      if(nextT>=gapUntil)step(nextT,beatN);
+      nextT+=stepLen;beatN++;
+    }
+  },40);
+}
+function stopMusic(silent){
+  playing=false;if(sched){clearInterval(sched);sched=null}
+}
+function stutterGap(sec){if(AC)gapUntil=AC.currentTime+sec}
+function sfxFreeze(){
+  if(!AC||S.muted)return;ensureAudio();var t=AC.currentTime;
+  tone(880,t,.12,"square",.3);tone(660,t+.12,.12,"square",.3);tone(440,t+.24,.3,"square",.3);
+  noise(t,.4,.4,500);
+}
+function sfxTick(){if(!AC||S.muted)return;tone(1000,AC.currentTime,.08,"square",.2)}
+function sfxWin(){
+  if(!AC||S.muted)return;ensureAudio();var t=AC.currentTime;
+  [0,4,7,12,16].forEach(function(n,i){tone(midi(60+n),t+i*.1,.3,"triangle",.3)});
+}
+function sfxPoint(){if(!AC||S.muted)return;ensureAudio();tone(midi(76),AC.currentTime,.12,"triangle",.3);tone(midi(83),AC.currentTime+.09,.2,"triangle",.3)}
+function sfxBuzz(){if(!AC||S.muted)return;ensureAudio();tone(120,AC.currentTime,.3,"sawtooth",.35)}
+$("mute").onclick=function(){S.muted=!S.muted;this.textContent=S.muted?"🔇 Sound off":"🔊 Sound on";if(S.muted){}else ensureAudio()};
+
+/* ---------- SETUP ---------- */
+function renderChips(){
+  var c=$("chips");c.innerHTML="";
+  S.players.forEach(function(p,i){
+    var d=document.createElement("span");d.className="chip";d.innerHTML=esc(p)+" <b data-i='"+i+"'>×</b>";c.appendChild(d);
+  });
+  var n=S.players.length;
+  $("setupHint").textContent=n<3?"Add at least 3 players ("+n+" so far).":n>10?"That's a big party! Up to 10 works best.":n+" players ready!";
+  $("startBtn").style.opacity=n>=3?1:.4;
+}
+function addPlayer(){
+  var v=$("nameIn").value.trim();if(!v)return;
+  if(S.players.length>=12)return;
+  if(S.players.indexOf(v)>=0)v=v+" "+(S.players.length+1);
+  S.players.push(v);$("nameIn").value="";renderChips();$("nameIn").focus();
+}
+$("addBtn").onclick=addPlayer;
+$("nameIn").addEventListener("keydown",function(e){if(e.key==="Enter")addPlayer()});
+$("chips").addEventListener("click",function(e){var i=e.target.getAttribute&&e.target.getAttribute("data-i");if(i!==null&&i!==undefined){S.players.splice(+i,1);renderChips()}});
+$("rMinus").onclick=function(){S.rounds=Math.max(3,S.rounds-1);$("rVal").textContent=S.rounds};
+$("rPlus").onclick=function(){S.rounds=Math.min(15,S.rounds+1);$("rVal").textContent=S.rounds};
+$("rulesBtn").onclick=function(){show("rules")};
+$("backSetup").onclick=function(){show("setup")};
+$("startBtn").onclick=function(){
+  if(S.players.length<3){$("setupHint").textContent="Need at least 3 players!";sfxBuzz();return}
+  ensureAudio();newGame();
+};
+
+/* ---------- GAME FLOW ---------- */
+function newGame(){
+  S.round=0;S.scores={};S.players.forEach(function(p){S.scores[p]=0});
+  S.deck=shuffle(DANCES);S.pdeck=shuffle(POSES);
+  nextRound();
+}
+function draw(deckName,src){
+  if(!S[deckName].length)S[deckName]=shuffle(src);
+  return S[deckName].pop();
+}
+function nextRound(){
+  clearTimers();
+  S.round++;S.out={};S.best=null;S.fake=false;
+  S.cur=draw("deck",DANCES);S.pose=draw("pdeck",POSES);
+  $("roundInfo").textContent="Round "+S.round+" of "+S.rounds;
+  $("rdEmoji").textContent=S.cur[0];$("rdText").textContent=S.cur[1];$("rdSub").textContent=S.cur[2];
+  show("ready");
+}
+$("danceBtn").onclick=function(){
+  ensureAudio();startMusic();
+  $("dnEmoji").textContent=S.cur[0];$("dnText").textContent=S.cur[1];
+  show("danceScreen");
+  // schedule fake-outs and the real cut
+  var total=9000+Math.random()*11000; // 9-20s
+  var fakes=0;
+  if(S.round>1||Math.random()<.5){
+    fakes=Math.random()<.5?1:(Math.random()<.5?2:0);
+  }
+  S.fake=fakes>0;
+  for(var i=0;i<fakes;i++){
+    (function(k){
+      var at=3000+Math.random()*(total-6500);
+      later(function(){
+        if(S.phase!=="danceScreen")return;
+        stutterGap(0.9+Math.random()*.5);
+        $("dnSub").textContent="😈 FAKE-OUT?! Don't freeze!";
+        later(function(){$("dnSub").textContent="🎵 Music is playing… the cut could come ANY second 🎵"},1800);
+      },at+k*1000);
+    })(i);
+  }
+  later(doFreeze,total);
+};
+$("cutNow").onclick=function(){if(S.phase==="danceScreen"){clearTimers();doFreeze()}};
+function doFreeze(){
+  if(S.phase!=="danceScreen")return;
+  clearTimers();stopMusic();sfxFreeze();
+  $("fzEmoji").textContent=S.pose[0];$("fzText").textContent=S.pose[1]+" — "+S.pose[2];
+  var t=6;$("fzTimer").textContent=t;
+  show("freezeScreen");
+  var iv=setInterval(function(){
+    t--;
+    if(t>0){$("fzTimer").textContent=t;sfxTick()}
+    else{clearInterval(iv);toJudge()}
+  },1000);
+  S.timers.push(iv);
+}
+function toJudge(){
+  clearTimers();sfxBuzz();
+  $("fakeNote").textContent=S.fake?"(There was a fake-out this round — anyone who froze early is out!)":"";
+  renderJudge();show("judge");
+}
+function renderJudge(){
+  var o=$("outList"),b=$("bestList");o.innerHTML="";b.innerHTML="";
+  S.players.forEach(function(p){
+    var ob=document.createElement("button");ob.className="pbtn"+(S.out[p]?" out":"");
+    ob.innerHTML=esc(p)+"<small>"+(S.out[p]?"OUT ✗":"tap if wobbled")+"</small>";
+    ob.onclick=function(){S.out[p]=!S.out[p];if(S.out[p]&&S.best===p)S.best=null;sfxBuzz();renderJudge()};
+    o.appendChild(ob);
+    var bb=document.createElement("button");bb.className="pbtn"+(S.best===p?" best":"");
+    if(S.out[p]){bb.style.opacity=.3;bb.disabled=true}
+    bb.innerHTML=esc(p)+"<small>"+(S.best===p?"BEST POSE ★":"best pose?")+"</small>";
+    bb.onclick=function(){S.best=(S.best===p?null:p);sfxPoint();renderJudge()};
+    b.appendChild(bb);
+  });
+}
+$("scoreBtn").onclick=function(){
+  var gain=[];
+  S.players.forEach(function(p){
+    if(!S.out[p]){S.scores[p]+=1}
+    if(S.best===p){S.scores[p]+=2}
+  });
+  var survivors=S.players.filter(function(p){return !S.out[p]}).length;
+  var note=survivors+" of "+S.players.length+" froze like pros (+1 each)."+(S.best?" "+S.best+" nailed the best pose (+2)!":"");
+  if(survivors===0)note="Total wipeout! Everyone wobbled. Hilarious.";
+  if(survivors===S.players.length&&!S.best)note="Everyone froze perfectly! Impressive.";
+  showScores(note,false);
+};
+function showScores(note,isFinal){
+  $("scTitle").textContent="SCOREBOARD";
+  $("scNote").textContent=note;
+  renderScoreList($("scList"));
+  $("nextBtn").textContent=S.round>=S.rounds?"See the Winner! 🏆":"Next Round →";
+  show("scores");sfxWin();
+}
+function ranked(){
+  return S.players.slice().sort(function(a,b){return S.scores[b]-S.scores[a]});
+}
+function renderScoreList(el){
+  el.innerHTML="";var r=ranked();var mx=Math.max(1,S.scores[r[0]]);
+  r.forEach(function(p,i){
+    var d=document.createElement("div");d.className="score";
+    d.innerHTML="<span class='nm'>"+(i===0?"👑 ":"")+esc(p)+"</span><span class='bar'><i></i></span><span class='pt'>"+S.scores[p]+"</span>";
+    el.appendChild(d);
+    var bar=d.querySelector("i");setTimeout(function(){bar.style.width=(S.scores[p]/mx*100)+"%"},60);
+  });
+}
+$("nextBtn").onclick=function(){
+  if(S.round>=S.rounds)finish();else nextRound();
+};
+function finish(){
+  var r=ranked();var top=S.scores[r[0]];
+  var winners=r.filter(function(p){return S.scores[p]===top});
+  $("fnName").textContent=winners.join(" & ");
+  var tier=Math.min(3,Math.floor(top/Math.max(1,S.rounds)*1.2));
+  $("fnNote").textContent="Title earned: "+NAMES_BY_SCORE[tier]+" ("+top+" points)";
+  renderScoreList($("fnList"));
+  $("roundInfo").textContent="Game over";
+  show("final");sfxWin();burst();setTimeout(burst,900);setTimeout(burst,1800);
+}
+$("againBtn").onclick=function(){newGame()};
+$("newBtn").onclick=function(){clearTimers();stopMusic();S.players=[];renderChips();$("roundInfo").textContent="";show("setup")};
+
+/* Keyboard shortcut for host: space/enter advances where sensible */
+document.addEventListener("keydown",function(e){
+  if(e.target&&e.target.tagName==="INPUT")return;
+  if(e.code==="Space"||e.key==="Enter"){
+    var m={ready:"danceBtn",danceScreen:"cutNow",scores:"nextBtn",judge:"scoreBtn"};
+    if(m[S.phase]){e.preventDefault();$(m[S.phase]).click()}
+  }
+});
+
+/* ---------- CONFETTI ---------- */
+var cv=$("confetti"),cx=cv.getContext("2d"),parts=[],anim=false;
+function size(){cv.width=innerWidth;cv.height=innerHeight}
+window.addEventListener("resize",size);size();
+function burst(){
+  var cols=["#ff3d9a","#ffe14d","#38e8ff","#4dff9d","#fff"];
+  for(var i=0;i<140;i++)parts.push({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.3,vx:(Math.random()-.5)*4,vy:2+Math.random()*5,r:5+Math.random()*7,c:cols[(Math.random()*cols.length)|0],a:Math.random()*6});
+  if(!anim){anim=true;requestAnimationFrame(tick)}
+}
+function tick(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  parts.forEach(function(p){p.x+=p.vx;p.y+=p.vy;p.a+=.15;cx.save();cx.translate(p.x,p.y);cx.rotate(p.a);cx.fillStyle=p.c;cx.fillRect(-p.r/2,-p.r/4,p.r,p.r/2);cx.restore()});
+  parts=parts.filter(function(p){return p.y<cv.height+30});
+  if(parts.length)requestAnimationFrame(tick);else{anim=false;cx.clearRect(0,0,cv.width,cv.height)}
+}
+
+renderChips();
+})();
+</script>
+</body>
+</html>
