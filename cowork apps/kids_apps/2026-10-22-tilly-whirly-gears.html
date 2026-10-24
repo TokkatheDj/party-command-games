@@ -1,0 +1,808 @@
+<!-- CONCEPT: PUZZLES / BRAIN + BUILDING (gear meshing) - Tilly's Whirly Gears: Tilly the mouse runs in a wheel that turns a gear, and kids drag small, medium and big gears onto pegs so the teeth touch and pass the spin along to a toy (pinwheel, music box, popcorn pot, bubble wand, carousel, rainbow top, sprinkler); a gear that's too big bumps and hops back, one that's too small just sits there, and later workshops ask kids to make toys spin a certain way (each extra gear flips the direction) or power two toys at once. Includes a free Tinker Table with magnetic snapping. No timer, no losing. Ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tilly's Whirly Gears</title>
+<style>
+:root{
+  --bg1:#ffe9a8; --bg2:#ffc6d9; --wood:#f3d3a0; --wood-d:#c99a5b; --ink:#4a2b1a;
+  --a:#ff5e8a; --b:#7b5cff; --ok:#3fbf6a; --panel:#fff8ec; --gap:10px;
+  --font:"Comic Sans MS","Trebuchet MS",system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+*::before,*::after{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  font-family:var(--font);color:var(--ink);background:linear-gradient(160deg,var(--bg1),var(--bg2));}
+#app{display:flex;flex-direction:column;height:100%;max-width:820px;margin:0 auto;}
+header{display:flex;align-items:center;gap:6px;padding:6px 8px;flex:0 0 auto;}
+h1{flex:1;margin:0;font-size:clamp(17px,5vw,28px);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@media (max-width:460px){ h1 .long{display:none;} }
+h1 .g{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent;}
+.hbtn{width:46px;height:46px;border-radius:14px;border:3px solid #fff;background:#fff6;font-size:22px;cursor:pointer;flex:0 0 auto;
+  box-shadow:0 3px 0 #0002;display:flex;align-items:center;justify-content:center;padding:0;}
+.hbtn:active{transform:translateY(2px);box-shadow:none;}
+#msg{flex:0 0 auto;height:48px;margin:0 8px;padding:0 12px;border-radius:16px;background:var(--panel);display:flex;align-items:center;justify-content:center;
+  text-align:center;font-size:clamp(14px,3.9vw,19px);font-weight:bold;box-shadow:0 3px 0 #0001;overflow:hidden;}
+#msg span{display:block;}
+#stage{flex:1 1 auto;position:relative;min-height:0;margin:6px 8px;}
+#board{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;border-radius:22px;}
+#tray{flex:0 0 auto;display:flex;justify-content:center;gap:12px;padding:6px 8px 10px;touch-action:none;}
+.tg{width:min(30vw,120px);height:94px;border-radius:20px;border:4px solid #fff;background:var(--panel);cursor:pointer;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:0;font-family:var(--font);font-size:15px;font-weight:bold;color:var(--ink);box-shadow:0 4px 0 #0002;padding:2px;touch-action:none;}
+.tg canvas{width:64px;height:64px;pointer-events:none;}
+.tg.sel{border-color:var(--b);background:#efe8ff;transform:scale(1.06);}
+.tg.pulse{animation:pulse .5s 3;}
+@keyframes pulse{50%{transform:scale(1.12);}}
+.overlay{position:fixed;inset:0;background:#0006;display:flex;align-items:center;justify-content:center;z-index:20;padding:12px;}
+.overlay[hidden]{display:none;}
+.card{background:var(--panel);border-radius:26px;padding:16px;max-width:560px;width:100%;max-height:100%;overflow-y:auto;text-align:center;box-shadow:0 8px 0 #0003;}
+.card h2{margin:4px 0 10px;font-size:clamp(22px,6vw,32px);}
+.card h2 .g{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent;}
+.ws{margin:10px 0 4px;font-size:clamp(15px,4vw,19px);font-weight:bold;text-align:left;}
+.lvls{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.lb{position:relative;height:70px;border-radius:18px;border:3px solid #fff;font-size:28px;white-space:nowrap;overflow:hidden;cursor:pointer;background:#ffe2ef;box-shadow:0 3px 0 #0002;font-family:var(--font);padding:0;}
+.lb small{position:absolute;left:6px;top:2px;font-size:14px;font-weight:bold;color:var(--ink);}
+.lb.done{background:#d6f5d9;}
+.lb.done::after{content:"⭐";position:absolute;right:2px;top:-6px;font-size:18px;}
+.big{min-height:60px;padding:8px 22px;border-radius:20px;border:4px solid #fff;font-size:clamp(17px,4.8vw,22px);font-weight:bold;cursor:pointer;
+  font-family:var(--font);color:#fff;background:linear-gradient(90deg,var(--a),var(--b));box-shadow:0 4px 0 #0003;margin:6px;}
+.big.alt{background:#fff;color:var(--ink);border-color:#eee;}
+.winEmoji{font-size:72px;line-height:1.1;}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:30;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="hbtn" id="bHome" aria-label="Levels">🏠</button>
+    <h1><span class="g"><span class="long">Tilly's </span>Whirly Gears</span></h1>
+    <button class="hbtn" id="bHint" aria-label="Hint">💡</button>
+    <button class="hbtn" id="bReset" aria-label="Start over">🔄</button>
+    <button class="hbtn" id="bSound" aria-label="Sound">🔊</button>
+  </header>
+  <div id="msg"><span>Drag a gear onto a peg!</span></div>
+  <div id="stage"><canvas id="board"></canvas></div>
+  <div id="tray">
+    <button class="tg" data-s="S"><canvas width="128" height="128"></canvas>Small</button>
+    <button class="tg" data-s="M"><canvas width="128" height="128"></canvas>Medium</button>
+    <button class="tg" data-s="L"><canvas width="128" height="128"></canvas>Big</button>
+  </div>
+</div>
+
+<div class="overlay" id="menu">
+  <div class="card">
+    <h2>⚙️ <span class="g">Tilly's Whirly Gears</span></h2>
+    <div style="font-size:clamp(14px,3.8vw,17px)">🐭 Tilly runs, the gears turn, the toys go!</div>
+    <div id="worlds"></div>
+    <button class="big" id="bFree">🧰 Tinker Table</button>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="card">
+    <div class="winEmoji" id="winEmoji">🎉</div>
+    <h2><span class="g" id="winTitle">Hooray!</span></h2>
+    <div id="winText" style="font-size:clamp(15px,4vw,19px);margin-bottom:6px"></div>
+    <button class="big" id="bNext">Next ▶</button>
+    <button class="big alt" id="bWinHome">🏠</button>
+  </div>
+</div>
+<canvas id="fx"></canvas>
+
+<script>
+// ---------- gear sizes & rules ----------
+const U = {
+  S:{r:1,   n:8,  c:'#ffd23f', d:'#c98f00', name:'Small'},
+  M:{r:1.5, n:12, c:'#4cc9f0', d:'#1b86b0', name:'Medium'},
+  L:{r:2,   n:16, c:'#ff7aa8', d:'#d03d70', name:'Big'}
+};
+const TOL = 0.12;           // teeth touch when centre distance is within this of r1+r2
+const BOARD = 10;           // board is 10 x 10 units
+const SPEED = 0.9;          // Tilly's wheel, radians per second (clockwise)
+const TAU = Math.PI * 2;
+const TOYS = {
+  pinwheel:{e:'🌀', name:'pinwheel'},  music:{e:'🎵', name:'music box'},
+  popcorn:{e:'🍿', name:'popcorn pot'}, bubbles:{e:'🫧', name:'bubble wand'},
+  carousel:{e:'🎠', name:'carousel'},   rainbow:{e:'🌈', name:'rainbow top'},
+  sprinkler:{e:'🌻', name:'flower sprinkler'}
+};
+
+// Levels: node 0 is Tilly's wheel. Pegs carry their answer size (s) for hints;
+// alt pegs are real pegs on a route that is NOT the answer; decoys are spare pegs.
+const WORLDS = [
+  {name:'1 · Fill the Gap', levels:[
+    {driver:[2,5,'M'], nodes:[{t:'peg',s:'M',from:0,a:0},{t:'target',s:'S',from:1,a:0,toy:'pinwheel'}]},
+    {driver:[2,3,'M'], nodes:[{t:'peg',s:'S',from:0,a:45},{t:'target',s:'L',from:1,a:20,toy:'music'}]},
+    {driver:[2,6.5,'S'], nodes:[{t:'peg',s:'L',from:0,a:-35},{t:'target',s:'M',from:1,a:10,toy:'popcorn'}]},
+    {driver:[2.2,2.4,'L'], nodes:[{t:'peg',s:'M',from:0,a:70},{t:'target',s:'L',from:1,a:20,toy:'bubbles'}]}
+  ]},
+  {name:'2 · Gear Chains', levels:[
+    {driver:[1.8,2.2,'M'], nodes:[{t:'peg',s:'M',from:0,a:40},{t:'peg',s:'S',from:1,a:-10},{t:'target',s:'M',from:2,a:60,toy:'carousel'}]},
+    {driver:[2,7.5,'M'], nodes:[{t:'peg',s:'L',from:0,a:-60},{t:'peg',s:'M',from:1,a:-10},{t:'target',s:'S',from:2,a:75,toy:'rainbow'},
+      {t:'decoy',x:2.2,y:1.8},{t:'decoy',x:5.4,y:8.4}]},
+    {driver:[1.6,8.2,'S'], nodes:[{t:'peg',s:'M',from:0,a:-80},{t:'peg',s:'L',from:1,a:-30},{t:'peg',s:'S',from:2,a:10},{t:'target',s:'M',from:3,a:100,toy:'sprinkler'}]},
+    {driver:[5,5.5,'M'], nodes:[{t:'peg',s:'S',from:0,a:180},{t:'target',s:'M',from:1,a:-90,toy:'pinwheel'},
+      {t:'peg',s:'M',from:0,a:40},{t:'target',s:'S',from:3,a:-60,toy:'music'}]}
+  ]},
+  {name:'3 · Which Way?', levels:[
+    {driver:[2,5,'M'], nodes:[{t:'target',x:8,y:5,s:'M',toy:'carousel',dir:-1},
+      {t:'peg',s:'L',meet:[0,1],side:-1,alt:true},
+      {t:'peg',s:'S',from:0,a:60},{t:'peg',s:'L',meet:[3,1],side:1}]},
+    {driver:[2,2.6,'M'], nodes:[{t:'target',x:7.5,y:6.6,s:'L',toy:'popcorn',dir:1},
+      {t:'peg',s:'L',meet:[0,1],side:-1},
+      {t:'peg',s:'S',from:0,a:100,alt:true},{t:'peg',s:'L',meet:[3,1],side:-1,alt:true}]},
+    {driver:[5,6.2,'M'], nodes:[{t:'target',x:1.9,y:2.6,s:'S',toy:'bubbles',dir:1},
+      {t:'peg',s:'M',meet:[0,1],side:1},
+      {t:'peg',s:'S',from:0,a:-30},{t:'peg',s:'S',from:3,a:-90},{t:'target',s:'S',from:4,a:-60,toy:'rainbow',dir:-1},
+      {t:'peg',s:'L',meet:[0,5],side:-1,alt:true}]},
+    {driver:[1.8,8,'M'], nodes:[{t:'peg',s:'L',from:0,a:-55},{t:'peg',s:'S',from:1,a:5},{t:'target',s:'M',from:2,a:-70,toy:'music',dir:-1},
+      {t:'peg',s:'M',from:2,a:80},{t:'target',s:'S',from:4,a:160,toy:'sprinkler',dir:1},{t:'decoy',x:1.8,y:2}]}
+  ]}
+];
+const LEVELS = WORLDS.flatMap(w => w.levels);
+
+function buildNodes(spec){
+  const nodes = [{t:'driver', x:spec.driver[0], y:spec.driver[1], s:spec.driver[2]}];
+  for (const n of spec.nodes){
+    let x = n.x, y = n.y;
+    if (x == null && n.from != null){
+      const f = nodes[n.from], dist = U[f.s].r + U[n.s].r, a = n.a * Math.PI / 180;
+      x = f.x + dist * Math.cos(a); y = f.y + dist * Math.sin(a);
+    } else if (x == null && n.meet){
+      const A = nodes[n.meet[0]], B = nodes[n.meet[1]];
+      const ra = U[A.s].r + U[n.s].r, rb = U[B.s].r + U[n.s].r;
+      const dx = B.x - A.x, dy = B.y - A.y, dd = Math.hypot(dx, dy);
+      const a = (ra*ra - rb*rb + dd*dd) / (2*dd), h = Math.sqrt(Math.max(0, ra*ra - a*a));
+      const mx = A.x + a*dx/dd, my = A.y + a*dy/dd, sd = n.side || 1;
+      x = mx - sd*h*dy/dd; y = my + sd*h*dx/dd;
+    }
+    nodes.push({...n, x, y});
+  }
+  return nodes;
+}
+
+// ---------- game state ----------
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('cowork-whirlygears-' + k); return v == null ? d : JSON.parse(v); } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem('cowork-whirlygears-' + k, JSON.stringify(v)); } catch(e){} }
+};
+let done = store.get('done', []);
+let soundOn = store.get('sound', true);
+
+const G = {
+  mode:'menu', lvl:0, gears:[], pegs:[], driver:null, targets:[],
+  DA:0, jam:false, winHold:0, won:false, misses:0, hintPeg:-1, hintT:0,
+  wrongWay:0, allToysCheered:false
+};
+
+function mkGear(x, y, s, kind, extra){
+  return Object.assign({x, y, s, r:U[s].r, n:U[s].n, kind, angle:0, ratio:0, offset:0, on:false, pop:0, shake:0, emitA:0}, extra || {});
+}
+
+function loadLevel(i){
+  G.mode = 'level'; G.lvl = i; G.gears = []; G.pegs = []; G.targets = [];
+  G.DA = 0; G.jam = false; G.winHold = 0; G.won = false; G.misses = 0; G.hintPeg = -1; G.wrongWay = 0;
+  const nodes = buildNodes(LEVELS[i]);
+  for (const n of nodes){
+    if (n.t === 'driver'){ G.driver = mkGear(n.x, n.y, n.s, 'driver'); G.gears.push(G.driver); }
+    else if (n.t === 'target'){ const g = mkGear(n.x, n.y, n.s, 'target', {toy:n.toy, dir:n.dir || 0}); G.targets.push(g); G.gears.push(g); }
+    else G.pegs.push({x:n.x, y:n.y, s:n.s || null, alt:!!n.alt, decoy:n.t === 'decoy', gear:null});
+  }
+  rebuild();
+  const t = G.targets, dirLvl = t.some(g => g.dir);
+  setMsg(i === 0 ? 'Drag a gear onto the peg so the teeth touch!'
+       : dirLvl ? 'Make each toy spin the way its arrow points!'
+       : t.length > 1 ? 'Can you make BOTH toys spin?'
+       : 'Get the ' + TOYS[t[0].toy].name + ' spinning!');
+}
+
+function loadFree(){
+  G.mode = 'free'; G.gears = []; G.pegs = []; G.targets = [];
+  G.DA = 0; G.jam = false; G.won = false; G.hintPeg = -1; G.allToysCheered = false;
+  G.driver = mkGear(1.9, 5, 'M', 'driver'); G.gears.push(G.driver);
+  [[8,1.9,'S','pinwheel'],[8.1,8.1,'M','popcorn'],[4.4,8.5,'S','music']].forEach(([x,y,s,toy]) => {
+    const g = mkGear(x, y, s, 'target', {toy, dir:0}); G.targets.push(g); G.gears.push(g);
+  });
+  rebuild();
+  setMsg('Tinker Table! Put gears anywhere — they snap together.');
+}
+
+// ---------- the gear engine ----------
+const meshes = (a, b) => Math.abs(Math.hypot(a.x-b.x, a.y-b.y) - (a.r + b.r)) <= TOL;
+const bumps  = (a, b) => Math.hypot(a.x-b.x, a.y-b.y) < a.r + b.r - TOL;
+function frac(v){ return v - Math.floor(v); }
+
+function rebuild(){
+  const gs = G.gears;
+  for (const g of gs){ g.on = false; g.ratio = 0; }
+  G.jam = false;
+  const d = G.driver; d.on = true; d.ratio = 1; d.offset = 0; d.angle = G.DA;
+  const q = [d];
+  while (q.length){
+    const g = q.shift();
+    for (const n of gs){
+      if (n === g || !meshes(g, n)) continue;
+      const want = -g.ratio * g.r / n.r;
+      if (!n.on){
+        n.on = true; n.ratio = want;
+        // line the teeth up so a tooth meets a gap
+        const psi = Math.atan2(n.y - g.y, n.x - g.x);
+        const u = frac((psi - g.angle) * g.n / TAU);
+        const uc = frac(0.5 - u), step = TAU / n.n;
+        let th = psi + Math.PI - uc * step;
+        th += Math.round((n.angle - th) / step) * step;
+        n.angle = th; n.offset = th - n.ratio * G.DA;
+        q.push(n);
+      } else if (Math.abs(n.ratio - want) > 1e-6) G.jam = true;
+    }
+  }
+}
+
+function isWin(){
+  if (G.jam || !G.targets.length) return false;
+  return G.targets.every(t => t.on && (!t.dir || Math.sign(t.ratio) === t.dir));
+}
+
+// try to put a gear of size s on peg p. returns 'ok' | 'bump' | 'full'
+function placeOnPeg(pi, s){
+  const p = G.pegs[pi];
+  if (p.gear) return 'full';
+  const g = mkGear(p.x, p.y, s, 'placed', {peg:pi});
+  for (const o of G.gears) if (bumps(g, o)){ G.lastBump = o; return 'bump'; }
+  p.gear = g; G.gears.push(g); g.pop = 1;
+  rebuild();
+  return 'ok';
+}
+function removeGear(g){
+  G.gears = G.gears.filter(x => x !== g);
+  if (g.peg != null && G.pegs[g.peg]) G.pegs[g.peg].gear = null;
+  rebuild();
+}
+
+// free play: magnetic snap to one or two turning neighbours
+function freeSpot(x, y, s){
+  const r = U[s].r, cands = [];
+  const others = G.gears;
+  for (const o of others){
+    const dx = x - o.x, dy = y - o.y, d = Math.hypot(dx, dy) || 1, want = o.r + r;
+    if (Math.abs(d - want) < 1.5) cands.push({x:o.x + dx/d*want, y:o.y + dy/d*want});
+  }
+  for (let i = 0; i < others.length; i++) for (let j = i+1; j < others.length; j++){
+    const A = others[i], B = others[j], ra = A.r + r, rb = B.r + r;
+    const dx = B.x-A.x, dy = B.y-A.y, dd = Math.hypot(dx, dy);
+    if (dd > ra + rb || dd < Math.abs(ra - rb) || dd === 0) continue;
+    const a = (ra*ra - rb*rb + dd*dd)/(2*dd), h = Math.sqrt(Math.max(0, ra*ra - a*a));
+    const mx = A.x + a*dx/dd, my = A.y + a*dy/dd;
+    for (const sd of [1,-1]){
+      const px = mx - sd*h*dy/dd, py = my + sd*h*dx/dd;
+      if (Math.hypot(px-x, py-y) < 1.5) cands.push({x:px, y:py, two:true});
+    }
+  }
+  cands.push({x, y, plain:true});
+  const ok = cands.filter(c => c.x >= r*0.6 && c.x <= BOARD - r*0.6 && c.y >= r*0.6 && c.y <= BOARD - r*0.6 &&
+    !others.some(o => bumps({x:c.x, y:c.y, r}, o)));
+  ok.sort((p, q) => (p.plain - q.plain) || ((q.two?1:0) - (p.two?1:0)) || (Math.hypot(p.x-x,p.y-y) - Math.hypot(q.x-x,q.y-y)));
+  return ok[0] || null;
+}
+
+// ---------- sound ----------
+let AC = null;
+function ac(){
+  if (!AC){ try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, dur, type, vol, delay, f2){
+  if (!soundOn) return; const a = ac(); if (!a) return;
+  const t0 = a.currentTime + (delay || 0), o = a.createOscillator(), g = a.createGain();
+  o.type = type || 'sine'; o.frequency.setValueAtTime(f, t0);
+  if (f2) o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol || 0.15, t0 + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(a.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+}
+const SND = {
+  clunk(){ tone(220, 0.12, 'triangle', 0.25); tone(140, 0.15, 'sine', 0.2, 0.03); },
+  boing(){ tone(260, 0.35, 'sine', 0.22, 0, 620); tone(620, 0.25, 'sine', 0.12, 0.2, 240); },
+  pop(){ tone(500, 0.08, 'sine', 0.2, 0, 1300); },
+  tick(){ tone(1700, 0.025, 'square', 0.025); },
+  whoosh(){ tone(900, 0.25, 'sine', 0.08, 0, 300); },
+  wah(){ tone(330, 0.3, 'triangle', 0.18, 0, 260); tone(260, 0.45, 'triangle', 0.18, 0.3, 180); },
+  jam(){ tone(110, 0.3, 'sawtooth', 0.08); tone(98, 0.3, 'sawtooth', 0.08, 0.12); },
+  fanfare(){ [523,659,784,1047].forEach((f,i) => tone(f, 0.25, 'triangle', 0.2, i*0.12)); tone(1047, 0.6, 'sine', 0.15, 0.5); },
+  note(i){ const mel = [523,523,784,784,880,880,784,698,698,659,659,587,587,523]; tone(mel[i % mel.length], 0.5, 'sine', 0.13); tone(mel[i % mel.length]*2, 0.3, 'sine', 0.04); },
+  bubble(){ tone(700 + Math.random()*500, 0.09, 'sine', 0.08, 0, 1500); },
+  drip(){ tone(1100 + Math.random()*400, 0.05, 'sine', 0.05, 0, 600); },
+  chime(){ tone(1320, 0.3, 'sine', 0.08); }
+};
+
+// ---------- drawing ----------
+const cv = document.getElementById('board'), ctx = cv.getContext('2d');
+const fx = document.getElementById('fx'), fctx = fx.getContext('2d');
+const stage = document.getElementById('stage');
+let W = 0, H = 0, DPR = 1, SC = 30, OX = 0, OY = 0;
+const EMOJI = '"Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif';
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = stage.clientWidth; H = stage.clientHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  SC = Math.min(W, H) / (BOARD + 0.5);
+  OX = (W - BOARD * SC) / 2; OY = (H - BOARD * SC) / 2;
+  fx.width = Math.round(innerWidth * DPR); fx.height = Math.round(innerHeight * DPR);
+}
+new ResizeObserver(resize).observe(stage);
+addEventListener('resize', resize);
+const px = x => OX + x * SC, py = y => OY + y * SC;
+
+function gearPath(c, x, y, R, n, ang){
+  const tip = R + 0.2 * SC, root = R - 0.2 * SC;
+  const step = TAU / n;
+  c.beginPath();
+  for (let i = 0; i < n; i++){
+    const a = ang + i * step;
+    const pts = [[a - step*0.5, root],[a - step*0.22, root],[a - step*0.13, tip],[a + step*0.13, tip],[a + step*0.22, root]];
+    pts.forEach(([aa, rr], k) => { const X = x + Math.cos(aa)*rr, Y = y + Math.sin(aa)*rr; (i === 0 && k === 0) ? c.moveTo(X, Y) : c.lineTo(X, Y); });
+  }
+  c.closePath();
+}
+function drawGear(c, x, y, r, n, ang, fill, dark, alpha, scl){
+  const R = r * SC * (scl || 1);
+  c.save(); c.globalAlpha = alpha == null ? 1 : alpha;
+  gearPath(c, x, y, R, n, ang);
+  c.fillStyle = fill; c.fill(); c.lineWidth = Math.max(2, SC*0.07); c.strokeStyle = dark; c.stroke();
+  // spoke holes
+  const holes = n >= 12 ? 5 : 4;
+  c.fillStyle = dark;
+  for (let i = 0; i < holes; i++){
+    const a = ang + i * TAU / holes;
+    c.beginPath(); c.arc(x + Math.cos(a)*R*0.55, y + Math.sin(a)*R*0.55, R*0.14, 0, TAU); c.fill();
+  }
+  c.beginPath(); c.arc(x, y, R*0.22, 0, TAU); c.fillStyle = '#fff'; c.fill(); c.strokeStyle = dark; c.stroke();
+  c.restore();
+}
+function emoji(c, e, x, y, size, rot){
+  c.save(); c.globalAlpha = 1; c.fillStyle = '#000';
+  c.font = Math.round(size) + 'px ' + EMOJI; c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.translate(x, y); if (rot) c.rotate(rot); c.fillText(e, 0, 0); c.restore();
+}
+
+function drawBoard(t){
+  const x0 = px(0), y0 = py(0), s = BOARD * SC, rad = SC * 0.6;
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0, y0, s, s, rad) : ctx.rect(x0, y0, s, s);
+  const gr = ctx.createLinearGradient(x0, y0, x0, y0 + s);
+  gr.addColorStop(0, '#f8e1b8'); gr.addColorStop(1, '#ecc68c');
+  ctx.fillStyle = gr; ctx.fill(); ctx.lineWidth = SC*0.15; ctx.strokeStyle = '#c99a5b'; ctx.stroke();
+  ctx.clip();
+  ctx.fillStyle = '#d8ad74';
+  for (let i = 0.5; i < BOARD; i += 1) for (let j = 0.5; j < BOARD; j += 1){
+    ctx.beginPath(); ctx.arc(px(i), py(j), SC*0.06, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawPeg(p, t){
+  const x = px(p.x), y = py(p.y);
+  if (!p.gear){
+    ctx.save(); ctx.setLineDash([SC*0.15, SC*0.12]); ctx.lineDashOffset = -t*SC*0.4;
+    ctx.strokeStyle = '#a0703a'; ctx.lineWidth = Math.max(2, SC*0.06);
+    ctx.beginPath(); ctx.arc(x, y, SC*(0.55 + 0.05*Math.sin(t*3)), 0, TAU); ctx.stroke(); ctx.restore();
+  }
+  ctx.beginPath(); ctx.arc(x, y, SC*0.26, 0, TAU); ctx.fillStyle = '#8b5a2b'; ctx.fill();
+  ctx.beginPath(); ctx.arc(x - SC*0.07, y - SC*0.07, SC*0.09, 0, TAU); ctx.fillStyle = '#c48a50'; ctx.fill();
+}
+
+function drawDriver(g, t){
+  const x = px(g.x) + shakeX(g, t), y = py(g.y), R = g.r * SC;
+  drawGear(ctx, x, y, g.r, g.n, g.angle, '#7bd389', '#3c9a52', 1, 1 + 0.12*g.pop);
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x, y, R*0.72, 0, TAU); ctx.fillStyle = '#fff7e6'; ctx.fill();
+  ctx.lineWidth = SC*0.1; ctx.strokeStyle = '#e07a2f'; ctx.stroke();
+  ctx.lineWidth = SC*0.04; ctx.strokeStyle = '#e8a66b';
+  for (let i = 0; i < 6; i++){ const a = g.angle + i*TAU/6; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a)*R*0.7, y + Math.sin(a)*R*0.7); ctx.stroke(); }
+  ctx.restore();
+  const running = !G.jam;
+  const bob = running ? Math.abs(Math.sin(t*9))*R*0.08 : 0;
+  emoji(ctx, '🐭', x, y + R*0.25 - bob, R*0.62, running ? Math.sin(t*9)*0.12 : 0);
+}
+
+function shakeX(g, t){ return (G.jam && g.on) ? Math.sin(t*60) * SC*0.06 : 0; }
+
+function drawToy(g, t){
+  const x = px(g.x) + shakeX(g, t), y = py(g.y), R = g.r * SC, a = g.angle, run = g.on && !G.jam;
+  const cols = ['#ff5e5e','#ffa94d','#ffe066','#69db7c','#4dabf7','#9775fa','#f783ac'];
+  ctx.save();
+  switch (g.toy){
+    case 'pinwheel':
+      for (let i = 0; i < 4; i++){
+        const aa = a + i*TAU/4;
+        ctx.beginPath(); ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(aa)*R*0.95, y + Math.sin(aa)*R*0.95);
+        ctx.lineTo(x + Math.cos(aa+0.9)*R*0.55, y + Math.sin(aa+0.9)*R*0.55);
+        ctx.closePath(); ctx.fillStyle = cols[i*2 % 7]; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(x, y, R*0.12, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+      break;
+    case 'music':
+      ctx.beginPath(); ctx.arc(x, y, R*0.75, 0, TAU); ctx.fillStyle = '#fff0f6'; ctx.fill(); ctx.strokeStyle = '#f06595'; ctx.lineWidth = SC*0.08; ctx.stroke();
+      for (let i = 0; i < 8; i++){ const aa = a + i*TAU/8; ctx.beginPath(); ctx.arc(x + Math.cos(aa)*R*0.6, y + Math.sin(aa)*R*0.6, R*0.06, 0, TAU); ctx.fillStyle = cols[i % 7]; ctx.fill(); }
+      emoji(ctx, '🐰', x, y - (run ? Math.abs(Math.sin(t*6))*R*0.12 : 0), R*0.75, run ? Math.sin(t*6)*0.25 : 0);
+      break;
+    case 'popcorn':
+      ctx.beginPath(); ctx.arc(x, y, R*0.75, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+      for (let i = 0; i < 8; i++){ ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, R*0.75, a + i*TAU/8, a + (i+0.5)*TAU/8); ctx.closePath(); ctx.fillStyle = '#ff6b6b'; ctx.fill(); }
+      emoji(ctx, '🍿', x, y - (run ? Math.abs(Math.sin(t*10))*R*0.1 : 0), R*0.8);
+      break;
+    case 'bubbles':
+      ctx.beginPath(); ctx.arc(x, y, R*0.75, 0, TAU); ctx.fillStyle = '#e7f5ff'; ctx.fill();
+      ctx.strokeStyle = '#9775fa'; ctx.lineWidth = SC*0.12;
+      ctx.beginPath(); ctx.arc(x + Math.cos(a)*R*0.3, y + Math.sin(a)*R*0.3, R*0.35, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x - Math.cos(a)*R*0.05, y - Math.sin(a)*R*0.05); ctx.lineTo(x - Math.cos(a)*R*0.7, y - Math.sin(a)*R*0.7); ctx.stroke();
+      break;
+    case 'carousel':
+      for (let i = 0; i < 8; i++){ ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, R*0.85, a + i*TAU/8, a + (i+1)*TAU/8); ctx.closePath(); ctx.fillStyle = i % 2 ? '#fff' : '#ff8fab'; ctx.fill(); }
+      ['🐴','🦄','🐷','🐸'].forEach((e, i) => { const aa = a + i*TAU/4; emoji(ctx, e, x + Math.cos(aa)*R*0.5, y + Math.sin(aa)*R*0.5 - (run ? Math.abs(Math.sin(t*5 + i))*R*0.08 : 0), R*0.38); });
+      ctx.beginPath(); ctx.arc(x, y, R*0.14, 0, TAU); ctx.fillStyle = '#ffd43b'; ctx.fill();
+      break;
+    case 'rainbow':
+      for (let i = 0; i < 7; i++){ ctx.beginPath(); ctx.moveTo(x, y); ctx.arc(x, y, R*0.85, a + i*TAU/7, a + (i+1)*TAU/7); ctx.closePath(); ctx.fillStyle = cols[i]; ctx.fill(); }
+      ctx.beginPath(); ctx.arc(x, y, R*0.2, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill();
+      break;
+    case 'sprinkler':
+      ctx.beginPath(); ctx.arc(x, y, R*0.75, 0, TAU); ctx.fillStyle = '#d3f9d8'; ctx.fill();
+      ctx.strokeStyle = '#748ffc'; ctx.lineWidth = SC*0.12;
+      for (let i = 0; i < 3; i++){ const aa = a + i*TAU/3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(aa)*R*0.65, y + Math.sin(aa)*R*0.65); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x + Math.cos(aa)*R*0.65, y + Math.sin(aa)*R*0.65, R*0.1, 0, TAU); ctx.fillStyle = '#4dabf7'; ctx.fill(); }
+      emoji(ctx, '🌻', x, y, R*0.45);
+      break;
+  }
+  ctx.restore();
+  if (run && g.dir && Math.sign(g.ratio) !== g.dir) emoji(ctx, '❓', x + R*0.7, y - R*0.9 - Math.abs(Math.sin(t*4))*SC*0.2, SC*0.7);
+}
+
+function drawDirArrow(g, t){
+  const x = px(g.x), y = py(g.y), rr = (g.r + 0.45) * SC;
+  const good = g.on && !G.jam && Math.sign(g.ratio) === g.dir;
+  const a0 = -Math.PI*0.85, a1 = -Math.PI*0.15;
+  ctx.save(); ctx.lineCap = 'round';
+  ctx.strokeStyle = good ? '#2f9e44' : '#f76707'; ctx.fillStyle = ctx.strokeStyle;
+  ctx.lineWidth = SC*0.18;
+  ctx.beginPath(); ctx.arc(x, y, rr, a0, a1); ctx.stroke();
+  const tipA = g.dir > 0 ? a1 : a0, tx = x + Math.cos(tipA)*rr, ty = y + Math.sin(tipA)*rr;
+  const tang = tipA + g.dir * Math.PI/2;           // direction of travel at the tip
+  const hl = SC*0.45;
+  ctx.beginPath(); ctx.moveTo(tx + Math.cos(tang)*hl*0.8, ty + Math.sin(tang)*hl*0.8);
+  ctx.lineTo(tx + Math.cos(tang + 2.3)*hl*0.6, ty + Math.sin(tang + 2.3)*hl*0.6);
+  ctx.lineTo(tx + Math.cos(tang - 2.3)*hl*0.6, ty + Math.sin(tang - 2.3)*hl*0.6);
+  ctx.closePath(); ctx.fill();
+  if (good) emoji(ctx, '✅', x, y - rr - SC*0.35, SC*0.6);
+  ctx.restore();
+}
+
+// ---------- particles ----------
+const parts = [], confetti = [];
+function spawn(x, y, kind, n){
+  for (let i = 0; i < (n || 1); i++){
+    const p = {x, y, vx:(Math.random()-0.5)*2, vy:-1.5 - Math.random()*1.5, life:1.4, kind, rot:Math.random()*TAU, s:0.5 + Math.random()*0.3};
+    if (kind === 'drop'){ const a = Math.random()*TAU; p.vx = Math.cos(a)*3; p.vy = Math.sin(a)*3; p.life = 0.6; }
+    if (kind === 'bubble'){ p.vy = -1 - Math.random(); p.life = 2; }
+    parts.push(p);
+  }
+}
+const EMIT = {
+  pinwheel:{step:TAU/3, f(g){ spawn(g.x, g.y - g.r, 'swoosh'); }},
+  music:{step:TAU/6, f(g){ spawn(g.x + (Math.random()-0.5)*g.r, g.y - g.r*0.6, 'note'); SND.note(G.noteI = (G.noteI || 0) + 1); }},
+  popcorn:{step:TAU/4, f(g){ spawn(g.x, g.y - g.r*0.4, 'corn', 2); SND.pop(); }},
+  bubbles:{step:TAU/5, f(g){ spawn(g.x + (Math.random()-0.5)*g.r, g.y - g.r*0.5, 'bubble'); SND.bubble(); }},
+  carousel:{step:TAU/3, f(g){ spawn(g.x, g.y - g.r, 'spark', 2); SND.chime(); }},
+  rainbow:{step:TAU/4, f(g){ spawn(g.x, g.y - g.r*0.5, 'star', 1); SND.chime(); }},
+  sprinkler:{step:TAU/12, f(g){ spawn(g.x, g.y, 'drop', 3); if (Math.random() < 0.4) SND.drip(); }}
+};
+const PEMOJI = {note:['🎵','🎶'], corn:['🍿'], spark:['✨'], star:['⭐'], swoosh:['💨']};
+
+function drawParts(dt){
+  for (let i = parts.length - 1; i >= 0; i--){
+    const p = parts[i]; p.life -= dt;
+    if (p.life <= 0){ parts.splice(i, 1); continue; }
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    if (p.kind === 'corn') p.vy += 4*dt;
+    const X = px(p.x), Y = py(p.y), a = Math.min(1, p.life);
+    ctx.save(); ctx.globalAlpha = a;
+    if (p.kind === 'bubble'){ ctx.beginPath(); ctx.arc(X, Y, SC*0.3*p.s*1.4, 0, TAU); ctx.strokeStyle = '#74c0fc'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(X - SC*0.1, Y - SC*0.1, SC*0.06, 0, TAU); ctx.fillStyle = '#fff'; ctx.fill(); }
+    else if (p.kind === 'drop'){ ctx.beginPath(); ctx.arc(X, Y, SC*0.1, 0, TAU); ctx.fillStyle = '#4dabf7'; ctx.fill(); }
+    else { ctx.globalAlpha = 1; const arr = PEMOJI[p.kind]; ctx.globalAlpha = a; ctx.font = Math.round(SC*0.6*p.s*1.4) + 'px ' + EMOJI;
+      ctx.fillStyle = '#000'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(arr[Math.floor(p.rot) % arr.length], X, Y); }
+    ctx.restore();
+  }
+}
+function burst(n){
+  const cols = ['#ff5e8a','#7b5cff','#ffd23f','#4cc9f0','#69db7c','#ffa94d'];
+  for (let i = 0; i < n; i++) confetti.push({x:innerWidth*Math.random(), y:-20 - Math.random()*innerHeight*0.5, vx:(Math.random()-0.5)*120,
+    vy:120 + Math.random()*200, r:Math.random()*TAU, vr:(Math.random()-0.5)*10, c:cols[i % cols.length], life:4});
+}
+function drawConfetti(dt){
+  fctx.setTransform(DPR, 0, 0, DPR, 0, 0); fctx.clearRect(0, 0, innerWidth, innerHeight);
+  for (let i = confetti.length - 1; i >= 0; i--){
+    const c = confetti[i]; c.life -= dt; c.x += c.vx*dt; c.y += c.vy*dt; c.r += c.vr*dt;
+    if (c.life <= 0 || c.y > innerHeight + 20){ confetti.splice(i, 1); continue; }
+    fctx.save(); fctx.translate(c.x, c.y); fctx.rotate(c.r); fctx.fillStyle = c.c; fctx.fillRect(-6, -3, 12, 6); fctx.restore();
+  }
+}
+
+// ---------- messages, hints ----------
+const msgEl = document.getElementById('msg');
+function setMsg(t){ msgEl.innerHTML = '<span></span>'; msgEl.firstChild.textContent = t; }
+
+function findHint(){
+  // a gear in the wrong place comes off first
+  for (let i = 0; i < G.pegs.length; i++){
+    const p = G.pegs[i];
+    if (p.gear && (p.alt || p.decoy || p.gear.s !== p.s)) return {i, off:true};
+  }
+  for (let i = 0; i < G.pegs.length; i++){
+    const p = G.pegs[i];
+    if (!p.alt && !p.decoy && p.s && !p.gear) return {i, off:false};
+  }
+  return null;
+}
+function showHint(){
+  if (G.mode !== 'level'){ setMsg('Drop a gear so its teeth touch a turning gear!'); return; }
+  const h = findHint(); if (!h) return;
+  G.hintPeg = h.i; G.hintT = 5; G.hintOff = h.off;
+  const s = G.pegs[h.i].s;
+  setMsg(h.off ? 'Tap the wobbly gear to take it off!' : 'Try a ' + U[s].name.toUpperCase() + ' gear on the glowing peg!');
+  SND.chime();
+}
+
+// ---------- input ----------
+let sel = null, carry = null, lastPt = {x:0, y:0};
+const trayBtns = [...document.querySelectorAll('.tg')];
+trayBtns.forEach(b => {
+  const c = b.querySelector('canvas').getContext('2d'), s = b.dataset.s, u = U[s];
+  const save = SC; SC = 128 / 4.6;
+  drawGear(c, 64, 64, u.r, u.n, 0.2, u.c, u.d, 1);
+  SC = save;
+  b.addEventListener('pointerdown', e => {
+    e.preventDefault(); ac();
+    carry = {s, fromTray:true, sx:e.clientX, sy:e.clientY, t0:performance.now(), moved:false, btn:b};
+    lastPt = {x:e.clientX, y:e.clientY};
+  });
+});
+function setSel(s){ sel = s; trayBtns.forEach(b => b.classList.toggle('sel', b.dataset.s === s)); }
+
+function toBoard(cx, cy){ const r = cv.getBoundingClientRect(); return {x:(cx - r.left - OX)/SC, y:(cy - r.top - OY)/SC, inside:cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom}; }
+function gearAt(b){
+  let best = null;
+  for (const g of G.gears) if (g.kind === 'placed' && Math.hypot(b.x-g.x, b.y-g.y) < g.r + 0.15) best = g;
+  return best;
+}
+function pegNear(b, s){
+  let best = -1, bd = 1.7;
+  G.pegs.forEach((p, i) => { if (p.gear && p.gear !== (carry && carry.from)) return; const d = Math.hypot(b.x-p.x, b.y-p.y); if (d < bd){ bd = d; best = i; } });
+  return best;
+}
+
+cv.addEventListener('pointerdown', e => {
+  e.preventDefault(); ac();
+  if (G.mode === 'menu' || G.won) return;
+  const b = toBoard(e.clientX, e.clientY), g = gearAt(b);
+  lastPt = {x:e.clientX, y:e.clientY};
+  if (g) carry = {s:g.s, from:g, sx:e.clientX, sy:e.clientY, t0:performance.now(), moved:false};
+  else carry = {s:null, tapOnly:true, sx:e.clientX, sy:e.clientY, t0:performance.now(), moved:false};
+});
+addEventListener('pointermove', e => {
+  if (!carry) return;
+  lastPt = {x:e.clientX, y:e.clientY};
+  if (!carry.moved && Math.hypot(e.clientX - carry.sx, e.clientY - carry.sy) > 10){
+    carry.moved = true;
+    if (carry.from){ removeGear(carry.from); carry.from.pegFree = true; }
+  }
+});
+addEventListener('pointerup', e => {
+  if (!carry) return;
+  const c = carry; carry = null;
+  const b = toBoard(e.clientX, e.clientY);
+  if (!c.moved){
+    if (c.fromTray){ setSel(sel === c.s ? null : c.s); if (sel) setMsg('Now tap a peg for the ' + U[sel].name.toLowerCase() + ' gear!'); return; }
+    if (c.from){ removeGear(c.from); spawn(c.from.x, c.from.y, 'spark', 2); SND.whoosh(); setMsg('Gear off! Try another one.'); return; }
+    if (c.tapOnly && b.inside){
+      if (!sel){ setMsg('First pick a gear from the box below!'); trayBtns.forEach(t => { t.classList.remove('pulse'); void t.offsetWidth; t.classList.add('pulse'); }); return; }
+      dropAt(b, sel); return;
+    }
+    return;
+  }
+  if (c.tapOnly) return;
+  if (!b.inside){ if (c.from){ SND.whoosh(); setMsg('Back in the box!'); } return; }
+  dropAt(b, c.s);
+});
+addEventListener('pointercancel', () => { if (carry && carry.from && carry.moved) setMsg('Back in the box!'); carry = null; });
+
+function dropAt(b, s){
+  if (G.mode === 'free'){
+    const spot = freeSpot(b.x, b.y, s);
+    if (!spot){ bounce(b, 'No room there — it bumps!', s); return; }
+    const g = mkGear(spot.x, spot.y, s, 'placed'); g.pop = 1; G.gears.push(g); rebuild(); SND.clunk();
+    afterPlace(g); return;
+  }
+  const pi = pegNear(b, s);
+  if (pi < 0){ setMsg('Gears go on the pegs!'); SND.whoosh(); return; }
+  const r = placeOnPeg(pi, s);
+  if (r === 'full'){ setMsg('That peg already has a gear.'); return; }
+  if (r === 'bump'){
+    const o = G.lastBump;
+    if (o && o.kind === 'placed'){
+      // blocked by another gear the kid placed — point at it instead of blaming the size
+      bounce(G.pegs[pi], 'It bumps into the ' + U[o.s].name.toLowerCase() + ' gear — tap that one off first!', s);
+      G.hintPeg = o.peg; G.hintOff = true; G.hintT = 3;
+      return;
+    }
+    G.misses++; bounce(G.pegs[pi], 'Too big — it bumps! Try a smaller gear.', s); maybeAutoHint(); return;
+  }
+  SND.clunk(); afterPlace(G.pegs[pi].gear);
+}
+function bounce(b, text, s){
+  G.fly = {x:b.x, y:b.y, s, t:0.5}; SND.boing(); setMsg(text);
+  G.wrongWay = Math.max(G.wrongWay, 4);   // let the bump message be read first
+}
+function afterPlace(g){
+  if (G.jam){ SND.jam(); setMsg('Uh-oh, the gears are stuck! Tap one to take it off.'); return; }
+  if (g.on){ setMsg(['Whirr! It turns!','Click-click — it spins!','Yes! The teeth touch!'][Math.floor(Math.random()*3)]); spawn(g.x, g.y - g.r, 'spark', 2); return; }
+  // not turning: is it too small for its neighbour?
+  let near = null, nd = 1e9;
+  for (const o of G.gears){ if (o === g) continue; const gap = Math.hypot(o.x-g.x, o.y-g.y) - o.r - g.r; if (gap < nd){ nd = gap; near = o; } }
+  if (near && near.on && nd > TOL && nd < 1.2){
+    G.misses++; setMsg('Not touching yet — try a bigger gear!'); SND.wah(); maybeAutoHint();
+  } else setMsg(G.mode === 'free' ? 'Plonk! Touch it to a turning gear.' : 'Plonk! Now link it up to Tilly\'s wheel.');
+}
+function maybeAutoHint(){ if (G.mode === 'level' && G.misses >= 3){ G.misses = 0; setTimeout(showHint, 900); } }
+
+// ---------- main loop ----------
+let last = performance.now(), T = 0, tickA = 0;
+function frame(now){
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; T += dt;
+  if (G.mode !== 'menu') step(dt);
+  render(dt);
+  drawConfetti(dt);
+  requestAnimationFrame(frame);
+}
+function step(dt){
+  if (!G.jam){
+    G.DA += dt * SPEED;
+    tickA += dt * SPEED;
+    if (tickA > TAU/8){ tickA = 0; SND.tick(); }
+  }
+  for (const g of G.gears){
+    g.pop = Math.max(0, g.pop - dt*3);
+    if (g.on && !G.jam){
+      const na = g.ratio * G.DA + g.offset;
+      if (g.kind === 'target'){
+        g.emitA += Math.abs(na - g.angle);
+        const em = EMIT[g.toy];
+        if (g.emitA > em.step){ g.emitA = 0; em.f(g); }
+      }
+      g.angle = na;
+    }
+  }
+  if (G.hintT > 0){ G.hintT -= dt; if (G.hintT <= 0) G.hintPeg = -1; }
+  if (G.fly){ G.fly.t -= dt; if (G.fly.t <= 0) G.fly = null; }
+
+  if (G.mode === 'level' && !G.won){
+    if (isWin()){ G.winHold += dt; if (G.winHold > 1.3) winLevel(); }
+    else {
+      G.winHold = 0;
+      const wrong = !G.jam && G.targets.some(t => t.on && t.dir && Math.sign(t.ratio) !== t.dir);
+      if (wrong){ G.wrongWay -= dt; if (G.wrongWay <= 0){ G.wrongWay = 6; SND.wah(); setMsg('Backwards! Follow the arrow — one more gear flips the spin.'); } }
+      else G.wrongWay = Math.min(G.wrongWay, 1.2);
+    }
+  }
+  if (G.mode === 'free' && !G.allToysCheered && !G.jam && G.targets.every(t => t.on)){
+    G.allToysCheered = true; SND.fanfare(); burst(120); setMsg('WOW! All three toys are going! 🎉');
+  }
+}
+function render(dt){
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  if (G.mode === 'menu' && !G.gears.length) return;
+  drawBoard(T);
+  G.pegs.forEach(p => drawPeg(p, T));
+  // hint ghost
+  if (G.hintPeg >= 0){
+    const p = G.pegs[G.hintPeg], glow = 0.5 + 0.5*Math.sin(T*6);
+    if (!G.hintOff && p.s) drawGear(ctx, px(p.x), py(p.y), U[p.s].r, U[p.s].n, 0, U[p.s].c, U[p.s].d, 0.25 + 0.25*glow);
+    ctx.save(); ctx.strokeStyle = '#fab005'; ctx.lineWidth = SC*0.12; ctx.globalAlpha = 0.5 + 0.5*glow;
+    ctx.beginPath(); ctx.arc(px(p.x), py(p.y), ((p.gear ? p.gear.r : U[p.s].r) + 0.35)*SC, 0, TAU); ctx.stroke(); ctx.restore();
+  }
+  for (const g of G.gears){
+    if (g.kind === 'driver') drawDriver(g, T);
+    else {
+      const x = px(g.x) + shakeX(g, T), y = py(g.y), u = U[g.s];
+      const fill = g.kind === 'target' ? '#ffd8a8' : u.c, dark = g.kind === 'target' ? '#e8590c' : u.d;
+      drawGear(ctx, x, y, g.r, g.n, g.angle, fill, dark, 1, 1 + 0.15*g.pop);
+      if (g.kind === 'target'){ drawToy(g, T); if (g.dir) drawDirArrow(g, T); }
+    }
+  }
+  drawParts(dt);
+  if (G.fly){
+    const f = G.fly, k = 1 - f.t/0.5, u = U[f.s];
+    drawGear(ctx, px(f.x), py(f.y + k*k*6), u.r, u.n, k*4, u.c, u.d, 1 - k);
+  }
+  if (carry && carry.moved && carry.s){
+    const b = toBoard(lastPt.x, lastPt.y), u = U[carry.s];
+    if (G.mode === 'level'){
+      const pi = pegNear(b, carry.s);
+      if (pi >= 0){
+        const p = G.pegs[pi], test = {x:p.x, y:p.y, r:u.r};
+        const bad = G.gears.some(o => bumps(test, o));
+        ctx.save(); ctx.setLineDash([SC*0.2, SC*0.15]); ctx.strokeStyle = bad ? '#e03131' : '#2f9e44'; ctx.lineWidth = SC*0.1;
+        ctx.beginPath(); ctx.arc(px(p.x), py(p.y), u.r*SC, 0, TAU); ctx.stroke(); ctx.restore();
+      }
+    } else {
+      const spot = freeSpot(b.x, b.y, carry.s);
+      if (spot){ ctx.save(); ctx.setLineDash([SC*0.2, SC*0.15]); ctx.strokeStyle = '#2f9e44'; ctx.lineWidth = SC*0.1;
+        ctx.beginPath(); ctx.arc(px(spot.x), py(spot.y), u.r*SC, 0, TAU); ctx.stroke(); ctx.restore(); }
+    }
+    drawGear(ctx, px(b.x), py(b.y), u.r, u.n, T, u.c, u.d, 0.85);
+  }
+}
+
+// ---------- screens ----------
+const menu = document.getElementById('menu'), win = document.getElementById('win');
+function buildMenu(){
+  const box = document.getElementById('worlds'); box.innerHTML = '';
+  let k = 0;
+  WORLDS.forEach(w => {
+    const h = document.createElement('div'); h.className = 'ws'; h.textContent = w.name; box.appendChild(h);
+    const grid = document.createElement('div'); grid.className = 'lvls';
+    w.levels.forEach(l => {
+      const i = k++, b = document.createElement('button');
+      b.className = 'lb' + (done.includes(i) ? ' done' : '');
+      const toys = l.nodes.filter(n => n.t === 'target').map(n => TOYS[n.toy].e).join('');
+      b.innerHTML = '<small>' + (i + 1) + '</small>' + toys;
+      if (toys.length > 2) b.style.fontSize = '20px';
+      b.setAttribute('aria-label', 'Level ' + (i + 1));
+      b.addEventListener('click', () => { ac(); menu.hidden = true; loadLevel(i); });
+      grid.appendChild(b);
+    });
+    box.appendChild(grid);
+  });
+}
+function showMenu(){ G.mode = 'menu'; buildMenu(); menu.hidden = false; win.hidden = true; }
+function winLevel(){
+  G.won = true;
+  if (!done.includes(G.lvl)){ done.push(G.lvl); store.set('done', done); }
+  const t = G.targets;
+  document.getElementById('winEmoji').textContent = t.map(g => TOYS[g.toy].e).join(' ');
+  document.getElementById('winTitle').textContent = ['Hooray!','Whirr-ific!','You did it!','Super spinning!'][G.lvl % 4];
+  document.getElementById('winText').textContent = t.length > 1 ? 'Both toys are spinning — thanks to your gears!' : 'The ' + TOYS[t[0].toy].name + ' is spinning — thanks to your gears!';
+  document.getElementById('bNext').textContent = G.lvl < LEVELS.length - 1 ? 'Next ▶' : '🧰 Tinker Table';
+  SND.fanfare(); burst(160);
+  setMsg('🎉 It works!');
+  setTimeout(() => { win.hidden = false; }, 900);
+}
+document.getElementById('bNext').addEventListener('click', () => {
+  win.hidden = true;
+  if (G.lvl < LEVELS.length - 1) loadLevel(G.lvl + 1); else loadFree();
+});
+document.getElementById('bWinHome').addEventListener('click', showMenu);
+document.getElementById('bHome').addEventListener('click', showMenu);
+document.getElementById('bFree').addEventListener('click', () => { ac(); menu.hidden = true; loadFree(); });
+document.getElementById('bHint').addEventListener('click', () => { ac(); showHint(); });
+document.getElementById('bReset').addEventListener('click', () => {
+  ac(); SND.whoosh();
+  if (G.mode === 'level') loadLevel(G.lvl); else if (G.mode === 'free') loadFree();
+});
+const bSound = document.getElementById('bSound');
+function paintSound(){ bSound.textContent = soundOn ? '🔊' : '🔇'; }
+bSound.addEventListener('click', () => { soundOn = !soundOn; store.set('sound', soundOn); paintSound(); if (soundOn) SND.chime(); });
+paintSound();
+
+resize();
+showMenu();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
