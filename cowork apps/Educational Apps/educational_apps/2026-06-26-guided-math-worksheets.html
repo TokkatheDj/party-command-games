@@ -11741,6 +11741,20 @@ function valuesEqual(a,b,aRaw,bRaw){
 }
 
 // Ordered list of {v, raw} scalar tokens pulled from a compound answer.
+// Each top-level comma part of an answer, reduced to what follows its last "≈" when it has one.
+// Commas inside (...) and thousands separators don't split.
+function approxFinals(raw){
+  var str=String(raw); if(str.indexOf('≈')<0) return str;
+  var parts=[],cur='',depth=0;
+  for(var i=0;i<str.length;i++){
+    var ch=str[i];
+    if(ch==='(') depth++; else if(ch===')') depth--;
+    var th=ch===','&&/\d/.test(str[i-1]||'')&&/^\d{3}(?!\d)/.test(str.slice(i+1));
+    if(ch===','&&depth===0&&!th){ parts.push(cur); cur=''; } else cur+=ch;
+  }
+  parts.push(cur);
+  return parts.map(function(p){ return p.indexOf('≈')<0 ? p : p.slice(p.lastIndexOf('≈')+1); }).join(',');
+}
 function scalarTokens(raw){
   var t=stripThousands(String(raw)).toLowerCase().replace(/[−–—]/g,'-')
     .replace(/[$]/g,' ').replace(/[()✓✗]/g,' ').replace(/[<>≤≥=≈]/g,' ')
@@ -11934,7 +11948,10 @@ function answersMatch(student, expected){
   }
 
   // Tier 4 — multi-value: ordered tuple (coords) / inequality chain, else unordered set.
-  var eTok=scalarTokens(expected), sTok=scalarTokens(student);
+  // A part that shows its working before "≈" ("r = ∛(250/π) ≈ 4.30 cm, h ≈ 8.60 cm") only
+  // contributes the value after the last "≈" - the 250 inside the working made this answer
+  // impossible to match (25 Oct 2026).
+  var eTok=scalarTokens(approxFinals(expected)), sTok=scalarTokens(student);
   if(eTok.length>=2){
     var isTuple=/^\(\s*-?[\d.\/]+\s*(?:,\s*-?[\d.\/]+\s*){1,2}\)$/.test(String(expected).trim());
     var ordered=isTuple || /[<>≤≥]/.test(String(expected));
