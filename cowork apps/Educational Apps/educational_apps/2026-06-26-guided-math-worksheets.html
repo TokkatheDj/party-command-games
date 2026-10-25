@@ -11925,7 +11925,17 @@ function answersMatch(student, expected){
       var cands=pieces.concat([eAfter]).filter(function(x){ return toValue(x)!=null; });
       var exact=cands.filter(function(x){ return decimalsOf(x)<0; });
       if(exact.length) cands=exact;
-      for(var p=0;p<cands.length;p++){ if(valuesEqual(sVal,toValue(cands[p]),sAfter,cands[p])) return true; }
+      var pctChain=/%/.test(String(expected));
+      for(var p=0;p<cands.length;p++){
+        var cv=toValue(cands[p]);
+        if(valuesEqual(sVal,cv,sAfter,cands[p])) return true;
+        // "25" for "25%": the percent sign left off is still the right answer - 14 right answers
+        // were rejected ("60" for 3/5 = 0.6 = 60%). Compared AS a percent at its own precision,
+        // so "24" still fails and "0.25" (by value) was already accepted (25 Oct 2026).
+        // When the exact form wins ("2/3 = 0.666667 = 66.6667%" compares against 2/3 only), the
+        // percent piece is gone from cands - so ask whether the CHAIN shows a percent at all.
+        if(pctChain && !/%/.test(sAfter) && valuesEqual(sVal/100,cv,sAfter+'%',cands[p])) return true;
+      }
     }
     return false;
   }
