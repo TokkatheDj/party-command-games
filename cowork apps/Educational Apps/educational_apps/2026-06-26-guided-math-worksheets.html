@@ -8404,8 +8404,8 @@ var G6 = (function(){
   function trim(x){ return String(+(+x).toFixed(8)); }
   function firstNum(t){ var m=String(t).replace(/,/g,'').replace(/[−–—]/g,'-').match(/-?\d+(?:\.\d+)?/); return m? parseFloat(m[0]) : null; }
   function lowestTerms(t){ var re=/(\d+)\s*\/\s*(\d+)/g, m, ok=true; while((m=re.exec(String(t)))){ if(gcd(+m[1],+m[2])!==1) ok=false; } return ok; }
-  // "writes a percent": the number, with a % sign
-  function pctGrade(val){ return function(t){ return /%|percent/i.test(t) && Math.abs(firstNum(t)-val)<1e-9; }; }
+  // "writes a percent": the number, with a % sign - or the bare number (26 Oct 2026: "60" for 60%)
+  function pctGrade(val){ return function(t){ return (/%|percent/i.test(t) || /^\s*[-−]?\d+(?:\.\d+)?\s*$/.test(t)) && Math.abs(firstNum(t)-val)<1e-9; }; }
   function decGrade(val){ return function(t){ return !/%/.test(t) && Math.abs((toValue(t)==null?NaN:toValue(t))-val)<1e-9; }; }
 
   // 10 × 10 grid; `k` squares shaded, as a reveal layer when `hidden`
@@ -8449,7 +8449,8 @@ var G6 = (function(){
     },
     answer:function(p){ return p.toPct ? (p.n*100/p.d)+'%' : fr(p.n,p.d); },
     alts:function(p){ return p.toPct ? [(p.n*100/p.d)+' %', (p.n*100/p.d)+' percent'] : [p.n+'/'+p.d]; },
-    rejects:function(p){ return p.toPct ? [String(p.n*100/p.d), p.n+'%'] : [(p.n*100/p.d)+'/100']; },
+    // A bare percent is right since 26 Oct 2026 ("60" for 60%); a wrong bare number must still fail.
+    rejects:function(p){ return p.toPct ? [String(p.n*100/p.d + 1), p.n+'%'] : [(p.n*100/p.d)+'/100']; },
     grade:function(t,p,dflt){ return p.toPct ? pctGrade(p.n*100/p.d)(t) : (dflt && lowestTerms(t) && !/%/.test(t)); }
   });
 
@@ -11880,6 +11881,11 @@ function symbolicallyEqual(student, expected){
 
 function answersMatch(student, expected){
   if(!student || !expected) return false;
+  // A plain number for a percent answer means that percent: "25" for "25%" (Lance, 26 Oct 2026).
+  // Retried with the sign added, so it goes through every check a typed "25%" does; "0.25" still
+  // matches the usual way, and "26" is still wrong.
+  if(/%\s*$/.test(afterLastEq(expected)) && /^\s*[-−]?\d+(?:\.\d+)?\s*$/.test(String(student))
+     && answersMatch(String(student).trim()+'%', expected)) return true;
   // Same text, ignoring case and spaces, is always right. (normalizeAnswer strips unit words
   // anywhere - every "s" - so the correct "SSS" became "" and could never match; Oct 2026.)
   var plain = function(t){ return String(t).toLowerCase().replace(/\s+/g,'').replace(/[−–—]/g,'-'); };
