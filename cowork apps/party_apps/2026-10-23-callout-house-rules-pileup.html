@@ -1,0 +1,650 @@
+<!-- CONCEPT: STANDING RULES / CALL-OUT - "House Rules": a pass-the-phone party game where every turn someone draws a card from a shared deck and the room's rulebook GROWS - Rule cards (or rules you write yourself) stay in force for the rest of the game ("no pointing", "say please before any question", "never say anyone's name"), up to four at once, with the drawer choosing which old rule to scrap when the House is full; Master cards hand out reflex badges (Thumb, Question, Nose, Echo, Freeze, Sky Master) whose holder can spring a trap at any moment and collect from the slowest player; Challenge cards run app-timed mini-games (Category Circle and Rhyme Chain with a shrinking turn clock the phone judges itself, Alphabet Run, Last One reflex, Stare-Down duels, Rule-Safe Speeches) and Mates chain two players' fortunes together. A big CAUGHT! button is always on screen: name the rule-breaker and the rule, the room rules FAIR or NONSENSE, and a token moves from the guilty to the catcher (or back again for a bogus call). Surprise Audits make a random player recite every active rule from memory. Wild cards (Robin Hood, Tax Day, Amnesty, Rewrite, Reverse, Mutiny) shake it up, the richest player at Last Orders wins, and awards crown the Rule Lawyer, Butterfingers and the most-broken rule. 48 rules, 6 Masters, 7 challenge types, full undo, resumable saves | Players: 3-12 | ~15-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>House Rules</title>
+<style>
+:root{
+  --bg:#13101c; --bg2:#1c1729; --panel:#241e34; --panel2:#2e2642; --line:#3d3356;
+  --ink:#f3eefc; --mute:#a99cc4; --dim:#9085a6; /* was #76698f: 3.2:1 on the panels, now 4.6+ (26 Oct 2026) */
+  --gold:#ffc94a; --coral:#ff6b6b; --mint:#4fe0b0; --sky:#6cb8ff; --violet:#b48cff; --pink:#ff7fc8;
+  --rule:#ffc94a; --master:#6cb8ff; --chal:#4fe0b0; --wild:#ff7fc8; --make:#b48cff;
+  --r:14px; --gap:10px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*::before,*::after{box-sizing:border-box}
+[hidden]{display:none !important}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(120% 80% at 50% 0%,#2a1f3f 0%,var(--bg) 60%);color:var(--ink);
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif}
+button{font:inherit;color:inherit;border:0;cursor:pointer;min-height:44px;border-radius:12px}
+button:disabled{opacity:.4;cursor:default}
+input{font:inherit;user-select:text;-webkit-user-select:text}
+#app{display:flex;flex-direction:column;height:100%;max-width:640px;margin:0 auto}
+.screen{display:flex;flex-direction:column;flex:1;min-height:0}
+.scroll{flex:1;min-height:0;overflow-y:auto;padding:12px 14px 16px;-webkit-overflow-scrolling:touch}
+h1{margin:0;font-size:clamp(30px,9vw,46px);font-weight:900;letter-spacing:-.5px;line-height:1.05;
+  background:linear-gradient(90deg,var(--gold),var(--coral),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{margin:0 0 8px;font-size:clamp(15px,4.2vw,19px);color:var(--mute);font-weight:700;letter-spacing:.3px;text-transform:uppercase}
+.sub{color:var(--mute);font-size:clamp(13px,3.6vw,16px);margin:6px 0 0;line-height:1.4}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px;margin-top:12px}
+.btn{background:var(--panel2);padding:10px 14px;font-weight:700;font-size:clamp(14px,3.8vw,17px)}
+.btn.big{min-height:56px;font-size:clamp(17px,4.8vw,21px);width:100%}
+.btn.gold{background:linear-gradient(135deg,#ffd76a,#ff9f43);color:#2a1600}
+.btn.coral{background:linear-gradient(135deg,#ff7a7a,#e8436b);color:#fff}
+.btn.mint{background:linear-gradient(135deg,#63f0c0,#25b98a);color:#04261b}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--mute)}
+.row{display:flex;gap:var(--gap);align-items:center}
+.row>*{flex:1}
+.hint{font-size:12.5px;color:var(--dim);margin-top:6px;line-height:1.35}
+
+/* setup */
+.title-wrap{text-align:center;padding:14px 4px 4px}
+.tag{display:inline-block;margin-top:8px;font-size:12px;color:var(--mute);border:1px solid var(--line);padding:4px 10px;border-radius:999px}
+.namelist{display:flex;flex-direction:column;gap:6px}
+.namerow{display:flex;gap:6px;align-items:center}
+.namerow .num{width:26px;text-align:center;color:var(--dim);font-weight:700}
+.namerow input{flex:1;min-width:0;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg2);color:var(--ink);padding:0 12px}
+.namerow button{width:44px;flex:none;background:var(--bg2);color:var(--coral);font-size:20px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;background:var(--bg2);border:1px solid var(--line);font-weight:700;font-size:14px;padding:6px 4px;line-height:1.15}
+.seg button.on{background:var(--panel2);border-color:var(--gold);color:var(--gold)}
+.seg small{display:block;font-weight:500;font-size:11px;color:var(--dim)}
+.toggle{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer;margin-top:4px}
+.toggle .sw{width:46px;height:28px;border-radius:999px;background:var(--bg2);border:1px solid var(--line);position:relative;flex:none;transition:.2s}
+.toggle .sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--dim);transition:.2s}
+.toggle.on .sw{background:#4a3a14;border-color:var(--gold)}
+.toggle.on .sw::after{left:21px;background:var(--gold)}
+.toggle span{font-size:14.5px;line-height:1.3}
+.toggle span small{display:block;color:var(--dim);font-size:12px}
+
+/* play */
+.topbar{display:flex;align-items:center;gap:8px;padding:10px 12px 6px}
+.topbar .t{flex:1;min-width:0}
+.topbar .t h1{font-size:clamp(22px,6.4vw,30px)}
+.deckpill{font-size:12px;color:var(--mute);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 10px;white-space:nowrap}
+.iconbtn{width:44px;flex:none;background:var(--panel);border:1px solid var(--line);font-size:18px}
+.turnbar{margin:0 12px;padding:8px 12px;border-radius:12px;background:linear-gradient(90deg,#3a2c12,#2a1f3f);border:1px solid #6a5420;font-size:clamp(14px,4vw,17px);display:flex;align-items:center;gap:8px}
+.turnbar b{color:var(--gold)}
+.turnbar .dir{margin-left:auto;font-size:12px;color:var(--mute)}
+.rules{display:flex;flex-direction:column;gap:8px}
+.rulecard{position:relative;background:linear-gradient(135deg,#3a2f12,#2b2316);border:1px solid #7a5f1c;border-radius:12px;padding:10px 12px 9px 40px;font-size:clamp(14.5px,4vw,17px);line-height:1.3;font-weight:600}
+.rulecard .no{position:absolute;left:10px;top:9px;width:22px;height:22px;border-radius:50%;background:var(--gold);color:#2a1600;font-size:13px;font-weight:900;display:grid;place-items:center}
+.rulecard .by{display:block;font-size:11.5px;color:#c9a95a;font-weight:500;margin-top:3px}
+.rulecard .by .brk{color:var(--coral)}
+.empty{color:var(--dim);font-size:14px;text-align:center;padding:10px 6px;border:1px dashed var(--line);border-radius:12px}
+.badges{display:flex;flex-wrap:wrap;gap:6px}
+.badge{display:flex;align-items:center;gap:6px;background:#17263b;border:1px solid #2f5784;border-radius:12px;padding:6px 10px;font-size:13.5px;text-align:left;min-height:44px}
+.badge .em{font-size:20px}
+.badge b{display:block;color:var(--sky);font-size:12px;font-weight:700}
+.badge.used{opacity:.45}
+.mates{font-size:13.5px;color:var(--mute);margin-top:8px;line-height:1.5}
+.mates b{color:var(--pink)}
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+.chip{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:6px 8px;display:flex;align-items:center;gap:6px;min-width:0}
+.chip .nm{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip .tk{font-weight:800;color:var(--gold);font-size:15px}
+.chip.turn{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+.chip .ic{font-size:12px}
+.actionbar{display:flex;gap:8px;padding:8px 12px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(0deg,var(--bg) 70%,transparent);flex:none}
+.actionbar .btn{min-height:58px;font-size:clamp(17px,4.8vw,21px)}
+.actionbar .draw{flex:1.4}
+.actionbar .caught{flex:1}
+.logline{font-size:12.5px;color:var(--dim);padding:3px 0;border-bottom:1px solid #2a2340;line-height:1.35}
+.logline:last-child{border-bottom:0}
+
+/* modal */
+#modal{position:fixed;inset:0;background:rgba(8,6,14,.82);display:flex;align-items:center;justify-content:center;padding:12px;z-index:20}
+#sheet{width:100%;max-width:520px;max-height:100%;overflow-y:auto;background:var(--bg2);border:1px solid var(--line);border-radius:18px;padding:16px 14px 14px;animation:pop .22s ease-out}
+@keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+.card{border-radius:16px;padding:16px 14px;text-align:center;margin-bottom:12px;border:2px solid}
+.card .kind{font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase}
+.card .big{font-size:clamp(20px,6vw,27px);font-weight:800;line-height:1.2;margin:8px 0 4px}
+.card .em{font-size:44px;line-height:1.1}
+.card .txt{font-size:clamp(14px,4vw,16.5px);color:var(--mute);line-height:1.4}
+.card.rule{background:linear-gradient(160deg,#3d3010,#231c10);border-color:var(--rule)} .card.rule .kind{color:var(--rule)}
+.card.make{background:linear-gradient(160deg,#2e2050,#1d1530);border-color:var(--make)} .card.make .kind{color:var(--make)}
+.card.master{background:linear-gradient(160deg,#13304f,#111c2c);border-color:var(--master)} .card.master .kind{color:var(--master)}
+.card.chal{background:linear-gradient(160deg,#0f3a2f,#0f201b);border-color:var(--chal)} .card.chal .kind{color:var(--chal)}
+.card.wild{background:linear-gradient(160deg,#4a1838,#24111d);border-color:var(--wild)} .card.wild .kind{color:var(--wild)}
+.card.audit{background:linear-gradient(160deg,#4a1515,#231010);border-color:var(--coral)} .card.audit .kind{color:var(--coral)}
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin:8px 0}
+.pick{background:var(--panel2);border:1px solid var(--line);padding:10px 8px;font-weight:700;font-size:15px;min-height:50px;overflow:hidden;text-overflow:ellipsis}
+.pick.sel{border-color:var(--gold);color:var(--gold)}
+.pick.rl{text-align:left;font-weight:600;font-size:14px;line-height:1.3;grid-column:1/-1}
+.q{font-size:clamp(16px,4.6vw,19px);font-weight:700;margin:2px 0 6px;line-height:1.3}
+.stack{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.sugg{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.sugg button{background:var(--bg);border:1px dashed var(--line);font-size:13.5px;text-align:left;padding:8px 10px;font-weight:500;color:var(--mute)}
+.ruleinput{width:100%;height:50px;border-radius:12px;border:1px solid var(--make);background:var(--bg);color:var(--ink);padding:0 12px;font-size:16px}
+.err{color:var(--coral);font-size:13px;min-height:18px;margin-top:4px}
+.timer{height:14px;border-radius:999px;background:var(--bg);overflow:hidden;border:1px solid var(--line);margin:10px 0}
+.timer i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--mint),var(--gold),var(--coral));transform-origin:left center}
+.who{font-size:clamp(26px,8vw,38px);font-weight:900;text-align:center;margin:6px 0;color:var(--gold);overflow-wrap:anywhere}
+.prompt{text-align:center;font-size:clamp(15px,4.4vw,18px);color:var(--ink);background:var(--panel);border-radius:12px;padding:10px;line-height:1.35}
+.prompt b{color:var(--mint)}
+.letter{font-size:64px;font-weight:900;text-align:center;color:var(--mint);line-height:1}
+.count{font-size:clamp(70px,24vw,120px);font-weight:900;text-align:center;line-height:1;margin:10px 0;color:var(--gold)}
+.count.go{color:var(--mint)}
+.mini{font-size:12.5px;color:var(--dim);text-align:center;margin-top:6px}
+.checks{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.check{display:flex;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;text-align:left;font-size:14.5px;font-weight:600;line-height:1.3}
+.check .box{width:26px;height:26px;flex:none;border-radius:8px;border:2px solid var(--dim);display:grid;place-items:center;font-size:16px}
+.check.on{border-color:var(--mint)}
+.check.on .box{border-color:var(--mint);background:var(--mint);color:#04261b}
+.result{text-align:center;font-size:clamp(17px,5vw,22px);font-weight:800;margin:8px 0;line-height:1.3}
+.result .pos{color:var(--mint)} .result .neg{color:var(--coral)}
+
+/* end */
+.podium{display:flex;flex-direction:column;gap:6px}
+.stand{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.stand .pl{width:28px;font-weight:900;color:var(--dim);text-align:center}
+.stand .nm{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stand .tk{font-weight:900;color:var(--gold)}
+.stand.first{border-color:var(--gold);background:linear-gradient(90deg,#3a2c12,var(--panel))}
+.award{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line)}
+.award:last-child{border-bottom:0}
+.award .em{font-size:28px;line-height:1}
+.award b{display:block;color:var(--gold)}
+.award span{font-size:14px;color:var(--mute);line-height:1.35}
+.helptxt{font-size:14.5px;line-height:1.5;color:var(--mute)}
+.helptxt b{color:var(--ink)}
+.helptxt p{margin:6px 0}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SETUP -->
+  <section class="screen" id="setup">
+    <div class="scroll">
+      <div class="title-wrap">
+        <h1>House Rules</h1>
+        <p class="sub">Draw a card, add a rule, and catch anyone who breaks it. The rulebook keeps growing until Last Orders.</p>
+        <span class="tag">🏠 3–12 players · one phone · 15–30 min</span>
+      </div>
+      <div class="panel" id="resumePanel" hidden>
+        <h2>Game in progress</h2>
+        <p class="sub" id="resumeInfo" style="margin-top:0"></p>
+        <div class="row" style="margin-top:10px">
+          <button class="btn gold" id="resumeBtn">Resume</button>
+          <button class="btn ghost" id="discardBtn">Discard</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Players <span id="pcount" style="color:var(--dim)"></span></h2>
+        <div class="namelist" id="names"></div>
+        <button class="btn ghost" id="addName" style="width:100%;margin-top:8px">＋ Add player</button>
+        <p class="hint">Enter names in seating order: turns and circle games go round the room in this order.</p>
+      </div>
+      <div class="panel">
+        <h2>Game length</h2>
+        <div class="seg" id="lenSeg">
+          <button data-v="24">Quick<small>24 cards</small></button>
+          <button data-v="36">Standard<small>36 cards</small></button>
+          <button data-v="48">Long<small>48 cards</small></button>
+        </div>
+        <h2 style="margin-top:14px">Starting tokens</h2>
+        <div class="seg" id="tokSeg">
+          <button data-v="6">6</button>
+          <button data-v="10">10</button>
+          <button data-v="15">15</button>
+        </div>
+        <div class="toggle" id="optAudit"><div class="sw"></div><span>Surprise Audits<small>Now and then a random player has to recite every rule from memory</small></span></div>
+        <div class="toggle" id="optMake"><div class="sw"></div><span>Write-your-own rules<small>Some cards let the drawer invent a rule</small></span></div>
+        <div class="toggle" id="optSound"><div class="sw"></div><span>Sound effects</span></div>
+      </div>
+      <div class="panel" style="margin-bottom:6px">
+        <button class="btn ghost" id="helpBtn1" style="width:100%">How to play</button>
+      </div>
+    </div>
+    <div class="actionbar">
+      <button class="btn gold big" id="startBtn">Open the House</button>
+    </div>
+  </section>
+
+  <!-- PLAY -->
+  <section class="screen" id="play" hidden>
+    <div class="topbar">
+      <div class="t"><h1>House Rules</h1></div>
+      <span class="deckpill" id="deckPill"></span>
+      <button class="iconbtn" id="undoBtn" aria-label="Undo">↶</button>
+      <button class="iconbtn" id="menuBtn" aria-label="Menu">☰</button>
+    </div>
+    <div class="turnbar" id="turnBar"></div>
+    <div class="scroll">
+      <h2>The House Rules</h2>
+      <div class="rules" id="rulesList"></div>
+      <div id="mastersWrap" class="panel" hidden>
+        <h2>Masters <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--dim)">· tap a badge when its trap springs</span></h2>
+        <div class="badges" id="badges"></div>
+        <div class="mates" id="mates"></div>
+      </div>
+      <div class="panel">
+        <h2>Tokens</h2>
+        <div class="board" id="board"></div>
+      </div>
+      <div class="panel" id="logPanel" hidden>
+        <h2>Recently</h2>
+        <div id="log"></div>
+      </div>
+    </div>
+    <div class="actionbar">
+      <button class="btn gold draw" id="drawBtn">Draw a card</button>
+      <button class="btn coral caught" id="caughtBtn">CAUGHT!</button>
+    </div>
+  </section>
+
+  <!-- END -->
+  <section class="screen" id="end" hidden>
+    <div class="scroll">
+      <div class="title-wrap">
+        <h1>Last Orders</h1>
+        <p class="sub" id="endSub"></p>
+      </div>
+      <div class="panel"><h2>Final tokens</h2><div class="podium" id="podium"></div></div>
+      <div class="panel"><h2>Awards</h2><div id="awards"></div></div>
+      <div class="panel"><h2>The final rulebook</h2><div class="rules" id="finalRules"></div></div>
+    </div>
+    <div class="actionbar">
+      <button class="btn gold" id="againBtn" style="flex:1.3">Play again</button>
+      <button class="btn ghost" id="newBtn" style="flex:1">New players</button>
+    </div>
+  </section>
+</div>
+
+<div id="modal" hidden><div id="sheet"></div></div>
+
+<script>
+'use strict';
+// ---------- card data ----------
+const RULES = [
+  'No pointing: use your elbow instead',
+  'Say "please" before asking any question',
+  'Nobody may say "yes" or "no"',
+  'Talk about yourself in the third person',
+  'Never say anyone\'s name: everyone is called "Captain"',
+  'Clap once before you speak to the person drawing',
+  'No swearing, no "um", no "like"',
+  'Only touch the phone with your left hand',
+  'Salute before you draw a card',
+  'Say "beep" after you say any number',
+  'Nobody may say the word "card"',
+  'Finish every question with "...my friend?"',
+  'No crossing your arms or legs',
+  'Laugh like a villain whenever someone gets caught',
+  'Say "thank you, House" after you pay a token',
+  'No saying "I" - try "this one" instead',
+  'Whisper whenever you say a colour',
+  'Touch your nose before you shout CAUGHT!',
+  'Nobody may say "rule" - call them "laws"',
+  'Wave at the phone every time you hand it on',
+  'No showing your teeth when you smile',
+  'Everyone must speak in a posh accent when answering a question',
+  'Keep one hand on your head while it\'s your turn',
+  'Say "dun dun DUN" whenever a new law is added',
+  'Never say "the" - just skip it',
+  'High-five your neighbour before taking a turn',
+  'No looking at the person currently drawing',
+  'You must stand up to accuse anyone',
+  'Bow when you win a token',
+  'Every question must start with "Oh wise one,"',
+  'No saying "what" - ask "pardon?" instead',
+  'Tap the table twice before saying a name',
+  'Speak like a robot whenever you say a number',
+  'Nobody may say "go" or "turn"',
+  'Pat your head while you think out loud',
+  'Point with your pinkie only',
+  'Thumbs up before you agree with anyone',
+  'Hum a note before any sentence that starts with "So"',
+  'Shake hands with whoever you catch',
+  'No phones, keys or cups in your right hand',
+  'Every time you say "good", say "great" instead',
+  'Say "ding!" when a token changes hands',
+  'Keep your feet off the floor while you talk about food',
+  'No yawning, sighing or groaning',
+  'Call the phone "Your Honour"',
+  'Rub your hands together before you draw',
+  'You may only shout CAUGHT! with your eyes shut',
+  'Nobody may say "okay" or "OK"'
+];
+const MAKE_SUGG = [
+  'Everyone must say "meow" after laughing',
+  'No saying the word "you"',
+  'Wiggle your eyebrows before you speak',
+  'Call the table "the Ship"',
+  'Snap your fingers before saying a name',
+  'Never say "me" or "my"',
+  'Every sentence must end with "...allegedly"',
+  'No touching your face',
+  'Say "cheers" before you pass anything',
+  'Nobody may say "game"',
+  'Count to three on your fingers before you answer',
+  'Use your best pirate voice when you complain'
+];
+const MASTERS = {
+  thumb:{em:'👍',name:'Thumb Master',how:'Any time, quietly put your thumb on the edge of the table. Everyone who notices copies you. The LAST person to copy pays you 1 token.',ask:'Who was the last to put their thumb down?'},
+  question:{em:'❓',name:'Question Master',how:'If anyone answers a question you ask them, they pay you 1 token. Everyone should dodge with "Ask me another!" (or a question back).',ask:'Who answered the Question Master\'s question?'},
+  nose:{em:'👃',name:'Nose Master',how:'Any time, touch your nose. The last player to notice and touch their own nose pays you 1 token.',ask:'Who was the last to touch their nose?'},
+  echo:{em:'🔁',name:'Echo Master',how:'Shout "ECHO!" and everyone must repeat your last word straight away. The slowest (or anyone who gets it wrong) pays you 1 token.',ask:'Who was the slowest echo?'},
+  freeze:{em:'🧊',name:'Freeze Master',how:'Shout "FREEZE!" and everyone must hold still for five seconds. The first to move or giggle pays you 1 token.',ask:'Who moved first?'},
+  sky:{em:'☝️',name:'Sky Master',how:'Any time, point at the ceiling. The last player to point up pays you 1 token.',ask:'Who was the last to point at the sky?'}
+};
+const CATEGORIES = ['Breakfast foods','Things in a kitchen','Animals with four legs','Pizza toppings','Sports','Things that are yellow','Board games','Things at a beach','Ice cream flavours','Musical instruments','Cartoon characters','Things you find in a school','Fruits','Vegetables','Superheroes','Countries in Europe','Things with wheels','Things that fly','Sea creatures','Dog breeds','Things in a bathroom','Types of shoes','Famous landmarks','Things that are cold','Jobs','Dances','Things in the sky','Desserts','Insects and bugs','Things you can wear on your head','Fairy tale characters','Things that make noise','Colours','Things in a garden','Card games','Birds','Hobbies','Things that are round','Cities in America','Things that have buttons'];
+const RHYMES = ['cat','bake','light','bear','king','snow','play','fun','sock','tree','rain','dog','cake','bell','star','moon','hat','ring','book','sing','pie','hop','fish','sand','toy','bee','mouse','car','pen','door'];
+const ALPHA_CATS = ['Animals','Foods','Names','Places','Things in a house','Anything at all','Things you can buy','Verbs (action words)'];
+const LAST_ONE = ['touch your nose','put both hands on your head','stand up','touch the floor','point at the phone','stick out your tongue','put a finger on your chin','clap three times','shout "HOUSE!"','hold up a shoe or sock','touch an elbow','stand on one leg'];
+const DUELS = [
+  {n:'Stare-Down',d:'Stare into each other\'s eyes. First to blink, look away or laugh loses.'},
+  {n:'Rock, Paper, Scissors',d:'Best of three. Shout it loud.'},
+  {n:'Thumb War',d:'One, two, three, four, I declare a thumb war. First pin wins.'},
+  {n:'Straight Face',d:'Each of you gets 15 seconds to make the other laugh. First to crack loses.'},
+  {n:'Tongue Twister',d:'Take turns saying "red lorry, yellow lorry" five times fast. First to flub loses.'},
+  {n:'Slow Clap',d:'Both clap together slowly, getting faster. First to break the rhythm loses.'}
+];
+const SPEECH = ['your dream holiday','the best sandwich ever made','why socks go missing','your first pet (real or imaginary)','what aliens would think of this room','a terrible business idea','your morning routine','the worst present you could give someone','how to win this game','the most useless superpower'];
+const WILDS = {
+  robin:{em:'🏹',name:'Robin Hood',txt:'The richest player gives 1 token to the poorest.'},
+  tax:{em:'💰',name:'Tax Day',txt:'Everyone with more tokens than the drawer pays the drawer 1 token.'},
+  amnesty:{em:'🕊️',name:'Amnesty',txt:'The drawer may scrap any one House Rule. No rules? Take 1 token from the bank.'},
+  rewrite:{em:'✍️',name:'Rewrite',txt:'The drawer rewrites one House Rule into a brand-new one.'},
+  reverse:{em:'🔄',name:'Reverse',txt:'Turn order flips direction.'},
+  mutiny:{em:'🏴‍☠️',name:'Mutiny',txt:'Every Master loses their badge. Mates are split up too.'},
+  jackpot:{em:'🎰',name:'Jackpot',txt:'The drawer collects 2 tokens from the bank.'}
+};
+const CHAL_INFO = {
+  category:{em:'🔤',name:'Category Circle',txt:'Go round the circle naming things in the category. The phone gives each player a shrinking clock. Miss, repeat or run out of time and you pay 1 token.'},
+  rhyme:{em:'🎵',name:'Rhyme Chain',txt:'Go round the circle saying words that rhyme with the word. The clock shrinks each lap. Stall, repeat or flub and you pay 1 token.'},
+  alpha:{em:'🅰️',name:'Alphabet Run',txt:'Go round the circle naming something in the category that starts with the letter on screen. The letter moves on each time. Stall and you pay 1 token.'},
+  last:{em:'⚡',name:'Last One',txt:'When the phone says GO, everyone does the action. The last player to do it pays 1 token.'},
+  duel:{em:'⚔️',name:'Duel',txt:'The drawer picks an opponent. The loser pays the winner 2 tokens.'},
+  speech:{em:'🎤',name:'Rule-Safe Speech',txt:'The drawer talks for 20 seconds on the topic without breaking a single House Rule. Survive it for +2 from the bank. Slip up and pay 1.'},
+  mate:{em:'🔗',name:'Mate',txt:'The drawer picks a Mate. From now on, whenever one of you pays a token, the other pays the same.'}
+};
+const DECK_MIX = {rule:0.30, make:0.08, master:0.15, chal:0.33, wild:0.14};
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rnd = n => Math.floor(Math.random() * n);
+const pickOne = a => a[rnd(a.length)];
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const SAVE_KEY = 'cowork-houserules-save';
+const NAMES_KEY = 'cowork-houserules-names';
+const OPTS_KEY = 'cowork-houserules-opts';
+const MAX_RULES = 4;
+
+// ---------- sound ----------
+let actx = null;
+function tone(freq, dur = 0.12, type = 'sine', vol = 0.18, delay = 0) {
+  if (!opts.sound) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime + delay;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(actx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  } catch (e) { /* audio is optional */ }
+}
+const sfx = {
+  flip: () => { tone(520, .08, 'triangle'); tone(780, .1, 'triangle', .16, .07); },
+  coin: () => { tone(988, .08, 'square', .08); tone(1319, .18, 'square', .08, .07); },
+  caught: () => { tone(880, .14, 'sawtooth', .12); tone(660, .14, 'sawtooth', .12, .15); tone(880, .14, 'sawtooth', .12, .3); },
+  bad: () => { tone(180, .35, 'sawtooth', .14); },
+  good: () => { tone(660, .1, 'triangle'); tone(880, .1, 'triangle', .18, .1); tone(1175, .2, 'triangle', .18, .2); },
+  tick: () => tone(1200, .03, 'square', .05),
+  go: () => tone(1046, .3, 'square', .14),
+  rule: () => { tone(392, .15, 'triangle'); tone(523, .15, 'triangle', .18, .14); tone(659, .3, 'triangle', .18, .28); }
+};
+
+// ---------- state ----------
+let opts = Object.assign({len:36, start:10, audit:true, make:true, sound:true}, JSON.parse(localStorage.getItem(OPTS_KEY) || '{}'));
+let S = null;            // game state
+let undoStack = [];
+let timers = [];         // live intervals/timeouts owned by the current modal
+function clearTimers() { timers.forEach(t => { clearInterval(t); clearTimeout(t); }); timers = []; }
+
+function buildDeck(len, allowMake) {
+  const mix = Object.assign({}, DECK_MIX);
+  if (!allowMake) { mix.rule += mix.make; mix.make = 0; }
+  const rulePool = shuffle(RULES.slice());
+  const masterKeys = Object.keys(MASTERS), chalKeys = Object.keys(CHAL_INFO), wildKeys = Object.keys(WILDS);
+  const cards = [];
+  const counts = {};
+  Object.keys(mix).forEach(k => counts[k] = Math.round(mix[k] * len));
+  let total = Object.values(counts).reduce((a, b) => a + b, 0);
+  while (total < len) { counts.chal++; total++; }
+  while (total > len) { counts.chal--; total--; }
+  for (let i = 0; i < counts.rule; i++) cards.push({t:'rule', text:rulePool[i % rulePool.length]});
+  for (let i = 0; i < counts.make; i++) cards.push({t:'make'});
+  const mk = shuffle(masterKeys.slice());
+  for (let i = 0; i < counts.master; i++) cards.push({t:'master', k:mk[i % mk.length]});
+  const ck = [];
+  while (ck.length < counts.chal) ck.push(...shuffle(chalKeys.slice()));
+  for (let i = 0; i < counts.chal; i++) cards.push({t:'chal', k:ck[i]});
+  const wk = [];
+  while (wk.length < counts.wild) wk.push(...shuffle(wildKeys.slice()));
+  for (let i = 0; i < counts.wild; i++) cards.push({t:'wild', k:wk[i]});
+  shuffle(cards);
+  // the first two draws are always laws, so there is something to catch early
+  for (let slot = 0; slot < 2; slot++) {
+    const from = cards.findIndex((c, i) => i >= slot && c.t === 'rule');
+    if (from > slot) [cards[slot], cards[from]] = [cards[from], cards[slot]];
+  }
+  return cards.reverse(); // pop() draws from the end
+}
+
+function newGame(names) {
+  S = {
+    phase:'play',
+    players:names.map(n => ({name:n, tokens:opts.start, caught:0, catches:0, bogus:0, chal:0})),
+    turn:0, dir:1, deck:buildDeck(opts.len, opts.make), deckTotal:opts.len, drawn:0,
+    rules:[], ruleId:0, masters:{}, masterUsed:{}, mates:[], log:[], broken:{}, retired:[], bank:0
+  };
+  undoStack = [];
+  save(); show('play'); render();
+}
+function save() { if (S) localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }
+function snapshot() { undoStack.push(JSON.stringify(S)); if (undoStack.length > 40) undoStack.shift(); }
+function undo() {
+  if (!undoStack.length) return;
+  clearTimers(); closeModal();
+  S = JSON.parse(undoStack.pop());
+  save(); render(); toastLog('↶ Undone');
+}
+function addLog(msg) { S.log.unshift(msg); if (S.log.length > 30) S.log.length = 30; }
+function toastLog(msg) { addLog(msg); save(); render(); }
+const P = i => S.players[i];
+const nm = i => esc(P(i).name);
+
+// pay amt from player `from` to player `to` (-1 = bank). Mates echo the payment once.
+function pay(from, to, amt, why, chain = true) {
+  if (from === to) return 0;
+  let paid = 0;
+  if (from === -1) { paid = amt; }
+  else { paid = Math.min(amt, P(from).tokens); P(from).tokens -= paid; }
+  if (to >= 0) P(to).tokens += paid; else S.bank += paid;
+  const fromN = from === -1 ? 'The bank' : P(from).name, toN = to === -1 ? 'the bank' : P(to).name;
+  addLog(`${esc(fromN)} → ${esc(toN)}: ${paid} 🪙${why ? ' · ' + esc(why) : ''}`);
+  if (chain && from >= 0) {
+    S.mates.forEach(([a, b]) => {
+      const other = a === from ? b : b === from ? a : -1;
+      if (other >= 0 && other !== to) pay(other, to, amt, 'Mate of ' + P(from).name, false);
+    });
+  }
+  if (paid) sfx.coin();
+  return paid;
+}
+
+// ---------- screens ----------
+function show(id) { ['setup', 'play', 'end'].forEach(s => $(s).hidden = s !== id); }
+
+function render() {
+  if (!S) return;
+  $('deckPill').textContent = `🂠 ${S.deck.length} left`;
+  $('undoBtn').disabled = !undoStack.length;
+  $('turnBar').innerHTML = `<span>🎴</span><span><b>${nm(S.turn)}</b> draws next</span><span class="dir">${S.dir > 0 ? '↻ clockwise' : '↺ reversed'}</span>`;
+  $('rulesList').innerHTML = S.rules.length
+    ? S.rules.map((r, i) => `<div class="rulecard"><span class="no">${i + 1}</span>${esc(r.text)}<span class="by">by ${esc(r.by)}${r.brk ? ` · <span class="brk">broken ${r.brk}×</span>` : ''}</span></div>`).join('')
+    : `<div class="empty">No rules yet. Draw a card to lay down the first law.</div>`;
+  const mk = Object.keys(S.masters);
+  $('mastersWrap').hidden = !mk.length && !S.mates.length;
+  $('badges').innerHTML = mk.map(k => `<button class="badge${S.masterUsed[k] ? ' used' : ''}" data-m="${k}"><span class="em">${MASTERS[k].em}</span><span><b>${MASTERS[k].name}</b>${nm(S.masters[k])}${S.masterUsed[k] ? ' · used' : ''}</span></button>`).join('');
+  $('mates').innerHTML = S.mates.length ? '🔗 Mates: ' + S.mates.map(([a, b]) => `<b>${nm(a)}</b> + <b>${nm(b)}</b>`).join(', ') : '';
+  const ms = {}; mk.forEach(k => { (ms[S.masters[k]] = ms[S.masters[k]] || []).push(MASTERS[k].em); });
+  $('board').innerHTML = S.players.map((p, i) => `<div class="chip${i === S.turn ? ' turn' : ''}"><span class="nm">${esc(p.name)}</span><span class="ic">${(ms[i] || []).join('')}</span><span class="tk">${p.tokens}</span></div>`).join('');
+  $('logPanel').hidden = !S.log.length;
+  $('log').innerHTML = S.log.slice(0, 6).map(l => `<div class="logline">${l}</div>`).join('');
+}
+
+// ---------- modal ----------
+function openModal(html) { $('sheet').innerHTML = html; $('modal').hidden = false; $('sheet').scrollTop = 0; }
+function closeModal() { $('modal').hidden = true; $('sheet').innerHTML = ''; }
+function on(id, fn) { const el = $(id); if (el) el.onclick = fn; }
+
+// a grid of player buttons; resolves with the chosen index
+function playerPicker(title, exclude, cb, extraHtml = '', cancelable = true) {
+  const btns = S.players.map((p, i) => exclude.includes(i) ? '' : `<button class="pick" data-p="${i}">${esc(p.name)}</button>`).join('');
+  openModal(`${extraHtml}<div class="q">${title}</div><div class="picks">${btns}</div>${cancelable ? '<button class="btn ghost" id="pkCancel" style="width:100%">Cancel</button>' : ''}`);
+  $('sheet').querySelectorAll('[data-p]').forEach(b => b.onclick = () => cb(+b.dataset.p));
+  on('pkCancel', closeModal);
+}
+// ---------- turn flow ----------
+function draw() {
+  if (!S || !S.deck.length) return lastOrders();
+  snapshot();
+  const card = S.deck.pop();
+  S.drawn++;
+  S.sinceAudit = (S.sinceAudit || 0) + 1;
+  sfx.flip();
+  ({rule:showRule, make:showMake, master:showMaster, chal:showChal, wild:showWild})[card.t](card, S.turn);
+}
+function finishCard() {
+  clearTimers(); closeModal();
+  const n = S.players.length;
+  S.turn = (S.turn + S.dir + n) % n;
+  S.masterUsed = {};
+  save(); render();
+  if (!S.deck.length) return lastOrders();
+  if (opts.audit && S.rules.length >= 2 && S.drawn >= 4 && S.sinceAudit >= 4 && Math.random() < 0.3) {
+    S.sinceAudit = 0; startAudit();
+  }
+}
+const cardHtml = (cls, kind, em, big, txt) => `<div class="card ${cls}"><div class="kind">${kind}</div>${em ? `<div class="em">${em}</div>` : ''}<div class="big">${big}</div>${txt ? `<div class="txt">${txt}</div>` : ''}</div>`;
+
+// ----- laws -----
+function addRule(text, drawer, done) {
+  const put = slot => {
+    const r = {id:++S.ruleId, text, by:P(drawer).name, brk:0};
+    if (slot == null) S.rules.push(r);
+    else { S.retired.push(S.rules[slot]); S.rules[slot] = r; }
+    addLog(`📜 ${nm(drawer)} laid down: “${esc(text)}”`);
+    sfx.rule(); done();
+  };
+  if (S.rules.length < MAX_RULES) return put(null);
+  openModal(`${cardHtml('rule', 'The House is full', '', esc(text), `${nm(drawer)}, scrap one old law to make room:`)}
+    <div class="picks">${S.rules.map((r, i) => `<button class="pick rl" data-r="${i}">${i + 1}. ${esc(r.text)}</button>`).join('')}</div>`);
+  $('sheet').querySelectorAll('[data-r]').forEach(b => b.onclick = () => put(+b.dataset.r));
+}
+function showRule(card, d) {
+  openModal(`${cardHtml('rule', 'House Rule', '📜', esc(card.text), `From now on, for the rest of the game. Break it and anyone can shout CAUGHT!`)}
+    <button class="btn gold big" id="ok">Make it law</button>`);
+  on('ok', () => addRule(card.text, d, finishCard));
+}
+function showMake(card, d, rewriteSlot = null) {
+  const sugg = shuffle(MAKE_SUGG.slice()).slice(0, 3);
+  openModal(`${cardHtml('make', rewriteSlot == null ? 'Write a Rule' : 'Rewrite', '✍️', `${nm(d)} makes the law`, rewriteSlot == null ? 'Invent a rule everyone must follow. Keep it fair, playable and kind.' : `Replacing: “${esc(S.rules[rewriteSlot].text)}”`)}
+    <input class="ruleinput" id="ruleIn" maxlength="90" placeholder="e.g. No saying the word ‘you’" autocomplete="off">
+    <div class="err" id="ruleErr"></div>
+    <div class="sugg">${sugg.map(s => `<button data-s="${esc(s)}">💡 ${esc(s)}</button>`).join('')}</div>
+    <div class="stack"><button class="btn gold big" id="ok">Make it law</button></div>`);
+  $('sheet').querySelectorAll('[data-s]').forEach(b => b.onclick = () => { $('ruleIn').value = b.dataset.s; $('ruleErr').textContent = ''; });
+  on('ok', () => {
+    const t = $('ruleIn').value.trim().replace(/\s+/g, ' ');
+    if (t.length < 4) { $('ruleErr').textContent = 'Write a rule first (at least a few words).'; return; }
+    if (S.rules.some((r, i) => i !== rewriteSlot && r.text.toLowerCase() === t.toLowerCase())) { $('ruleErr').textContent = 'That one is already a House Rule.'; return; }
+    if (rewriteSlot != null) {
+      S.retired.push(S.rules[rewriteSlot]);
+      S.rules[rewriteSlot] = {id:++S.ruleId, text:t, by:P(d).name, brk:0};
+      addLog(`✍️ ${nm(d)} rewrote a law: “${esc(t)}”`); sfx.rule(); finishCard();
+    } else addRule(t, d, finishCard);
+  });
+}
+
+// ----- masters -----
+function showMaster(card, d) {
+  const m = MASTERS[card.k], prev = S.masters[card.k];
+  const note = prev != null && prev !== d ? `<br><br>The badge moves from ${nm(prev)}.` : '';
+  openModal(`${cardHtml('master', 'Master card', m.em, `${nm(d)} is the ${m.name}`, esc(m.how) + note)}
+    <p class="hint" style="text-align:center">The badge shows on the main screen. Tap it whenever the trap springs. One spring per turn.</p>
+    <button class="btn gold big" id="ok">Take the badge</button>`);
+  on('ok', () => { S.masters[card.k] = d; addLog(`${m.em} ${nm(d)} became ${m.name}`); finishCard(); });
+}
+function useMaster(k) {
+  const m = MASTERS[k], who = S.masters[k];
+  if (who == null) return;
+  if (S.masterUsed[k]) {
+    openModal(`${cardHtml('master', m.name, m.em, 'Already sprung', 'Each Master can spring their trap once per turn. Wait for the next card.')}<button class="btn big" id="ok">OK</button>`);
+    return on('ok', closeModal);
+  }
+  playerPicker(m.ask, [who], i => {
+    snapshot();
+    S.masterUsed[k] = true;
+    pay(i, who, 1, m.name);
+    save(); closeModal(); render();
+  }, cardHtml('master', m.name, m.em, `${nm(who)} sprang the trap!`, ''));
+}
+
+// ----- wilds -----
+function showWild(card, d) {
+  const w = WILDS[card.k];
+  openModal(`${cardHtml('wild', 'Wild card', w.em, w.name, esc(w.txt))}<button class="btn gold big" id="ok">Do it</button>`);
+  on('ok', () => {
+    const ps = S.players.map((p, i) => i);
+    if (card.k === 'robin') {
+      const hi = Math.max(...S.players.map(p => p.tokens)), lo = Math.min(...S.players.map(p => p.tokens));
+      if (hi === lo) { addLog('🏹 Robin Hood found everyone equal'); return finishCard(); }
+      const rich = pickOne(ps.filter(i => P(i).tokens === hi)), poor = pickOne(ps.filter(i => P(i).tokens === lo));
+      pay(rich, poor, 1, 'Robin Hood', false); return wildResult(w, `${nm(rich)} gives 1 🪙 to ${nm(poor)}`);
+    }
+    if (card.k === 'tax') {
+      const mine = P(d).tokens, payers = ps.filter(i => i !== d && P(i).tokens > mine);
+      payers.forEach(i => pay(i, d, 1, 'Tax Day', false));
+      return wildResult(w, payers.length ? `${payers.map(nm).join(', ')} pay${payers.length === 1 ? 's' : ''} ${nm(d)}` : `Nobody is richer than ${nm(d)}. No tax due.`);
+    }
+    if (card.k === 'amnesty') {
+      if (!S.rules.length) { pay(-1, d, 1, 'Amnesty'); return wildResult(w, `No laws to scrap. ${nm(d)} takes 1 🪙.`); }
+      openModal(`${cardHtml('wild', 'Amnesty', w.em, `${nm(d)}, scrap a law`, '')}<div class="picks">${S.rules.map((r, i) => `<button class="pick rl" data-r="${i}">${i + 1}. ${esc(r.text)}</button>`).join('')}</div>`);
+      return $('sheet').querySelectorAll('[data-r]').forEach(b => b.onclick = () => {
+        const r = S.rules.splice(+b.dataset.r, 1)[0]; S.retired.push(r);
+        addLog(`🕊️ ${nm(d)} scrapped “${esc(r.text)}”`); finishCard();
+      });
+    }
+    if (card.k === 'rewrite') {
+      if (!S.rules.length) return showMake({t:'make'}, d);
+      openModal(`${cardHtml('wild', 'Rewrite', w.em, `${nm(d)}, pick a law to rewrite`, '')}<div class="picks">${S.rules.map((r, i) => `<button class="pick rl" data-r="${i}">${i + 1}. ${esc(r.text)}</button>`).join('')}</div>`);
+      return $('sheet').querySelectorAll('[data-r]').forEach(b => b.onclick = () => showMake({t:'make'}, d, +b.dataset.r));
+    }
+    if (card.k === 'reverse') { S.dir *= -1; addLog('🔄 Turn order reversed'); return finishCard(); }
+    if (card.k === 'mutiny') {
+      const had = Object.keys(S.masters).length + S.mates.length;
+      S.masters = {}; S.mates = [];
+      return wildResult(w, had ? 'All badges are gone and every Mate is single again.' : 'Nobody had a badge to lose.');
+    }
+    if (card.k === 'jackpot') { pay(-1, d, 2, 'Jackpot'); return wildResult(w, `${nm(d)} collects 2 🪙`); }
+  });
+}
+function wildResult(w, html) {
+  addLog(`${w.em} ${w.name}: ${html}`);
+  openModal(`${cardHtml('wild', w.name, w.em, '', '')}<div class="result">${html}</div><button class="btn gold big" id="ok">Next turn</button>`);
+  on('ok', finishCard);
+}
+</script>
+</body>
+</html>

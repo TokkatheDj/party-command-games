@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<!-- CONCEPT: Critter Cubbies - a kid-friendly 4x4 animal Sudoku where every row, column and box needs all four animals; tap a cubby, tap an animal. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Critter Cubbies</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;height:100%;font-family:"Trebuchet MS","Comic Sans MS",system-ui,sans-serif;background:linear-gradient(180deg,#bfe9ff,#fff4d6);color:#4a2f63;overflow-x:hidden}
+#app{max-width:560px;margin:0 auto;padding:12px;min-height:100%;display:flex;flex-direction:column;align-items:center}
+h1{margin:6px 0 2px;font-size:clamp(30px,8vw,46px);color:#ff6b6b;text-shadow:0 3px 0 #fff,0 5px 0 #ffd166;text-align:center}
+.desc{margin:0 0 10px;text-align:center;font-size:clamp(15px,4vw,19px);font-weight:bold;max-width:440px}
+.screen{display:none;width:100%;flex-direction:column;align-items:center}
+.screen.on{display:flex}
+.btn{border:0;border-radius:22px;font:inherit;font-weight:bold;font-size:clamp(20px,5.5vw,28px);padding:14px 26px;margin:8px;cursor:pointer;color:#fff;box-shadow:0 6px 0 rgba(0,0,0,.22);transition:transform .08s}
+.btn:active{transform:translateY(5px);box-shadow:0 1px 0 rgba(0,0,0,.22)}
+.green{background:#2ecc71}.yellow{background:#f6b21b}.red{background:#ff6b6b}.blue{background:#4dabf7}.purple{background:#9b6bff}
+/* white button text needs 4.5:1 - the same hues, deeper (26 Oct 2026) */
+.btn.green{background:#1e854a}.btn.yellow{background:#986b06}.btn.red{background:#ea0000}.btn.blue{background:#0977d0}.btn.purple{background:#864cff}
+.menuRow{display:flex;flex-direction:column;width:min(340px,90%)}
+.menuRow .btn{width:100%}
+.hero{font-size:clamp(50px,16vw,90px);letter-spacing:6px;margin:6px 0;animation:bob 2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-8px) rotate(3deg)}}
+.top{display:flex;justify-content:space-between;align-items:center;width:100%;gap:6px}
+.top .btn{font-size:clamp(16px,4.5vw,22px);padding:8px 16px;margin:4px}
+.stars{font-size:clamp(20px,6vw,30px);letter-spacing:2px}
+#grid{display:grid;grid-template-columns:repeat(4,1fr);width:min(88vw,400px);aspect-ratio:1;background:#7a4fb5;border-radius:20px;padding:6px;gap:0;margin:8px 0;box-shadow:0 8px 0 #5b3a8a}
+.cell{border:0;background:#fffaf0;font-size:clamp(34px,11vw,60px);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;padding:0;font-family:inherit;margin:0;line-height:1}
+.cell.bR{border-right:5px solid #7a4fb5}.cell.bB{border-bottom:5px solid #7a4fb5}
+.cell:nth-child(1){border-top-left-radius:14px}.cell:nth-child(4){border-top-right-radius:14px}.cell:nth-child(13){border-bottom-left-radius:14px}.cell:nth-child(16){border-bottom-right-radius:14px}
+.cell.hl{background:#e9f6ff}
+.cell.given{background:#ffe9b8}
+.cell.sel{background:#b9f5c8;outline:5px solid #2ecc71;outline-offset:-5px;z-index:2}
+.cell.pop span{animation:pop .45s}
+@keyframes pop{0%{transform:scale(.2)}60%{transform:scale(1.4) rotate(8deg)}100%{transform:scale(1)}}
+.cell.shake{animation:shake .45s}
+.cell.bad{background:#ffd6d6}
+@keyframes shake{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.cell.wiggle span{animation:wig .8s infinite}
+@keyframes wig{50%{transform:rotate(-12deg) scale(1.12)}}
+#msg{min-height:34px;font-size:clamp(17px,4.6vw,22px);font-weight:bold;text-align:center;margin:2px 0;color:#7a4fb5}
+#pal{display:flex;gap:10px;justify-content:center;margin:6px 0;width:100%}
+.pbtn{flex:1;max-width:100px;aspect-ratio:1;border:0;border-radius:22px;background:#fff;font-size:clamp(34px,11vw,52px);cursor:pointer;box-shadow:0 6px 0 rgba(0,0,0,.2);position:relative;font-family:inherit;padding:0;transition:transform .08s}
+.pbtn:active{transform:translateY(5px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
+.pbtn:disabled{opacity:.35;cursor:default}
+.pbtn small{position:absolute;bottom:2px;left:0;right:0;font-size:13px;color:#7a4fb5;font-weight:bold}
+.pbtn:nth-child(1){background:#ffe0e0}.pbtn:nth-child(2){background:#e0f0ff}.pbtn:nth-child(3){background:#dcffe0}.pbtn:nth-child(4){background:#fff1c9}
+#win{position:fixed;inset:0;background:rgba(122,79,181,.85);display:none;flex-direction:column;align-items:center;justify-content:center;z-index:10;text-align:center;color:#fff}
+#win.on{display:flex}
+#win h2{font-size:clamp(34px,10vw,56px);margin:0 0 6px;text-shadow:0 4px 0 rgba(0,0,0,.25)}
+#win .big{font-size:clamp(48px,15vw,84px);animation:bob 1s infinite}
+canvas#conf{position:fixed;inset:0;pointer-events:none;z-index:11}
+.how{font-size:clamp(15px,4vw,18px);background:#fff;border-radius:18px;padding:10px 16px;margin:8px 0;max-width:420px;text-align:center;box-shadow:0 4px 0 rgba(0,0,0,.1)}
+</style>
+</head>
+<body>
+<div id="app">
+ <h1>🐾 Critter Cubbies 🐾</h1>
+ <p class="desc">Give every critter a cozy cubby! Each row, column and box needs all 4 animals — no repeats.</p>
+
+ <div class="screen on" id="menu">
+  <div class="hero">🐱🐶🐸🐼</div>
+  <div class="how">Tap a cubby, then tap an animal to put it there.<br>Stuck? Tap the 💡 for a hint!</div>
+  <div class="menuRow">
+   <button class="btn green" data-lv="0">🌱 Easy Peasy</button>
+   <button class="btn yellow" data-lv="1">⭐ Just Right</button>
+   <button class="btn purple" data-lv="2">🚀 Super Tricky</button>
+  </div>
+  <div class="stars" id="menuStars"></div>
+ </div>
+
+ <div class="screen" id="play">
+  <div class="top">
+   <button class="btn blue" id="home">🏠</button>
+   <div class="stars" id="stars"></div>
+   <button class="btn yellow" id="hint">💡 Hint</button>
+  </div>
+  <div id="grid"></div>
+  <div id="msg"></div>
+  <div id="pal"></div>
+ </div>
+</div>
+
+<div id="win">
+ <div class="big" id="winAnimals">🐱🐶🐸🐼</div>
+ <h2 id="winTitle">Hooray!</h2>
+ <div style="font-size:24px;font-weight:bold" id="winSub"></div>
+ <button class="btn green" id="again">▶ Another one!</button>
+ <button class="btn blue" id="toMenu">🏠 Menu</button>
+</div>
+<canvas id="conf"></canvas>
+
+<script>
+(function(){
+const ANI=['🐱','🐶','🐸','🐼'];
+const REMOVE=[6,9,11];
+let AC=null;
+function ac(){try{if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();}catch(e){}return AC;}
+function tone(f,t,d,type,v,slide){const a=ac();if(!a)return;const o=a.createOscillator(),g=a.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,a.currentTime+t);if(slide)o.frequency.exponentialRampToValueAtTime(slide,a.currentTime+t+d);g.gain.setValueAtTime(0,a.currentTime+t);g.gain.linearRampToValueAtTime(v||.2,a.currentTime+t+.02);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+t+d);o.connect(g);g.connect(a.destination);o.start(a.currentTime+t);o.stop(a.currentTime+t+d+.05);}
+const SND=[[523,'sine'],[392,'triangle'],[330,'square'],[262,'sawtooth']];
+const snd={
+ place(i){tone(SND[i][0],0,.18,SND[i][1],.15);tone(SND[i][0]*1.5,.08,.2,'sine',.12);},
+ oops(){tone(300,0,.25,'triangle',.18,200);},
+ sel(){tone(660,0,.06,'sine',.1);},
+ hint(){[784,988,1175].forEach((f,i)=>tone(f,i*.07,.2,'sine',.15));},
+ win(){[523,659,784,1046,784,1046,1318].forEach((f,i)=>tone(f,i*.13,.3,'triangle',.2));}
+};
+
+// ---------- puzzle generation ----------
+function shuf(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function makeSolution(){
+ let g=[];for(let r=0;r<4;r++){g.push([]);for(let c=0;c<4;c++)g[r].push(((r%2)*2+Math.floor(r/2)+c)%4);}
+ const sym=shuf([0,1,2,3]);g=g.map(row=>row.map(v=>sym[v]));
+ const rowOrder=[],colOrder=[];
+ const rb=shuf([0,1]),cb=shuf([0,1]);
+ rb.forEach(b=>{shuf([0,1]).forEach(i=>rowOrder.push(b*2+i));});
+ cb.forEach(b=>{shuf([0,1]).forEach(i=>colOrder.push(b*2+i));});
+ let n=rowOrder.map(r=>colOrder.map(c=>g[r][c]));
+ if(Math.random()<.5)n=n[0].map((_,c)=>n.map(r=>r[c]));
+ return n;
+}
+function ok(g,r,c,v){
+ for(let i=0;i<4;i++){if(g[r][i]===v||g[i][c]===v)return false;}
+ const br=r-r%2,bc=c-c%2;
+ for(let i=0;i<2;i++)for(let j=0;j<2;j++)if(g[br+i][bc+j]===v)return false;
+ return true;
+}
+function count(g,lim){
+ for(let r=0;r<4;r++)for(let c=0;c<4;c++)if(g[r][c]<0){
+  let n=0;
+  for(let v=0;v<4;v++)if(ok(g,r,c,v)){g[r][c]=v;n+=count(g,lim-n);g[r][c]=-1;if(n>=lim)return n;}
+  return n;
+ }
+ return 1;
+}
+function makePuzzle(level){
+ const sol=makeSolution();
+ const p=sol.map(r=>r.slice());
+ const cells=shuf([...Array(16).keys()]);
+ let removed=0;
+ for(const k of cells){
+  if(removed>=REMOVE[level])break;
+  const r=Math.floor(k/4),c=k%4,keep=p[r][c];
+  p[r][c]=-1;
+  if(count(p.map(x=>x.slice()),2)===1)removed++;else p[r][c]=keep;
+ }
+ return {sol,p};
+}
+
+// ---------- game state ----------
+let level=0,sol,board,given,sel=-1,solved=0,busy=false;
+const $=id=>document.getElementById(id);
+const gridEl=$('grid'),palEl=$('pal'),msg=$('msg');
+let cellEls=[];
+const stars=[0,0,0];
+
+function say(t){msg.textContent=t;}
+function buildGrid(){
+ gridEl.innerHTML='';cellEls=[];
+ for(let i=0;i<16;i++){
+  const r=Math.floor(i/4),c=i%4;
+  const b=document.createElement('button');
+  b.className='cell'+(c===1?' bR':'')+(r===1?' bB':'');
+  b.setAttribute('aria-label','cubby '+(i+1));
+  b.addEventListener('click',()=>pick(i));
+  gridEl.appendChild(b);cellEls.push(b);
+ }
+}
+function buildPal(){
+ palEl.innerHTML='';
+ ANI.forEach((a,i)=>{
+  const b=document.createElement('button');b.className='pbtn';b.id='p'+i;
+  b.innerHTML=a+'<small></small>';
+  b.addEventListener('click',()=>place(i));
+  palEl.appendChild(b);
+ });
+}
+function render(){
+ const sr=sel>=0?Math.floor(sel/4):-9,sc=sel>=0?sel%4:-9;
+ for(let i=0;i<16;i++){
+  const r=Math.floor(i/4),c=i%4,e=cellEls[i];
+  const v=board[r][c];
+  e.className=e.className.replace(/\b(hl|sel|given)\b/g,'').trim();
+  const sameBox=sel>=0&&(r-r%2===sr-sr%2)&&(c-c%2===sc-sc%2);
+  if(given[r][c])e.classList.add('given');
+  if(sel>=0&&(r===sr||c===sc||sameBox))e.classList.add('hl');
+  if(i===sel)e.classList.add('sel');
+  const cur=e.firstChild&&e.firstChild.textContent;
+  const want=v>=0?ANI[v]:'';
+  if(cur!==want){e.innerHTML=want?'<span>'+want+'</span>':'';}
+ }
+ for(let a=0;a<4;a++){
+  let n=0;board.forEach(row=>row.forEach(x=>{if(x===a)n++;}));
+  const b=$('p'+a);b.disabled=(n>=4);
+  b.querySelector('small').textContent='●'.repeat(4-n);
+ }
+ $('stars').textContent='⭐'.repeat(Math.min(solved,5))+(solved>5?'+':'');
+}
+function firstEmpty(from){
+ for(let k=0;k<16;k++){const i=(from+k)%16;if(board[Math.floor(i/4)][i%4]<0)return i;}
+ return -1;
+}
+function newGame(lv){
+ level=lv;
+ const g=makePuzzle(lv);
+ sol=g.sol;board=g.p.map(r=>r.slice());
+ given=board.map(r=>r.map(v=>v>=0));
+ busy=false;
+ buildGrid();
+ sel=firstEmpty(0);
+ say('Tap an animal to fill the green cubby!');
+ show('play');render();
+}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));}
+function pick(i){
+ if(busy)return;
+ const r=Math.floor(i/4),c=i%4;
+ if(given[r][c]){say('This critter lives here already! 🏡');snd.sel();return;}
+ if(board[r][c]>=0){snd.sel();sel=i;render();return;}
+ sel=i;snd.sel();render();
+}
+function conflicts(r,c,v){
+ const list=[];
+ for(let i=0;i<4;i++){
+  if(board[r][i]===v&&i!==c)list.push(r*4+i);
+  if(board[i][c]===v&&i!==r)list.push(i*4+c);
+ }
+ const br=r-r%2,bc=c-c%2;
+ for(let i=0;i<2;i++)for(let j=0;j<2;j++){const rr=br+i,cc=bc+j;if(board[rr][cc]===v&&!(rr===r&&cc===c))list.push(rr*4+cc);}
+ return [...new Set(list)];
+}
+function place(a){
+ if(busy||sel<0)return;
+ ac();
+ const r=Math.floor(sel/4),c=sel%4;
+ if(board[r][c]>=0||given[r][c])return;
+ if(sol[r][c]===a){
+  board[r][c]=a;snd.place(a);
+  const e=cellEls[sel];render();
+  e.classList.add('pop');setTimeout(()=>e.classList.remove('pop'),500);
+  say(['Purr-fect! 🎉','Nice one! ⭐','Great spot! 🌟','You got it! 👏'][Math.floor(Math.random()*4)]);
+  if(board.every(row=>row.every(v=>v>=0))){win();return;}
+  sel=firstEmpty(sel+1);render();
+ }else{
+  snd.oops();
+  const bad=conflicts(r,c,a);
+  const targets=bad.length?bad:[sel];
+  targets.concat(bad.length?[sel]:[]).forEach(i=>{const e=cellEls[i];e.classList.remove('shake');void e.offsetWidth;e.classList.add('shake','bad');setTimeout(()=>e.classList.remove('shake','bad'),700);});
+  say(bad.length?'Oops! That animal is already nearby — try another! 🤔':'Hmm, not quite — try another critter! 🤔');
+ }
+}
+function hint(){
+ if(busy)return;ac();
+ let i=sel>=0&&board[Math.floor(sel/4)][sel%4]<0?sel:firstEmpty(0);
+ if(i<0)return;
+ sel=i;
+ const r=Math.floor(i/4),c=i%4;
+ board[r][c]=sol[r][c];snd.hint();render();
+ const e=cellEls[i];e.classList.add('pop');setTimeout(()=>e.classList.remove('pop'),500);
+ say('Here is a little help! 💡');
+ if(board.every(row=>row.every(v=>v>=0))){win();return;}
+ sel=firstEmpty(i+1);render();
+}
+function win(){
+ busy=true;sel=-1;render();
+ solved++;stars[level]++;
+ cellEls.forEach((e,i)=>setTimeout(()=>e.classList.add('wiggle'),i*40));
+ snd.win();
+ setTimeout(()=>{
+  $('winAnimals').textContent=shuf(ANI.slice()).join('');
+  $('winTitle').textContent=['Hooray!','Wow, great job!','You did it!','Super star!'][Math.floor(Math.random()*4)];
+  $('winSub').textContent='Every critter has a cozy cubby! '+'⭐'.repeat(Math.min(solved,5));
+  $('win').classList.add('on');confetti();
+ },900);
+}
+
+// ---------- confetti ----------
+const cv=$('conf'),cx=cv.getContext('2d');let parts=[],raf=0;
+function confetti(){
+ cv.width=innerWidth;cv.height=innerHeight;
+ parts=[];for(let i=0;i<140;i++)parts.push({x:Math.random()*cv.width,y:-20-Math.random()*cv.height*.5,vx:(Math.random()-.5)*3,vy:2+Math.random()*4,s:6+Math.random()*8,c:`hsl(${Math.random()*360},90%,60%)`,r:Math.random()*6,vr:(Math.random()-.5)*.3});
+ cancelAnimationFrame(raf);
+ (function step(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  parts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;cx.save();cx.translate(p.x,p.y);cx.rotate(p.r);cx.fillStyle=p.c;cx.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);cx.restore();});
+  parts=parts.filter(p=>p.y<cv.height+20);
+  if(parts.length)raf=requestAnimationFrame(step);else cx.clearRect(0,0,cv.width,cv.height);
+ })();
+}
+
+// ---------- wiring ----------
+document.querySelectorAll('[data-lv]').forEach(b=>b.addEventListener('click',()=>{ac();newGame(+b.dataset.lv);}));
+$('home').addEventListener('click',()=>{show('menu');updMenu();});
+$('hint').addEventListener('click',hint);
+$('again').addEventListener('click',()=>{$('win').classList.remove('on');newGame(level);});
+$('toMenu').addEventListener('click',()=>{$('win').classList.remove('on');show('menu');updMenu();});
+function updMenu(){$('menuStars').textContent=solved?('Puzzles solved: '+solved+' ⭐'):'';}
+buildPal();
+document.addEventListener('keydown',e=>{
+ if(!$('play').classList.contains('on')||busy)return;
+ const k=e.key;
+ if(k>='1'&&k<='4'){place(+k-1);e.preventDefault();return;}
+ if(sel<0)return;
+ let r=Math.floor(sel/4),c=sel%4;
+ if(k==='ArrowLeft')c=(c+3)%4;else if(k==='ArrowRight')c=(c+1)%4;else if(k==='ArrowUp')r=(r+3)%4;else if(k==='ArrowDown')r=(r+1)%4;else return;
+ e.preventDefault();sel=r*4+c;snd.sel();render();
+});
+})();
+</script>
+</body>
+</html>

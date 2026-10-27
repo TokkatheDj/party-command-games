@@ -1,0 +1,922 @@
+<!-- CONCEPT: SPEED & DEXTERITY - "Match Snatch": a lay-the-phone-flat picture-matching race in the shared-symbol tradition - every two cards in the 57-card deck share exactly ONE picture, so 2-4 players around one phone or tablet race to spot the picture their own card shares with the middle card and tap it first. Three round modes (The Tower: snatch the middle card, most cards wins; Empty Your Hand: slap your stack onto the middle, first out wins; Quick Draw: fresh cards every flip, first match takes it) and six twist cards (Spin Cycle, Blink, Shuffle, Giants & Ants, Shadows, Classic). Wrong taps freeze your card for 1.5 s, a fairness window settles photo finishes, bot seats (Easy/Medium/Hard) fill empty chairs or let one person practise, and a winner-stays bench rotation brings up to 10 players through the table. Double-points final round, awards | Players: 2-10 (up to 4 at the table per round) | ~10-20 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Match Snatch</title>
+<style>
+:root {
+  --bg: #0d1022;
+  --bg2: #1a1240;
+  --panel: #171b36;
+  --panel2: #232a52;
+  --line: #333b6e;
+  --ink: #f4f6ff;
+  --muted: #a9b0d6;
+  --a: #ff5c8a;
+  --b: #ffd166;
+  --c: #4cc9f0;
+  --good: #7ae582;
+  --bad: #ff6b6b;
+  --card: #fffaf0;
+  --cardEdge: #e6dcc6;
+  --p0: #ff5c8a;
+  --p1: #4cc9f0;
+  --p2: #ffd166;
+  --p3: #7ae582;
+  --pad: clamp(10px, 3vw, 20px);
+  --rad: 18px;
+}
+*, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  overflow: hidden;
+  touch-action: manipulation;
+  user-select: none; -webkit-user-select: none;
+  background: radial-gradient(circle at 50% 0%, var(--bg2), var(--bg) 70%);
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+button { font-family: inherit; }
+.off { display: none !important; }
+
+/* ---------- menu-style screens ---------- */
+.screen { position: fixed; inset: 0; }
+.scroll { overflow-y: auto; padding: var(--pad); -webkit-overflow-scrolling: touch; }
+.wrap { width: 100%; max-width: 640px; margin: 0 auto; padding-bottom: 24px; }
+h1.title {
+  margin: 6px 0 2px; text-align: center; font-weight: 900; letter-spacing: 1px;
+  font-size: clamp(38px, 12vw, 68px); line-height: 1.05;
+  background: linear-gradient(90deg, var(--a), var(--b), var(--c));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tag { text-align: center; color: var(--ink); font-size: clamp(15px, 4vw, 19px); margin: 6px 0 4px; line-height: 1.35; }
+.meta { text-align: center; color: var(--muted); font-size: clamp(13px, 3.4vw, 15px); margin: 0 0 14px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--rad); padding: 14px; margin-bottom: 12px; }
+.panel h3 { margin: 0 0 10px; font-size: clamp(15px, 4vw, 18px); color: var(--b); letter-spacing: .5px; text-transform: uppercase; }
+.how { margin: 0; padding-left: 20px; color: var(--ink); font-size: clamp(14px, 3.7vw, 16px); line-height: 1.45; }
+.how li { margin-bottom: 4px; }
+.btn {
+  min-height: 48px; padding: 10px 18px; border-radius: 14px; border: 0;
+  font-weight: 800; font-size: clamp(15px, 4vw, 19px); cursor: pointer;
+  background: var(--panel2); color: var(--ink);
+}
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: linear-gradient(90deg, var(--a), var(--b)); color: #22102e; }
+.btn.wide { width: 100%; }
+.btn.small { min-height: 44px; font-size: clamp(13px, 3.5vw, 16px); padding: 8px 12px; }
+.row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.row input {
+  flex: 1; min-width: 0; min-height: 46px; border-radius: 12px; border: 2px solid var(--line);
+  background: #0f1330; color: var(--ink); font-size: 16px; padding: 0 12px; font-weight: 700;
+  user-select: text; -webkit-user-select: text;
+}
+.row .dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 14px; background: var(--muted); }
+.row .type { min-width: 118px; min-height: 46px; }
+.row .type.bot { background: #2b2350; color: var(--b); }
+.row .del { width: 46px; min-height: 46px; padding: 0; background: #3a1e33; color: var(--bad); }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button { min-width: 54px; min-height: 46px; border-radius: 12px; border: 2px solid var(--line); background: #0f1330; color: var(--ink); font-weight: 800; font-size: 17px; cursor: pointer; padding: 0 12px; }
+.seg button.on { background: var(--c); border-color: var(--c); color: #04212c; }
+.seg button:disabled { opacity: .35; cursor: default; }
+.opt { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.opt .lab { font-weight: 700; font-size: clamp(14px, 3.8vw, 16px); }
+.hint { color: var(--muted); font-size: clamp(12px, 3.3vw, 14px); margin: 4px 0 0; line-height: 1.35; }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.btns .btn { flex: 1 1 140px; }
+
+/* round card + results */
+.rcard { border-radius: 22px; padding: 16px; margin-bottom: 12px; border: 2px solid var(--line); background: linear-gradient(160deg, #262d5c, #161a38); text-align: center; }
+.rcard .kicker { color: var(--muted); font-weight: 800; letter-spacing: 1px; text-transform: uppercase; font-size: 13px; }
+.rcard .big { font-size: clamp(26px, 8vw, 40px); font-weight: 900; margin: 4px 0; }
+.rcard .ico { font-size: clamp(34px, 10vw, 52px); line-height: 1.1; }
+.rcard p { margin: 6px 0 0; font-size: clamp(14px, 3.8vw, 17px); line-height: 1.4; }
+.rcard.twist { border-color: #6b4fc7; background: linear-gradient(160deg, #31215e, #171338); }
+.double { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 999px; background: var(--b); color: #2a1600; font-weight: 900; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.chip { padding: 8px 12px; border-radius: 999px; font-weight: 800; border: 2px solid var(--pc, var(--line)); color: var(--pc, var(--ink)); background: rgba(255,255,255,.04); font-size: clamp(14px, 3.7vw, 16px); }
+.chip.bench { --pc: var(--muted); opacity: .8; }
+.tbl { width: 100%; border-collapse: collapse; font-size: clamp(14px, 3.8vw, 17px); }
+.tbl td { padding: 8px 6px; border-bottom: 1px solid var(--line); }
+.tbl td.n { text-align: right; font-weight: 800; white-space: nowrap; }
+.tbl td.nm { font-weight: 700; word-break: break-word; }
+.tbl tr.top td { color: var(--b); }
+.plus { color: var(--good); }
+.winner { text-align: center; margin: 10px 0 4px; }
+.winner .trophy { font-size: clamp(50px, 16vw, 80px); line-height: 1; }
+.winner .wname { font-size: clamp(28px, 9vw, 46px); font-weight: 900; background: linear-gradient(90deg, var(--b), var(--a)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.award { display: flex; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.award:last-child { border-bottom: 0; }
+.award .ai { font-size: 30px; width: 40px; text-align: center; flex: 0 0 40px; }
+.award b { display: block; color: var(--b); }
+.award span { color: var(--muted); font-size: 14px; }
+
+/* ---------- arena ---------- */
+#play { display: flex; flex-direction: column; touch-action: none; overflow: hidden; }
+.band { display: flex; flex: 0 0 auto; padding: 4px; min-height: 0; }
+.band.top { transform: rotate(180deg); }
+.seat {
+  --pc: var(--p0);
+  flex: 1 1 0; min-width: 0; position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  margin: 3px; border-radius: 22px; border: 3px solid var(--pc);
+  background: rgba(255,255,255,.035);
+  touch-action: none; cursor: pointer;
+  transition: box-shadow .2s;
+}
+.seat.botseat { cursor: default; }
+.seat .label {
+  height: 24px; line-height: 24px; max-width: 100%; padding: 0 8px;
+  font-weight: 800; font-size: clamp(13px, 3.6vw, 18px); color: var(--pc);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.seat .label .cnt { color: var(--ink); margin-left: 6px; }
+.seat.flash { box-shadow: 0 0 0 5px var(--pc), 0 0 34px var(--pc); }
+.seat.frozen .card { filter: grayscale(1) brightness(.55); }
+.seat .freeze {
+  position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  font-size: clamp(22px, 7vw, 36px); font-weight: 900; color: #cfefff; pointer-events: none;
+  text-shadow: 0 2px 8px #000;
+}
+.seat.frozen .freeze { display: flex; }
+.seat.done .card { opacity: .35; }
+
+.mid { flex: 0 0 auto; position: relative; display: flex; align-items: center; justify-content: center; }
+.side { position: absolute; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+#midInfo { left: 6px; width: 76px; }
+#midInfo .num { font-size: clamp(24px, 7vw, 34px); font-weight: 900; color: var(--b); line-height: 1; }
+#midInfo .unit { font-size: 12px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+#midInfo .mname { font-size: 11px; color: var(--c); font-weight: 800; margin-top: 4px; }
+#midRight { right: 6px; width: 76px; }
+#pauseBtn { width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--line); background: var(--panel2); color: var(--ink); font-size: 22px; cursor: pointer; }
+#twistTag { font-size: 11px; color: #c9b6ff; font-weight: 800; margin-top: 4px; }
+
+.card {
+  position: relative; flex: 0 0 auto;
+  width: var(--d, 160px); height: var(--d, 160px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffffff, var(--card) 58%, #efe3c8);
+  box-shadow: 0 6px 18px rgba(0,0,0,.5), inset 0 0 0 4px var(--cardEdge);
+}
+#centerCard { box-shadow: 0 0 0 4px var(--b), 0 8px 26px rgba(0,0,0,.6), inset 0 0 0 4px var(--cardEdge); }
+.face { position: absolute; inset: 0; border-radius: 50%; }
+.g {
+  position: absolute; left: var(--x); top: var(--y);
+  font-size: calc(var(--R) * var(--s)); line-height: 1;
+  transform: translate(-50%, -50%) rotate(var(--r));
+  transition: left .35s ease, top .35s ease, transform .35s ease;
+  pointer-events: none;
+}
+.g.hit { animation: hit .5s ease forwards; z-index: 2; }
+@keyframes hit {
+  0% { transform: translate(-50%, -50%) rotate(var(--r)) scale(1); }
+  45% { transform: translate(-50%, -50%) rotate(var(--r)) scale(1.65); filter: drop-shadow(0 0 8px #ffb400); }
+  100% { transform: translate(-50%, -50%) rotate(var(--r)) scale(1.35); filter: drop-shadow(0 0 6px #ffb400); }
+}
+.card.pop { animation: pop .28s ease-out; }
+@keyframes pop { from { transform: scale(.55); opacity: .3; } to { transform: scale(1); opacity: 1; } }
+.tw-spin .face { animation: spin 15s linear infinite; }
+.tw-spin .face.rev { animation-direction: reverse; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.tw-flicker #centerCard .face { animation: flick 2s linear infinite; }
+@keyframes flick { 0%, 64% { opacity: 1; } 66%, 98% { opacity: 0; } 100% { opacity: 1; } }
+.tw-shadows .g { filter: brightness(0); }
+.tw-shadows .g.hit { filter: brightness(0) drop-shadow(0 0 8px #ffb400); }
+
+#toast {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(.8);
+  max-width: 92%; padding: 10px 16px; border-radius: 16px; text-align: center;
+  background: rgba(10, 12, 30, .9); border: 2px solid var(--b);
+  font-weight: 900; font-size: clamp(16px, 5vw, 26px); color: var(--ink);
+  opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s; z-index: 5;
+}
+#toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#count {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: clamp(80px, 30vw, 200px); font-weight: 900; color: var(--b);
+  text-shadow: 0 6px 30px rgba(0,0,0,.8); background: rgba(5, 6, 18, .45); z-index: 6;
+}
+.modalbg { position: fixed; inset: 0; background: rgba(4, 5, 16, .78); display: flex; align-items: center; justify-content: center; z-index: 20; padding: var(--pad); }
+.modal { width: 100%; max-width: 380px; background: var(--panel); border: 2px solid var(--line); border-radius: 22px; padding: 18px; text-align: center; }
+.modal h2 { margin: 0 0 12px; }
+.modal .btn { width: 100%; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<!-- ===== SETUP ===== -->
+<section id="setup" class="screen scroll">
+  <div class="wrap">
+    <h1 class="title">Match Snatch</h1>
+    <p class="tag">Every two cards share exactly <b>one</b> picture. Spot the one your card shares with the middle card, tap it first and snatch the round!</p>
+    <p class="meta">2–10 players · up to 4 at the table each round · ~10–20 min · lay the phone flat between you</p>
+
+    <div class="panel">
+      <h3>How to play</h3>
+      <ol class="how">
+        <li>Sit around the phone or tablet. Each player owns one card in their own corner.</li>
+        <li>Find the ONE picture your card shares with the big middle card and tap it <b>on your card</b>.</li>
+        <li>Wrong tap? Your card freezes for 1.5 seconds.</li>
+        <li>Each round deals a new mode and twist. Winner gets 3 points, runner-up 1. Final round counts double.</li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <h3>Players</h3>
+      <div id="roster"></div>
+      <div class="btns">
+        <button class="btn small" id="addHuman">+ Player</button>
+        <button class="btn small" id="addBot">+ Bot</button>
+      </div>
+      <p class="hint">Tap the type button to switch a seat between Human and Bot (Easy · Medium · Hard). On a laptop with one mouse, play against bots.</p>
+    </div>
+
+    <div class="panel">
+      <h3>Table</h3>
+      <div class="opt"><span class="lab">Seats at the table</span><div class="seg" id="segSeats"></div></div>
+      <div class="opt"><span class="lab">Rounds</span><div class="seg" id="segRounds"></div></div>
+      <div class="opt"><span class="lab">Twist cards</span><div class="seg" id="segTwists"></div></div>
+      <p class="hint" id="benchHint"></p>
+    </div>
+
+    <button class="btn primary wide" id="startBtn">Start the game</button>
+  </div>
+</section>
+
+<!-- ===== ROUND INTRO ===== -->
+<section id="intro" class="screen scroll off">
+  <div class="wrap">
+    <div class="rcard">
+      <div class="kicker" id="inRound">Round 1 of 5</div>
+      <div class="ico" id="inModeIco"></div>
+      <div class="big" id="inMode"></div>
+      <p id="inModeDesc"></p>
+      <div id="inDouble"></div>
+    </div>
+    <div class="rcard twist">
+      <div class="kicker">Twist card</div>
+      <div class="big" id="inTwist"></div>
+      <p id="inTwistDesc"></p>
+    </div>
+    <div class="panel">
+      <h3>At the table</h3>
+      <div class="chips" id="inSeats"></div>
+      <div id="inBenchWrap" class="off">
+        <h3 style="margin-top:14px">Sitting out</h3>
+        <div class="chips" id="inBench"></div>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn" id="redrawBtn">🔀 Different card</button>
+      <button class="btn primary" id="goBtn">Lay it flat — GO!</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PLAY ===== -->
+<section id="play" class="screen off">
+  <div class="band top" id="bandTop"></div>
+  <div class="mid" id="mid">
+    <div class="side" id="midInfo"><div class="num" id="midNum">0</div><div class="unit" id="midUnit">left</div><div class="mname" id="midMode"></div></div>
+    <div class="card" id="centerCard"></div>
+    <div class="side" id="midRight"><button id="pauseBtn" aria-label="Pause">⏸</button><div id="twistTag"></div></div>
+    <div id="toast"></div>
+  </div>
+  <div class="band" id="bandBot"></div>
+  <div id="count" class="off">3</div>
+</section>
+
+<!-- ===== RESULTS ===== -->
+<section id="results" class="screen scroll off">
+  <div class="wrap">
+    <div class="rcard">
+      <div class="kicker" id="resKicker">Round 1 results</div>
+      <div class="big" id="resHead"></div>
+    </div>
+    <div class="panel"><h3>This round</h3><table class="tbl" id="resRound"></table></div>
+    <div class="panel"><h3>Standings</h3><table class="tbl" id="resTotal"></table></div>
+    <button class="btn primary wide" id="nextBtn">Next round</button>
+  </div>
+</section>
+
+<!-- ===== FINAL ===== -->
+<section id="final" class="screen scroll off">
+  <div class="wrap">
+    <div class="winner"><div class="trophy">🏆</div><div class="wname" id="finName"></div><p class="meta" id="finSub"></p></div>
+    <div class="panel"><h3>Final standings</h3><table class="tbl" id="finTable"></table></div>
+    <div class="panel"><h3>Awards</h3><div id="finAwards"></div></div>
+    <div class="btns">
+      <button class="btn primary" id="againBtn">Play again</button>
+      <button class="btn" id="newBtn">New game</button>
+    </div>
+  </div>
+</section>
+
+<div class="modalbg off" id="pauseModal">
+  <div class="modal">
+    <h2>Paused</h2>
+    <button class="btn primary" id="resumeBtn">Resume</button>
+    <button class="btn" id="endRoundBtn">End this round now</button>
+    <button class="btn" id="quitBtn">Quit to setup</button>
+  </div>
+</div>
+
+<script>
+// ---------- deck: order-7 projective plane -> 57 cards x 8 pictures, any two cards share exactly one ----------
+const SYM = ['🍎','🍌','🍇','🍉','🍓','🥕','🌽','🍄','🧀','🍕','🍩','🍦','🎂','🐶','🐱','🐭','🐰','🦊','🐻','🐼','🐸','🐵','🐔','🐧','🦉','🐢','🐍','🐙','🦀','🐟','🐳','🦋','🐝','🐞','🌵','🌻','🍁','🌙','⭐','🔥','💧','🌈','⚽','🎈','🎁','🔑','🔔','⏰','💡','🚀','🚗','🎸','👑','👻','🦖','🧲','⚓'];
+const SYM_NAME = ['apple','banana','grapes','watermelon','strawberry','carrot','corn','mushroom','cheese','pizza','donut','ice cream','cake','dog','cat','mouse','bunny','fox','bear','panda','frog','monkey','chicken','penguin','owl','turtle','snake','octopus','crab','fish','whale','butterfly','bee','ladybug','cactus','sunflower','leaf','moon','star','fire','droplet','rainbow','ball','balloon','gift','key','bell','clock','light bulb','rocket','car','guitar','crown','ghost','dinosaur','magnet','anchor'];
+const N = 7;
+function buildDeck() {
+  const d = [];
+  for (let m = 0; m < N; m++) for (let b = 0; b < N; b++) {
+    const c = [];
+    for (let x = 0; x < N; x++) c.push(x * N + ((m * x + b) % N));
+    c.push(N * N + m);
+    d.push(c);
+  }
+  for (let x0 = 0; x0 < N; x0++) {
+    const c = [];
+    for (let y = 0; y < N; y++) c.push(x0 * N + y);
+    c.push(N * N + N);
+    d.push(c);
+  }
+  const inf = [];
+  for (let m = 0; m <= N; m++) inf.push(N * N + m);
+  d.push(inf);
+  return d;
+}
+const DECK = buildDeck();
+const common = (a, b) => DECK[a].find(s => DECK[b].includes(s));
+(function selfCheck() {
+  let bad = SYM.length !== 57 || SYM_NAME.length !== 57 || DECK.length !== 57;
+  for (let i = 0; i < DECK.length && !bad; i++) for (let j = i + 1; j < DECK.length; j++) {
+    if (DECK[i].filter(s => DECK[j].includes(s)).length !== 1) { bad = true; break; }
+  }
+  if (bad) console.error('Match Snatch: deck self-check failed');
+})();
+
+// ---------- content ----------
+const MODES = {
+  tower: { name: 'The Tower', ico: '🗼', unit: 'cards', midUnit: 'cards left',
+    desc: 'Tap the match between YOUR card and the middle card to snatch the middle card - it becomes your new card. Most cards when the pile runs out wins.' },
+  well: { name: 'Empty Your Hand', ico: '✋', unit: 'cards dumped', midUnit: 'fewest left',
+    desc: 'Everyone holds a stack. Match your top card with the middle card to slap it onto the pile. First to empty their stack wins.' },
+  quick: { name: 'Quick Draw', ico: '🤠', unit: 'flips', midUnit: 'flips left',
+    desc: 'Every flip deals everyone a brand-new card. First to tap their match takes the flip. Most flips wins.' }
+};
+const TWISTS = {
+  classic: { name: 'Classic', desc: 'No tricks. Just eyes and fingers.', bot: 1 },
+  spin: { name: 'Spin Cycle', desc: 'Every card slowly spins. Keep your eye on the prize.', bot: 1.15 },
+  flicker: { name: 'Blink', desc: 'The middle card keeps blinking out. Memorise it fast!', bot: 1.15 },
+  shuffle: { name: 'Shuffle', desc: 'The pictures slide to new spots every few seconds.', bot: 1.15 },
+  giants: { name: 'Giants & Ants', desc: 'Wild picture sizes - the match might be huge on one card and tiny on the other.', bot: 1.1 },
+  shadows: { name: 'Shadows', desc: 'Every picture is a black silhouette. No colour clues!', bot: 1.25 }
+};
+const TYPES = ['human', 'easy', 'med', 'hard'];
+const TYPE_LABEL = { human: '🙂 Human', easy: '🤖 Easy', med: '🤖 Medium', hard: '🤖 Hard' };
+const BOT = {
+  easy: { min: 3200, max: 5600, err: 0.10 },
+  med: { min: 2000, max: 3600, err: 0.05 },
+  hard: { min: 1200, max: 2300, err: 0.02 }
+};
+const BOT_NAMES = ['Robo Rita', 'Beep Bop', 'Cogsworth', 'Sparky', 'Gizmo', 'Pixel Pete', 'Tin Tina', 'Bolt'];
+const SEAT_VARS = ['--p0', '--p1', '--p2', '--p3'];
+const FREEZE_MS = 1500;
+const RESOLVE_MS = 560;
+const KEY = 'cowork-matchsnatch-setup';
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const seatColor = i => `var(${SEAT_VARS[i % 4]})`;
+
+// ---------- audio ----------
+let AC = null;
+function ensureAudio() {
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === 'suspended') AC.resume();
+  } catch (e) { AC = null; }
+}
+function tone(freq, dur = 0.12, type = 'sine', vol = 0.18, delay = 0) {
+  if (!AC) return;
+  const t = AC.currentTime + delay;
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(AC.destination);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+const SEAT_BASE = [523, 587, 659, 784];
+const sndMatch = i => { const f = SEAT_BASE[i % 4]; tone(f, 0.1, 'triangle', 0.2); tone(f * 1.25, 0.1, 'triangle', 0.2, 0.08); tone(f * 1.5, 0.18, 'triangle', 0.2, 0.16); };
+const sndWrong = () => { tone(150, 0.28, 'sawtooth', 0.12); tone(110, 0.3, 'square', 0.06, 0.05); };
+const sndTick = () => tone(520, 0.12, 'square', 0.1);
+const sndGo = () => { tone(880, 0.22, 'square', 0.12); tone(1320, 0.18, 'triangle', 0.1, 0.05); };
+const sndFanfare = () => [523, 659, 784, 1047].forEach((f, k) => tone(f, 0.22, 'triangle', 0.18, k * 0.12));
+document.addEventListener('pointerdown', ensureAudio, { capture: true });
+
+// ---------- setup state ----------
+let roster = [];   // {name, type}
+let cfg = { seats: 3, rounds: 5, twists: true };
+function loadSetup() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (s && Array.isArray(s.roster) && s.roster.length >= 2) {
+      roster = s.roster.slice(0, 10).map(p => ({ name: String(p.name || 'Player').slice(0, 16), type: TYPES.includes(p.type) ? p.type : 'human' }));
+      if (s.cfg) cfg = { seats: +s.cfg.seats || 3, rounds: +s.cfg.rounds || 5, twists: s.cfg.twists !== false };
+      return;
+    }
+  } catch (e) { /* fall through to defaults */ }
+  roster = [{ name: 'Player 1', type: 'human' }, { name: 'Player 2', type: 'human' }, { name: 'Robo Rita', type: 'med' }];
+}
+function saveSetup() { try { localStorage.setItem(KEY, JSON.stringify({ roster, cfg })); } catch (e) { /* storage full or blocked */ } }
+
+function renderSetup() {
+  const maxSeats = Math.min(4, roster.length);
+  cfg.seats = Math.max(2, Math.min(cfg.seats, maxSeats));
+  $('roster').innerHTML = roster.map((p, i) => `
+    <div class="row">
+      <span class="dot"></span>
+      <input maxlength="16" data-i="${i}" value="${esc(p.name)}" aria-label="Player ${i + 1} name">
+      <button class="btn type ${p.type === 'human' ? '' : 'bot'}" data-type="${i}">${TYPE_LABEL[p.type]}</button>
+      <button class="btn del" data-del="${i}" aria-label="Remove" ${roster.length <= 2 ? 'disabled style="opacity:.3"' : ''}>✕</button>
+    </div>`).join('');
+  $('addHuman').disabled = $('addBot').disabled = roster.length >= 10;
+  $('segSeats').innerHTML = [2, 3, 4].map(n => `<button data-seats="${n}" class="${cfg.seats === n ? 'on' : ''}" ${n > maxSeats ? 'disabled' : ''}>${n}</button>`).join('');
+  $('segRounds').innerHTML = [3, 5, 7].map(n => `<button data-rounds="${n}" class="${cfg.rounds === n ? 'on' : ''}">${n}</button>`).join('');
+  $('segTwists').innerHTML = `<button data-tw="1" class="${cfg.twists ? 'on' : ''}">On</button><button data-tw="0" class="${cfg.twists ? '' : 'on'}">Off</button>`;
+  const bench = roster.length - cfg.seats;
+  $('benchHint').textContent = bench > 0
+    ? `${bench} player${bench > 1 ? 's' : ''} will sit out each round. Winner stays at the table; everyone else rotates to the bench.`
+    : 'Everyone plays every round.';
+  saveSetup();
+}
+$('roster').addEventListener('input', e => {
+  const i = e.target.dataset.i;
+  if (i !== undefined) { roster[+i].name = e.target.value.slice(0, 16); saveSetup(); }
+});
+$('roster').addEventListener('click', e => {
+  const t = e.target.closest('button');
+  if (!t) return;
+  if (t.dataset.type !== undefined) {
+    const p = roster[+t.dataset.type];
+    const wasHuman = p.type === 'human';
+    p.type = TYPES[(TYPES.indexOf(p.type) + 1) % TYPES.length];
+    if (wasHuman && /^Player \d+$/.test(p.name)) p.name = freeBotName();
+    renderSetup();
+  } else if (t.dataset.del !== undefined && roster.length > 2) {
+    roster.splice(+t.dataset.del, 1); renderSetup();
+  }
+});
+function freeBotName() { const used = new Set(roster.map(p => p.name)); return BOT_NAMES.find(n => !used.has(n)) || 'Bot ' + (roster.length + 1); }
+$('addHuman').onclick = () => { if (roster.length < 10) { roster.push({ name: 'Player ' + (roster.length + 1), type: 'human' }); if (cfg.seats < 4 && roster.length <= 4) cfg.seats = roster.length; renderSetup(); } };
+$('addBot').onclick = () => { if (roster.length < 10) { roster.push({ name: freeBotName(), type: 'med' }); if (cfg.seats < 4 && roster.length <= 4) cfg.seats = roster.length; renderSetup(); } };
+document.querySelector('#setup').addEventListener('click', e => {
+  const b = e.target.closest('.seg button');
+  if (!b || b.disabled) return;
+  if (b.dataset.seats) cfg.seats = +b.dataset.seats;
+  if (b.dataset.rounds) cfg.rounds = +b.dataset.rounds;
+  if (b.dataset.tw) cfg.twists = b.dataset.tw === '1';
+  renderSetup();
+});
+
+// ---------- screens ----------
+const SCREENS = ['setup', 'intro', 'play', 'results', 'final'];
+function show(id) { SCREENS.forEach(s => $(s).classList.toggle('off', s !== id)); if (id !== 'play') $('pauseModal').classList.add('off'); }
+
+// ---------- game state ----------
+let G = null;  // whole game
+let R = null;  // current round
+let timers = [];
+const later = (fn, ms) => { const r = R; const t = setTimeout(() => { if (R === r) fn(); }, ms); timers.push(t); return t; };
+function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+function newGame() {
+  roster.forEach((p, i) => { if (!p.name.trim()) p.name = p.type === 'human' ? 'Player ' + (i + 1) : freeBotName(); });
+  saveSetup();
+  const players = roster.map(p => ({ name: p.name.trim(), type: p.type, total: 0, matches: 0, wrong: 0, best: Infinity, roundWins: 0, played: 0 }));
+  const idx = players.map((_, i) => i);
+  G = { players, order: idx.slice(0, cfg.seats), bench: idx.slice(cfg.seats), round: 0, rounds: cfg.rounds, last: null };
+  nextIntro();
+}
+
+function drawRoundCard() {
+  const r = G.round;
+  let mode, twist;
+  if (r === 0) { mode = 'tower'; twist = 'classic'; }
+  else {
+    const modes = Object.keys(MODES).filter(m => !G.last || m !== G.last.mode);
+    mode = pick(modes);
+    if (!cfg.twists) twist = 'classic';
+    else {
+      const tws = Object.keys(TWISTS).filter(t => t !== 'classic' && (!G.last || t !== G.last.twist));
+      twist = pick(tws);
+    }
+  }
+  G.card = { mode, twist };
+}
+
+function nextIntro() {
+  drawRoundCard();
+  renderIntro();
+  show('intro');
+}
+function renderIntro() {
+  const { mode, twist } = G.card;
+  const final = G.round === G.rounds - 1;
+  $('inRound').textContent = final ? `Final round (${G.round + 1} of ${G.rounds})` : `Round ${G.round + 1} of ${G.rounds}`;
+  $('inModeIco').textContent = MODES[mode].ico;
+  $('inMode').textContent = MODES[mode].name;
+  $('inModeDesc').textContent = MODES[mode].desc;
+  $('inDouble').innerHTML = final ? '<span class="double">DOUBLE POINTS</span>' : '';
+  $('inTwist').textContent = TWISTS[twist].name;
+  $('inTwistDesc').textContent = TWISTS[twist].desc;
+  $('inSeats').innerHTML = G.order.map((pi, s) => `<span class="chip" style="--pc:${seatColor(s)}">${esc(G.players[pi].name)}${G.players[pi].type !== 'human' ? ' 🤖' : ''}</span>`).join('');
+  $('inBenchWrap').classList.toggle('off', !G.bench.length);
+  $('inBench').innerHTML = G.bench.map(pi => `<span class="chip bench">${esc(G.players[pi].name)}</span>`).join('');
+  $('redrawBtn').classList.toggle('off', G.round === 0);
+}
+$('redrawBtn').onclick = () => { if (G) { drawRoundCard(); renderIntro(); } };
+$('goBtn').onclick = () => { if (G) startRound(); };
+
+// ---------- card layout ----------
+function placeGlyphs(syms, twist) {
+  const a0 = Math.random() * Math.PI * 2;
+  const giant = twist === 'giants';
+  const midSize = giant ? pick([0.3, 0.34, 0.6, 0.66]) : rand(0.4, 0.48);
+  const ringSizes = giant ? (midSize > 0.5 ? [0.18, 0.22, 0.28, 0.3] : [0.18, 0.22, 0.3, 0.44, 0.48]) : null;
+  return syms.map((s, k) => {
+    if (k === 0) return { s, x: 50, y: 50, size: midSize, rot: Math.round(rand(-180, 180)) };
+    const ang = a0 + (k - 1) * 2 * Math.PI / 7 + rand(-0.1, 0.1);
+    const rr = 31 + rand(-1.5, 1.5);   // % of diameter -> 0.62 R
+    return { s, x: 50 + rr * Math.cos(ang), y: 50 + rr * Math.sin(ang), size: giant ? pick(ringSizes) : rand(0.3, 0.4), rot: Math.round(rand(-180, 180)) };
+  });
+}
+const makeLayout = (id, twist) => ({ id, glyphs: placeGlyphs(shuffle(DECK[id].slice()), twist) });
+function renderCard(el, layout, rev) {
+  el.innerHTML = `<div class="face${rev ? ' rev' : ''}">` + layout.glyphs.map(g =>
+    `<span class="g" data-s="${g.s}" style="--x:${g.x.toFixed(2)}%;--y:${g.y.toFixed(2)}%;--s:${g.size.toFixed(3)};--r:${g.rot}deg">${SYM[g.s]}</span>`).join('') + '</div>';
+}
+function restyle(el, layout) {
+  layout.glyphs.forEach(g => {
+    const sp = el.querySelector(`.g[data-s="${g.s}"]`);
+    if (!sp) return;
+    sp.style.setProperty('--x', g.x.toFixed(2) + '%');
+    sp.style.setProperty('--y', g.y.toFixed(2) + '%');
+    sp.style.setProperty('--s', g.size.toFixed(3));
+    sp.style.setProperty('--r', g.rot + 'deg');
+  });
+}
+function popCard(el) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+function highlight(el, sym) { const g = el.querySelector(`.g[data-s="${sym}"]`); if (g) g.classList.add('hit'); }
+function setD(el, d) { el.style.setProperty('--d', d + 'px'); el.style.setProperty('--R', (d / 2) + 'px'); }
+let toastT = 0;
+function toast(msg, ms = 900) {
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+// ---------- round ----------
+function startRound() {
+  clearTimers();
+  const { mode, twist } = G.card;
+  const n = G.order.length;
+  const pool = shuffle([...Array(DECK.length).keys()]);
+  R = {
+    mode, twist, phase: 'count', center: -1, centerLayout: null, pile: [], flip: 0, flips: 0,
+    changeAt: 0, settleUntil: 0, nextShuffle: 0, pausedAt: 0,
+    seats: G.order.map(pi => {
+      const t = G.players[pi].type;
+      return { pi, bot: t === 'human' ? null : BOT[t], won: 0, frozenUntil: 0, botAt: Infinity, stack: [], card: -1, layout: null };
+    })
+  };
+  if (mode === 'tower') {
+    R.seats.forEach(s => { s.card = pool.pop(); });
+    R.center = pool.pop();
+    R.pile = pool.splice(0, 8 + n * 4);
+  } else if (mode === 'well') {
+    const k = n <= 2 ? 7 : n === 3 ? 6 : 5;
+    R.seats.forEach(s => { s.stack = pool.splice(0, k); s.card = s.stack[0]; });
+    R.center = pool.pop();
+  } else {
+    R.flips = 9;
+    dealFlip();
+  }
+  R.seats.forEach(s => { s.layout = makeLayout(s.card, twist); });
+  R.centerLayout = makeLayout(R.center, twist);
+  G.order.forEach(pi => G.players[pi].played++);
+  const play = $('play');
+  Object.keys(TWISTS).forEach(t => play.classList.remove('tw-' + t));
+  play.classList.add('tw-' + twist);
+  show('play');
+  buildArena();
+  layoutArena();
+  countdown();
+}
+function dealFlip() {
+  const pool = shuffle([...Array(DECK.length).keys()]);
+  R.seats.forEach(s => { s.card = pool.pop(); s.layout = makeLayout(s.card, R.twist); });
+  R.center = pool.pop();
+  R.centerLayout = makeLayout(R.center, R.twist);
+}
+
+function buildArena() {
+  const top = $('bandTop'), bot = $('bandBot');
+  top.innerHTML = ''; bot.innerHTML = '';
+  R.seats.forEach((s, i) => {
+    const z = document.createElement('div');
+    z.className = 'seat' + (s.bot ? ' botseat' : '');
+    z.style.setProperty('--pc', seatColor(i));
+    z.innerHTML = '<div class="label"><span class="nm"></span><span class="cnt"></span></div><div class="card"></div><div class="freeze">❄️</div>';
+    z.querySelector('.nm').textContent = G.players[s.pi].name + (s.bot ? ' 🤖' : '');
+    s.el = z; s.cardEl = z.querySelector('.card'); s.cntEl = z.querySelector('.cnt'); s.frzEl = z.querySelector('.freeze');
+    (i % 2 === 0 ? bot : top).appendChild(z);
+    if (!s.bot) z.addEventListener('pointerdown', e => onPointer(e, i));
+    renderCard(s.cardEl, s.layout, i % 2 === 1);
+  });
+  renderCard($('centerCard'), R.centerLayout, false);
+  $('midMode').textContent = MODES[R.mode].name;
+  $('twistTag').textContent = R.twist === 'classic' ? '' : TWISTS[R.twist].name;
+  $('toast').classList.remove('show');
+  updateHud();
+}
+function layoutArena() {
+  if (!R || $('play').classList.contains('off')) return;
+  const W = window.innerWidth, H = window.innerHeight;
+  const midH = Math.round(Math.max(150, Math.min(H * 0.31, 320)));
+  const bandH = Math.floor((H - midH) / 2);
+  $('bandTop').style.height = $('bandBot').style.height = bandH + 'px';
+  $('mid').style.height = midH + 'px';
+  const perBand = Math.ceil(R.seats.length / 2);
+  const zoneW = (W - 8) / perBand - 6;
+  // band padding 8 + seat border 6 + label 24 + gap 4 + breathing room 14
+  const d = Math.floor(Math.max(90, Math.min(zoneW - 14, bandH - 56)));
+  R.seats.forEach(s => setD(s.cardEl, d));
+  setD($('centerCard'), Math.floor(Math.max(100, Math.min(midH - 14, W - 172))));
+}
+window.addEventListener('resize', layoutArena);
+
+function updateHud() {
+  R.seats.forEach(s => {
+    s.cntEl.textContent = R.mode === 'tower' ? `🃏 ${s.won}` : R.mode === 'well' ? `✋ ${s.stack.length} left` : `⭐ ${s.won}`;
+  });
+  let num;
+  if (R.mode === 'tower') num = R.pile.length + ($('centerCard').childElementCount ? 1 : 0);
+  else if (R.mode === 'well') num = Math.min(...R.seats.map(s => s.stack.length));
+  else num = R.flips - R.flip;
+  $('midNum').textContent = num;
+  $('midUnit').textContent = MODES[R.mode].midUnit;
+}
+
+function countdown() {
+  const c = $('count');
+  c.classList.remove('off');
+  R.phase = 'count';
+  let k = 3;
+  c.textContent = k; sndTick();
+  const step = () => {
+    k--;
+    if (k > 0) { c.textContent = k; sndTick(); later(step, 700); }
+    else if (k === 0) { c.textContent = 'GO!'; sndGo(); later(step, 450); }
+    else { c.classList.add('off'); beginPlay(); }
+  };
+  later(step, 700);
+}
+function beginPlay() {
+  const now = performance.now();
+  R.phase = 'play'; R.changeAt = now; R.settleUntil = now; R.nextShuffle = now + 2600;
+  resetBots(now);
+}
+function resetBots(now) {
+  R.seats.forEach(s => {
+    if (s.bot) s.botAt = Math.max(now, s.frozenUntil) + rand(s.bot.min, s.bot.max) * TWISTS[R.twist].bot;
+  });
+}
+
+// ---------- input ----------
+function onPointer(e, i) {
+  e.preventDefault();
+  if (!R || R.phase !== 'play') return;
+  const s = R.seats[i];
+  const rc = s.cardEl.getBoundingClientRect();
+  const cx = rc.left + rc.width / 2, cy = rc.top + rc.height / 2;
+  if (Math.hypot(e.clientX - cx, e.clientY - cy) > rc.width / 2 * 1.1) return;   // tapped the zone, not the card
+  let best = null, bd = Infinity, bw = 0;
+  s.cardEl.querySelectorAll('.g').forEach(g => {
+    const r = g.getBoundingClientRect();
+    const d = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+    if (d < bd) { bd = d; best = g; bw = r.width; }
+  });
+  // a tap in the gap between pictures is ignored rather than punished
+  if (best && bd <= Math.max(26, bw * 0.9)) tap(i, +best.dataset.s);
+}
+
+// every tap - human or bot - goes through here
+function tap(i, sym) {
+  if (!R || R.phase !== 'play') return false;
+  const now = performance.now(), s = R.seats[i];
+  if (now < s.frozenUntil || now < R.settleUntil) return false;
+  const m = common(s.card, R.center);
+  const p = G.players[s.pi];
+  if (sym === m) {
+    R.phase = 'resolve';   // locks every other seat until the new cards land, so a photo finish is never penalised
+    p.matches++;
+    const t = now - R.changeAt;
+    if (t < p.best) p.best = t;
+    s.won++;
+    highlight(s.cardEl, m); highlight($('centerCard'), m);
+    s.el.classList.add('flash');
+    sndMatch(i);
+    toast(`${p.name}: ${SYM[m]} ${SYM_NAME[m]}!`);
+    later(() => applyMatch(i), RESOLVE_MS);
+    return true;
+  }
+  p.wrong++;
+  s.frozenUntil = now + FREEZE_MS;
+  s.frzEl.textContent = '❄️ 1.5';
+  s.el.classList.add('frozen');
+  sndWrong();
+  if (s.bot) s.botAt = s.frozenUntil + rand(300, 900);
+  return false;
+}
+
+function applyMatch(i) {
+  const s = R.seats[i];
+  const cc = $('centerCard');
+  s.el.classList.remove('flash');
+  let over = false;
+  if (R.mode === 'tower') {
+    s.card = R.center; s.layout = R.centerLayout;          // the middle card slides over to you
+    renderCard(s.cardEl, s.layout, i % 2 === 1); popCard(s.cardEl);
+    if (!R.pile.length) { over = true; cc.innerHTML = ''; }
+    else { R.center = R.pile.pop(); R.centerLayout = makeLayout(R.center, R.twist); renderCard(cc, R.centerLayout, false); popCard(cc); }
+  } else if (R.mode === 'well') {
+    R.center = s.card; R.centerLayout = s.layout;           // your card lands on the middle
+    renderCard(cc, R.centerLayout, false); popCard(cc);
+    s.stack.shift();
+    if (!s.stack.length) { over = true; s.el.classList.add('done'); s.cardEl.innerHTML = ''; }
+    else { s.card = s.stack[0]; s.layout = makeLayout(s.card, R.twist); renderCard(s.cardEl, s.layout, i % 2 === 1); popCard(s.cardEl); }
+  } else {
+    R.flip++;
+    if (R.flip >= R.flips) over = true;
+    else {
+      dealFlip();
+      R.seats.forEach((t, k) => { renderCard(t.cardEl, t.layout, k % 2 === 1); popCard(t.cardEl); });
+      renderCard(cc, R.centerLayout, false); popCard(cc);
+    }
+  }
+  updateHud();
+  if (over) { endRound(); return; }
+  const now = performance.now();
+  R.phase = 'play'; R.changeAt = now; R.settleUntil = now + 200;
+  resetBots(now);
+}
+
+// ---------- loop: freezes, bots, shuffle twist ----------
+function shuffleAll() {
+  const re = (el, layout) => { layout.glyphs = placeGlyphs(shuffle(layout.glyphs.map(g => g.s)), R.twist); restyle(el, layout); };
+  R.seats.forEach(s => re(s.cardEl, s.layout));
+  re($('centerCard'), R.centerLayout);
+}
+function tick() {
+  requestAnimationFrame(tick);
+  if (!R || R.phase !== 'play') return;
+  const now = performance.now();
+  for (let i = 0; i < R.seats.length; i++) {
+    const s = R.seats[i];
+    if (s.frozenUntil) {
+      if (now >= s.frozenUntil) { s.frozenUntil = 0; s.el.classList.remove('frozen'); }
+      else s.frzEl.textContent = '❄️ ' + ((s.frozenUntil - now) / 1000).toFixed(1);
+    }
+    if (s.bot && now >= s.botAt && !s.frozenUntil && now >= R.settleUntil) {
+      const m = common(s.card, R.center);
+      const sym = Math.random() < s.bot.err ? pick(DECK[s.card].filter(x => x !== m)) : m;
+      s.botAt = now + 600;   // overwritten by tap() on a miss
+      highlightBotTap(s, sym);
+      tap(i, sym);
+      if (R.phase !== 'play') return;
+    }
+  }
+  if (R.twist === 'shuffle' && now >= R.nextShuffle) { R.nextShuffle = now + 2600; shuffleAll(); }
+}
+function highlightBotTap(s, sym) {
+  const g = s.cardEl.querySelector(`.g[data-s="${sym}"]`);
+  if (!g) return;
+  g.style.outline = '3px solid rgba(255,255,255,.7)';
+  g.style.borderRadius = '50%';
+  setTimeout(() => { g.style.outline = ''; }, 300);
+}
+
+// ---------- pause ----------
+function pause() {
+  if (!R || R.phase !== 'play') return;
+  R.phase = 'pause'; R.pausedAt = performance.now();
+  $('pauseModal').classList.remove('off');
+}
+$('pauseBtn').addEventListener('pointerdown', e => { e.preventDefault(); pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+$('resumeBtn').onclick = () => {
+  if (!R || R.phase !== 'pause') return;
+  const now = performance.now(), dt = now - R.pausedAt;
+  R.seats.forEach(s => { if (s.frozenUntil) s.frozenUntil += dt; s.botAt += dt; });
+  R.nextShuffle += dt; R.changeAt += dt; R.settleUntil = now + 250;
+  R.phase = 'play';
+  $('pauseModal').classList.add('off');
+};
+$('endRoundBtn').onclick = () => { if (!R || R.phase !== 'pause') return; $('pauseModal').classList.add('off'); endRound(); };
+$('quitBtn').onclick = () => { clearTimers(); R = null; G = null; show('setup'); renderSetup(); };
+
+// ---------- scoring ----------
+function endRound() {
+  R.phase = 'done';
+  R.seats.forEach(s => { s.el.classList.remove('frozen', 'flash'); });
+  const mult = G.round === G.rounds - 1 ? 2 : 1;
+  const ranked = R.seats.map((s, i) => ({ s, i })).sort((a, b) => b.s.won - a.s.won);
+  let rank = 0;
+  ranked.forEach((r, k) => { if (k > 0 && r.s.won < ranked[k - 1].s.won) rank = k; r.rank = rank; });
+  const anyone = ranked[0].s.won > 0;
+  ranked.forEach(r => {
+    r.pts = anyone && r.s.won > 0 ? (r.rank === 0 ? 3 : r.rank === 1 ? 1 : 0) * mult : 0;
+    const p = G.players[r.s.pi];
+    p.total += r.pts;
+    if (r.rank === 0 && r.pts > 0) p.roundWins++;
+  });
+  G.lastResult = { mode: R.mode, ranked, mult };
+  G.last = { mode: R.mode, twist: R.twist };
+  // winner stays; everyone else rotates to the bench so up to 10 people get through the table
+  if (G.bench.length) {
+    const keep = ranked[0].s.pi;
+    const outs = ranked.slice().reverse().map(r => r.s.pi).filter(pi => pi !== keep).slice(0, Math.min(G.bench.length, G.order.length - 1));
+    outs.forEach(pi => { G.order[G.order.indexOf(pi)] = G.bench.shift(); });
+    G.bench.push(...outs);
+  }
+  sndFanfare();
+  toast(anyone ? `${G.players[ranked[0].s.pi].name} takes the round!` : 'Round over!', 1300);
+  later(showResults, 1400);
+}
+
+function standingsRows(markBench) {
+  const list = G.players.map((p, i) => ({ p, i })).sort((a, b) => b.p.total - a.p.total || b.p.matches - a.p.matches);
+  return list.map(({ p, i }, k) => `<tr class="${k === 0 && p.total > 0 ? 'top' : ''}"><td>${k + 1}.</td><td class="nm">${esc(p.name)}${p.type !== 'human' ? ' 🤖' : ''}${markBench && G.bench.includes(i) ? ' <span style="color:var(--muted);font-weight:600">· sits out next</span>' : ''}</td><td class="n">${p.matches} ✓</td><td class="n">${p.total} pts</td></tr>`).join('');
+}
+function showResults() {
+  const lr = G.lastResult, unit = MODES[lr.mode].unit;
+  $('resKicker').textContent = `Round ${G.round + 1} of ${G.rounds} results${lr.mult > 1 ? ' · double points' : ''}`;
+  const w = lr.ranked.filter(r => r.rank === 0 && r.pts > 0);
+  $('resHead').textContent = !w.length ? 'No winner this time'
+    : w.length > 1 ? w.map(r => G.players[r.s.pi].name).join(' & ') + ' tie!'
+    : G.players[w[0].s.pi].name + ' wins the round!';
+  const medal = ['🥇', '🥈', '🥉', '4th'];
+  $('resRound').innerHTML = lr.ranked.map(r => `<tr class="${r.rank === 0 && r.pts > 0 ? 'top' : ''}"><td>${medal[r.rank]}</td><td class="nm">${esc(G.players[r.s.pi].name)}</td><td class="n">${r.s.won} ${unit}</td><td class="n plus">+${r.pts}</td></tr>`).join('');
+  G.round++;
+  const done = G.round >= G.rounds;
+  $('resTotal').innerHTML = standingsRows(!done);
+  $('nextBtn').textContent = done ? 'See final results 🏆' : G.round === G.rounds - 1 ? 'Final round →' : 'Next round →';
+  show('results');
+  $('results').scrollTop = 0;
+}
+$('nextBtn').onclick = () => { if (!G) return; if (G.round >= G.rounds) showFinal(); else nextIntro(); };
+
+function showFinal() {
+  const ps = G.players;
+  const sorted = ps.slice().sort((a, b) => b.total - a.total || b.matches - a.matches);
+  const top = sorted.filter(p => p.total === sorted[0].total && p.matches === sorted[0].matches);
+  $('finName').textContent = top.map(p => p.name).join(' & ') + (top.length > 1 ? ' share the crown!' : ' wins!');
+  $('finSub').textContent = `${sorted[0].total} points · ${sorted[0].roundWins} round win${sorted[0].roundWins === 1 ? '' : 's'} · ${sorted[0].matches} matches`;
+  $('finTable').innerHTML = sorted.map((p, k) => `<tr class="${k === 0 ? 'top' : ''}"><td>${k + 1}.</td><td class="nm">${esc(p.name)}${p.type !== 'human' ? ' 🤖' : ''}</td><td class="n">${p.matches} ✓ · ${p.wrong} ✗</td><td class="n">${p.total} pts</td></tr>`).join('');
+  const aw = [];
+  const fast = ps.filter(p => isFinite(p.best)).sort((a, b) => a.best - b.best)[0];
+  if (fast) aw.push(['⚡', 'Eagle Eye', `${fast.name} - fastest match, ${(fast.best / 1000).toFixed(2)} s`]);
+  const most = ps.slice().sort((a, b) => b.matches - a.matches)[0];
+  if (most && most.matches) aw.push(['🧲', 'Snatch Machine', `${most.name} - ${most.matches} matches`]);
+  const butter = ps.slice().sort((a, b) => b.wrong - a.wrong)[0];
+  if (butter && butter.wrong) {
+    aw.push(['🧈', 'Butterfingers', `${butter.name} - ${butter.wrong} wrong tap${butter.wrong === 1 ? '' : 's'}`]);
+    const cool = ps.filter(p => p.matches >= 3).sort((a, b) => a.wrong / a.matches - b.wrong / b.matches)[0];
+    if (cool && cool !== butter) aw.push(['🧊', 'Cool Hand', `${cool.name} - ${cool.wrong} wrong in ${cool.matches} matches`]);
+  }
+  $('finAwards').innerHTML = aw.map(([i, t, d]) => `<div class="award"><div class="ai">${i}</div><div><b>${t}</b><span>${esc(d)}</span></div></div>`).join('') || '<p class="hint">Play a full game to earn awards.</p>';
+  sndFanfare();
+  R = null;
+  show('final');
+  $('final').scrollTop = 0;
+}
+$('againBtn').onclick = () => newGame();
+$('newBtn').onclick = () => { G = null; R = null; show('setup'); renderSetup(); };
+$('startBtn').onclick = () => newGame();
+
+// ---------- boot ----------
+loadSetup();
+renderSetup();
+show('setup');
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
