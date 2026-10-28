@@ -28,6 +28,22 @@ def log(msg):
         f.write("%s  %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), msg))
 
 
+def blanks_check():
+    """Every fill-in spot on the live maths worksheets takes typing (worksheet_blanks_check.js,
+    28 Oct 2026). Returns the pages that failed, shaped like broken tiles."""
+    r = subprocess.run([NODE, os.path.join(HERE, "worksheet_blanks_check.js")], cwd=HERE, capture_output=True,
+                       text=True, encoding="utf-8", timeout=1800, creationflags=NO_WINDOW)
+    try:
+        pages = json.loads(r.stdout)["pages"]
+    except (ValueError, KeyError):
+        log("worksheet blanks check failed (exit %s): %s" % (r.returncode, (r.stderr or r.stdout)[-300:].strip()))
+        return [{"name": "Math worksheets: fill-in check", "ok": False, "problems": ["the check itself failed"]}]
+    bad = [{"name": "Math worksheets: " + p["url"].split("/")[2], "ok": False,
+            "problems": p.get("untypeable", []) + p.get("errors", [])} for p in pages if not p["ok"]]
+    log("worksheet fill-in spots: %d pages, %s" % (len(pages), "%d need a look" % len(bad) if bad else "all typeable"))
+    return bad
+
+
 def main():
     root = os.environ.get("ARCADE_ROOT") or os.path.dirname(HERE)      # a throwaway copy, for tests
     args = [NODE, os.path.join(HERE, "arcade_play_check.js"), root] + sys.argv[1:2]
@@ -40,6 +56,8 @@ def main():
         return 1
     json.dump(result, open(OUT, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
     bad = [t for t in result["tiles"] if not t["ok"]]
+    if not sys.argv[1:2]:
+        bad += blanks_check()
     log("played %d tiles, %d need a look%s" % (len(result["tiles"]), len(bad),
         (": " + ", ".join(t["name"] for t in bad)) if bad else ""))
 

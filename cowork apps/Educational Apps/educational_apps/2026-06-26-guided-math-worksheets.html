@@ -184,6 +184,7 @@ body.student-mode .blank.sm{min-width:32px;width:50px;}
 body.student-mode .blank.lg{min-width:80px;width:120px;}
 body.student-mode .blank.xl{min-width:140px;width:220px;}
 body.student-mode .lt-blank{width:70px;background:#eef5fc;border-bottom:2px solid #2f6fb0;border-radius:4px 4px 0 0;}
+body.student-mode .blank-line > input.write-line{width:100%;height:100%;border:none;outline:none;background:#eef5fc;border-radius:4px 4px 0 0;padding:0 8px;font:inherit;font-size:13px;color:#1d3557;}
 body.student-mode .box-blank input,body.student-mode .lt-blank input,body.student-mode .fill-blank input,
 body.student-mode .blank input{
   width:100%;height:100%;border:none;background:transparent;outline:none;
@@ -11496,7 +11497,7 @@ function cwsPrint(){
       // hidden), so it prints as just "Step 1" — useless on paper. Remove it; keep write-in
       // scaffolds, which ARE paper-friendly.
       clone.querySelectorAll('.steps').forEach(function(st){ if(st.querySelector('.interactive-step')) st.remove(); });
-      clone.querySelectorAll('.blank input, .box-blank input, .lt-blank input, .fill-blank input').forEach(function(inp){inp.value='';});
+      clone.querySelectorAll('.blank input, .box-blank input, .lt-blank input, .fill-blank input, .blank-line > input').forEach(function(inp){inp.value='';});
       if(!answerKeyOn){ var s=clone.querySelector('.solution-box'); if(s) s.remove(); }
       // If nothing to write in remains, give the student room to solve + an answer line.
       if(!clone.querySelector('.step, .blank, .blank-line')){
@@ -12016,6 +12017,19 @@ function activateInteractive(){
       });
     });
 
+    // Empty .blank-line rows are "write a sentence" lines (word problems, optimization, budget);
+    // give each one a full-width box. Free text, not graded. Keyed ':s'.
+    prob.querySelectorAll('.blank-line').forEach(function(line, sIdx){
+      if(line.children.length || line.closest('.solution-box')) return;
+      var inputKey = probKey+':s'+sIdx;
+      var saved = studentState.inputs[inputKey] || '';
+      line.innerHTML = '<input type="text" class="write-line" placeholder="Type your answer in words" data-input-key="'+inputKey+'" value="'+saved.replace(/"/g,'&quot;')+'">';
+      line.querySelector('input').addEventListener('input', function(e){
+        studentState.inputs[inputKey] = e.target.value;
+        saveStudentState();
+      });
+    });
+
     // Make .choices clickable with validation
     prob.querySelectorAll('.choices').forEach(function(choices, cIdx){
       var choiceKey = probKey+':c'+cIdx;
@@ -12103,7 +12117,7 @@ function activateInteractive(){
 function deactivateInteractive(){
   // Remove check bars, restore blanks to their original form
   document.querySelectorAll('.prob-check-bar').forEach(function(bar){bar.remove();});
-  document.querySelectorAll('.blank input, .box-blank input, .lt-blank input, .fill-blank input').forEach(function(input){
+  document.querySelectorAll('.blank input, .box-blank input, .lt-blank input, .fill-blank input, .blank-line > input').forEach(function(input){
     input.parentElement.innerHTML = ''; // clear input; blank goes back to a horizontal rule
   });
   document.querySelectorAll('.choices .opt').forEach(function(opt){
@@ -12270,7 +12284,7 @@ function resetStudentProgress(){
   studentState.startTime = Date.now();
   saveStudentState();
   // Clear all interactive inputs
-  document.querySelectorAll('.blank input, .box-blank input, .lt-blank input, .fill-blank input').forEach(function(i){i.value='';});
+  document.querySelectorAll('.blank input, .box-blank input, .lt-blank input, .fill-blank input, .blank-line > input').forEach(function(i){i.value='';});
   document.querySelectorAll('.prob-final-answer input').forEach(function(i){i.value='';});
   document.querySelectorAll('.choices .opt.selected').forEach(function(o){o.classList.remove('selected','correct-choice','incorrect-choice');});
   document.querySelectorAll('.blank.correct, .blank.incorrect, .prob-final-answer.correct, .prob-final-answer.incorrect').forEach(function(el){
