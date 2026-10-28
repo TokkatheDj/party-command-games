@@ -51,7 +51,9 @@ function unreachable({ offsetTop, bottom }) {
   const ho = getComputedStyle(document.documentElement).overflowY, bo = document.body ? getComputedStyle(document.body).overflowY : "visible";
   const pageOverflow = ho !== "visible" ? ho : bo;
   if (pageOverflow !== "hidden" && pageOverflow !== "clip" && se.scrollHeight > innerHeight + 2) return [];
-  const scrollsInside = el => { for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) {
+  // ...or a box it sits in, <body> included: a body with height:100% and overflow:auto scrolls
+  // itself while the page reports nothing to scroll (four false alarms on 28 Oct)
+  const scrollsInside = el => { for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
     const o = getComputedStyle(a).overflowY; if ((o === "auto" || o === "scroll") && a.scrollHeight > a.clientHeight + 2) return true; }
     return false; };
   const out = [];
