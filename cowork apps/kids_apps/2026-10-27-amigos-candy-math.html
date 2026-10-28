@@ -46,7 +46,7 @@ body{background:var(--night);background-image:var(--bg);background-size:400% 400
 /* 100vh on a phone counts the space under the browser's address bar, which pushed the bottom row
    off the screen (28 Oct 2026): dvh is the visible height, and resize() sets it exactly too. */
 #app{display:flex;height:100vh;height:100dvh;gap:14px;padding:14px}
-#panel{width:250px;flex:none;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-bottom:120px}
+#panel{width:250px;flex:none;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
 .logo{font-family:var(--title);font-size:26px;line-height:1;margin:0;color:var(--logo);
   text-shadow:3px 3px 0 #000;letter-spacing:1px;text-transform:uppercase}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -116,8 +116,13 @@ canvas#cv{touch-action:none;background:rgba(0,0,0,.35);border:4px solid var(--ac
 /* Full-screen confetti layer */
 #fx{position:fixed;inset:0;pointer-events:none;z-index:6}
 /* ===== Amigo the coqui: sits in the corner, hops up to cheer ===== */
+/* He stays tucked away while you play and slides up only to ask a question: sitting in the
+   corner he covered the bottom-left tile (28 Oct 2026). His cheers are still said out loud. */
 #amigoBox{position:fixed;left:14px;bottom:14px;z-index:4;display:flex;align-items:flex-end;gap:6px;pointer-events:none;
-  max-width:calc(100vw - 28px)}
+  max-width:calc(100vw - 28px);transform:translateY(170%);visibility:hidden;
+  transition:transform .4s cubic-bezier(.3,1.3,.5,1),visibility 0s .4s}
+#amigoBox.out{transform:none;visibility:visible;transition:transform .4s cubic-bezier(.3,1.3,.5,1),visibility 0s}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 #amigoBtn{pointer-events:auto;width:96px;height:96px;min-height:0;padding:0;border:none;border-radius:50%;background:none;
   box-shadow:none;flex:none;animation:breathe 3s ease-in-out infinite}
 #amigoBtn:hover{transform:none;filter:brightness(1.1)}
@@ -182,7 +187,7 @@ canvas#cv{touch-action:none;background:rgba(0,0,0,.35);border:4px solid var(--ac
 #wrap.quiz canvas#cv{opacity:.5;transition:opacity .3s}
 /* Narrow screens: panel moves on top, Amigo sits under the board */
 @media(max-width:700px){
-  #app{flex-direction:column;gap:6px;padding:8px 8px 80px}
+  #app{flex-direction:column;gap:6px;padding:8px}
   #panel{width:100%;gap:5px;flex:none;overflow:visible;padding-bottom:0}
   .logo{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}   /* hidden, but still the page heading */
   .stats{grid-template-columns:1.4fr 1fr 1fr 1fr 1fr;gap:4px}
@@ -237,8 +242,9 @@ canvas#cv{touch-action:none;background:rgba(0,0,0,.35);border:4px solid var(--ac
 </div>
 <aside id="amigoBox" aria-label="Amigo">
   <button id="amigoBtn" aria-label="Amigo the coqui. Tap him to say hi!"><svg viewBox="0 0 512 512" aria-hidden="true"><use href="#amigo"/></svg></button>
-  <div id="bubble" role="status" aria-live="polite"></div>
+  <div id="bubble"></div>
 </aside>
+<p id="said" class="sr" role="status" aria-live="polite"></p>
 <canvas id="fx" aria-hidden="true"></canvas>
 <section id="overlay" aria-label="Game menu"><div class="card" id="card"></div></section>
 
@@ -490,8 +496,10 @@ function cheer(kind, vars = {}) {
   do { i = Math.floor(Math.random() * pool.length); } while (pool.length > 1 && i === lastLine[kind]);
   lastLine[kind] = i;
   const text = fill(pool[i], vars);
-  showBubble('<p>' + text + '</p>', 2600 + text.length * 45);
-  hop(); sfx.chirp(); setTimeout(() => say(text), 250);
+  $('said').textContent = text;                     // screen readers hear every cheer
+  if ($('amigoBox').classList.contains('out')) {     // only while he's up for a question
+    showBubble('<p>' + text + '</p>', 2600 + text.length * 45); hop(); }
+  sfx.chirp(); setTimeout(() => say(text), 250);
   lastCheer = performance.now();
 }
 
@@ -515,7 +523,7 @@ function askCoach() {
   const opts = new Set([ans]);
   for (const w of [ans + 1, ans - 1, ans + 2, ans - 2].sort(() => Math.random() - 0.5)) if (w >= 0 && opts.size < 3) opts.add(w);
   const list = [...opts].sort((x, y) => x - y);
-  coachOpen = true; $('wrap').classList.add('quiz');
+  coachOpen = true; $('wrap').classList.add('quiz'); amigoShow();
   showBubble('<p>' + a + (kind === 'quizAdd' ? ' + ' : ' − ') + b + ' = ?</p><div class="pics" aria-hidden="true">' + pics + '</div><div class="choices">' +
     list.map(o => '<button data-v="' + o + '" aria-label="' + o + '">' + o + '</button>').join('') +
     '</div><p class="qhint"></p><button class="skip">Skip</button>');
@@ -524,7 +532,12 @@ function askCoach() {
   hop(); sfx.chirp(); setTimeout(() => say(fill(LINES[kind][0], { a, b })), 250);
   clearTimeout(coachTimer); coachTimer = setTimeout(() => { if (coachOpen) { closeCoach(); $('bubble').classList.remove('show'); } }, 60000);
 }
-function closeCoach() { coachOpen = false; clearTimeout(coachTimer); $('wrap').classList.remove('quiz'); }
+function closeCoach() { coachOpen = false; clearTimeout(coachTimer); $('wrap').classList.remove('quiz'); amigoAway(2800); }
+// Amigo slides up for a question, and back down a moment after (long enough to cheer the answer)
+let awayTimer = null;
+function amigoShow() { clearTimeout(awayTimer); $('amigoBox').classList.add('out'); }
+function amigoAway(ms) { clearTimeout(awayTimer);
+  awayTimer = setTimeout(() => { if (!coachOpen) { $('amigoBox').classList.remove('out'); $('bubble').classList.remove('show'); } }, ms); }
 function answerCoach(btn, v, ans) {
   if (!coachOpen) return;
   if (v === ans) {
