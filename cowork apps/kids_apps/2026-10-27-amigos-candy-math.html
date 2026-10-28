@@ -33,7 +33,7 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;font-family:'Trebuchet MS',Verdana,sans-serif;color:var(--cream)}
 /* Slowly shifting sky gradient */
-body{background:var(--night);background-image:var(--bg);background-size:400% 400%;animation:sky 40s ease-in-out infinite;height:100vh}
+body{background:var(--night);background-image:var(--bg);background-size:400% 400%;animation:sky 40s ease-in-out infinite;height:100vh;height:100dvh}
 @keyframes sky{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 /* Drifting decorations (bats, fireflies, clouds, stars) - made by decorate() for each theme */
 #deco span{position:fixed;pointer-events:none}
@@ -43,7 +43,9 @@ body{background:var(--night);background-image:var(--bg);background-size:400% 400
 @keyframes glow{from{opacity:.1;transform:translate(0,0)}to{opacity:1;transform:translate(14px,-18px)}}
 .twinkle{font-size:14px;animation:twink 2.4s ease-in-out infinite alternate}
 @keyframes twink{from{opacity:.15}to{opacity:.9}}
-#app{display:flex;height:100vh;gap:14px;padding:14px}
+/* 100vh on a phone counts the space under the browser's address bar, which pushed the bottom row
+   off the screen (28 Oct 2026): dvh is the visible height, and resize() sets it exactly too. */
+#app{display:flex;height:100vh;height:100dvh;gap:14px;padding:14px}
 #panel{width:250px;flex:none;display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-bottom:120px}
 .logo{font-family:var(--title);font-size:26px;line-height:1;margin:0;color:var(--logo);
   text-shadow:3px 3px 0 #000;letter-spacing:1px;text-transform:uppercase}
@@ -818,6 +820,7 @@ function closeHelp() {
 function startGame() {
   initAudio(); startMusic(); sfx.start();
   helpOpen = false; state = 'play'; newGame(); $('overlay').classList.add('hide');
+  resize();
   setTimeout(() => { if (state === 'play') cheer('hello'); }, 900);
 }
 
@@ -875,15 +878,23 @@ function rrect(x, y, w, h, r) {
   ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
+// Fit the board to what is VISIBLE: phone browsers' bars come and go, and the page's own
+// height can be taller than the screen, so measure the visible height every time.
 function resize() {
-  const w = $('wrap').clientWidth - 8, h = $('wrap').clientHeight - 8;
-  cell = Math.max(40, Math.floor(Math.min(w / COLS, h / ROWS)));
+  const seen = window.visualViewport ? visualViewport.height : innerHeight;
+  $('app').style.height = Math.round(seen) + 'px';
+  const pad = parseFloat(getComputedStyle($('app')).paddingBottom) || 0;
+  const room = seen - $('wrap').getBoundingClientRect().top - pad;   // space left under the panel
+  const w = $('wrap').clientWidth - 8, h = Math.min($('wrap').clientHeight, room) - 8;
+  cell = Math.max(28, Math.floor(Math.min(w / COLS, h / ROWS)));
   dpr = window.devicePixelRatio || 1;
   cv.style.width = cell * COLS + 'px'; cv.style.height = cell * ROWS + 'px';
   cv.width = cell * COLS * dpr; cv.height = cell * ROWS * dpr;
   fx.width = innerWidth * dpr; fx.height = innerHeight * dpr;
 }
 addEventListener('resize', resize);
+if (window.visualViewport) visualViewport.addEventListener('resize', resize);   // address bar sliding in or out
+addEventListener('orientationchange', () => setTimeout(resize, 300));
 
 /* ================= DRAWING THE TILES =================
    Each theme lists 3 shape names; a tile's level picks one (k % 3). A shape draws itself
