@@ -25,7 +25,7 @@ APPS = {
 
 class Sections(unittest.TestCase):
     def test_action_games_is_placed(self):
-        self.assertEqual(add_to_arcade.section_for("Action Games/x.html"), "kids")
+        self.assertEqual(add_to_arcade.section_for("Action Games/x.html"), "action")
         self.assertEqual(add_to_arcade.section_for("party_apps/x.html"), "party")
         self.assertIsNone(add_to_arcade.section_for("vr_puzzle_apps/x.html"))
 

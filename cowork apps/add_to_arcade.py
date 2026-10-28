@@ -26,9 +26,13 @@ README = os.path.join(REPO, "README.md")
 PROFILE = os.path.join(REPO, "portfolio-profile", "README.md")
 STATE = os.path.join(HERE, "test_reports", "new-apps.json")
 LIVE = "https://tokkathedj.github.io/party-command-games/"
-SECTION_OF = {"party_apps": "party", "kids_apps": "kids", "action_games": "kids", "Action Games": "kids",
-              "art_apps": "kids", "music_apps": "kids", "music_game_apps": "kids", "educational_apps": "kids",
-              "Educational Apps": "kids", "table_games_apps": "party", "card_games_apps": "party"}
+# Section keys in the catalog (28 Oct 2026 regroup): classics, party (Game Night), carnival, kids (Little Kids),
+# learn, create (Art & Music), action, math (worksheets). A kids app about counting or letters belongs in
+# learn - move its line there by hand; the folder can't tell.
+SECTIONS = ["classics", "party", "carnival", "kids", "learn", "create", "action", "math"]
+SECTION_OF = {"party_apps": "party", "kids_apps": "kids", "action_games": "action", "Action Games": "action",
+              "art_apps": "create", "music_apps": "create", "music_game_apps": "create", "educational_apps": "learn",
+              "Educational Apps": "learn", "table_games_apps": "party", "card_games_apps": "party"}
 EMOJI = [("puzzle", "🧩"), ("draw", "✏️"), ("doodle", "✏️"), ("paint", "🖌️"), ("color", "🎨"),
          ("pup", "🐶"), ("dog", "🐶"), ("cat", "🐱"), ("dragon", "🐉"), ("bingo", "🙋"), ("word", "🔠"),
          ("music", "🎵"), ("beat", "🥁"), ("math", "🔢"), ("count", "🔢"), ("race", "🏁"), ("run", "🏃"),
@@ -106,7 +110,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("apps", nargs="*")
     ap.add_argument("--waiting", action="store_true")
-    ap.add_argument("--name"); ap.add_argument("--emoji"); ap.add_argument("--section", choices=["party", "kids"])
+    ap.add_argument("--name"); ap.add_argument("--emoji"); ap.add_argument("--section", choices=SECTIONS)
     ap.add_argument("--dry", action="store_true"); ap.add_argument("--no-push", action="store_true")
     a = ap.parse_args()
 
