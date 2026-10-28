@@ -1,6 +1,7 @@
 import type { Context, Config } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
 import { createHash, timingSafeEqual } from "node:crypto";
+import Anthropic from "@anthropic-ai/sdk";
 
 function buildPrompt(criteria: any, requesterName: string) {
   const mechanics = (criteria.mechanics || []).join(", ");
@@ -251,32 +252,32 @@ export default async (req: Request, context: Context) => {
     }
 
     const prompt = buildPrompt(criteria, clip(requester_name, 30));
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-5",
-        max_tokens: 16000,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      // detail stays in the function log -- upstream bodies can name the provider/model
-      console.error(`builder API error (${resp.status}): ${errText.slice(0, 400)}`);
-      await store.setJSON(id, {
-        status: "error",
-        message: `The builder couldn't be reached (error ${resp.status}). Try again in a bit.`,
-      });
-      return;
+    // Streamed so a long build can't hit an HTTP timeout. 16000 tokens was too few: the
+    // model's thinking counts toward max_tokens, and a small game ran out before </html>.
+    // 48000 still finishes well inside a background function's 15 minutes.
+    const client = new Anthropic({ apiKey, maxRetries: 1 });
+    let data: Anthropic.Message;
+    try {
+      data = await client.messages
+        .stream({
+          model: "claude-sonnet-5",
+          max_tokens: 48000,
+          messages: [{ role: "user", content: prompt }],
+        })
+        .finalMessage();
+    } catch (err) {
+      if (err instanceof Anthropic.APIError) {
+        // detail stays in the function log -- upstream bodies can name the provider/model
+        console.error(`builder API error (${err.status}): ${String(err.message).slice(0, 400)}`);
+        await store.setJSON(id, {
+          status: "error",
+          message: `The builder couldn't be reached (error ${err.status ?? "network"}). Try again in a bit.`,
+        });
+        return;
+      }
+      throw err;
     }
 
-    const data = await resp.json();
     const reply = appFromReply(data);
     if (!reply.html) {
       console.error(`builder reply unusable: stop_reason=${data?.stop_reason}`);
