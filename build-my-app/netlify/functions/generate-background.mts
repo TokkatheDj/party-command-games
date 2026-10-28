@@ -51,6 +51,29 @@ function extractHtml(text: string) {
   return html;
 }
 
+// What the customer gets back from one builder reply: the app, or the message to show.
+// A reply cut off at max_tokens still contains "<html", so checking for that alone sent a
+// half-written app to someone who had paid. Thinking counts toward max_tokens too, so a long
+// app can run out before </html>. A declined request (stop_reason "refusal") has no app.
+function appFromReply(data: any): { html?: string; message?: string } {
+  const reason = data?.stop_reason;
+  if (reason === "refusal") {
+    return { message: "The builder can't make that one. Try a different idea." };
+  }
+  if (reason === "max_tokens") {
+    return { message: "That app came out too big to finish in one build. Try a simpler idea, or fewer features, and build again." };
+  }
+  const rawText = (data?.content || [])
+    .filter((block: any) => block.type === "text")
+    .map((block: any) => block.text || "")
+    .join("");
+  const html = extractHtml(rawText);
+  if (!html || !/<html/i.test(html) || !/<\/html>\s*$/i.test(html)) {
+    return { message: "The builder didn't return a usable app. Try simplifying your idea and building again." };
+  }
+  return { html };
+}
+
 function slugify(text: string) {
   return (
     (text || "app")
@@ -254,19 +277,13 @@ export default async (req: Request, context: Context) => {
     }
 
     const data = await resp.json();
-    const rawText = (data?.content || [])
-      .filter((block: any) => block.type === "text")
-      .map((block: any) => block.text || "")
-      .join("");
-    const html = extractHtml(rawText);
-
-    if (!html || !/<html/i.test(html)) {
-      await store.setJSON(id, {
-        status: "error",
-        message: "The builder didn't return a usable app. Try simplifying your idea and building again.",
-      });
+    const reply = appFromReply(data);
+    if (!reply.html) {
+      console.error(`builder reply unusable: stop_reason=${data?.stop_reason}`);
+      await store.setJSON(id, { status: "error", message: reply.message });
       return;
     }
+    const html = reply.html;
 
     let liveUrl: string | null = null;
     let publishError: string | null = null;
