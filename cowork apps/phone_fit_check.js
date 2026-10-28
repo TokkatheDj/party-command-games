@@ -108,13 +108,20 @@ async function check(p, phone, url, inFrame) {
 // opens is measured on the FULL height; pages inside frames are untouched.
 async function imitateBars(ctx, phone) {
   const scale = phone.full / 100;
-  await ctx.route(/\.html(\?|#|$)/, async (route, req) => {
-    const resp = await route.fetch();
-    let body = await resp.text();
-    if (req.frame() && req.frame().parentFrame() === null)
+  // The page itself AND its stylesheets: a built app (Vite, on Netlify) keeps its CSS in
+  // /assets/*.css and loads from "/", not a .html address (28 Oct 2026)
+  await ctx.route("**/*", async (route, req) => {
+    let top = false;
+    try { top = !!req.frame() && req.frame().parentFrame() === null; } catch (e) { /* worker request */ }
+    const kind = req.resourceType();
+    try {
+      if (!top || (kind !== "document" && kind !== "stylesheet")) return await route.continue();
+      const resp = await route.fetch();
+      let body = await resp.text();
       // not inside inlined images: base64 like "...Q3vhK..." also looks like a number + "vh" (28 Oct 2026)
       body = body.replace(/(?<![A-Za-z0-9+/])(\d*\.?\d+)vh\b/g, (m, n) => `${(parseFloat(n) * scale).toFixed(2)}px`);
-    await route.fulfill({ response: resp, body });
+      await route.fulfill({ response: resp, body });
+    } catch (e) { /* a request still in flight when the page or browser closed - nothing to do */ }
   });
 }
 
@@ -122,7 +129,7 @@ async function imitateBars(ctx, phone) {
 async function fitProblems(browser, url) {
   const out = [];
   for (const phone of PHONES) {
-    const ctx = await browser.newContext({ viewport: { width: phone.width, height: phone.height }, isMobile: true, hasTouch: true });
+    const ctx = await browser.newContext({ viewport: { width: phone.width, height: phone.height }, isMobile: true, hasTouch: true, serviceWorkers: "block" });
     try { await imitateBars(ctx, phone); out.push(...await check(await ctx.newPage(), phone, url, false)); }
     catch (e) { out.push(`${phone.name}: could not check the fit: ${e.message.split("\n")[0]}`); }
     finally { await ctx.close(); }
@@ -136,7 +143,7 @@ if (require.main === module) (async () => {
   const browser = await chromium.launch();
   const results = {};
   for (const phone of PHONES) {
-    const ctx = await browser.newContext({ viewport: { width: phone.width, height: phone.height }, isMobile: true, hasTouch: true });
+    const ctx = await browser.newContext({ viewport: { width: phone.width, height: phone.height }, isMobile: true, hasTouch: true, serviceWorkers: "block" });
     await imitateBars(ctx, phone);
     const p = await ctx.newPage();
     await p.goto(`http://127.0.0.1:${PORT}/index.html`); await p.waitForTimeout(800);
