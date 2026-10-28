@@ -116,6 +116,7 @@ canvas#cv{touch-action:none;background:rgba(0,0,0,.35);border:4px solid var(--ac
   70%{opacity:1;transform:translate(-50%,-6px) scale(1)}100%{opacity:0;transform:translate(-50%,-30px)}}
 /* Full-screen confetti layer */
 #fx{position:fixed;inset:0;pointer-events:none;z-index:6}
+#flash{position:fixed;inset:0;pointer-events:none;z-index:6;opacity:0;mix-blend-mode:screen;transition:opacity .5s ease-out}
 /* ===== Amigo the coqui: sits in the corner, hops up to cheer ===== */
 /* He stays tucked away while you play and slides up only to ask a question: sitting in the
    corner he covered the bottom-left tile (28 Oct 2026). His cheers are still said out loud. */
@@ -248,6 +249,7 @@ canvas#cv{touch-action:none;background:rgba(0,0,0,.35);border:4px solid var(--ac
 </aside>
 <p id="said" class="sr" role="status" aria-live="polite"></p>
 <canvas id="fx" aria-hidden="true"></canvas>
+<div id="flash" aria-hidden="true"></div>
 <section id="overlay" aria-label="Game menu"><div class="card" id="card"></div></section>
 
 <script>
@@ -712,7 +714,8 @@ function resolveChain() {
   const last = chain[len - 1], oldMax = maxV, C = T().colors;
   chain.forEach(p => { if (p !== last) { burst(p.c, p.r, C[lvl(grid[p.r][p.c].v) % C.length], len >= 8 ? 16 : 8); grid[p.r][p.c] = null; } });
   const t = grid[last.r][last.c]; t.v = res; t.s = 1.5;
-  burst(last.c, last.r, C[lvl(res) % C.length], 18 + len * 2);
+  burst(last.c, last.r, C[lvl(res) % C.length], 10 + len);
+  themeBurst(last.c, last.r, res, len);   // the theme's own effect, sized by the new tile and the chain
   floatText(last.c, last.r, '+' + res);
   score += res; moves++; maxV = Math.max(maxV, res); best = Math.max(best, score); saveBest();
   combo = len >= 4 ? combo + 1 : 0;
@@ -720,7 +723,7 @@ function resolveChain() {
   showEq(sumText(vals) + ' = ' + sum + (res !== sum ? ' → ' + res : '') +
     (res !== sum ? '<small>' + sum + ' rounds up to ' + res + '</small>' : combo >= 2 ? '<small>Combo ×' + combo + '!</small>' : ''));
   sfx.merge(lvl(res), len); rumbleFx(Math.min(4, len / 2));
-  if (len >= 8) { sfx.fanfare(); throwConfetti(len >= 12 ? 220 : 110); }
+  if (len >= 8) sfx.fanfare();   // (the theme shower replaces the old confetti for big chains)
   if (res > oldMax && res >= 32) starBurst(last.c, last.r);
   // Amigo reacts to the best thing that just happened (a level-up beats everything)
   const leveled = checkLevel();
@@ -776,6 +779,107 @@ function starBurst(c, r) {
     particles.push({ x, y, vx: Math.cos(a) * 160, vy: Math.sin(a) * 160 - 40, life: 1.3, emoji: '⭐' }); }
 }
 // Confetti rains over the whole screen
+/* ================= THEME EFFECTS (28 Oct 2026) =================
+   Every merge sets off its theme's own effect: sprinkles (Candy Shop), friendly ghosts and mist
+   (Spooky), bubbles and ripples (Ocean), embers and sparks (Volcano), leaves and fireflies
+   (Rainforest), stars and a shockwave (Space). The bigger the new tile and the longer the chain,
+   the bigger the effect; the biggest also send the theme's shower over the whole screen.
+   Devices set to "reduce motion" get a much lighter version. */
+const EFFECTS = {
+  sweet:   { kinds: ['sprinkle', 'sprinkle', 'sparkle'], shower: 'sprinkle', flash: '#ff8fc7' },
+  spooky:  { kinds: ['ghost', 'mist', 'sparkle'],       shower: 'ghost',    flash: '#a57bff' },
+  ocean:   { kinds: ['bubble', 'bubble', 'ring'],       shower: 'bubble',   flash: '#4fd1ff' },
+  volcano: { kinds: ['ember', 'ember', 'spark'],        shower: 'ember',    flash: '#ff7a1a' },
+  forest:  { kinds: ['leaf', 'firefly', 'leaf'],        shower: 'leaf',     flash: '#b6ff5c' },
+  space:   { kinds: ['star', 'star', 'sparkle'],        shower: 'star',     flash: '#8be9fd' }
+};
+let fxParts = [], showers = [];
+const calm = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+const rand = (a, b) => a + Math.random() * (b - a);
+// 0 (a pair of 2s) .. 1 (a long chain into a big tile)
+function fxPower(res, len) { return Math.max(0, Math.min(1, (lvl(res) - 1) / 10 * 0.55 + (len - 2) / 12 * 0.6)); }
+// One effect piece; s scales size and speed
+function fxPiece(kind, x, y, s, col) {
+  const a = rand(0, 6.283), sp = rand(70, 230) * s;
+  const p = { kind, x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 0, life: rand(.8, 1.4), size: rand(5, 9) * s,
+    rot: rand(0, 6.283), vr: rand(-6, 6), col, phase: rand(0, 6.283) };
+  p.max = p.life;
+  if (kind === 'sprinkle') { p.g = 420; p.vy -= 120 * s; p.col = PALETTE[Math.floor(rand(0, 8))]; }
+  if (kind === 'sparkle') { p.vx *= .5; p.vy *= .5; p.col = '#fff6c8'; }
+  if (kind === 'ghost') { p.vx *= .35; p.vy = -rand(40, 110) * s; p.size *= 1.8; p.life = p.max = rand(1.2, 2); }
+  if (kind === 'mist') { p.vx *= .2; p.vy *= .2; p.size *= 3; p.col = '#c9a7ff'; }
+  if (kind === 'bubble') { p.vx *= .4; p.vy = -rand(70, 170) * s; p.life = p.max = rand(1, 1.8); }
+  if (kind === 'ember') { p.vy = -rand(160, 420) * s; p.vx *= .6; p.g = 380; p.col = Math.random() < .5 ? '#ffcf3d' : '#ff7a1a'; p.size *= .7; }
+  if (kind === 'spark') { p.col = '#fff07a'; p.size *= .5; }
+  if (kind === 'leaf') { p.vx *= .6; p.vy = -rand(40, 140) * s; p.g = 120; p.col = Math.random() < .5 ? '#5fd36a' : '#b6ff5c'; p.size *= 1.3; p.life = p.max = rand(1.2, 2); }
+  if (kind === 'firefly') { p.vx *= .3; p.vy *= .3; p.col = '#e8ff6a'; p.size *= .6; p.life = p.max = rand(1.2, 2); }
+  if (kind === 'star') { p.col = Math.random() < .5 ? '#ffd23f' : '#fff6c8'; p.size *= 1.2; }
+  return p;
+}
+// The merge effect, centred on the new tile
+function themeBurst(c, r, res, len) {
+  const E = EFFECTS[theme] || EFFECTS.sweet, pw = fxPower(res, len), x = (c + .5) * cell, y = (r + .5) * cell;
+  const col = T().colors[lvl(res) % T().colors.length], s = 1 + 1.4 * pw;
+  const n = Math.round((12 + 110 * pw) * (calm ? .3 : 1));
+  // the ring every theme gets: its size says how big the merge was
+  fxParts.push({ kind: 'ring', x, y, R: cell * (0.7 + 3.3 * pw), life: .7, max: .7, col: theme === 'volcano' ? '#ffcf3d' : col, size: 4 + 6 * pw });
+  if (theme === 'space' && pw > .3) fxParts.push({ kind: 'ring', x, y, R: cell * (1.4 + 5 * pw), life: 1, max: 1, col: '#8be9fd', size: 2 + 4 * pw });
+  for (let i = 0; i < n; i++) fxParts.push(fxPiece(E.kinds[i % E.kinds.length], x, y, s, col));
+  if (fxParts.length > 500) fxParts.splice(0, fxParts.length - 500);
+  if (pw >= .45) themeShower(pw, E);
+}
+// The big ones: the theme's shower over the whole screen, and a soft flash
+function themeShower(pw, E) {
+  const n = Math.round((30 + 170 * pw) * (calm ? .25 : 1)), up = ['bubble', 'ember', 'ghost'].includes(E.shower);
+  for (let i = 0; i < n; i++) {
+    const p = fxPiece(E.shower, rand(0, innerWidth), up ? innerHeight + rand(10, 200) : -rand(10, 300), 1 + pw, '#fff');
+    if (up) { p.vy = -rand(120, 320); p.g = E.shower === 'ember' ? 30 : 0; } else { p.vy = rand(60, 200); p.g = E.shower === 'sprinkle' ? 160 : 30; }
+    p.vx = rand(-40, 40); p.life = p.max = rand(2.2, 3.6);
+    showers.push(p);
+  }
+  if (showers.length > 600) showers.splice(0, showers.length - 600);
+  if (!calm) { const f = $('flash'); f.style.transition = 'none'; f.style.background = E.flash; f.style.opacity = (.12 + .2 * pw).toFixed(2);
+    void f.offsetWidth; f.style.transition = 'opacity .7s ease-out'; f.style.opacity = '0'; }
+}
+// Move one piece; false when it's done
+function stepPiece(p, dt) {
+  p.life -= dt; if (p.life <= 0) return false;
+  if (p.kind === 'ring') return true;
+  p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+  if (['ghost', 'bubble', 'leaf', 'firefly'].includes(p.kind)) p.x += Math.sin(p.life * 4 + p.phase) * 30 * dt;   // drift side to side
+  if (p.kind !== 'ember' && p.kind !== 'sprinkle') { p.vx *= 1 - 1.5 * dt; if (!p.g) p.vy *= 1 - 1.2 * dt; }  // slow down
+  return true;
+}
+function star5(g, r) { g.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * .6283, q = i % 2 ? r * .45 : r; g.lineTo(Math.cos(a) * q, Math.sin(a) * q); } g.closePath(); }
+// Draw one piece on canvas context g
+function drawPiece(g, p) {
+  const t = p.life / p.max, a = Math.min(1, t * 1.6);
+  g.save(); g.globalAlpha = a; g.translate(p.x, p.y);
+  switch (p.kind) {
+    case 'ring': { const r = p.R * (1 - t * t); g.globalAlpha = t; g.lineWidth = p.size * t + 1; g.strokeStyle = p.col;
+      g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.stroke(); break; }
+    case 'sprinkle': g.rotate(p.rot); g.fillStyle = p.col; g.fillRect(-p.size, -p.size * .2, p.size * 2, p.size * .4); break;
+    case 'sparkle': case 'star': g.rotate(p.rot); g.fillStyle = p.col;
+      if (p.kind === 'star') { g.shadowColor = p.col; g.shadowBlur = p.size; }
+      star5(g, p.kind === 'star' ? p.size : p.size * .7); g.fill(); break;
+    case 'ghost': { const r = p.size; g.fillStyle = 'rgba(255,255,255,.92)'; g.beginPath(); g.arc(0, 0, r, Math.PI, 0);
+      g.lineTo(r, r); for (let i = 0; i < 3; i++) g.quadraticCurveTo(r - (i * 2 + 1) * r / 3, r * (i % 2 ? 1.3 : .7), r - (i + 1) * 2 * r / 3, r);
+      g.closePath(); g.fill(); g.fillStyle = '#1b1030'; g.beginPath(); g.arc(-r * .35, -r * .1, r * .16, 0, 6.283); g.arc(r * .35, -r * .1, r * .16, 0, 6.283); g.fill(); break; }
+    case 'mist': { const r = p.size * (2 - t); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r);
+      gr.addColorStop(0, 'rgba(201,167,255,.45)'); gr.addColorStop(1, 'rgba(201,167,255,0)'); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, r, 0, 6.283); g.fill(); break; }
+    case 'bubble': g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 1.5; g.fillStyle = 'rgba(160,230,255,.18)';
+      g.beginPath(); g.arc(0, 0, p.size, 0, 6.283); g.fill(); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.arc(-p.size * .35, -p.size * .35, p.size * .22, 0, 6.283); g.fill(); break;
+    case 'ember': case 'firefly': g.fillStyle = p.col; g.shadowColor = p.col; g.shadowBlur = p.size * 3;
+      if (p.kind === 'firefly') g.globalAlpha = a * (.5 + .5 * Math.sin(p.life * 12 + p.phase));
+      g.beginPath(); g.arc(0, 0, p.size, 0, 6.283); g.fill(); break;
+    case 'spark': g.strokeStyle = p.col; g.lineWidth = 2; g.beginPath(); g.moveTo(0, 0); g.lineTo(-p.vx * .05, -p.vy * .05); g.stroke(); break;
+    case 'leaf': g.rotate(p.rot); g.fillStyle = p.col; g.beginPath(); g.ellipse(0, 0, p.size, p.size * .45, 0, 0, 6.283); g.fill();
+      g.strokeStyle = 'rgba(0,60,0,.4)'; g.lineWidth = 1; g.beginPath(); g.moveTo(-p.size, 0); g.lineTo(p.size, 0); g.stroke(); break;
+  }
+  g.restore();
+}
+
 function throwConfetti(n) {
   const C = T().colors;
   for (let i = 0; i < n; i++) confetti.push({ x: Math.random() * innerWidth, y: -20 - Math.random() * innerHeight * .4,
@@ -1201,6 +1305,9 @@ function frame(ts) {
     else { ctx.fillStyle = p.color; ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size); }
     ctx.globalAlpha = 1;
   }
+  // the theme effects on the board
+  fxParts = fxParts.filter(p => stepPiece(p, dt));
+  for (const p of fxParts) drawPiece(ctx, p);
   // confetti over the whole screen
   fctx.setTransform(dpr, 0, 0, dpr, 0, 0); fctx.clearRect(0, 0, innerWidth, innerHeight);
   for (let i = confetti.length - 1; i >= 0; i--) {
@@ -1208,6 +1315,9 @@ function frame(ts) {
     if (p.y > innerHeight + 30) { confetti.splice(i, 1); continue; }
     fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.rot); fctx.fillStyle = p.color; fctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); fctx.restore();
   }
+  // the theme's shower over the whole screen, for the big merges
+  showers = showers.filter(p => stepPiece(p, dt));
+  for (const p of showers) drawPiece(fctx, p);
   requestAnimationFrame(frame);
 }
 
