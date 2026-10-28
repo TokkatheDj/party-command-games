@@ -61,6 +61,18 @@ class NightlyStep(unittest.TestCase):
         self.assertEqual(len(s["verify"]), 3)
         self.assertTrue(any("VR Room" in line for line in self.logged))
 
+    def test_leaves_a_hand_queued_arcade_step_alone(self):
+        # 27 Oct 2026: a step queued by hand (id "arcade-add-amigos-candy-math") vanished at the
+        # 21:30 run, because every waiting "arcade-add-" step was treated as last night's own.
+        mine = {"id": "arcade-add-amigos-candy-math", "from": "claude", "status": "waiting"}
+        old = {"id": "arcade-add-2026-10-26-2130", "from": "new_app_check.py", "status": "waiting"}
+        json.dump({"steps": [mine, old]}, open(self.queue, "w", encoding="utf-8"))
+        new_app_check.queue_arcade_step(APPS)
+        ids = [s["id"] for s in json.load(open(self.queue, encoding="utf-8"))["steps"]]
+        self.assertIn("arcade-add-amigos-candy-math", ids)               # kept
+        self.assertNotIn("arcade-add-2026-10-26-2130", ids)              # its own old one replaced
+        self.assertEqual(len(ids), 2)
+
     def test_only_unplaced_apps_means_no_step(self):
         new_app_check.queue_arcade_step({"vr_puzzle_apps/a-vr-room.html": APPS["vr_puzzle_apps/a-vr-room.html"]})
         self.assertIsNone(self.step())

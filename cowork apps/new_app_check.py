@@ -237,7 +237,9 @@ def queue_arcade_step(known):
     # section made the whole step stop on "which section?" (16 Oct, an Action Games app).
     ok = [(k, v) for k, v in passed if section_for(k)]
     unplaced = [v["title"][:40] for k, v in passed if not section_for(k)]
-    steps = [st for st in q.get("steps", []) if not (st.get("id", "").startswith("arcade-add-") and st.get("status") == "waiting")]
+    # Replace only this script's own waiting step. Matching on the "arcade-add-" id alone
+    # threw away a step queued by hand (27 Oct: arcade-add-amigos-candy-math vanished at 21:30).
+    steps = [st for st in q.get("steps", []) if not (st.get("from") == "new_app_check.py" and st.get("status") == "waiting")]
     if ok:
         names = ", ".join(v["title"][:40] for _, v in ok)
         steps.append({
