@@ -36,6 +36,22 @@ class Sections(unittest.TestCase):
         self.assertEqual(unplaced, ["vr_puzzle_apps/a-vr-room.html"])     # named, not added
 
 
+class FamilyNames(unittest.TestCase):
+    # 27 Oct 2026: a credit put a child's name on a public page. Made-up names here - the real
+    # list lives outside this public repo.
+    def setUp(self):
+        self.names = os.path.join(tempfile.mkdtemp(), "names.txt")
+        open(self.names, "w", encoding="utf-8").write("# a comment\nZebulon\n\nQuintessa\n")
+
+    def test_finds_whole_names_in_any_case(self):
+        self.assertEqual(add_to_arcade.private_names_in("Game idea by ZEBULON M.", self.names), ["Zebulon"])
+        self.assertEqual(add_to_arcade.private_names_in("Zebulonia is a place", self.names), [])   # whole words only
+        self.assertEqual(add_to_arcade.private_names_in("a comment", self.names), [])              # comments aren't names
+
+    def test_no_list_says_so(self):
+        self.assertIsNone(add_to_arcade.private_names_in("anything", self.names + ".missing"))
+
+
 class NightlyStep(unittest.TestCase):
     def setUp(self):
         d = tempfile.mkdtemp()

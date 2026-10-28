@@ -58,6 +58,22 @@ def emoji_for(rel, name):
     return next((e for w, e in EMOJI if w in k), "🎮")
 
 
+# Family names that must never reach the public Arcade, one per line. The list lives OUTSIDE
+# this public repo - a copy in here would publish the very names it protects. 27 Oct 2026: a
+# game's title-screen credit put a child's name on a public page.
+PRIVATE_NAMES = r"C:\Users\Lance\Amigo\private-names.txt"
+
+
+def private_names_in(text, path=None):
+    """The listed names that appear in text as whole words; None if there is no list here."""
+    try:
+        names = [l.strip() for l in open(path or PRIVATE_NAMES, encoding="utf-8")
+                 if l.strip() and not l.lstrip().startswith("#")]
+    except OSError:
+        return None
+    return sorted(n for n in set(names) if re.search(r"\b%s\b" % re.escape(n), text, re.I))
+
+
 def section_for(rel):
     """The Arcade section an app's folder belongs to, or None if the folder has none
     (the VR folders, review-kit, ... - not Arcade games, or not placed yet)."""
@@ -119,6 +135,12 @@ def main():
         full = os.path.join(HERE, rel)
         if not os.path.isfile(full):
             sys.exit("%s: no such file" % rel)
+        found = private_names_in(open(full, encoding="utf-8", errors="replace").read() + " " + (a.name or ""))
+        if found is None:
+            print("note: no family-names list at %s - not checked for names" % PRIVATE_NAMES)
+        elif found:   # the count only: this output lands in logs
+            sys.exit("%s: has %d family name(s) in it - they stay off the public Arcade; take them out first"
+                     % (rel, len(found)))
         if subprocess.run(GIT + ["check-ignore", "-q", os.path.join(FOLDER, rel)]).returncode == 0:
             sys.exit("%s: its folder is private (gitignored) - publishing it needs an exception in .gitignore; "
                      "see the action_games/* lines there" % rel)
