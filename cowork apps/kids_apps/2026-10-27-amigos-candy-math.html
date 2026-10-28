@@ -166,6 +166,7 @@ canvas#cv{touch-action:none;background:rgba(0,0,0,.35);border:4px solid var(--ac
 /* Theme picker on the title card */
 .themes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}
 .themes.modes{grid-template-columns:repeat(3,1fr);margin-top:12px}
+#mathBtn{font-size:15px;padding:6px 14px;min-height:48px;letter-spacing:0;margin:2px auto 0;display:block}
 .themes button{font-size:15px;padding:6px;min-height:52px;letter-spacing:0}
 .themes button[aria-pressed="true"]{outline:4px solid #fff;outline-offset:2px}
 .themes button[aria-pressed="false"]{filter:brightness(.8)}
@@ -302,6 +303,10 @@ const MODES = { classic: { name: 'Classic', icon: '🍬' }, relax: { name: 'Rela
 const MODE_ORDER = ['classic', 'relax', 'race'];
 const RACE_S = 120;
 let gameMode = 'classic', raceEnd = 0, raceCalls = {}, raceDone = false, clockShown = '';
+// Relax can be played with no maths at all (28 Oct 2026): no questions from Amigo and no sums
+// shown, just matching. Classic and Race always keep their questions.
+let noMath = false;
+const mathOn = () => !(gameMode === 'relax' && noMath);
 let theme = 'sweet';
 const T = () => THEMES[theme];
 
@@ -531,7 +536,7 @@ const QUIZ_EVERY = 5;          // a question every 5 moves, and at every level-u
 let coachTimer = null;
 const rnd = n => Math.floor(Math.random() * n);
 function askCoach() {
-  if (state !== 'play' || coachOpen || helpOpen) return;
+  if (state !== 'play' || coachOpen || helpOpen || !mathOn()) return;
   const big = level >= 3 ? 10 : 5, icon = T().q;
   let a, b, ans, kind, pics;
   if (Math.random() < 0.5) {   // adding: count them all
@@ -720,7 +725,7 @@ function resolveChain() {
   score += res; moves++; maxV = Math.max(maxV, res); best = Math.max(best, score); saveBest();
   combo = len >= 4 ? combo + 1 : 0;
   // show the maths
-  showEq(sumText(vals) + ' = ' + sum + (res !== sum ? ' → ' + res : '') +
+  if (mathOn()) showEq(sumText(vals) + ' = ' + sum + (res !== sum ? ' → ' + res : '') +
     (res !== sum ? '<small>' + sum + ' rounds up to ' + res + '</small>' : combo >= 2 ? '<small>Combo ×' + combo + '!</small>' : ''));
   sfx.merge(lvl(res), len); rumbleFx(Math.min(4, len / 2));
   if (len >= 8) sfx.fanfare();   // (the theme shower replaces the old confetti for big chains)
@@ -745,7 +750,8 @@ function resolveChain() {
     for (let r = ROWS - 1, i = 0; r >= 0; r--, i++) grid[r][c] = col[i];
   }
   chain = []; settling = true; checkOver = true; updateStats();
-  $('preview').innerHTML = '✅ ' + sumText(vals) + ' = ' + sum + (res !== sum ? ' → <b>' + res + '</b>' : '');   // keep the last sum readable
+  $('preview').innerHTML = mathOn() ? '✅ ' + sumText(vals) + ' = ' + sum + (res !== sum ? ' → <b>' + res + '</b>' : '')   // keep the last sum readable
+    : '✅ ' + len + ' in a row → <b>' + res + '</b>';
 }
 // Mix the candies; keep trying until there is at least one pair to match
 function mix() {
@@ -907,7 +913,7 @@ function updatePreview() {
   const p = $('preview');
   if (chain.length < 2) { p.textContent = chain.length ? 'Match a pair first: drag to a neighbor with the SAME number…' : 'Start by matching a pair!'; return; }
   const vals = chain.map(q => grid[q.r][q.c].v), sum = chainSum(), res = roundUp2(sum);
-  p.innerHTML = sumText(vals) + ' = ' + sum + ' → <b>' + res + '</b>';
+  p.innerHTML = mathOn() ? sumText(vals) + ' = ' + sum + ' → <b>' + res + '</b>' : vals.length + ' in a row → <b>' + res + '</b>';
 }
 // The instructions live on their own "help" card, opened with the ❓ button (or the H key)
 const HELP_HTML = '<ul><li>Press and <b>drag</b> through 2+ touching candies (diagonals count!).</li>' +
@@ -918,7 +924,7 @@ const HELP_HTML = '<ul><li>Press and <b>drag</b> through 2+ touching candies (di
   '<li>🐸 <b>Amigo</b> cheers you on and asks little <b>adding and taking-away</b> questions. Count the pictures, tap the answer, and get bonus points!</li>' +
   '<li>Stuck with no pairs? Amigo uses one of your shuffles for you.</li>' +
   '<li>🎨 <b>Theme</b> changes the world: Candy Shop, Spooky, Ocean, Volcano, Rainforest or Space. Every number keeps its colour in every world: 2 is yellow, 4 is blue, 8 is pink…</li>' +
-  '<li><b>Modes:</b> 🍬 Classic plays until no pairs are left. 🌈 Relax never ends: stuck boards mix themselves. ⏱️ Race gives you two minutes.</li>' +
+  '<li><b>Modes:</b> 🍬 Classic plays until no pairs are left. 🌈 Relax never ends: stuck boards mix themselves, and its 🙈 Math off switch turns off the sums and questions for just matching. ⏱️ Race gives you two minutes.</li>' +
   '<li>Keys: <b>S</b> shuffle, <b>A</b> Amigo voice, <b>T</b> theme, <b>M</b> mute, <b>V</b> rumble, <b>H</b> help, <b>R</b> restart.</li></ul>';
 const AMIGO_SVG = '<svg class="hero" viewBox="0 0 512 512" aria-hidden="true"><use href="#amigo"/></svg>';
 function showOverlay(mode) {
@@ -933,7 +939,9 @@ function showOverlay(mode) {
       '<div class="themes modes">' + MODE_ORDER.map(k => '<button class="alt" data-mode="' + k + '" aria-pressed="' + (k === gameMode) + '">' +
         MODES[k].icon + ' ' + MODES[k].name + '</button>').join('') + '</div>' +
       '<p class="credit">' + ({ classic: 'Classic: play until no pairs are left.', relax: 'Relax: no game over - the candies mix themselves when you\'re stuck.',
-        race: 'Race: two minutes - how high can you score?' })[gameMode] + '</p>';
+        race: 'Race: two minutes - how high can you score?' })[gameMode] + '</p>' +
+      (gameMode === 'relax' ? '<button id="mathBtn" class="alt" aria-pressed="' + !noMath + '">' +
+        (noMath ? '🙈 Math off: just match' : '🧠 Math on: sums and questions') + '</button>' : '');
   } else if (mode === 'help') {
     h += HELP_HTML;
   } else {
@@ -952,6 +960,7 @@ function showOverlay(mode) {
   if ($('helpBtn')) $('helpBtn').onclick = openHelp;
   card.querySelectorAll('.themes button[data-theme]').forEach(b => b.onclick = () => { setTheme(b.dataset.theme); showOverlay('title'); });
   card.querySelectorAll('.modes button').forEach(b => b.onclick = () => { setMode(b.dataset.mode); showOverlay('title'); });
+  if ($('mathBtn')) $('mathBtn').onclick = () => { noMath = !noMath; store.set('nomath', noMath); showOverlay('title'); };
   $('overlay').classList.remove('hide');
 }
 function openHelp() {
@@ -1323,6 +1332,7 @@ function frame(ts) {
 
 /* ================= BOOT ================= */
 gameMode = MODES[store.get('mode', 'classic')] ? store.get('mode', 'classic') : 'classic';
+noMath = store.get('nomath', false) === true;
 best = store.get(bestKey(), 0);
 voiceOn = store.get('voice', true); setVoice(voiceOn);
 resize(); setTheme(store.get('theme', 'sweet')); newGame(); showOverlay('title'); requestAnimationFrame(frame);
