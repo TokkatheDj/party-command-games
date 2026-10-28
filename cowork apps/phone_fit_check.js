@@ -112,7 +112,8 @@ async function imitateBars(ctx, phone) {
     const resp = await route.fetch();
     let body = await resp.text();
     if (req.frame() && req.frame().parentFrame() === null)
-      body = body.replace(/(\d*\.?\d+)vh\b/g, (m, n) => `${(parseFloat(n) * scale).toFixed(2)}px`);
+      // not inside inlined images: base64 like "...Q3vhK..." also looks like a number + "vh" (28 Oct 2026)
+      body = body.replace(/(?<![A-Za-z0-9+/])(\d*\.?\d+)vh\b/g, (m, n) => `${(parseFloat(n) * scale).toFixed(2)}px`);
     await route.fulfill({ response: resp, body });
   });
 }
