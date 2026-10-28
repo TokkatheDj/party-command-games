@@ -41,6 +41,10 @@ function buildPrompt(criteria: any, requesterName: string) {
     `- Give it a title/start screen with a clear call-to-action button, and a real win/complete/game-over state with a way to play again.`,
     `- Any illustration or drawn asset should be shaded/filled and use the full color palette, not a thin outline sketch.`,
     ``,
+    `FAIR TO PLAY -- the player must never get stuck with no way to win:`,
+    `- If the app has a maze or grid that the player moves through, the maze must have loops: never a "perfect" maze with only one route between places. After carving it (e.g. recursive backtracking), give every dead end a second exit and open a few extra walls, so there is always another way around any enemy or obstacle.`,
+    `- Moving enemies must never be able to permanently block the only path to something the player has to reach. Place every required item where the player can actually get to it, and never spawn an enemy on or right next to the player's start.`,
+    ``,
     `Build the complete, working app in one pass -- do not ask clarifying questions, do not produce placeholder or skeleton code.`,
   ];
   return lines.filter(Boolean).join("\n");
