@@ -12,7 +12,9 @@
  *      that appeared on its own;
  *   3. presses the most Start-like button (by touch on the phone) and plays for a
  *      few seconds - taps and arrow keys - recording any errors it causes;
- *   4. flags "null" / "undefined" / "NaN" left showing as text.
+ *   4. flags "null" / "undefined" / "NaN" left showing as text;
+ *   5. on two phones with their browser bars showing, flags a button or play area left
+ *      below the screen where nothing scrolls to it (phone_fit_check.js).
  *
  *   node smoke_new_apps.js kids_apps/2026-10-11-foo.html party_apps/bar.html
  * Prints one JSON object: { checked_at, apps: [{ app, title, ok, problems: [...], a11y: [...] }] }
@@ -45,6 +47,10 @@ const IGNORE = /SpeechSynthesisErrorEvent|Speech synthesis error|ERR_REQUEST_RAN
 // and critical only, the page as it opens on a tablet). 13 Oct: three new apps reached the
 // Arcade failing colour contrast; the health check only saw it once they were live. Reported
 // apart from "does it play" - new_app_check.py decides what it blocks.
+// Phone fit (28 Oct 2026): sized with 100vh, Candy Math's bottom row sat under a real iPhone's
+// browser bar while every check here passed - a test browser has no bars. phone_fit_check.js
+// imitates them; an app that leaves a button or its play area off the screen fails "does it play".
+const fit = require("./phone_fit_check");
 const AXE = "D:/Documents/Claude Local/canopy-hr/node_modules/axe-core/axe.min.js";
 const axeSrc = fs.existsSync(AXE) ? fs.readFileSync(AXE, "utf8") : null;
 
@@ -151,6 +157,8 @@ async function checkOne(browser, rel, vp) {
       const r = await checkOne(browser, rel, vp);
       title = r.title; problems.push(...r.problems);
     }
+    const url = `http://127.0.0.1:${PORT}/${rel.split("/").map(encodeURIComponent).join("/")}`;
+    problems.push(...(await fit.fitProblems(browser, url)).map(w => "doesn't fit a phone screen - " + w));
     out.apps.push({ app: rel, title, ok: problems.length === 0, problems, a11y: await a11yScan(browser, rel) });
   }
   await browser.close(); server.close();
