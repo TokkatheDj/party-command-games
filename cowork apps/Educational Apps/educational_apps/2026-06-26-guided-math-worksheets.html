@@ -183,6 +183,8 @@ body.student-mode .blank{
 body.student-mode .blank.sm{min-width:32px;width:50px;}
 body.student-mode .blank.lg{min-width:80px;width:120px;}
 body.student-mode .blank.xl{min-width:140px;width:220px;}
+body.student-mode .lt-blank{width:70px;background:#eef5fc;border-bottom:2px solid #2f6fb0;border-radius:4px 4px 0 0;}
+body.student-mode .box-blank input,body.student-mode .lt-blank input,body.student-mode .fill-blank input,
 body.student-mode .blank input{
   width:100%;height:100%;border:none;background:transparent;outline:none;
   font-family:var(--math);font-weight:700;color:#1d3557;
@@ -11494,7 +11496,7 @@ function cwsPrint(){
       // hidden), so it prints as just "Step 1" — useless on paper. Remove it; keep write-in
       // scaffolds, which ARE paper-friendly.
       clone.querySelectorAll('.steps').forEach(function(st){ if(st.querySelector('.interactive-step')) st.remove(); });
-      clone.querySelectorAll('.blank input').forEach(function(inp){inp.value='';});
+      clone.querySelectorAll('.blank input, .box-blank input, .lt-blank input, .fill-blank input').forEach(function(inp){inp.value='';});
       if(!answerKeyOn){ var s=clone.querySelector('.solution-box'); if(s) s.remove(); }
       // If nothing to write in remains, give the student room to solve + an answer line.
       if(!clone.querySelector('.step, .blank, .blank-line')){
@@ -12001,6 +12003,19 @@ function activateInteractive(){
       });
     });
 
+    // Box-method grids, like-term lines and division boxes use their own blank classes;
+    // make them typeable too. Keyed ':w' so saved answers indexed over .blank keep their slots.
+    prob.querySelectorAll('.box-blank, .lt-blank, .fill-blank').forEach(function(blank, wIdx){
+      if(blank.querySelector('input')) return;
+      var inputKey = probKey+':w'+wIdx;
+      var saved = studentState.inputs[inputKey] || '';
+      blank.innerHTML = '<input type="text" data-input-key="'+inputKey+'" value="'+saved.replace(/"/g,'&quot;')+'">';
+      blank.querySelector('input').addEventListener('input', function(e){
+        studentState.inputs[inputKey] = e.target.value;
+        saveStudentState();
+      });
+    });
+
     // Make .choices clickable with validation
     prob.querySelectorAll('.choices').forEach(function(choices, cIdx){
       var choiceKey = probKey+':c'+cIdx;
@@ -12088,7 +12103,7 @@ function activateInteractive(){
 function deactivateInteractive(){
   // Remove check bars, restore blanks to their original form
   document.querySelectorAll('.prob-check-bar').forEach(function(bar){bar.remove();});
-  document.querySelectorAll('.blank input').forEach(function(input){
+  document.querySelectorAll('.blank input, .box-blank input, .lt-blank input, .fill-blank input').forEach(function(input){
     input.parentElement.innerHTML = ''; // clear input; blank goes back to a horizontal rule
   });
   document.querySelectorAll('.choices .opt').forEach(function(opt){
@@ -12255,7 +12270,7 @@ function resetStudentProgress(){
   studentState.startTime = Date.now();
   saveStudentState();
   // Clear all interactive inputs
-  document.querySelectorAll('.blank input').forEach(function(i){i.value='';});
+  document.querySelectorAll('.blank input, .box-blank input, .lt-blank input, .fill-blank input').forEach(function(i){i.value='';});
   document.querySelectorAll('.prob-final-answer input').forEach(function(i){i.value='';});
   document.querySelectorAll('.choices .opt.selected').forEach(function(o){o.classList.remove('selected','correct-choice','incorrect-choice');});
   document.querySelectorAll('.blank.correct, .blank.incorrect, .prob-final-answer.correct, .prob-final-answer.incorrect').forEach(function(el){
