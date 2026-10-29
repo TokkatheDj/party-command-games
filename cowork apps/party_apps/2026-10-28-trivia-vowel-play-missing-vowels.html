@@ -1,0 +1,767 @@
+<!-- CONCEPT: TRIVIA (missing-vowels speed round) - "Vowel Play": a host-run team quiz in the Only Connect missing-vowels tradition where every answer flashes up with its vowels stripped out (PEPPERONI = PPP RN) and teams slam their buzz pad on one shared screen to shout it; four escalating rounds (Warm Up with true spacing, Scrambled spacing for 2, Drip Feed where vowels trickle back and the value drains 3-2-1, Mystery Category hidden until someone cracks the first clue), wrong buzzes cost a point and lock you out so rivals can steal, then a Final Wager on one long saying. 56 categories in 8 decks + 20 finals, host peek, full undo, resumable saves, awards | Players: 4-16 in 2-4 teams | ~15-30 min -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Vowel Play</title>
+<style>
+:root{
+  --bg:#0d0f1c; --panel:#171a2e; --panel2:#20243d; --line:#2e3354;
+  --text:#eef0ff; --muted:#9aa0c8; --a:#ff5d8f; --b:#ffc73e; --good:#4fe39a; --bad:#ff6363;
+  --t0:#ff5d8f; --t1:#3ec7ff; --t2:#ffc73e; --t3:#7cf29a;
+  --r:16px; --gap:10px;
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;cursor:pointer;border:none;min-height:44px;border-radius:12px}
+input{font:inherit}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;padding:max(12px,env(safe-area-inset-top)) 14px 14px;overflow-y:auto}
+.screen.on{display:flex}
+h1{margin:0;font-size:clamp(40px,12vw,76px);font-weight:900;letter-spacing:-1px;line-height:1;
+  background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{margin:6px 0 10px;font-size:clamp(20px,5.5vw,30px)}
+.sub{color:var(--muted);font-size:clamp(14px,3.8vw,18px);line-height:1.45}
+.btn{background:var(--panel2);padding:12px 18px;font-weight:700;font-size:clamp(15px,4vw,18px);border:1px solid var(--line)}
+.btn.big{background:linear-gradient(90deg,var(--a),#ff8a5d);border:none;color:#1a0b12;font-size:clamp(17px,4.8vw,22px);padding:14px 22px}
+.btn.good{background:var(--good);color:#06240f;border:none}
+.btn.bad{background:var(--bad);color:#2a0606;border:none}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.4;cursor:default}
+.center{margin:auto;width:100%;max-width:560px;display:flex;flex-direction:column;gap:14px;align-items:stretch;text-align:center}
+.demo{font-family:ui-monospace,Consolas,monospace;font-weight:800;letter-spacing:2px;font-size:clamp(22px,7vw,36px);color:var(--b)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{background:var(--panel2);border:1px solid var(--line);padding:8px 14px;font-weight:600;font-size:15px}
+.chip.on{background:var(--b);color:#271b00;border-color:var(--b)}
+.lbl{font-weight:700;margin:0 0 8px;font-size:15px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.setup{max-width:560px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px;padding-bottom:16px}
+.teamIn{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.teamIn i{width:16px;height:44px;border-radius:6px;flex:none}
+.teamIn input{flex:1;min-width:0;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);padding:0 12px;font-size:16px}
+.rules p{margin:0 0 10px;text-align:left}
+.rules b{color:var(--b)}
+
+/* play */
+#play{padding:max(8px,env(safe-area-inset-top)) 10px 10px;gap:8px;overflow:hidden}
+.topbar{display:flex;align-items:center;gap:8px}
+.topbar .rnd{flex:1;min-width:0}
+.rndName{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:700}
+.catName{font-size:clamp(16px,4.6vw,24px);font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconBtn{width:44px;height:44px;padding:0;background:var(--panel2);border:1px solid var(--line);font-size:18px;flex:none}
+.scores{display:flex;gap:6px}
+.sc{flex:1;min-width:0;border-radius:12px;padding:5px 8px;background:var(--panel);border:2px solid transparent;text-align:center}
+.sc .n{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc .p{font-size:clamp(18px,5vw,26px);font-weight:900;line-height:1.1}
+.sc.locked{opacity:.35}
+.stage{flex:1;min-height:0;position:relative;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;overflow:hidden}
+.meta{display:flex;justify-content:space-between;align-items:center;padding:8px 12px 0;font-size:13px;color:var(--muted);font-weight:700;gap:8px}
+.val{background:var(--b);color:#271b00;border-radius:999px;padding:3px 10px;font-weight:900;font-size:14px;white-space:nowrap}
+.val.drop{animation:pop .4s}
+@keyframes pop{50%{transform:scale(1.25)}}
+.pz{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px 12px}
+.pzText{font-family:ui-monospace,Consolas,'Courier New',monospace;font-weight:800;text-align:center;line-height:1.25;letter-spacing:.06em;max-width:100%;word-break:normal}
+.pzText .ch{display:inline-block;margin:0 .28em;white-space:nowrap}
+.pzText .v{color:var(--b);display:inline-block;animation:drip .5s}
+.pzText .v.hid{display:none}
+.pzText .v.still{animation:none}
+@keyframes drip{from{transform:translateY(-.6em);opacity:0}to{transform:none;opacity:1}}
+.pzText.ans{color:var(--good)}
+.pzMsg{font-size:clamp(15px,4vw,19px);color:var(--muted);text-align:center;padding:0 12px 10px;min-height:28px}
+.ctrls{display:flex;gap:6px}
+.ctrls .btn{flex:1;padding:8px 6px;font-size:clamp(13px,3.6vw,16px)}
+.pads{display:grid;gap:8px;grid-template-columns:repeat(var(--n),1fr);height:clamp(70px,13vh,110px);flex:none}
+.pad{border-radius:16px;font-weight:900;font-size:clamp(14px,4vw,20px);color:#10121f;box-shadow:inset 0 -6px 0 rgba(0,0,0,.25);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px;overflow:hidden;line-height:1.1}
+.pad small{font-size:11px;font-weight:700;opacity:.75}
+.pad span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pad:active{transform:translateY(2px)}
+.pad.out{opacity:.25;filter:grayscale(.7)}
+.pads.wait .pad{opacity:.25}
+
+.ov{position:absolute;inset:0;background:rgba(13,15,28,.94);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:14px;text-align:center;z-index:3}
+.ov.on{display:flex}
+.ov .who{font-size:clamp(24px,7vw,40px);font-weight:900}
+.ov .row{justify-content:center;width:100%;max-width:440px}
+.ov .row .btn{flex:1}
+.peek{font-family:ui-monospace,Consolas,monospace;color:var(--muted);font-size:15px;min-height:22px}
+
+.wager{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:8px}
+.wager .nm{flex:1;min-width:0;text-align:left;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wager .amt{width:56px;text-align:center;font-size:24px;font-weight:900}
+.wager .btn{width:48px;padding:0}
+.fmark{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.fmark .nm{flex:1;min-width:0;text-align:left;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fmark .btn{width:64px;padding:0}
+.fmark .btn.sel.good{outline:3px solid #fff}
+.fmark .btn.sel.bad{outline:3px solid #fff}
+.fmark .btn:not(.sel){opacity:.35}
+
+.podium .pl{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--panel2);margin-bottom:8px;font-weight:800;font-size:18px}
+.podium .pl .rk{width:32px;font-size:22px}
+.podium .pl .nm{flex:1;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.award{text-align:left;padding:8px 0;border-bottom:1px solid var(--line)}
+.award:last-child{border:none}
+.award b{color:var(--b)}
+.toast{position:fixed;left:50%;top:18%;transform:translateX(-50%);background:var(--good);color:#06240f;padding:10px 18px;border-radius:999px;font-weight:900;font-size:20px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
+.toast.on{opacity:1}
+.toast.bad{background:var(--bad);color:#2a0606}
+.timerBar{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:0 12px}
+.timerBar i{display:block;height:100%;background:var(--b);width:100%}
+</style>
+</head>
+<body>
+
+<section id="home" class="screen on">
+  <div class="center">
+    <h1>Vowel Play</h1>
+    <div class="demo">PPP RN</div>
+    <div class="sub">The team quiz where every answer has lost its vowels.<br>Buzz first, shout it out, steal what your rivals fumble.</div>
+    <button class="btn big" id="bNew">New Game</button>
+    <button class="btn" id="bCont" style="display:none">Continue saved game</button>
+    <button class="btn" id="bHow">How to play</button>
+    <div class="sub" style="font-size:13px">4-16 players in 2-4 teams · one shared screen · ~15-30 min</div>
+  </div>
+</section>
+
+<section id="how" class="screen">
+  <div class="setup">
+    <h2>How to play</h2>
+    <div class="card rules sub">
+      <p>One person is the <b>Host</b>: they hold the screen where everyone can see it and judge answers. The Host can play too, or just run the show.</p>
+      <p>Every clue is a real answer from the category with <b>all its vowels (A E I O U) removed</b>. <b>Y</b> stays. So <b>BLD GL</b> in “Birds” is <b>BALD EAGLE</b>.</p>
+      <p>Slam your team's <b>buzz pad</b> first, then shout the full answer. The Host taps <b>Right</b> or <b>Wrong</b>. A wrong answer costs a point and locks your team out of that clue, so rivals can <b>steal</b> it.</p>
+      <p><b>Round 1 · Warm Up</b> (1 pt): spaces are in the right places.<br>
+      <b>Round 2 · Scrambled</b> (2 pts): the spaces have been shuffled, so <b>PP PRN</b> could be PEPPERONI.<br>
+      <b>Round 3 · Drip Feed</b> (3→1 pts): vowels drip back one by one. Buzz early for 3 points, or wait for help and win less.<br>
+      <b>Round 4 · Mystery Category</b> (2 pts): scrambled, and the category is hidden until someone gets the first answer.</p>
+      <p><b>Final Wager</b>: each team bets some of its points on one long saying. Teams whisper or write their answer for the Host, then everything is revealed at once.</p>
+      <p>Host tools: <b>Peek</b> (hold to see the answer), <b>Reveal</b> (nobody scores), <b>Undo</b>. Keyboard: 1-4 buzz, Y/N judge, Space next.</p>
+    </div>
+    <button class="btn big" data-go="home">Got it</button>
+  </div>
+</section>
+
+<section id="setup" class="screen">
+  <div class="setup">
+    <h2>New game</h2>
+    <div class="card">
+      <div class="lbl">Teams</div>
+      <div class="chips" id="teamCount"></div>
+      <div id="teamNames" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">Length</div>
+      <div class="chips" id="lenChips"></div>
+      <div class="sub" id="lenInfo" style="margin-top:8px;font-size:14px"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">Decks</div>
+      <div class="chips" id="deckChips"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">Options</div>
+      <div class="chips" id="optChips"></div>
+    </div>
+    <div class="sub" id="setupErr" style="color:var(--bad);min-height:20px"></div>
+    <button class="btn big" id="bStart">Start the quiz</button>
+    <button class="btn ghost" data-go="home">Back</button>
+  </div>
+</section>
+
+<section id="intro" class="screen">
+  <div class="center">
+    <div class="rndName" id="inRound" style="font-size:14px"></div>
+    <h2 id="inTitle" style="font-size:clamp(28px,8vw,44px)"></h2>
+    <div class="demo" id="inDemo"></div>
+    <div class="sub" id="inDesc"></div>
+    <div class="card" id="inScores"></div>
+    <button class="btn big" id="bIntroGo">Let's go</button>
+    <button class="btn ghost" id="bIntroMenu">Menu</button>
+  </div>
+</section>
+
+<section id="play" class="screen">
+  <div class="topbar">
+    <div class="rnd"><div class="rndName" id="pRound"></div><div class="catName" id="pCat"></div></div>
+    <button class="iconBtn" id="bUndo" title="Undo">↶</button>
+    <button class="iconBtn" id="bMenu" title="Menu">☰</button>
+  </div>
+  <div class="scores" id="scores"></div>
+  <div class="stage">
+    <div class="meta"><span id="pClue"></span><span class="val" id="pVal"></span></div>
+    <div class="pz" id="pzBox"><div class="pzText" id="pz"></div></div>
+    <div class="pzMsg" id="pzMsg"></div>
+    <div class="ov" id="ovJudge">
+      <div class="sub">Buzzed in</div>
+      <div class="who" id="jWho"></div>
+      <div class="sub">Shout the answer! Host, were they right?</div>
+      <div class="peek" id="jPeek">Hold Peek to check the answer</div>
+      <div class="row"><button class="btn bad" id="bWrong">✗ Wrong</button><button class="btn good" id="bRight">✓ Right</button></div>
+      <button class="btn" id="bPeek2">Hold to peek</button>
+    </div>
+  </div>
+  <div class="ctrls">
+    <button class="btn" id="bPeek">Hold to peek</button>
+    <button class="btn" id="bReveal">Reveal</button>
+    <button class="btn big" id="bNext" style="display:none">Next ▸</button>
+  </div>
+  <div class="pads" id="pads"></div>
+</section>
+
+<section id="wager" class="screen">
+  <div class="setup">
+    <div class="rndName" style="font-size:14px">Final</div>
+    <h2>Place your wagers</h2>
+    <div class="sub">One long saying, vowels dripping back over 45 seconds. Each team bets part of its points. Get it right and you win your bet, get it wrong and you lose it. Teams on 0 or less can still bet up to 3.</div>
+    <div class="card" id="wagers"></div>
+    <button class="btn big" id="bWagerGo">Lock wagers & show the puzzle</button>
+  </div>
+</section>
+
+<section id="final" class="screen" style="gap:10px">
+  <div class="topbar"><div class="rnd"><div class="rndName">Final Wager</div><div class="catName" id="fCat"></div></div></div>
+  <div class="stage">
+    <div class="meta"><span>Write or whisper your answer to the Host</span><span class="val" id="fTime"></span></div>
+    <div class="timerBar"><i id="fBar"></i></div>
+    <div class="pz" id="fBox"><div class="pzText" id="fz"></div></div>
+  </div>
+  <div class="card" id="fMarks" style="display:none"></div>
+  <div class="ctrls"><button class="btn" id="bFPeek">Hold to peek</button><button class="btn big" id="bFStop">Time! Reveal</button></div>
+</section>
+
+<section id="end" class="screen">
+  <div class="setup" style="text-align:center">
+    <h1 style="font-size:clamp(34px,10vw,60px)">Final Scores</h1>
+    <div class="podium card" id="podium"></div>
+    <div class="card" id="awards"></div>
+    <button class="btn big" id="bAgain">Rematch, same teams</button>
+    <button class="btn" data-go="setup">New setup</button>
+    <button class="btn ghost" data-go="home">Home</button>
+  </div>
+</section>
+
+<section id="menu" class="screen" style="background:rgba(13,15,28,.97);z-index:5">
+  <div class="center">
+    <h2>Paused</h2>
+    <button class="btn big" id="bResume">Resume</button>
+    <button class="btn" id="bSkipCat">Skip this category</button>
+    <button class="btn" id="bSound"></button>
+    <button class="btn" id="bQuit">Quit to home (game is saved)</button>
+  </div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const DECKS=[
+ {id:'food',name:'🍕 Food & Drink'},{id:'animals',name:'🐯 Animals'},{id:'stories',name:'🎬 Stories & Screen'},
+ {id:'places',name:'🗺️ Places'},{id:'sport',name:'⚽ Sport & Games'},{id:'science',name:'🔬 Science & Nature'},
+ {id:'stuff',name:'🎒 Everyday Stuff'},{id:'say',name:'💬 Sayings'}
+];
+const CATS=[
+ ['food','Pizza toppings','Pepperoni|Mushrooms|Green Peppers|Black Olives|Pineapple|Extra Cheese|Sausage'],
+ ['food','Breakfast foods','Scrambled Eggs|French Toast|Pancakes|Porridge|Blueberry Muffin|Hash Browns|Cornflakes'],
+ ['food','Fruits','Watermelon|Strawberry|Pomegranate|Grapefruit|Raspberry|Passion Fruit|Pineapple'],
+ ['food','Desserts','Chocolate Cake|Apple Pie|Ice Cream Sundae|Cheesecake|Banana Split|Rice Pudding|Brownie'],
+ ['food','Sandwiches','Peanut Butter and Jelly|Grilled Cheese|Club Sandwich|Egg Salad|Tuna Melt|Hot Dog'],
+ ['food','Vegetables','Broccoli|Sweet Potato|Brussels Sprouts|Cauliflower|Corn on the Cob|Green Beans|Carrot'],
+ ['food','Snack foods','Popcorn|Potato Chips|Pretzels|Trail Mix|Cheese Puffs|Rice Cakes|Crackers'],
+ ['food','Drinks','Orange Juice|Hot Chocolate|Lemonade|Milkshake|Iced Tea|Sparkling Water|Smoothie'],
+ ['animals','Big cats','Mountain Lion|Snow Leopard|Cheetah|Jaguar|Bengal Tiger|Black Panther|Ocelot'],
+ ['animals','Sea creatures','Blue Whale|Great White Shark|Octopus|Sea Turtle|Jellyfish|Dolphin|Starfish'],
+ ['animals','Birds','Bald Eagle|Flamingo|Penguin|Hummingbird|Peacock|Woodpecker|Ostrich'],
+ ['animals','Farm animals','Chicken|Billy Goat|Donkey|Sheep|Turkey|Dairy Cow|Horse'],
+ ['animals','Creepy crawlies','Butterfly|Grasshopper|Ladybug|Dragonfly|Honey Bee|Praying Mantis|Caterpillar'],
+ ['animals','Dog breeds','Golden Retriever|German Shepherd|Labrador|Dalmatian|Poodle|Chihuahua|Beagle'],
+ ['animals','Reptiles','Komodo Dragon|Rattlesnake|Alligator|Chameleon|Gila Monster|Tortoise|Crocodile'],
+ ['animals','Jungle animals','Gorilla|Orangutan|Toucan|Sloth|Anaconda|Poison Dart Frog|Parrot'],
+ ['stories','Fairy tales','Cinderella|Snow White|Little Red Riding Hood|Jack and the Beanstalk|Goldilocks|Sleeping Beauty|Rapunzel'],
+ ['stories','Superheroes','Spider Man|Wonder Woman|Batman|Captain America|Black Panther|Iron Man|Superman'],
+ ['stories','Animated films','Toy Story|Finding Nemo|The Lion King|Frozen|Monsters Inc|The Incredibles|Shrek'],
+ ['stories','Nursery rhymes','Humpty Dumpty|Baa Baa Black Sheep|Twinkle Twinkle Little Star|Hickory Dickory Dock|Old King Cole|Jack and Jill'],
+ ['stories','Wizards & witches','Harry Potter|Gandalf|Merlin|Hermione Granger|Glinda|Wicked Witch of the West'],
+ ['stories','Cartoon characters','Mickey Mouse|Bugs Bunny|SpongeBob SquarePants|Scooby Doo|Winnie the Pooh|Peppa Pig'],
+ ['stories','Video games','Super Mario|Minecraft|Tetris|Pac Man|Pokemon|Sonic the Hedgehog|Animal Crossing'],
+ ['places','Countries','Australia|Brazil|Canada|Japan|Mexico|New Zealand|Egypt|Germany'],
+ ['places','Capital cities','Paris|London|Tokyo|Madrid|Buenos Aires|Berlin|Washington'],
+ ['places','Famous landmarks','Eiffel Tower|Statue of Liberty|Great Wall of China|Big Ben|Mount Rushmore|Golden Gate Bridge|Taj Mahal'],
+ ['places','US states','California|Texas|Florida|New York|Michigan|Colorado|Alaska'],
+ ['places','Rooms in a house','Living Room|Kitchen|Bathroom|Bedroom|Garage|Dining Room|Attic'],
+ ['places','Places in town','Post Office|Fire Station|Library|Grocery Store|Movie Theater|Playground|Bakery'],
+ ['places','Natural wonders','Grand Canyon|Niagara Falls|Mount Everest|Great Barrier Reef|Amazon Rainforest|Sahara Desert'],
+ ['places','At the beach','Sand Castle|Beach Umbrella|Sunscreen|Seashells|Surfboard|Beach Towel|Ice Cream Truck'],
+ ['sport','Sports','Basketball|Ice Hockey|Table Tennis|Volleyball|Baseball|Gymnastics|Badminton'],
+ ['sport','Olympic events','Pole Vault|High Jump|Long Jump|Marathon|Synchronized Swimming|Javelin|Figure Skating'],
+ ['sport','Playground games','Hide and Seek|Hopscotch|Duck Duck Goose|Red Rover|Simon Says|Musical Chairs|Tug of War'],
+ ['sport','Sports equipment','Baseball Bat|Hockey Stick|Tennis Racket|Soccer Ball|Golf Club|Bowling Ball|Skipping Rope'],
+ ['sport','Board games','Monopoly|Scrabble|Snakes and Ladders|Connect Four|Chess|Battleship|Checkers'],
+ ['sport','Card games','Go Fish|Old Maid|Crazy Eights|Solitaire|Snap|Rummy|Happy Families'],
+ ['science','Space','Jupiter|Saturn|Milky Way|Shooting Star|Black Hole|Astronaut|Full Moon'],
+ ['science','Weather','Thunderstorm|Rainbow|Hurricane|Snowflake|Lightning|Tornado|Heatwave'],
+ ['science','Body parts','Elbow|Kneecap|Eyebrow|Fingernail|Belly Button|Shoulder Blade|Ankle'],
+ ['science','Gemstones','Diamond|Ruby|Emerald|Sapphire|Amethyst|Pearl|Topaz'],
+ ['science','In a science lab','Microscope|Test Tube|Safety Goggles|Bunsen Burner|Magnifying Glass|Lab Coat'],
+ ['science','Plants','Oak Tree|Sunflower|Cactus|Palm Tree|Venus Flytrap|Dandelion|Christmas Tree'],
+ ['science','Colours','Turquoise|Lavender|Burgundy|Navy Blue|Lime Green|Hot Pink|Orange'],
+ ['stuff','Kitchen gadgets','Toaster|Microwave|Can Opener|Frying Pan|Rolling Pin|Blender|Kettle'],
+ ['stuff','In a school bag','Pencil Case|Water Bottle|Lunch Box|Notebook|Calculator|Homework|Ruler'],
+ ['stuff','Musical instruments','Electric Guitar|Harmonica|Violin|Trumpet|Drum Kit|Saxophone|Xylophone'],
+ ['stuff','Jobs','Firefighter|Astronaut|Police Officer|Teacher|Dentist|Veterinarian|Chef'],
+ ['stuff','Things with wheels','Skateboard|Bicycle|Shopping Cart|Wheelbarrow|Fire Truck|Roller Skates|Scooter'],
+ ['stuff','Clothing','Baseball Cap|Rain Boots|Pajamas|Sweatshirt|Flip Flops|Bow Tie|Raincoat'],
+ ['stuff','Holidays','Christmas|Halloween|Thanksgiving|Valentines Day|New Years Eve|Easter|April Fools Day'],
+ ['stuff','At a birthday party','Birthday Cake|Balloons|Party Hats|Pinata|Goodie Bags|Candles|Presents'],
+ ['say','Famous sayings','Better Late Than Never|Practice Makes Perfect|Time Flies|Piece of Cake|Easy Peasy|Break a Leg'],
+ ['say','Things grown-ups say','Clean Your Room|Brush Your Teeth|Eat Your Vegetables|Because I Said So|Put Your Shoes On|Turn Off the Lights'],
+ ['say','Greetings & goodbyes','Good Morning|See You Later|Nice to Meet You|Happy Birthday|Welcome Home|Good Night|Take Care'],
+ ['say','Things on a road trip','Are We There Yet|Seat Belt|Gas Station|Road Map|Car Snacks|Traffic Jam|Sing Along']
+].map(([deck,name,a])=>({deck,name,answers:a.split('|')}));
+const FINALS=[
+ "Don't count your chickens before they hatch","Every cloud has a silver lining","The early bird catches the worm",
+ "An apple a day keeps the doctor away","Rome wasn't built in a day","Look before you leap","Two heads are better than one",
+ "Where there's a will there's a way","Don't judge a book by its cover","The grass is always greener on the other side",
+ "Laughter is the best medicine","A picture is worth a thousand words","Slow and steady wins the race",
+ "It's raining cats and dogs","Happily ever after","Somewhere over the rainbow","Actions speak louder than words",
+ "Great minds think alike","There's no place like home","Practice what you preach"
+];
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const KEY='cowork-vowel-play-';
+const TC=['var(--t0)','var(--t1)','var(--t2)','var(--t3)'];
+const ROUNDS=[
+ {id:'warm',name:'Round 1',title:'Warm Up',pts:1,demo:'BLD GL',desc:'All the vowels are gone, but the spaces are where they belong. 1 point a clue.'},
+ {id:'scram',name:'Round 2',title:'Scrambled',pts:2,demo:'GR NBN S',desc:'Vowels gone AND the spaces have been shuffled, so word breaks can lie. 2 points a clue.'},
+ {id:'drip',name:'Round 3',title:'Drip Feed',pts:3,demo:'BALD EGL',desc:'The vowels drip back one at a time. Buzz early for 3 points; the longer you wait, the less it is worth.'},
+ {id:'myst',name:'Round 4',title:'Mystery Category',pts:2,demo:'?? ??? ??',desc:'Scrambled clues and the category is hidden until someone cracks the first answer (or two clues go unclaimed). 2 points a clue.'}
+];
+const LENS=[
+ {id:1,name:'Quick',info:'1 category per round · 16 clues + final · ~10 min'},
+ {id:2,name:'Standard',info:'2 categories per round · 32 clues + final · ~20 min'},
+ {id:3,name:'Long',info:'3 categories per round · 48 clues + final · ~30 min'}
+];
+const CLUES_PER_CAT=4, DRIP_MS=2800, FINAL_MS=45000;
+const rnd=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const VOW=new Set(['A','E','I','O','U']);
+const norm=s=>s.toUpperCase().replace(/[^A-Z0-9 ]/g,'').replace(/\s+/g,' ').trim();
+const strip=ans=>norm(ans).split(' ').map(w=>[...w].filter(c=>!VOW.has(c)).join('')).filter(Boolean);
+function scramble(ans){
+  const words=strip(ans), letters=words.join(''), orig=words.join(' ');
+  let best=null;
+  for(let t=0;t<10;t++){
+    const out=[]; let i=0;
+    while(i<letters.length){
+      const left=letters.length-i;
+      let k=[2,3,3,4,4,5][rnd(6)];
+      if(k>=left) k=left; else if(left-k===1) k++;
+      out.push(letters.slice(i,i+k)); i+=k;
+    }
+    best=out;
+    if(out.join(' ')!==orig||letters.length<=3) break;
+  }
+  return best;
+}
+function vowelCount(text){return [...norm(text)].filter(c=>VOW.has(c)).length}
+
+/* ---------- settings & storage ---------- */
+const store={
+  get(k,d){try{const v=localStorage.getItem(KEY+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(KEY+k,JSON.stringify(v))}catch(e){}},
+  del(k){try{localStorage.removeItem(KEY+k)}catch(e){}}
+};
+let SET=Object.assign({n:2,names:['Red Team','Blue Team','Gold Team','Green Team'],len:2,decks:DECKS.map(d=>d.id),pen:true,sound:true},store.get('settings',{}));
+if(!Array.isArray(SET.decks)||!SET.decks.length) SET.decks=DECKS.map(d=>d.id);
+let S=null, undoStack=[], menuOpen=false;
+
+/* ---------- audio ---------- */
+let AC=null;
+function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();return AC}
+function tone(f,d,type='sine',v=.15,when=0){
+  if(!SET.sound) return; const a=ac(); if(!a) return;
+  const t=a.currentTime+when, o=a.createOscillator(), g=a.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,t);
+  g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(.0001,t+d);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t+d+.02);
+}
+const sfx={
+  buzz:()=>{tone(330,.18,'square',.12);tone(440,.2,'square',.08,.05)},
+  right:()=>[523,659,784,1047].forEach((f,i)=>tone(f,.18,'triangle',.14,i*.07)),
+  wrong:()=>{tone(180,.35,'sawtooth',.12);tone(140,.4,'sawtooth',.1,.08)},
+  drip:()=>tone(1200,.07,'sine',.08),
+  tick:()=>tone(900,.04,'square',.05),
+  fanfare:()=>[392,523,659,784,659,784,1047].forEach((f,i)=>tone(f,.22,'triangle',.13,i*.12))
+};
+document.addEventListener('pointerdown',()=>ac(),{once:true});
+
+/* ---------- screens ---------- */
+function show(id){$$('.screen').forEach(s=>{if(s.id!=='menu')s.classList.toggle('on',s.id===id)})}
+$$('[data-go]').forEach(b=>b.addEventListener('click',()=>{const g=b.dataset.go; if(g==='setup')buildSetup(); if(g==='home')goHome(); else show(g)}));
+function goHome(){closeMenu();show('home');$('#bCont').style.display=(S&&S.phase!=='end')?'':'none'}
+let toastT=0;
+function toast(t,bad){const el=$('#toast');el.textContent=t;el.classList.toggle('bad',!!bad);el.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>el.classList.remove('on'),1300)}
+
+/* ---------- setup ---------- */
+function buildSetup(){
+  $('#teamCount').innerHTML=[2,3,4].map(n=>`<button class="chip ${SET.n===n?'on':''}" data-n="${n}">${n} teams</button>`).join('');
+  $('#teamNames').innerHTML=Array.from({length:SET.n},(_,i)=>`<div class="teamIn"><i style="background:${TC[i]}"></i><input maxlength="16" data-i="${i}" value="${esc(SET.names[i]||'')}" placeholder="Team ${i+1}"></div>`).join('');
+  $('#lenChips').innerHTML=LENS.map(l=>`<button class="chip ${SET.len===l.id?'on':''}" data-l="${l.id}">${l.name}</button>`).join('');
+  $('#lenInfo').textContent=LENS.find(l=>l.id===SET.len).info;
+  $('#deckChips').innerHTML=DECKS.map(d=>`<button class="chip ${SET.decks.includes(d.id)?'on':''}" data-d="${d.id}">${d.name}</button>`).join('');
+  $('#optChips').innerHTML=`<button class="chip ${SET.pen?'on':''}" data-o="pen">Wrong buzz costs 1 point</button><button class="chip ${SET.sound?'on':''}" data-o="sound">Sound</button>`;
+  $('#setupErr').textContent='';
+  show('setup');
+}
+$('#setup').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.dataset.n){readNames();SET.n=+b.dataset.n;buildSetup()}
+  else if(b.dataset.l){readNames();SET.len=+b.dataset.l;buildSetup()}
+  else if(b.dataset.d){readNames();const d=b.dataset.d;SET.decks=SET.decks.includes(d)?SET.decks.filter(x=>x!==d):[...SET.decks,d];buildSetup()}
+  else if(b.dataset.o){readNames();SET[b.dataset.o]=!SET[b.dataset.o];buildSetup()}
+});
+function readNames(){$$('#teamNames input').forEach(inp=>{SET.names[+inp.dataset.i]=inp.value.trim()})}
+$('#bStart').addEventListener('click',()=>{
+  readNames();
+  const pool=CATS.filter(c=>SET.decks.includes(c.deck));
+  const need=SET.len*ROUNDS.length;
+  if(!SET.decks.length){$('#setupErr').textContent='Pick at least one deck.';return}
+  if(pool.length<need){$('#setupErr').textContent=`Those decks have ${pool.length} categories; this length needs ${need}. Add a deck or pick a shorter game.`;return}
+  store.set('settings',SET);
+  newGame();
+});
+
+/* ---------- game ---------- */
+function newGame(keepTeams){
+  const names=Array.from({length:SET.n},(_,i)=>(SET.names[i]||'').trim()||`Team ${i+1}`);
+  const used=store.get('used',[]);
+  let pool=shuffle(CATS.filter(c=>SET.decks.includes(c.deck)));
+  const need=SET.len*ROUNDS.length;
+  const fresh=pool.filter(c=>!used.includes(c.name));
+  pool = fresh.length>=need ? fresh : [...fresh, ...pool.filter(c=>used.includes(c.name))];
+  const picked=pool.slice(0,need);
+  store.set('used',[...used.filter(n=>!picked.some(c=>c.name===n)),...picked.map(c=>c.name)].slice(-40));
+  const plan=ROUNDS.map((_,r)=>picked.slice(r*SET.len,(r+1)*SET.len).map(c=>({name:c.name,picks:shuffle([...c.answers]).slice(0,CLUES_PER_CAT)})));
+  const usedF=store.get('usedFinals',[]);
+  let fpool=FINALS.filter(f=>!usedF.includes(f)); if(!fpool.length) fpool=FINALS;
+  const fin=fpool[rnd(fpool.length)];
+  store.set('usedFinals',[...usedF,fin].slice(-15));
+  S={teams:names.map(name=>({name,score:0,c:0,w:0,st:0,fast:null})),len:SET.len,pen:SET.pen,plan,
+     r:0,ci:0,k:0,phase:'intro',locked:[],buzz:null,el:0,shown:0,order:[],chunks:[],wrongOnClue:false,
+     mystOpen:false,unclaimed:0,res:null,buzzAt:0,fin:{text:fin,wagers:names.map(()=>0),marks:names.map(()=>null),left:FINAL_MS,shown:0,order:[]}};
+  undoStack=[];
+  save(); showIntro();
+}
+const cat=()=>S.plan[S.r][S.ci];
+const clueAns=()=>cat().picks[S.k];
+const round=()=>ROUNDS[S.r];
+function save(){if(S)store.set('save',S)}
+function snap(){undoStack.push(JSON.stringify(S));if(undoStack.length>30)undoStack.shift();$('#bUndo').disabled=false}
+function undo(){if(!undoStack.length)return;S=JSON.parse(undoStack.pop());save();route();toast('Undone')}
+
+function value(){
+  const R=round();
+  if(R.id!=='drip') return R.pts;
+  const V=S.order.length; if(!V) return 3;
+  const f=S.shown/V; return f<1/3?3:f<2/3?2:1;
+}
+function catLabel(){
+  if(round().id==='myst'&&!S.mystOpen) return '❓ Mystery category';
+  return cat().name;
+}
+
+function showIntro(){
+  S.phase='intro'; save();
+  const R=round();
+  $('#inRound').textContent=`${R.name} of ${ROUNDS.length}`;
+  $('#inTitle').textContent=R.title;
+  $('#inDemo').textContent=R.demo;
+  $('#inDesc').textContent=R.desc;
+  $('#inScores').innerHTML=S.r===0?`<div class="sub">${S.teams.map((t,i)=>`<b style="color:${TC[i]}">${esc(t.name)}</b>`).join(' vs ')}</div>`:
+    S.teams.map((t,i)=>`<div style="display:flex;justify-content:space-between;font-weight:800;padding:4px 0"><span style="color:${TC[i]}">${esc(t.name)}</span><span>${t.score}</span></div>`).join('');
+  show('intro');
+}
+$('#bIntroGo').addEventListener('click',()=>{snap();S.ci=0;S.k=0;S.phase='cat';S.mystOpen=false;S.unclaimed=0;save();show('play');render()});
+$('#bIntroMenu').addEventListener('click',goHome);
+
+function startClue(){
+  const a=clueAns(), R=round();
+  S.chunks = (R.id==='scram'||R.id==='myst') ? scramble(a) : strip(a);
+  const V=vowelCount(a); S.order=shuffle(Array.from({length:V},(_,i)=>i)); S.shown=0;
+  S.el=0; S.locked=[]; S.buzz=null; S.wrongOnClue=false; S.res=null; S.phase='clue';
+  save(); render();
+}
+
+function buzz(t){
+  if(!S||S.phase!=='clue'||menuOpen||S.locked.includes(t)||t>=S.teams.length) return;
+  snap(); S.buzz=t; S.buzzAt=S.el; S.phase='judge'; sfx.buzz(); save(); render();
+}
+function judge(ok){
+  if(S.phase!=='judge') return;
+  snap();
+  const t=S.teams[S.buzz];
+  if(ok){
+    const pts=value(); t.score+=pts; t.c++;
+    if(S.wrongOnClue) t.st++;
+    if(t.fast===null||S.buzzAt<t.fast) t.fast=S.buzzAt;
+    S.res={team:S.buzz,pts,steal:S.wrongOnClue};
+    if(round().id==='myst') S.mystOpen=true;
+    S.phase='reveal'; sfx.right(); toast(`${t.name} +${pts}${S.wrongOnClue?' · STEAL!':''}`);
+  }else{
+    if(S.pen){t.score-=1}
+    t.w++; S.locked.push(S.buzz); S.wrongOnClue=true; sfx.wrong(); toast(S.pen?`${t.name} −1`:`${t.name} locked out`,true);
+    S.buzz=null;
+    if(S.locked.length>=S.teams.length){S.res={team:null};S.phase='reveal';noClaim()}
+    else S.phase='clue';
+  }
+  save(); render();
+}
+function noClaim(){
+  if(round().id==='myst'&&!S.mystOpen){S.unclaimed++; if(S.unclaimed>=2) S.mystOpen=true}
+}
+function reveal(){
+  if(S.phase!=='clue') return;
+  snap(); S.res={team:null}; S.phase='reveal'; noClaim(); save(); render();
+}
+function next(){
+  if(S.phase==='cat'){snap();startClue();return}
+  if(S.phase!=='reveal') return;
+  snap(); advance();
+}
+function advance(){
+  S.k++;
+  if(S.k>=CLUES_PER_CAT){
+    S.k=0; S.ci++; S.mystOpen=false; S.unclaimed=0;
+    if(S.ci>=S.len){
+      S.ci=0; S.r++;
+      if(S.r>=ROUNDS.length){S.r=ROUNDS.length-1;S.ci=S.len-1;S.k=CLUES_PER_CAT-1;goWager();return}
+      showIntro(); return;
+    }
+    S.phase='cat'; save(); render(); return;
+  }
+  startClue();
+}
+
+/* ---------- rendering ---------- */
+function puzzleHTML(text,mode,shown,order){
+  if(mode==='answer') return norm(text).split(' ').map(w=>`<span class="ch">${w}</span>`).join('');
+  if(mode==='drip'){
+    const rank=[]; order.forEach((vi,r)=>rank[vi]=r);
+    let vi=0;
+    return norm(text).split(' ').map(w=>{
+      let h=''; for(const c of w){ if(VOW.has(c)){const r=rank[vi];h+=`<span class="v ${r<shown?'still':'hid'}" data-r="${r}">${c}</span>`;vi++} else h+=c }
+      return `<span class="ch">${h}</span>`;
+    }).join('');
+  }
+  return text.map(c=>`<span class="ch">${c}</span>`).join('');
+}
+function fit(el,box){
+  const W=box.clientWidth-20, H=box.clientHeight-12; if(W<=0||H<=0) return;
+  let s=Math.min(110,Math.max(18,W/3.2)); el.style.fontSize=s+'px';
+  while(s>14&&(el.scrollWidth>W||el.offsetHeight>H||[...el.children].some(c=>c.offsetWidth>W))){s-=2;el.style.fontSize=s+'px'}
+}
+function render(){
+  if(!S) return;
+  const R=round(), ph=S.phase;
+  $('#pRound').textContent=`${R.name} · ${R.title} · Category ${S.ci+1}/${S.len}`;
+  $('#pCat').textContent=catLabel();
+  $('#scores').innerHTML=S.teams.map((t,i)=>`<div class="sc ${ph==='clue'&&S.locked.includes(i)?'locked':''}" style="border-color:${TC[i]}"><div class="n" style="color:${TC[i]}">${esc(t.name)}</div><div class="p">${t.score}</div></div>`).join('');
+  const pads=$('#pads'); pads.style.setProperty('--n',S.teams.length);
+  pads.classList.toggle('wait',ph!=='clue');
+  pads.innerHTML=S.teams.map((t,i)=>`<button class="pad ${S.locked.includes(i)&&ph==='clue'?'out':''}" data-t="${i}" style="background:${TC[i]}"><span>${esc(t.name)}</span><small>${S.locked.includes(i)&&ph==='clue'?'LOCKED':'BUZZ · '+(i+1)}</small></button>`).join('');
+  const pz=$('#pz'), box=$('#pzBox'), msg=$('#pzMsg');
+  pz.classList.remove('ans');
+  $('#pClue').textContent=ph==='cat'?`${CLUES_PER_CAT} clues coming up`:`Clue ${S.k+1} of ${CLUES_PER_CAT}`;
+  const v=$('#pVal'); v.textContent=ph==='cat'?`${R.id==='drip'?'3→1':R.pts} pt${R.pts>1||R.id==='drip'?'s':''} each`:`Worth ${value()}`;
+  $('#ovJudge').classList.toggle('on',ph==='judge');
+  $('#bReveal').style.display=ph==='clue'?'':'none';
+  $('#bPeek').style.display=(ph==='clue'||ph==='judge')?'':'none';
+  $('#bNext').style.display=(ph==='cat'||ph==='reveal')?'':'none';
+  $('#bUndo').disabled=!undoStack.length;
+  if(ph==='cat'){
+    const myst=R.id==='myst';
+    pz.innerHTML=`<span class="ch" style="font-family:'Segoe UI',system-ui,sans-serif;letter-spacing:0">${esc(myst?'❓ ??? ❓':cat().name)}</span>`;
+    msg.textContent=myst?'Category hidden! Crack the first clue to reveal it.':`Category ${S.ci+1} of ${S.len}. Hands near your buzzers…`;
+    $('#bNext').textContent='Start clues ▸';
+  }else if(ph==='reveal'){
+    pz.innerHTML=puzzleHTML(clueAns(),'answer'); pz.classList.add('ans');
+    const res=S.res||{};
+    msg.innerHTML=res.team!=null?`<b style="color:${TC[res.team]}">${esc(S.teams[res.team].name)}</b> +${res.pts}${res.steal?' · stolen!':''}`:'Nobody got that one.';
+    const last=S.k>=CLUES_PER_CAT-1;
+    $('#bNext').textContent=last?(S.ci>=S.len-1?(S.r>=ROUNDS.length-1?'To the Final ▸':'Next round ▸'):'Next category ▸'):'Next clue ▸';
+  }else{
+    pz.innerHTML=R.id==='drip'?puzzleHTML(clueAns(),'drip',S.shown,S.order):puzzleHTML(S.chunks,'chunks');
+    if(ph==='judge'){
+      $('#jWho').textContent=S.teams[S.buzz].name; $('#jWho').style.color=TC[S.buzz];
+      $('#jPeek').textContent='Hold Peek to check the answer';
+    }
+    const lockedNames=S.locked.map(i=>S.teams[i].name);
+    msg.textContent=lockedNames.length?`Locked out: ${lockedNames.join(', ')}. Steal it!`:(R.id==='drip'?'Vowels are dripping back… buzz before it drops!':'First team to buzz answers.');
+  }
+  fit(pz,box);
+  save();
+}
+function dripOne(){
+  const sp=$(`#pz .v[data-r="${S.shown}"]`);
+  const before=value(); S.shown++;
+  if(sp){sp.classList.remove('hid')}
+  fit($('#pz'),$('#pzBox'));
+  const after=value(); sfx.drip();
+  if(after!==before){const v=$('#pVal');v.textContent=`Worth ${after}`;v.classList.remove('drop');void v.offsetWidth;v.classList.add('drop')}
+}
+
+/* ---------- final ---------- */
+function goWager(){
+  S.phase='wager';
+  S.fin.wagers=S.teams.map(()=>0);
+  S.fin.marks=S.teams.map(()=>null); S.fin.left=FINAL_MS; S.fin.shown=0;
+  S.fin.order=shuffle(Array.from({length:vowelCount(S.fin.text)},(_,i)=>i));
+  save(); renderWager(); show('wager');
+}
+const maxWager=t=>t.score>0?t.score:3;
+function renderWager(){
+  $('#wagers').innerHTML=S.teams.map((t,i)=>`<div class="wager"><span class="nm" style="color:${TC[i]}">${esc(t.name)} <small style="color:var(--muted)">(${t.score})</small></span>
+    <button class="btn" data-w="${i}" data-d="-1">−</button><span class="amt">${S.fin.wagers[i]}</span><button class="btn" data-w="${i}" data-d="1">+</button>
+    <button class="btn" data-w="${i}" data-d="all" style="width:auto;padding:0 10px">All</button></div>`).join('');
+}
+$('#wagers').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  const i=+b.dataset.w, t=S.teams[i], m=maxWager(t);
+  S.fin.wagers[i]=b.dataset.d==='all'?m:Math.max(0,Math.min(m,S.fin.wagers[i]+(+b.dataset.d)));
+  save(); renderWager();
+});
+$('#bWagerGo').addEventListener('click',()=>{S.phase='final';save();renderFinal();show('final')});
+function renderFinal(){
+  const ph=S.phase;
+  $('#fCat').textContent='A famous saying';
+  const fz=$('#fz'), box=$('#fBox');
+  fz.classList.toggle('ans',ph==='fmark');
+  fz.innerHTML=ph==='fmark'?puzzleHTML(S.fin.text,'answer'):puzzleHTML(S.fin.text,'drip',S.fin.shown,S.fin.order);
+  $('#fTime').textContent=ph==='fmark'?'Time!':Math.ceil(S.fin.left/1000)+'s';
+  $('#fBar').style.width=(100*S.fin.left/FINAL_MS)+'%';
+  $('#bFStop').style.display=ph==='final'?'':'none';
+  $('#bFPeek').style.display=ph==='final'?'':'none';
+  const fm=$('#fMarks'); fm.style.display=ph==='fmark'?'':'none';
+  if(ph==='fmark'){
+    fm.innerHTML=`<div class="lbl">Host: did each team get it?</div>`+S.teams.map((t,i)=>`<div class="fmark"><span class="nm" style="color:${TC[i]}">${esc(t.name)} · bet ${S.fin.wagers[i]}</span>
+      <button class="btn bad ${S.fin.marks[i]===false?'sel':''}" data-m="${i}" data-v="0">✗</button><button class="btn good ${S.fin.marks[i]===true?'sel':''}" data-m="${i}" data-v="1">✓</button></div>`).join('')+
+      `<button class="btn big" id="bFinish" style="width:100%" ${S.fin.marks.some(m=>m===null)?'disabled':''}>Final scores ▸</button>`;
+  }
+  fit(fz,box);
+}
+function stopFinal(){if(S.phase!=='final')return;S.phase='fmark';S.fin.left=0;sfx.buzz();save();renderFinal()}
+$('#bFStop').addEventListener('click',stopFinal);
+$('#fMarks').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.id==='bFinish'){finish();return}
+  S.fin.marks[+b.dataset.m]=b.dataset.v==='1'; save(); renderFinal();
+});
+function finish(){
+  S.teams.forEach((t,i)=>{const w=S.fin.wagers[i];if(S.fin.marks[i]){t.score+=w;t.finWin=w}else{t.score-=w;t.finWin=-w}});
+  S.phase='end'; save(); renderEnd(); show('end'); sfx.fanfare();
+}
+function renderEnd(){
+  const order=S.teams.map((t,i)=>({...t,i})).sort((a,b)=>b.score-a.score);
+  let rank=0,prev=null;
+  $('#podium').innerHTML=order.map((t,j)=>{if(t.score!==prev){rank=j+1;prev=t.score}
+    const medal=['🥇','🥈','🥉','4'][rank-1]||rank;
+    return `<div class="pl" style="border-left:6px solid ${TC[t.i]}"><span class="rk">${medal}</span><span class="nm">${esc(t.name)}</span><span>${t.score}</span></div>`}).join('');
+  const aw=[];
+  const top=order.filter(t=>t.score===order[0].score);
+  aw.push(`🏆 <b>${top.length>1?'Shared crown':'Champions'}</b>: ${top.map(t=>esc(t.name)).join(' & ')}`);
+  const best=(f,ok)=>{const c=S.teams.map((t,i)=>({t,i,v:f(t)})).filter(x=>ok(x.v));if(!c.length)return null;const m=Math.max(...c.map(x=>x.v));return c.filter(x=>x.v===m)};
+  const most=best(t=>t.c,v=>v>0); if(most) aw.push(`🎯 <b>Sharpshooters</b>: ${most.map(x=>esc(x.t.name)).join(' & ')} with ${most[0].v} correct`);
+  const fast=S.teams.map((t,i)=>({t,i})).filter(x=>x.t.fast!==null).sort((a,b)=>a.t.fast-b.t.fast)[0];
+  if(fast) aw.push(`⚡ <b>Quickest Draw</b>: ${esc(fast.t.name)}, buzzed right in ${(fast.t.fast/1000).toFixed(1)}s`);
+  const thief=best(t=>t.st,v=>v>0); if(thief) aw.push(`🦝 <b>Master Thieves</b>: ${thief.map(x=>esc(x.t.name)).join(' & ')} with ${thief[0].v} steal${thief[0].v>1?'s':''}`);
+  const brave=best(t=>t.w,v=>v>0); if(brave) aw.push(`🙈 <b>Bravest Buzzers</b>: ${brave.map(x=>esc(x.t.name)).join(' & ')} (${brave[0].v} wrong guess${brave[0].v>1?'es':''})`);
+  const gamble=best(t=>t.finWin||0,v=>v>0); if(gamble) aw.push(`🎲 <b>Big Gamble</b>: ${gamble.map(x=>esc(x.t.name)).join(' & ')} won ${gamble[0].v} on the Final`);
+  aw.push(`💬 The final saying was <b>${esc(S.fin.text)}</b>`);
+  $('#awards').innerHTML=aw.map(a=>`<div class="award">${a}</div>`).join('');
+}
+$('#bAgain').addEventListener('click',()=>{SET.n=S.teams.length;SET.names=S.teams.map(t=>t.name).concat(SET.names.slice(S.teams.length));SET.len=S.len;newGame()});
+
+/* ---------- controls ---------- */
+$('#pads').addEventListener('pointerdown',e=>{const b=e.target.closest('.pad');if(b){e.preventDefault();buzz(+b.dataset.t)}});
+$('#bRight').addEventListener('click',()=>judge(true));
+$('#bWrong').addEventListener('click',()=>judge(false));
+$('#bReveal').addEventListener('click',reveal);
+$('#bNext').addEventListener('click',next);
+$('#bUndo').addEventListener('click',undo);
+function peekBind(btn,target,restore){
+  const on=e=>{e.preventDefault();target().textContent='Answer: '+norm(peekText())};
+  const off=()=>restore();
+  btn.addEventListener('pointerdown',on);
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>btn.addEventListener(ev,off));
+}
+const peekText=()=>S.phase==='final'?S.fin.text:clueAns();
+peekBind($('#bPeek'),()=>$('#pzMsg'),()=>render());
+peekBind($('#bPeek2'),()=>$('#jPeek'),()=>{$('#jPeek').textContent='Hold Peek to check the answer'});
+peekBind($('#bFPeek'),()=>$('#fCat'),()=>{$('#fCat').textContent='A famous saying'});
+
+function openMenu(){menuOpen=true;$('#bSound').textContent='Sound: '+(SET.sound?'on':'off');$('#bSkipCat').style.display=$('#play').classList.contains('on')?'':'none';$('#menu').classList.add('on')}
+function closeMenu(){menuOpen=false;$('#menu').classList.remove('on')}
+$('#bMenu').addEventListener('click',openMenu);
+$('#bResume').addEventListener('click',closeMenu);
+$('#bSound').addEventListener('click',()=>{SET.sound=!SET.sound;store.set('settings',SET);$('#bSound').textContent='Sound: '+(SET.sound?'on':'off')});
+$('#bSkipCat').addEventListener('click',()=>{closeMenu();if(['cat','clue','judge','reveal'].includes(S.phase)){snap();S.k=CLUES_PER_CAT-1;advance()}});
+$('#bQuit').addEventListener('click',()=>{save();goHome()});
+$('#bNew').addEventListener('click',buildSetup);
+$('#bHow').addEventListener('click',()=>show('how'));
+$('#bCont').addEventListener('click',()=>{undoStack=[];route()});
+function route(){
+  closeMenu();
+  const ph=S.phase;
+  if(ph==='intro') showIntro();
+  else if(ph==='wager'){renderWager();show('wager')}
+  else if(ph==='final'||ph==='fmark'){show('final');renderFinal()}
+  else if(ph==='end'){show('end');renderEnd()}
+  else {show('play');render()}
+}
+document.addEventListener('keydown',e=>{
+  if(!S||e.target.tagName==='INPUT') return;
+  if($('#play').classList.contains('on')&&!menuOpen){
+    if(e.key>='1'&&e.key<='4') buzz(+e.key-1);
+    else if(e.key==='y'||e.key==='Y') judge(true);
+    else if(e.key==='n'||e.key==='N') judge(false);
+    else if(e.key===' '||e.key==='Enter'){e.preventDefault(); next()}
+  }
+});
+
+/* ---------- ticker ---------- */
+let last=performance.now(), saveAcc=0;
+setInterval(()=>{
+  const now=performance.now(), dt=Math.min(500,now-last); last=now;
+  if(!S||menuOpen) return;
+  if(S.phase==='clue'&&$('#play').classList.contains('on')){
+    S.el+=dt;
+    if(round().id==='drip'){const target=Math.min(S.order.length,Math.floor(S.el/DRIP_MS));while(S.shown<target)dripOne()}
+  }else if(S.phase==='final'&&$('#final').classList.contains('on')){
+    const prevS=Math.ceil(S.fin.left/1000);
+    S.fin.left=Math.max(0,S.fin.left-dt);
+    const V=S.fin.order.length, per=(FINAL_MS-5000)/Math.max(1,V);
+    const target=Math.min(V,Math.floor((FINAL_MS-S.fin.left)/per));
+    let changed=false;
+    while(S.fin.shown<target){const sp=$(`#fz .v[data-r="${S.fin.shown}"]`);if(sp)sp.classList.remove('hid');S.fin.shown++;changed=true;sfx.drip()}
+    if(changed) fit($('#fz'),$('#fBox'));
+    const s=Math.ceil(S.fin.left/1000);
+    $('#fTime').textContent=s+'s'; $('#fBar').style.width=(100*S.fin.left/FINAL_MS)+'%';
+    if(s!==prevS&&s<=5&&s>0) sfx.tick();
+    if(S.fin.left<=0) stopFinal();
+  }
+  saveAcc+=dt; if(saveAcc>2000){saveAcc=0;save()}
+},100);
+addEventListener('pagehide',save);
+new ResizeObserver(()=>{if($('#play').classList.contains('on'))fit($('#pz'),$('#pzBox'));if($('#final').classList.contains('on'))fit($('#fz'),$('#fBox'))}).observe(document.body);
+['#pzBox','#fBox'].forEach(s=>new ResizeObserver(()=>{const el=$(s).firstElementChild;fit(el,$(s))}).observe($(s)));
+
+/* ---------- boot ---------- */
+(function boot(){
+  const sv=store.get('save',null);
+  if(sv&&sv.teams&&sv.plan&&sv.phase!=='end'){S=sv}
+  goHome();
+})();
+</script>
+</body>
+</html>
