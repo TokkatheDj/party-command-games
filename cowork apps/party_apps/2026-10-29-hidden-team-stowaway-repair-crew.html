@@ -1,0 +1,591 @@
+<!-- CONCEPT: Stowaway - a pass-the-phone hidden-team party game: the crew of a creaky starship must repair 5 systems while secret Stowaways among them sabotage the jobs; a rotating Captain picks a repair crew, the room votes it up or down out loud, then each chosen engineer secretly plays FIX or JAM on the passed phone and the shuffled cards are flipped one by one - three fixes save the ship, three jams (or five rejected crews in a row) sink it, and an optional Navigator who knows the Stowaways must hide from a final Airlock guess. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Stowaway</title>
+<style>
+:root{
+  --bg:#090c18; --bg2:#121830; --panel:#172040; --panel2:#1f2a52; --line:#2c3a6e;
+  --text:#e8ecff; --muted:#8e9ac8; --crew:#38e0c8; --crew2:#3d8bff; --stow:#ff6a4d; --stow2:#ffb347;
+  --gold:#ffd45c; --ok:#4fe38a; --bad:#ff5470; --r:16px; --gap:12px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  background:radial-gradient(ellipse at 50% -10%,#1d2a60 0%,var(--bg) 60%) fixed;color:var(--text);
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;min-height:100%;overflow-x:clip}
+body{min-height:100vh}
+#stars{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.55}
+#app{position:relative;z-index:1;max-width:540px;margin:0 auto;padding:10px 14px 28px}
+header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+html{background:var(--bg)}
+h1{flex:1;min-width:0;white-space:nowrap;margin:0;font-size:clamp(20px,6vw,34px);letter-spacing:.06em;font-weight:900;
+  background:linear-gradient(90deg,var(--crew),var(--crew2),var(--stow2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.ib{min-width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--text);font-size:20px;cursor:pointer}
+.card{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:var(--gap)}
+h2{margin:0 0 8px;font-size:clamp(18px,5vw,23px)}
+h3{margin:4px 0 8px;font-size:clamp(15px,4vw,18px);color:var(--muted);font-weight:600}
+p{margin:6px 0;line-height:1.45;font-size:clamp(14px,3.8vw,16px)}
+.muted{color:var(--muted)} .small{font-size:13px}
+.btn{display:block;width:100%;min-height:52px;border:0;border-radius:14px;font-size:clamp(16px,4.4vw,19px);font-weight:800;cursor:pointer;
+  color:#06121a;background:linear-gradient(90deg,var(--crew),var(--crew2));margin-top:10px;padding:10px 14px}
+.btn.alt{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+.btn.warn{background:linear-gradient(90deg,var(--stow),var(--stow2))}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1}
+input[type=text]{width:100%;min-height:48px;border-radius:12px;border:1px solid var(--line);background:#0c1230;color:var(--text);font-size:17px;padding:0 12px;user-select:text;-webkit-user-select:text}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:48px;padding:8px 14px;border-radius:999px;border:2px solid var(--line);background:var(--panel2);color:var(--text);font-size:16px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.chip.on{border-color:var(--crew);background:#11433f;box-shadow:0 0 12px #38e0c855}
+.chip.cap::before{content:"👑"}
+.chip.yes{border-color:var(--ok);background:#123d26}
+.chip.no{border-color:var(--bad);background:#43131f}
+.chip .x{color:var(--muted);font-weight:400}
+.opt{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.opt:first-of-type{border-top:0}
+.opt .t{flex:1} .opt b{display:block;font-size:15px} .opt span{font-size:13px;color:var(--muted)}
+.seg{display:flex;border:1px solid var(--line);border-radius:12px;overflow:hidden;flex:0 0 auto}
+.seg button{min-width:48px;min-height:44px;border:0;background:var(--panel2);color:var(--text);font-weight:700;cursor:pointer;font-size:14px}
+.seg button.on{background:var(--crew);color:#06121a}
+.track{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:6px 0 4px}
+.sys{border-radius:12px;border:2px solid var(--line);background:#0c1230;text-align:center;padding:6px 2px;min-height:74px}
+.sys .e{font-size:24px}.sys .n{font-size:11px;color:var(--muted)}.sys .s{font-size:12px;font-weight:800}
+.sys.cur{border-color:var(--gold);box-shadow:0 0 14px #ffd45c55}
+.sys.fix{border-color:var(--ok);background:#0f3322}
+.sys.jam{border-color:var(--bad);background:#3a1020}
+.alarm{display:flex;gap:6px;align-items:center;justify-content:center;font-size:13px;color:var(--muted);margin-top:6px}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line)}
+.dot.hit{background:var(--bad);border-color:var(--bad);box-shadow:0 0 8px var(--bad)}
+.big{font-size:clamp(30px,10vw,46px);font-weight:900;text-align:center;margin:8px 0}
+.center{text-align:center}
+.hold{width:100%;min-height:150px;border-radius:20px;border:2px dashed var(--line);background:#0c1230;color:var(--muted);font-size:18px;font-weight:700;cursor:pointer;touch-action:none;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:16px;text-align:center}
+.hold.open{border-style:solid;color:var(--text)}
+.hold.open.crewc{border-color:var(--crew);background:#0d2e3a}
+.hold.open.stowc{border-color:var(--stow);background:#3a1612}
+.hold.open.navc{border-color:var(--gold);background:#3a3010}
+.role{font-size:clamp(26px,8vw,36px);font-weight:900;margin:4px 0}
+.play{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.play button{min-height:130px;border-radius:18px;border:0;font-size:clamp(22px,7vw,30px);font-weight:900;cursor:pointer;color:#06121a}
+.pfix{background:linear-gradient(160deg,var(--ok),var(--crew))}
+.pjam{background:linear-gradient(160deg,var(--stow),var(--bad))}
+.flips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:12px 0}
+.fl{width:72px;height:96px;border-radius:12px;border:2px solid var(--line);background:repeating-linear-gradient(45deg,#1a2350,#1a2350 8px,#141b40 8px,#141b40 16px);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;transition:transform .35s}
+.fl.f{background:#103a28;border-color:var(--ok)} .fl.j{background:#43131f;border-color:var(--bad)}
+.fl.pop{animation:pop .4s}
+@keyframes pop{0%{transform:scale(.6) rotateY(90deg)}100%{transform:scale(1) rotateY(0)}}
+.banner{padding:16px;border-radius:var(--r);text-align:center;font-weight:900;font-size:clamp(22px,7vw,30px)}
+.banner.crewb{background:linear-gradient(90deg,#0f4a44,#123a7a)}
+.banner.stowb{background:linear-gradient(90deg,#5a1c12,#6a3a0a)}
+.list{list-style:none;padding:0;margin:0}
+.list li{display:flex;justify-content:space-between;gap:8px;padding:8px 2px;border-top:1px solid var(--line);font-size:15px}
+.list li:first-child{border-top:0}
+.tag{font-weight:800;font-size:13px;padding:2px 8px;border-radius:8px}
+.tag.crew{background:#11433f;color:var(--crew)} .tag.stow{background:#43131f;color:var(--stow)} .tag.nav{background:#3a3010;color:var(--gold)}
+.ov{position:fixed;inset:0;z-index:20;background:#05071099;backdrop-filter:blur(4px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:16px}
+.ov .card{width:100%;max-width:520px;margin-top:20px}
+.timer{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums;text-align:center;color:var(--gold)}
+.logrow{border-top:1px solid var(--line);padding:8px 0;font-size:14px;line-height:1.4}
+.logrow:first-child{border-top:0}
+.ok{color:var(--ok)} .bad{color:var(--bad)} .gold{color:var(--gold)}
+.howto li{margin:4px 0;font-size:14px;line-height:1.4}
+.howto{padding-left:20px;margin:6px 0}
+</style>
+</head>
+<body>
+<canvas id="stars"></canvas>
+<div id="app"></div>
+<div id="ovl"></div>
+<script>
+const KEY = 'cowork-stowaway-state', TKEY = 'cowork-stowaway-tally', MKEY = 'cowork-stowaway-mute';
+const SIZES = {4:[2,2,2,3,3],5:[2,3,2,3,3],6:[2,3,4,3,4],7:[2,3,3,4,4],8:[3,4,4,5,5],9:[3,4,4,5,5],10:[3,4,4,5,5]};
+const STOW = {4:1,5:2,6:2,7:3,8:3,9:3,10:4};
+const SYS = [['🚀','Engines'],['🫧','Oxygen'],['🛡️','Shields'],['📡','Comms'],['🌌','Hyperdrive']];
+const FLAVOR_FIX = ['The engines roar back to life!','Fresh air hisses through the vents.','The shield bubble shimmers on.','Static clears - Mission Control says hi.','Stars stretch into lines. Hyperdrive online!'];
+const FLAVOR_JAM = ['Something chewed the fuel line...','A sock is stuffed in the air filter.','Someone unplugged the shield to charge a toaster.','The antenna is tied in a bow.','The hyperdrive is full of jelly beans.'];
+const app = document.getElementById('app'), ovl = document.getElementById('ovl');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+// storage can be blocked (private mode, blocked site data): every read and write goes through these
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+let muted = lsGet(MKEY) === '1';
+let tally = {}; try { tally = JSON.parse(lsGet(TKEY)) || {}; } catch (e) {}
+let S = load() || fresh([]);
+let over = null;      // overlay: {type:'log'} | {type:'peek', who, sub}
+let draft = '';       // setup name input
+let tInt = null, flipT = null;
+let note = '';        // a one-line message under the header (replaces alert/confirm)
+let armed = '', armedUntil = 0;   // action waiting for its confirming second tap
+const confirmTap = (act, msg) => { if (armed === act && Date.now() < armedUntil) { armed = ''; return true; } armed = act; armedUntil = Date.now() + 4000; note = msg; render(); return false; };
+
+function fresh(players, opts) {
+  return { phase: 'setup', players, opts: opts || { nav: true, scan: false, timer: 90 } };
+}
+function load() {
+  try {
+    const s = JSON.parse(lsGet(KEY));
+    if (!s || !s.phase) return null;
+    if (s.sub === 'peek' || s.sub === 'play' || s.sub === 'show') s.sub = 'gate';   // never resume onto a secret
+    return s;
+  } catch (e) { return null; }
+}
+function save() { lsSet(KEY, JSON.stringify(S)); }
+addEventListener('pagehide', save);
+
+/* ---------- audio ---------- */
+let AC = null;
+function tone(f, d = 0.12, type = 'sine', v = 0.18, when = 0) {
+  if (muted) return;
+  try {
+    AC = AC || new (window.AudioContext || window.webkitAudioContext)();
+    const t = AC.currentTime + when, o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.001, t + d);
+    o.connect(g).connect(AC.destination); o.start(t); o.stop(t + d + 0.02);
+  } catch (e) {}
+}
+const sfx = {
+  tap: () => tone(660, .06, 'triangle', .12),
+  fix: () => { tone(523, .12, 'triangle'); tone(784, .18, 'triangle', .18, .1); },
+  jam: () => { tone(140, .25, 'sawtooth', .16); tone(110, .3, 'sawtooth', .14, .12); },
+  win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, .22, 'triangle', .18, i * .12)),
+  lose: () => [392, 330, 262, 196].forEach((f, i) => tone(f, .28, 'sawtooth', .12, i * .15)),
+  alarm: () => { tone(880, .15, 'square', .1); tone(660, .15, 'square', .1, .18); },
+  tick: () => tone(1200, .04, 'square', .06)
+};
+
+/* ---------- helpers ---------- */
+const N = () => S.players.length;
+const nm = i => esc(S.players[i]);
+const need = () => SIZES[N()][S.round];
+const jamsNeeded = r => (N() >= 7 && r === 3) ? 2 : 1;
+const fixes = () => S.results.filter(r => r === 'fix').length;
+const jamsTotal = () => S.results.filter(r => r === 'jam').length;
+const stowIdx = () => S.roles.map((r, i) => r === 'stow' ? i : -1).filter(i => i >= 0);
+const navOn = () => S.opts.nav && N() >= 5;
+const inGame = () => !['setup', 'end'].includes(S.phase);
+
+function startGame() {
+  const n = N();
+  const order = shuffle([...Array(n).keys()]);
+  S.roles = Array(n).fill('crew');
+  order.slice(0, STOW[n]).forEach(i => S.roles[i] = 'stow');
+  if (S.opts.nav && n >= 5) S.roles[order[STOW[n]]] = 'nav';
+  Object.assign(S, {
+    phase: 'reveal', ri: 0, sub: 'gate', round: 0, rejects: 0, results: [null, null, null, null, null],
+    captain: Math.floor(Math.random() * n), team: [], votes: [], log: [], plays: [], pi: 0,
+    winner: null, reason: '', tallied: false, tEnd: 0, scanned: [], scanHolder: -1, scanTarget: -1, flash: ''
+  });
+  if (S.opts.scan && n >= 5) { S.scanHolder = (S.captain - 1 + n) % n; S.scanned = [S.scanHolder]; }
+  over = null; render();
+}
+
+function endGame(winner, reason) {
+  S.phase = 'end'; S.winner = winner; S.reason = reason;
+  if (!S.tallied) {
+    S.players.forEach((p, i) => {
+      const side = S.roles[i] === 'stow' ? 'stow' : 'crew';
+      tally[p] = tally[p] || { w: 0, g: 0 };
+      tally[p].g++; if (side === winner) tally[p].w++;
+      tally[p].t = Date.now();
+    });
+    // names from long-gone game nights drop off once more than 40 are stored
+    Object.keys(tally).sort((a, b) => (tally[b].t || 0) - (tally[a].t || 0)).slice(40).forEach(p => delete tally[p]);
+    lsSet(TKEY, JSON.stringify(tally));
+    S.tallied = true;
+  }
+  winner === 'crew' ? sfx.win() : sfx.lose();
+  render();
+}
+
+function nextCaptain() { S.captain = (S.captain + 1) % N(); S.team = []; S.votes = []; S.tEnd = 0; S.flash = ''; }
+
+/* ---------- shared view pieces ---------- */
+function trackHTML() {
+  const cells = SYS.map((s, i) => {
+    const r = S.results[i], cur = i === S.round && !r && S.phase !== 'end';
+    const two = N() >= 7 && i === 3;
+    return `<div class="sys ${r || ''} ${cur ? 'cur' : ''}"><div class="e">${r === 'jam' ? '💥' : s[0]}</div>
+      <div class="n">${s[1]}</div><div class="s">${r === 'fix' ? '<span class="ok">FIXED</span>' : r === 'jam' ? '<span class="bad">JAMMED</span>' : SIZES[N()][i] + ' crew'}</div>
+      ${two ? '<div class="n gold">2 jams</div>' : ''}</div>`;
+  }).join('');
+  const dots = [0, 1, 2, 3, 4].map(i => `<span class="dot ${i < S.rejects ? 'hit' : ''}"></span>`).join('');
+  return `<div class="track">${cells}</div><div class="alarm">Alarm: ${dots} <span>5 rejected crews = ship lost</span></div>`;
+}
+function gateHTML(i, line, act) {
+  return `<div class="card center"><h3>${line}</h3>
+    <div class="big">📱 ${nm(i)}</div>
+    <p class="muted">Everyone else: look away.</p>
+    <button class="btn" data-act="${act}">I'm ${nm(i)} - open</button></div>`;
+}
+
+/* ---------- screens ---------- */
+function vSetup() {
+  const n = N(), okN = n >= 4 && n <= 10;
+  const chips = S.players.map((p, i) => `<button class="chip" data-act="rm" data-i="${i}">${esc(p)} <span class="x">✕</span></button>`).join('');
+  const seg = (k, vals, labels) => `<div class="seg">${vals.map((v, j) => `<button class="${S.opts[k] === v ? 'on' : ''}" data-act="opt" data-k="${k}" data-v="${v}">${labels[j]}</button>`).join('')}</div>`;
+  const lb = Object.entries(tally).filter(([p]) => S.players.includes(p)).sort((a, b) => b[1].w - a[1].w);
+  return `
+  <div class="card"><h2>🛸 Fix the ship. Find the stowaways.</h2>
+    <p class="muted">Your starship is falling apart and somebody on board wants it to stay that way. 4-10 players, one phone, ~20-30 min.</p></div>
+  <div class="card"><h2>Crew manifest <span class="muted small">(${n}/10)</span></h2>
+    <div class="row"><input type="text" id="nameIn" maxlength="14" placeholder="Add a player name" value="${esc(draft)}"><button class="btn" style="flex:0 0 90px;margin:0" data-act="add">Add</button></div>
+    <div class="chips" style="margin-top:10px">${chips || '<span class="muted small">No players yet.</span>'}</div>
+    ${n >= 4 ? `<p class="small muted">${STOW[Math.min(n, 10)] || '?'} Stowaway${STOW[Math.min(n, 10)] > 1 ? 's' : ''} will be hiding among ${n} players.</p>` : ''}
+  </div>
+  <div class="card"><h2>Options</h2>
+    <div class="opt"><div class="t"><b>🧭 Navigator</b><span>One crew member secretly knows the Stowaways. If the crew wins, Stowaways get one Airlock guess to steal it. (5+ players)</span></div>${seg('nav', [true, false], ['On', 'Off'])}</div>
+    <div class="opt"><div class="t"><b>🔦 Scanner</b><span>After jobs 2, 3 and 4, the Scanner holder secretly checks one player's side, then hands the Scanner over. (5+ players; best with 7+.)</span></div>${seg('scan', [true, false], ['On', 'Off'])}</div>
+    <div class="opt"><div class="t"><b>⏱️ Debate timer</b><span>Countdown while the Captain picks a crew.</span></div>${seg('timer', [0, 60, 90, 120], ['Off', '60', '90', '120'])}</div>
+  </div>
+  <button class="btn" data-act="start" ${okN ? '' : 'disabled'}>${okN ? 'Launch!' : n < 4 ? 'Add at least 4 players' : 'Max 10 players'}</button>
+  <button class="btn alt" data-act="how">How to play</button>
+  ${lb.length ? `<div class="card" style="margin-top:12px"><h2>🏆 Wins this crew</h2><ul class="list">${lb.map(([p, t]) => `<li><span>${esc(p)}</span><span>${t.w} / ${t.g}</span></li>`).join('')}</ul>
+    <button class="btn alt" data-act="clearWins">Clear the win record</button></div>` : ''}`;
+}
+
+function roleHTML(i) {
+  const r = S.roles[i], st = stowIdx(), others = st.filter(j => j !== i).map(nm);
+  if (r === 'stow') return `<div class="role" style="color:var(--stow)">🦹 STOWAWAY</div>
+    <p>Jam repairs without getting caught. Three jams and the ship is yours.</p>
+    <p><b>${others.length ? 'Fellow stowaways: ' + others.join(', ') : 'You are the only stowaway. Good luck.'}</b></p>
+    ${navOn() ? '<p class="small">If the crew fixes 3 systems, you get ONE guess at who the Navigator is.</p>' : ''}`;
+  if (r === 'nav') return `<div class="role" style="color:var(--gold)">🧭 NAVIGATOR</div>
+    <p>You are crew - and your scanners see the stowaways:</p><p><b>${st.map(nm).join(', ')}</b></p>
+    <p class="small">Steer the crew quietly. If the stowaways work out it was you, they steal the win.</p>`;
+  return `<div class="role" style="color:var(--crew)">🧑‍🚀 CREW</div>
+    <p>Fix the ship. Work out who keeps jamming the repairs and keep them off the crews.</p>`;
+}
+function holdHTML(inner, cls) {
+  return `<div class="hold" id="hold" data-cls="${cls}"><div id="holdIn">✋ Press and HOLD to see your secret<br><span class="small">let go to hide it</span></div><template id="holdT">${inner}</template></div>`;
+}
+
+function vReveal() {
+  const i = S.ri;
+  if (S.sub === 'gate') return `<div class="card"><h3>Secret roles - ${i + 1} of ${N()}</h3></div>` + gateHTML(i, 'Pass the phone to', 'open');
+  const r = S.roles[i];
+  return `<div class="card center"><h2>${nm(i)}, your role</h2>
+    ${holdHTML(roleHTML(i), r === 'stow' ? 'stowc' : r === 'nav' ? 'navc' : 'crewc')}
+    <button class="btn alt" data-act="revealDone">Got it - hide &amp; pass on</button></div>`;
+}
+
+function vPropose() {
+  const k = S.team.length, nd = need();
+  const chips = S.players.map((p, i) => `<button class="chip ${S.team.includes(i) ? 'on' : ''} ${i === S.captain ? 'cap' : ''}" data-act="pick" data-i="${i}">${esc(p)}</button>`).join('');
+  const t = S.opts.timer ? `<div class="row" style="margin-top:10px"><div class="timer" id="timer" style="flex:0 0 70px">${fmt(Math.max(0, S.tEnd ? Math.ceil((S.tEnd - Date.now()) / 1000) : S.opts.timer))}</div>
+    <button class="btn alt" data-act="timer" style="min-height:44px;margin:0">${S.tEnd ? '⏱️ Restart timer' : '⏱️ Start debate timer'}</button></div>` : '';
+  return `<div class="card">${trackHTML()}</div>
+  ${S.flash ? `<div class="card center bad" style="border-color:var(--bad)"><b>🚨 ${esc(S.flash)}</b></div>` : ''}
+  <div class="card"><h3>Job ${S.round + 1}: ${SYS[S.round][0]} ${SYS[S.round][1]} ${jamsNeeded(S.round) > 1 ? '<span class="gold">(needs 2 jams to fail)</span>' : ''}</h3>
+    <h2>👑 Captain ${nm(S.captain)}, pick ${nd} for the repair crew</h2>
+    <p class="small muted">Argue it out loud. The Captain can pick themself. Tap names to choose.</p>
+    <div class="chips">${chips}</div>
+    <button class="btn" data-act="propose" ${k === nd ? '' : 'disabled'}>Put it to a vote (${k}/${nd})</button>
+    ${t}</div>`;
+}
+// vote countdown: null = idle, 3..1 = counting, 0 = THUMBS!
+let countN = null;
+const countLabel = () => countN === null ? '3 \u00b7 2 \u00b7 1 \u00b7 THUMBS!' : countN === 0 ? '👍 THUMBS! 👎' : countN + '...';
+const fmt = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+
+function vVote() {
+  const set = S.votes.filter(v => v).length;
+  const chips = S.players.map((p, i) => {
+    const v = S.votes[i];
+    return `<button class="chip ${v === 1 ? 'yes' : v === -1 ? 'no' : ''}" data-act="vote" data-i="${i}">${v === 1 ? '👍' : v === -1 ? '👎' : '❔'} ${esc(p)}</button>`;
+  }).join('');
+  return `<div class="card">${trackHTML()}</div>
+  <div class="card"><h3>Proposed crew for ${SYS[S.round][1]}</h3>
+    <div class="big" style="font-size:clamp(20px,6vw,28px)">${S.team.map(nm).join(' &middot; ')}</div>
+    <p>Everybody at once: <b>thumbs up</b> to approve, <b>thumbs down</b> to reject.</p>
+    <button class="btn warn" data-act="count" id="countBtn">${countLabel()}</button>
+    <p class="small muted" style="margin-top:12px">Then log each vote (tap to switch). Votes are public - remember them!</p>
+    <div class="chips">${chips}</div>
+    <div class="row"><button class="btn alt" data-act="allv" data-v="1">All 👍</button><button class="btn alt" data-act="allv" data-v="-1">All 👎</button></div>
+    <button class="btn" data-act="tally" ${set === N() ? '' : 'disabled'}>Count the votes (${set}/${N()})</button>
+    <button class="btn alt" data-act="backPropose">&larr; Change the crew</button></div>`;
+}
+
+function vRepair() {
+  const who = S.team[S.pi];
+  if (S.sub === 'gate') return `<div class="card"><h3>Repair crew - ${S.pi + 1} of ${S.team.length} &middot; ${SYS[S.round][0]} ${SYS[S.round][1]}</h3></div>` + gateHTML(who, 'Pass the phone to', 'open');
+  if (S.sub === 'done') return `<div class="card center"><div class="big">🔒</div><h2>Card locked in.</h2>
+    <p class="muted">Nobody can see what you played.</p>
+    <button class="btn" data-act="playNext">${S.pi + 1 < S.team.length ? 'Hide &amp; pass on' : 'Done - put the phone in the middle'}</button></div>`;
+  const stow = S.roles[who] === 'stow';
+  const a = `<button class="pfix" data-act="play" data-v="fix">🔧<br>FIX</button>`;
+  const b = stow ? `<button class="pjam" data-act="play" data-v="jam">💥<br>JAM</button>` : `<button class="pfix" data-act="play" data-v="fix">🔧<br>FIX</button>`;
+  return `<div class="card center"><h2>${nm(who)}: secret repair card</h2>
+    <p class="muted small">${stow ? 'You may FIX (to look innocent) or JAM.' + (jamsNeeded(S.round) > 1 ? ' This job needs 2 jams to fail.' : '') : 'Crew can only fix. Tap either button - both are FIX.'}</p>
+    <div class="play">${S.flip ? b + a : a + b}</div></div>`;
+}
+
+function vResult() {
+  const shown = S.shown, cards = S.reveal.map((c, i) => i < shown ? `<div class="fl ${c === 'fix' ? 'f' : 'j'} pop">${c === 'fix' ? '🔧' : '💥'}</div>` : `<div class="fl">?</div>`).join('');
+  const done = shown >= S.reveal.length, r = S.results[S.round], jams = S.reveal.filter(c => c === 'jam').length;
+  return `<div class="card center"><h3>Job ${S.round + 1}: ${SYS[S.round][0]} ${SYS[S.round][1]}</h3>
+    <p class="muted small">Crew: ${S.team.map(nm).join(', ')}</p>
+    <div class="flips">${cards}</div>
+    ${done ? `<div class="banner ${r === 'fix' ? 'crewb' : 'stowb'}">${r === 'fix' ? 'SYSTEM FIXED' : 'SYSTEM JAMMED'}</div>
+      <p>${r === 'fix' ? FLAVOR_FIX[S.round] : FLAVOR_JAM[S.round]}</p>
+      <p><b>${jams} jam${jams === 1 ? '' : 's'}</b> on this crew.${r === 'fix' && jams ? ' <span class="gold">(Not enough to break it!)</span>' : ''}</p>
+      <button class="btn" data-act="cont">Continue</button>` : '<p class="muted">Flipping cards...</p>'}</div>`;
+}
+
+function vScan() {
+  const h = S.scanHolder;
+  if (S.sub === 'gate') return `<div class="card"><h3>🔦 Scanner check</h3><p class="small muted">${nm(h)} holds the Scanner. Everyone will see WHO they scan - only ${nm(h)} sees the result.</p></div>` + gateHTML(h, 'Pass the phone to', 'open');
+  if (S.sub === 'pick') {
+    const chips = S.players.map((p, i) => (i === h || S.scanned.includes(i)) ? '' : `<button class="chip" data-act="scanPick" data-i="${i}">${esc(p)}</button>`).join('');
+    return `<div class="card"><h2>${nm(h)}, who do you scan?</h2><p class="small muted">Players who already held the Scanner can't be scanned.</p><div class="chips">${chips}</div></div>`;
+  }
+  const t = S.scanTarget, isStow = S.roles[t] === 'stow';
+  return `<div class="card center"><h2>Scan result: ${nm(t)}</h2>
+    ${holdHTML(`<div class="role" style="color:${isStow ? 'var(--stow)' : 'var(--crew)'}">${isStow ? '🦹 STOWAWAY' : '🧑‍🚀 CREW'}</div><p>${nm(t)} is ${isStow ? 'a Stowaway' : 'on the crew'}.</p><p class="small">You may tell the room - or lie.</p>`, isStow ? 'stowc' : 'crewc')}
+    <button class="btn alt" data-act="scanDone">Got it - hand the Scanner to ${nm(t)}</button></div>`;
+}
+
+function vAirlock() {
+  const st = stowIdx();
+  const chips = S.players.map((p, i) => S.roles[i] === 'stow' ? '' : `<button class="chip ${S.airPick === i ? 'no' : ''}" data-act="airPick" data-i="${i}">${esc(p)}</button>`).join('');
+  return `<div class="card">${trackHTML()}</div>
+  <div class="card center"><div class="banner crewb">3 SYSTEMS FIXED!</div>
+    <h2 style="margin-top:12px">...but wait. The airlock hisses open.</h2>
+    <p>Stowaways, stand up: <b class="bad">${st.map(nm).join(', ')}</b></p>
+    <p>Talk it over together. If you can name the <b class="gold">🧭 Navigator</b>, you throw them out the airlock and steal the win.</p>
+    <div class="chips" style="justify-content:center">${chips}</div>
+    <button class="btn warn" data-act="airGo" ${S.airPick >= 0 ? '' : 'disabled'}>Airlock ${S.airPick >= 0 ? nm(S.airPick) : '...'}</button></div>`;
+}
+
+function vEnd() {
+  const w = S.winner, rows = S.players.map((p, i) => {
+    const r = S.roles[i];
+    return `<li><span>${esc(p)}</span><span class="tag ${r}">${r === 'stow' ? '🦹 Stowaway' : r === 'nav' ? '🧭 Navigator' : '🧑‍🚀 Crew'}</span></li>`;
+  }).join('');
+  const lb = S.players.map(p => [p, tally[p] || { w: 0, g: 0 }]).sort((a, b) => b[1].w - a[1].w);
+  return `<div class="card">${trackHTML()}</div>
+  <div class="banner ${w === 'crew' ? 'crewb' : 'stowb'}">${w === 'crew' ? '🧑‍🚀 THE CREW WINS' : '🦹 THE STOWAWAYS WIN'}</div>
+  <div class="card" style="margin-top:12px"><p class="center">${esc(S.reason)}</p></div>
+  <div class="card"><h2>Who was who</h2><ul class="list">${rows}</ul></div>
+  <div class="card"><h2>🏆 Wins</h2><ul class="list">${lb.map(([p, t]) => `<li><span>${esc(p)}</span><span>${t.w} / ${t.g}</span></li>`).join('')}</ul></div>
+  <button class="btn" data-act="start">Rematch - new roles</button>
+  <button class="btn alt" data-act="log">📜 Ship's log</button>
+  <button class="btn alt" data-act="toSetup">Change players / options</button>`;
+}
+
+/* ---------- overlays ---------- */
+function vLog() {
+  const rows = S.log.length ? S.log.map(e => {
+    if (e.scan) return `<div class="logrow">🔦 ${nm(e.by)} scanned <b>${nm(e.who)}</b></div>`;
+    const yes = e.votes.map((v, i) => v === 1 ? nm(i) : null).filter(Boolean), no = e.votes.map((v, i) => v === -1 ? nm(i) : null).filter(Boolean);
+    return `<div class="logrow"><b>Job ${e.round + 1} ${SYS[e.round][0]}</b> &middot; 👑 ${nm(e.cap)} picked <b>${e.team.map(nm).join(', ')}</b><br>
+      <span class="ok">👍 ${yes.join(', ') || '-'}</span> &nbsp; <span class="bad">👎 ${no.join(', ') || '-'}</span><br>
+      ${!e.ok ? '<span class="muted">Rejected</span>' : e.jams == null ? '<span class="muted">Repair in progress</span>' : e.res === 'fix' ? `<span class="ok">FIXED</span> (${e.jams} jam${e.jams === 1 ? '' : 's'})` : `<span class="bad">JAMMED</span> (${e.jams} jam${e.jams === 1 ? '' : 's'})`}</div>`;
+  }).join('') : '<p class="muted">Nothing logged yet.</p>';
+  return `<div class="ov"><div class="card"><h2>📜 Ship's log</h2>${rows}<button class="btn" data-act="close">Close</button></div></div>`;
+}
+function vPeek() {
+  if (over.sub === 'pick') return `<div class="ov"><div class="card"><h2>🔍 Forgot your role?</h2><p class="small muted">Pick your name, then the phone will ask you to confirm before showing anything.</p>
+    <div class="chips">${S.players.map((p, i) => `<button class="chip" data-act="peekWho" data-i="${i}">${esc(p)}</button>`).join('')}</div>
+    <button class="btn alt" data-act="close">Cancel</button></div></div>`;
+  const i = over.who, r = S.roles[i];
+  if (over.sub === 'gate') return `<div class="ov"><div style="width:100%;max-width:520px;margin-top:20px">${gateHTML(i, 'Hand the phone to', 'peekOpen')}<button class="btn alt" data-act="close">Cancel</button></div></div>`;
+  return `<div class="ov"><div class="card center"><h2>${nm(i)}, your role</h2>${holdHTML(roleHTML(i), r === 'stow' ? 'stowc' : r === 'nav' ? 'navc' : 'crewc')}<button class="btn alt" data-act="close">Hide &amp; close</button></div></div>`;
+}
+function vHow() {
+  return `<div class="ov"><div class="card"><h2>How to play</h2><ol class="howto">
+    <li><b>Secret roles.</b> Pass the phone round. Most of you are <b class="ok">Crew</b>; a few are <b class="bad">Stowaways</b> who know each other.</li>
+    <li><b>Pick a crew.</b> The 👑 Captain chooses who goes on this repair job. Everyone argues about it out loud.</li>
+    <li><b>Vote.</b> On "THUMBS!" everyone shows thumbs up or down at once. Majority 👍 sends the crew; otherwise the next Captain tries. <b>5 rejections in a row and the Stowaways win.</b></li>
+    <li><b>Repair.</b> Each crew member secretly taps FIX or JAM on the passed phone. Crew can only fix. Stowaways may jam - or fix to look innocent.</li>
+    <li><b>Flip.</b> Cards are shuffled and flipped. One jam breaks the system (job 4 needs 2 jams with 7+ players).</li>
+    <li><b>Win.</b> 3 fixed systems: Crew wins. 3 jammed: Stowaways win.</li>
+    <li><b>🧭 Navigator</b> (option): a Crew member who knows the Stowaways. If the Crew wins, the Stowaways get one guess at who the Navigator is - guess right and they steal it.</li>
+    <li><b>🔦 Scanner</b> (option): after jobs 2-4 the holder secretly sees one player's side, then passes the Scanner to them.</li>
+    <li>Check the 📜 log to see who voted for which crews. Votes are your best clue!</li></ol>
+    <button class="btn" data-act="close">Got it</button></div></div>`;
+}
+
+/* ---------- render ---------- */
+function render() {
+  clearInterval(tInt);
+  const views = { setup: vSetup, reveal: vReveal, propose: vPropose, vote: vVote, repair: vRepair, result: vResult, scan: vScan, airlock: vAirlock, end: vEnd };
+  app.innerHTML = `<header><h1>STOWAWAY</h1>
+    ${inGame() ? '<button class="ib" data-act="log" aria-label="Log">📜</button>' + (S.phase === 'airlock' ? '' : '<button class="ib" data-act="peek" aria-label="Check my role">🔍</button>') : ''}
+    <button class="ib" data-act="mute" aria-label="Sound">${muted ? '🔇' : '🔊'}</button>
+    ${inGame() ? '<button class="ib" data-act="quit" aria-label="Quit">✕</button>' : ''}</header>`
+    + (note ? `<div class="card center" role="status"><b>${esc(note)}</b></div>` : '') + views[S.phase]();
+  ovl.innerHTML = !over ? '' : over.type === 'log' ? vLog() : over.type === 'how' ? vHow() : vPeek();
+  bindHold();
+  if (S.phase === 'propose' && S.tEnd) tInt = setInterval(tickTimer, 250);
+  const inp = document.getElementById('nameIn');
+  if (inp) {
+    inp.addEventListener('input', () => draft = inp.value);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); addName(); } });
+  }
+  save();
+}
+function tickTimer() {
+  const el = document.getElementById('timer'); if (!el) return;
+  const s = Math.max(0, Math.ceil((S.tEnd - Date.now()) / 1000));
+  if (el.textContent !== fmt(s)) { el.textContent = fmt(s); if (s <= 5 && s > 0) sfx.tick(); if (s === 0) { sfx.alarm(); clearInterval(tInt); } }
+}
+function bindHold() {
+  document.querySelectorAll('#hold').forEach(h => {
+    const inner = h.querySelector('#holdIn'), tpl = h.querySelector('#holdT'), cls = h.dataset.cls, closed = inner.innerHTML;
+    const show = e => { e.preventDefault(); inner.innerHTML = tpl.innerHTML; h.classList.add('open', cls); };
+    const hide = () => { inner.innerHTML = closed; h.classList.remove('open', cls); };
+    h.addEventListener('pointerdown', show);
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(t => h.addEventListener(t, hide));
+    h.addEventListener('contextmenu', e => e.preventDefault());
+  });
+}
+
+function addName() {
+  const v = draft.trim().slice(0, 14);
+  if (!v || N() >= 10) return;
+  if (S.players.some(p => p.toLowerCase() === v.toLowerCase())) { note = 'That name is already on the manifest.'; render(); return; }
+  S.players.push(v); draft = ''; note = ''; sfx.tap(); render();
+  const inp = document.getElementById('nameIn'); if (inp) inp.focus();
+}
+
+/* ---------- actions ---------- */
+const ACT = {
+  add: addName,
+  rm: d => { S.players.splice(+d.i, 1); render(); },
+  opt: d => { S.opts[d.k] = d.k === 'timer' ? +d.v : d.v === 'true'; render(); },
+  start: () => { if (N() >= 4 && N() <= 10) startGame(); },
+  how: () => { over = { type: 'how' }; render(); },
+  toSetup: () => { S = fresh(S.players, S.opts); render(); },
+  quit: () => { if (confirmTap('quit', 'Tap ✕ again to abandon this voyage. Roles will be lost.')) { S = fresh(S.players, S.opts); over = null; note = ''; render(); } },
+  clearWins: () => { if (confirmTap('clearWins', 'Tap "Clear the win record" again to erase every win.')) { tally = {}; lsSet(TKEY, '{}'); note = 'Win record cleared.'; render(); } },
+  mute: () => { muted = !muted; lsSet(MKEY, muted ? '1' : '0'); render(); },
+  log: () => { over = { type: 'log' }; render(); },
+  peek: () => { if (S.phase === 'airlock') return; over = { type: 'peek', sub: 'pick' }; render(); },
+  peekWho: d => { over = { type: 'peek', sub: 'gate', who: +d.i }; render(); },
+  peekOpen: () => { over.sub = 'show'; render(); },
+  close: () => { over = null; render(); },
+  open: () => { S.sub = S.phase === 'scan' ? (S.scanTarget >= 0 ? 'show' : 'pick') : S.phase === 'repair' ? 'play' : 'peek'; if (S.phase === 'repair') S.flip = Math.random() < .5; sfx.tap(); render(); },
+  revealDone: () => {
+    S.ri++; S.sub = 'gate';
+    if (S.ri >= N()) { S.phase = 'propose'; S.team = []; S.tEnd = 0; }
+    render();
+  },
+  pick: d => {
+    const i = +d.i, k = S.team.indexOf(i);
+    if (k >= 0) S.team.splice(k, 1); else if (S.team.length < need()) S.team.push(i); else { S.team.shift(); S.team.push(i); }
+    sfx.tap(); render();
+  },
+  timer: () => { S.tEnd = Date.now() + S.opts.timer * 1000; render(); },
+  propose: () => { if (S.team.length !== need()) return; S.flash = ''; S.team.sort((a, b) => a - b); S.votes = Array(N()).fill(0); S.phase = 'vote'; render(); },
+  backPropose: () => { S.phase = 'propose'; render(); },
+  count: () => {
+    if (countN !== null) return;
+    countN = 3;
+    const show = () => { const b = document.getElementById('countBtn'); if (b) b.textContent = countLabel(); };
+    // countN is always the number on screen, so a re-render mid-count shows the same thing
+    const step = () => {
+      if (S.phase !== 'vote') { countN = null; return; }
+      show();
+      if (countN > 0) { tone(500, .1, 'square', .1); setTimeout(() => { countN--; step(); }, 650); }
+      else { tone(900, .25, 'square', .14); setTimeout(() => { countN = null; show(); }, 1800); }
+    };
+    step();
+  },
+  vote: d => { const i = +d.i; S.votes[i] = S.votes[i] === 1 ? -1 : 1; sfx.tap(); render(); },
+  allv: d => { S.votes = Array(N()).fill(+d.v); render(); },
+  tally: () => {
+    if (S.votes.some(v => !v)) return;
+    const yes = S.votes.filter(v => v === 1).length, ok = yes > N() / 2;
+    S.log.push({ round: S.round, cap: S.captain, team: S.team.slice(), votes: S.votes.slice(), ok });
+    if (ok) { S.rejects = 0; S.phase = 'repair'; S.pi = 0; S.sub = 'gate'; S.plays = []; sfx.fix(); render(); return; }
+    S.rejects++; sfx.alarm();
+    if (S.rejects >= 5) return endGame('stow', 'Five crews rejected in a row - while everyone argued, the ship drifted into an asteroid field.');
+    nextCaptain(); S.phase = 'propose';
+    S.flash = `Crew rejected ${yes}-${N() - yes}. Captaincy passes to ${S.players[S.captain]}. Alarm ${S.rejects}/5.`;
+    render();
+  },
+  play: d => {
+    const who = S.team[S.pi];
+    S.plays.push(S.roles[who] === 'stow' ? d.v : 'fix');   // crew can only fix, whatever they tap
+    S.sub = 'done'; tone(300, .08, 'triangle', .1); render();
+  },
+  playNext: () => {
+    S.pi++; S.sub = 'gate';
+    if (S.pi >= S.team.length) {
+      S.reveal = shuffle(S.plays); S.shown = 0;
+      const jams = S.reveal.filter(c => c === 'jam').length;
+      S.results[S.round] = jams >= jamsNeeded(S.round) ? 'jam' : 'fix';
+      const e = S.log[S.log.length - 1]; e.jams = jams; e.res = S.results[S.round];
+      S.phase = 'result'; S.plays = [];
+      render(); flipNext();
+      return;
+    }
+    render();
+  },
+  cont: () => {
+    if (fixes() >= 3) {
+      if (navOn()) { S.phase = 'airlock'; S.airPick = -1; sfx.alarm(); render(); return; }
+      return endGame('crew', 'Three systems fixed - the ship limps home and the stowaways are marched off at the spaceport.');
+    }
+    if (jamsTotal() >= 3) return endGame('stow', 'Three systems jammed - the stowaways have the ship. Next stop: their secret moon base.');
+    S.round++; nextCaptain();
+    if (S.opts.scan && N() >= 5 && S.round >= 2 && S.round <= 4) { S.phase = 'scan'; S.sub = 'gate'; }
+    else S.phase = 'propose';
+    render();
+  },
+  scanPick: d => { if (S.scanTarget >= 0) return; S.scanTarget = +d.i; S.sub = 'show'; render(); },
+  scanDone: () => {
+    S.log.push({ scan: true, by: S.scanHolder, who: S.scanTarget });
+    S.scanned.push(S.scanTarget); S.scanHolder = S.scanTarget; S.scanTarget = -1;
+    S.phase = 'propose'; S.sub = 'gate'; render();
+  },
+  airPick: d => { S.airPick = +d.i; sfx.tap(); render(); },
+  airGo: () => {
+    if (S.airPick < 0) return;
+    if (S.roles[S.airPick] === 'nav') endGame('stow', `${S.players[S.airPick]} was the Navigator - and is now drifting gently past Neptune. The stowaways steal the ship!`);
+    else endGame('crew', `${S.players[S.airPick]} was just regular crew (sorry!). The real Navigator steers the ship home safely.`);
+  }
+};
+function flipNext() {
+  clearTimeout(flipT);
+  if (S.phase !== 'result' || S.shown >= S.reveal.length) return;
+  flipT = setTimeout(() => {
+    if (S.phase !== 'result') return;
+    S.reveal[S.shown] === 'fix' ? sfx.fix() : sfx.jam();
+    S.shown++; render();
+    if (S.shown < S.reveal.length) flipNext();
+    else setTimeout(() => S.results[S.round] === 'fix' ? sfx.win() : sfx.lose(), 300);
+  }, S.shown === 0 ? 900 : 1100);
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const f = ACT[b.dataset.act]; if (!f) return;
+  if (b.dataset.act !== armed) { armed = ''; note = ''; }   // any other tap cancels a pending confirm and clears the note
+  f(b.dataset);
+});
+
+/* ---------- starfield ---------- */
+(() => {
+  const c = document.getElementById('stars'), x = c.getContext('2d');
+  let st = [];
+  const size = () => { c.width = innerWidth; c.height = innerHeight; st = Array.from({ length: 90 }, () => ({ x: Math.random() * c.width, y: Math.random() * c.height, r: Math.random() * 1.4 + .3, s: Math.random() * .25 + .05 })); };
+  size(); addEventListener('resize', size);
+  const loop = () => {
+    x.clearRect(0, 0, c.width, c.height); x.fillStyle = '#cfd8ff';
+    for (const p of st) { p.y += p.s; if (p.y > c.height) p.y = 0; x.globalAlpha = .4 + p.r / 3; x.beginPath(); x.arc(p.x, p.y, p.r, 0, 7); x.fill(); }
+    requestAnimationFrame(loop);
+  };
+  loop();
+})();
+
+render();
+if (S.phase === 'result') flipNext();
+</script>
+</body>
+</html>
