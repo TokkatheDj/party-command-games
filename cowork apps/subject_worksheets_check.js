@@ -265,22 +265,45 @@ async function layoutCheck(page, modId) {
       const n0 = PROBS[id].length;
       if (add("fill", "No blank here", "x") !== "ed-msg no") out.push("editor accepted a fill-in with no ___");
       if (add("mc", "Pick <b>one</b>", "right", "wrong 1\nwrong 2") !== "ed-msg ok") out.push("editor: mc not added");
-      if (add("fill", "The sky is ___.", "blue / light blue") !== "ed-msg ok") out.push("editor: fill not added");
+      if (add("fill", "Ends a question: ___", "?") !== "ed-msg no") out.push("editor accepted a punctuation-only answer");
+      if (add("fill", "The sky is ___.", "blue\nlight blue") !== "ed-msg ok") out.push("editor: fill not added");
       if (add("match", "Match", "", "a = 1\nb = 2") !== "ed-msg ok") out.push("editor: match not added");
       if (add("order", "Order", "", "first\nsecond\nthird") !== "ed-msg ok") out.push("editor: order not added");
       if (add("short", "Why?", "Because.") !== "ed-msg ok") out.push("editor: short not added");
       if (PROBS[id].length !== n0 + 5) out.push("editor: expected 5 added questions");
-      if (document.querySelector("#mod-" + id + " .problem:last-child .prob-prompt").innerHTML.indexOf("&lt;b&gt;") === -1 && PROBS[id][n0].q.indexOf("&lt;b&gt;") === -1) out.push("editor: question text not escaped");
+      const addedPrompt = probEl(id + ":" + n0).querySelector(".prob-prompt");
+      if (addedPrompt.querySelector("b") || addedPrompt.textContent.indexOf("<b>one</b>") === -1) out.push("editor: question text not escaped");
       const k = id + ":" + (n0 + 1), inp = probEl(k).querySelector(".blank input");
       inp.value = "Light Blue"; inp.dispatchEvent(new Event("input", { bubbles: true })); checkProblem(k);
       if (studentState.results[k] !== "correct") out.push("editor: added fill-in did not grade");
+      // Show Answer: a wrong answer stays wrong, and the right answer picked after the reveal doesn't score
+      const km = id + ":" + n0, opts = probEl(km).querySelectorAll(".mc-opt");
+      [...opts].find(o => o.dataset.ok !== "1").click();
+      probEl(km).querySelector(".show-answer").click();
+      if (studentState.results[km] !== "incorrect") out.push("Show Answer erased a wrong answer");
+      [...opts].find(o => o.dataset.ok === "1").click();
+      if (studentState.results[km] === "correct") out.push("a right answer after Show Answer still scored");
       for (let j = 0; j < 5; j++) edRemove(id, 0);
       if (PROBS[id].length !== n0) out.push("editor: remove failed");
+      // the same editor field keeps an answer that contains a slash
+      add("fill", "Half is ___.", "1/2");
+      if (JSON.stringify(PROBS[id][n0].a) !== '["1/2"]') out.push("editor split 1/2 into separate answers");
+      edRemove(id, 0);
+      // accents optional: a missing accent passes, an accent the answer doesn't have fails
+      if (!wordsMatch("estas", ["estás"], true).ok) out.push("missing accent not accepted");
+      if (wordsMatch("él", ["el"], true).ok) out.push("él accepted for el");
+      if (wordsMatch("sí", ["si"], true).ok) out.push("sí accepted for si");
+      // printed label problems carry a word bank with every name
+      document.querySelectorAll(".problem[data-type=label]").forEach(pr => {
+        const p = probByKey(pr.dataset.key), wb = pr.querySelector(".paper .word-bank");
+        if (!wb || !p.parts.concat(p.bank || []).every(n => wb.textContent.includes(n))) out.push(pr.dataset.key + ": printed label problem has no full word bank");
+      });
       // reset needs two taps, no dialog
       const r = document.getElementById("pp-reset"); r.click();
       if (!Object.keys(studentState.results).length) out.push("reset cleared on the first tap");
       r.click();
       if (Object.keys(studentState.results).length) out.push("reset did not clear");
+      if (lastCelebratedModule !== null || document.getElementById("pp-time").textContent !== "0:00") out.push("reset left the confetti flag or the timer");
       return out;
     });
     report.failures.push(...ctl.map(f => `${width}px controls: ${f}`));
