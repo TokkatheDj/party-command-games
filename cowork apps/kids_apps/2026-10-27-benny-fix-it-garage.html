@@ -1,0 +1,726 @@
+<!-- CONCEPT: PRETEND PLAY (mechanic) - Benny's Fix-It Garage: animal customers drive their cars, vans, trucks and buses into Benny the beaver's garage with things that need fixing (flat tire, empty tank, mud, a broken headlight, a dent, squeaky wheels); kids look at the car, pick the right tool from the big toolbox and really use it - tap the pump to puff the tire up, hold the gas nozzle to fill the gauge, rub the mud off with the sponge, pop in a new bulb, tap-tap-tap the dent out with the hammer, oil each squeaky wheel - and each fixed car honks thank-you and drives away; a garage day has 8 customers that grow from one problem to three, and a saved Garage Book counts every friend helped. No timer, no losing - a wrong tool just gets a friendly hint and the right tool wiggles. Ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Benny's Fix-It Garage</title>
+<style>
+:root{
+  --wall1:#9fd8ff; --wall2:#e3f4ff; --floor:#c9ced8; --floor-d:#a9b0bd;
+  --ink:#2b2340; --panel:#fffaf0; --accent:#ff7a2f; --accent2:#ffd23f; --accent3:#3fa7ff;
+  --good:#35c26b; --btn:#ffffff; --btn-on:#ffe08a; --hint:#ff4f8b;
+  --radius:16px; --font:"Comic Sans MS","Trebuchet MS",system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none;font-family:var(--font);color:var(--ink);background:var(--wall1)}
+#app{display:flex;flex-direction:column;height:100%;height:100dvh}
+header{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:6px 8px;background:linear-gradient(180deg,#fff3d1,#ffdf8a);box-shadow:0 2px 6px rgba(0,0,0,.15);z-index:2}
+h1{margin:0;flex:1;min-width:0;font-size:clamp(15px,4.4vw,26px);line-height:1.05}
+@media (max-width:560px){#dots{flex-wrap:wrap;width:96px;font-size:13px;line-height:1.15}}
+h1 .grad{background:linear-gradient(90deg,#ff5a2f,#e89a00,#2f8fff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hbtn{min-width:48px;height:48px;border:none;border-radius:14px;background:var(--btn);font-size:24px;cursor:pointer;box-shadow:0 3px 0 rgba(0,0,0,.18);font-family:var(--font);color:var(--ink)}
+.hbtn:active{transform:translateY(2px);box-shadow:none}
+.hbtn:focus-visible,.tool:focus-visible,.big:focus-visible,#cv:focus-visible{outline:4px solid var(--accent3);outline-offset:2px}
+#dots{display:flex;gap:2px;font-size:clamp(12px,3.4vw,18px);white-space:nowrap}
+#dots span{opacity:.35}
+#dots span.on{opacity:1}
+#msg{flex:0 0 auto;height:62px;display:flex;align-items:center;gap:8px;padding:4px 10px;background:var(--panel);border-bottom:3px solid #f1dfb8}
+#msg .benny{font-size:38px;line-height:1;flex:0 0 auto}
+#say{flex:1;min-width:0;font-size:clamp(13px,3.7vw,19px);line-height:1.2;max-height:52px;overflow:hidden}
+#stage{flex:1 1 auto;position:relative;min-height:0;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:pointer}
+#jobs{flex:0 0 auto;height:46px;display:flex;gap:6px;align-items:center;justify-content:center;padding:4px 6px;background:#fff2d6;overflow:hidden}
+.chip{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:999px;background:#fff;border:2px solid #f0c27a;font-size:clamp(12px,3.4vw,16px);white-space:nowrap}
+.chip.done{background:#dff7e7;border-color:var(--good);text-decoration:line-through;opacity:.8}
+#tools{flex:0 0 auto;display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:6px 8px calc(8px + env(safe-area-inset-bottom));background:linear-gradient(180deg,#ff8f45,#e8662a)}
+@media (max-width:560px){#tools{grid-template-columns:repeat(3,1fr)}}
+.tool{min-height:64px;border:none;border-radius:var(--radius);background:var(--btn);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font-family:var(--font);color:var(--ink);box-shadow:0 4px 0 rgba(0,0,0,.25);padding:2px}
+.tool .e{font-size:30px;line-height:1.1}
+.tool .n{font-size:clamp(11px,3vw,14px);font-weight:bold}
+.tool.sel{background:var(--btn-on);box-shadow:0 0 0 4px #fff inset,0 4px 0 rgba(0,0,0,.25)}
+.tool.hint{animation:wig .5s ease-in-out infinite;background:#ffe3ee}
+.tool:active{transform:translateY(3px);box-shadow:0 1px 0 rgba(0,0,0,.25)}
+@keyframes wig{0%,100%{transform:rotate(0)}25%{transform:rotate(-7deg) scale(1.06)}75%{transform:rotate(7deg) scale(1.06)}}
+.overlay{position:fixed;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(40,30,70,.45)}
+.overlay[hidden]{display:none}
+.card{background:var(--panel);border-radius:22px;padding:18px 16px;max-width:460px;width:100%;max-height:100%;overflow-y:auto;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.card h2{margin:4px 0 8px;font-size:clamp(22px,6.5vw,34px);background:linear-gradient(90deg,#ff5a2f,#e89a00,#2f8fff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.card .face{font-size:64px;line-height:1}
+.card p{margin:6px 0 12px;font-size:clamp(14px,4vw,18px);line-height:1.3}
+.big{display:block;width:100%;min-height:62px;margin:8px 0;border:none;border-radius:18px;font-family:var(--font);font-size:clamp(18px,5vw,24px);font-weight:bold;cursor:pointer;color:#fff;background:linear-gradient(180deg,#ff8f45,#ea5a1a);box-shadow:0 5px 0 #b8400c}
+.big.alt{background:linear-gradient(180deg,#55b8ff,#2f86e0);box-shadow:0 5px 0 #1d5ea8}
+.big:active{transform:translateY(4px);box-shadow:0 1px 0 #b8400c}
+.row{font-size:clamp(26px,8vw,40px);letter-spacing:2px;margin:6px 0;word-break:break-all}
+#bookGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));grid-auto-rows:max-content;gap:8px;margin:8px 0}
+.bk{background:#fff;border-radius:14px;padding:6px;border:2px solid #f0c27a;font-size:13px}
+.bk .e{font-size:34px;display:block}
+.bk.none{opacity:.35;filter:grayscale(1)}
+@media (prefers-reduced-motion: reduce){.tool.hint{animation:none;outline:4px dashed var(--hint)}}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <button class="hbtn" id="homeBtn" aria-label="Home menu">🏠</button>
+    <h1><span class="grad">Benny's Fix-It Garage</span></h1>
+    <div id="dots" role="img" aria-label="Customers fixed today"></div>
+    <button class="hbtn" id="sndBtn" aria-label="Sound and voice on" aria-pressed="true">🔊</button>
+  </header>
+  <div id="msg"><span class="benny" aria-hidden="true">🦫</span><div id="say" aria-live="polite">Hi! I'm Benny!</div></div>
+  <div id="stage">
+    <canvas id="cv" tabindex="0" aria-label="Garage. Pick a tool, then tap or rub the vehicle. Keyboard: press Space to use the tool."></canvas>
+    <div class="overlay" id="titleOv">
+      <div class="card">
+        <div class="face" aria-hidden="true">🦫🔧</div>
+        <h2>Benny's Fix-It Garage</h2>
+        <p>Cars, vans, trucks and buses need help! Look at what's wrong, pick the right tool, and fix it up.</p>
+        <button class="big" id="startBtn">🚗 Open the Garage</button>
+        <button class="big alt" id="bookBtn">📖 Garage Book</button>
+      </div>
+    </div>
+    <div class="overlay" id="endOv" hidden>
+      <div class="card">
+        <div class="face" aria-hidden="true">🦫🎉</div>
+        <h2>Great Garage Day!</h2>
+        <p id="endTxt">You fixed every vehicle!</p>
+        <div class="row" id="endRow"></div>
+        <button class="big" id="againBtn">🔧 Another Day</button>
+        <button class="big alt" id="endBookBtn">📖 Garage Book</button>
+      </div>
+    </div>
+    <div class="overlay" id="bookOv" hidden>
+      <div class="card">
+        <h2>Garage Book</h2>
+        <p id="bookTxt"></p>
+        <div id="bookGrid"></div>
+        <button class="big alt" id="bookBack">⬅ Back</button>
+      </div>
+    </div>
+  </div>
+  <div id="jobs" role="group" aria-label="Jobs to do"></div>
+  <div id="tools" role="toolbar" aria-label="Toolbox"></div>
+</div>
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d'), stage = $('stage');
+const KEY = 'cowork-bennygarage-';
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const TOOLS = [
+  {id:'pump', e:'💨', n:'Air Pump'},
+  {id:'gas', e:'⛽', n:'Gas'},
+  {id:'sponge', e:'🧽', n:'Sponge'},
+  {id:'bulb', e:'💡', n:'Bulb'},
+  {id:'hammer', e:'🔨', n:'Hammer'},
+  {id:'oil', e:'🛢️', n:'Oil Can'}
+];
+const TOOL = Object.fromEntries(TOOLS.map(t => [t.id, t]));
+const PROBS = {
+  tire:  {tool:'pump',  icon:'🛞', label:'Flat tire',  how:'Tap the flat tire to pump air in!', done:'The tire is round and bouncy!'},
+  gas:   {tool:'gas',   icon:'🪫', label:'No gas',     how:'Press and hold on the car to fill it up!', done:'Glug glug! The tank is full!'},
+  mud:   {tool:'sponge',icon:'🟤', label:'Muddy',      how:'Rub the mud spots to scrub them off!', done:'Squeaky clean and shiny!'},
+  light: {tool:'bulb',  icon:'🌑', label:'Light out',  how:'Tap the broken headlight to put a new bulb in!', done:'Click! The light shines bright!'},
+  dent:  {tool:'hammer',icon:'💥', label:'Dent',       how:'Tap the dent - tap, tap, tap!', done:'Bonk bonk bonk - smooth as new!'},
+  squeak:{tool:'oil',   icon:'🔊', label:'Squeaky',    how:'Tap each squeaky wheel to give it oil!', done:'No more squeaks!'}
+};
+const CUSTOMERS = [
+  {a:'🦆',n:'Daisy Duck'},{a:'🐷',n:'Penny Pig'},{a:'🐶',n:'Rex the Dog'},{a:'🐱',n:'Mittens'},
+  {a:'🐸',n:'Fred Frog'},{a:'🦊',n:'Foxy'},{a:'🐻',n:'Big Bear'},{a:'🐰',n:'Bun Bun'},
+  {a:'🐵',n:'Coco Monkey'},{a:'🐮',n:'Mrs. Moo'},{a:'🐔',n:'Henny Hen'},{a:'🦁',n:'Leo Lion'}
+];
+const SHAPES = ['car','van','truck','bus'];
+const SHAPE_NAME = {car:'car', van:'van', truck:'truck', bus:'bus'};
+const COLORS = ['#ff5a5f','#3fa7ff','#ffc93c','#4fd17f','#b07cff','#ff9f43','#2fd0c9','#ff7eb6'];
+const DAY_LEN = 8;
+
+// ---------- storage ----------
+function loadBook(){ try{ return JSON.parse(localStorage.getItem(KEY+'book')) || {total:0,days:0,who:{}}; }catch(e){ return {total:0,days:0,who:{}}; } }
+function saveBook(){ try{ localStorage.setItem(KEY+'book', JSON.stringify(book)); }catch(e){} }
+let book = loadBook();
+let soundOn = localStorage.getItem(KEY+'sound') !== 'off';
+
+// ---------- audio ----------
+let AC = null;
+function ac(){ if(!AC){ try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(AC && AC.state==='suspended') AC.resume(); return AC; }
+function tone(f, d=0.15, type='sine', v=0.18, slide=0, when=0){
+  if(!soundOn) return; const a = ac(); if(!a) return;
+  const t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t);
+  if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f+slide), t+d);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t+0.01); g.gain.exponentialRampToValueAtTime(0.0001, t+d);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t+d+0.02);
+}
+function noise(d=0.2, v=0.15, freq=1200, when=0){
+  if(!soundOn) return; const a = ac(); if(!a) return;
+  const t = a.currentTime + when, len = Math.floor(a.sampleRate*d), buf = a.createBuffer(1, len, a.sampleRate), ch = buf.getChannelData(0);
+  for(let i=0;i<len;i++) ch[i] = (Math.random()*2-1) * (1 - i/len);
+  const s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = buf; f.type = 'bandpass'; f.frequency.value = freq; g.gain.value = v;
+  s.connect(f).connect(g).connect(a.destination); s.start(t);
+}
+const SFX = {
+  pump(){ noise(0.18, 0.35, 900); tone(220, 0.12, 'triangle', 0.08, 120); },
+  scrub(){ noise(0.08, 0.12, 2400); },
+  bonk(){ tone(180, 0.12, 'square', 0.12, -80); tone(520, 0.06, 'triangle', 0.08, 0, 0.02); },
+  click(){ tone(1400, 0.05, 'square', 0.08); tone(900, 0.08, 'sine', 0.1, 0, 0.05); },
+  drip(){ tone(900, 0.12, 'sine', 0.14, -500); },
+  squeak(){ tone(1700, 0.09, 'sawtooth', 0.04, 500); },
+  fixed(){ [523,659,784,1046].forEach((f,i)=>tone(f, 0.16, 'triangle', 0.14, 0, i*0.08)); },
+  oops(){ tone(330, 0.14, 'sine', 0.12, -60); tone(262, 0.18, 'sine', 0.12, -40, 0.12); },
+  honk(){ tone(392, 0.18, 'square', 0.1, 0); tone(494, 0.18, 'square', 0.08, 0); tone(392, 0.22, 'square', 0.1, 0, 0.26); tone(494, 0.22, 'square', 0.08, 0, 0.26); },
+  vroom(){ tone(70, 0.9, 'sawtooth', 0.07, 90); },
+  tada(){ [523,659,784,659,784,1046].forEach((f,i)=>tone(f, 0.2, 'triangle', 0.14, 0, i*0.11)); },
+  tap(){ tone(660, 0.05, 'sine', 0.08); }
+};
+let lastGlug = 0;
+function speak(text){
+  if(!soundOn || !('speechSynthesis' in window)) return;
+  try{ speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text.replace(/[^\p{L}\p{N}\s'!?.,-]/gu,'')); u.rate = 0.95; u.pitch = 1.2; speechSynthesis.speak(u); }catch(e){}
+}
+function say(text, talk=true){ $('say').textContent = text; if(talk) speak(text); }
+
+// ---------- layout ----------
+let W = 300, H = 300, DPR = 1;
+function resize(){
+  const r = stage.getBoundingClientRect();
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = Math.max(50, r.width); H = Math.max(50, r.height);
+  cv.width = Math.round(W*DPR); cv.height = Math.round(H*DPR);
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+// ---------- vehicle geometry (units; front faces +x, ground y=0) ----------
+function geo(shape){
+  switch(shape){
+    case 'van': return {body:[[-50,-10],[-50,-58],[18,-58],[44,-40],[50,-30],[50,-10]], wins:[[[22,-54],[40,-40],[22,-40]],[[-44,-52],[-24,-52],[-24,-38],[-44,-38]],[[-18,-52],[14,-52],[14,-38],[-18,-38]]], drv:[30,-45], wheels:[-30,30], light:[47,-24], cap:[-47,-28], bodyBox:[-46,46,-50,-14], h:58};
+    case 'truck': return {body:[[-50,-10],[-50,-34],[8,-34],[8,-58],[34,-58],[50,-36],[50,-10]], wins:[[[14,-54],[32,-54],[44,-38],[14,-38]]], drv:[26,-45], wheels:[-30,32], light:[47,-24], cap:[-2,-26], bodyBox:[-46,46,-32,-14], h:58};
+    case 'bus': return {body:[[-52,-10],[-52,-62],[46,-62],[52,-52],[52,-10]], wins:[[[34,-58],[48,-58],[48,-40],[34,-40]],[[-48,-58],[-30,-58],[-30,-42],[-48,-42]],[[-26,-58],[-8,-58],[-8,-42],[-26,-42]],[[-4,-58],[14,-58],[14,-42],[-4,-42]]], drv:[41,-48], wheels:[-33,33], light:[49,-22], cap:[-49,-26], bodyBox:[-48,48,-38,-14], h:62};
+    default: return {body:[[-50,-10],[-50,-32],[-30,-34],[-20,-54],[16,-54],[30,-34],[48,-32],[50,-24],[50,-10]], wins:[[[-25,-36],[-17,-50],[-3,-50],[-3,-36]],[[1,-36],[1,-50],[14,-50],[24,-36]]], drv:[11,-42], wheels:[-30,30], light:[47,-25], cap:[-47,-26], bodyBox:[-44,44,-30,-14], h:54};
+  }
+}
+const rnd = (a,b) => a + Math.random()*(b-a);
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+function makeVehicle(idx){
+  const nProbs = idx < 2 ? 1 : idx < 5 ? 2 : 3;
+  const shape = SHAPES[idx % 4 === 0 ? 0 : Math.floor(Math.random()*4)];
+  const g = geo(shape);
+  const who = dayCustomers[idx];
+  // favour problems not used by the previous car so the day mixes it up
+  const prev = idx > 0 && cars[idx-1] ? cars[idx-1].probs : [];
+  const keys = shuffle(Object.keys(PROBS)).sort((a,b) => (prev.includes(a)?1:0) - (prev.includes(b)?1:0)).slice(0, nProbs);
+  const v = {shape, g, who, color: pick(COLORS), probs: keys, st:{}, x:0, rot:0, bounce:0};
+  const [bx0,bx1,by0,by1] = g.bodyBox;
+  if(keys.includes('tire')) v.st.tire = {wheel: Math.random()<.5?0:1, level:0.3};
+  if(keys.includes('gas')) v.st.gas = {level:0.08};
+  if(keys.includes('mud')){
+    const spots = [];
+    for(let i=0;i<6;i++) spots.push({x: bx0 + (bx1-bx0)*((i+0.5)/6) + rnd(-4,4), y: rnd(by0+4, by1-2), r: rnd(5,8), dirt:1});
+    v.st.mud = {spots};
+  }
+  if(keys.includes('light')) v.st.light = {ok:false};
+  if(keys.includes('dent')){
+    let x = rnd(bx0+8, bx1-14); if(keys.includes('mud')) x = rnd(-10, 10);
+    v.st.dent = {x, y: (by0+by1)/2 + 2, hits:0};
+  }
+  if(keys.includes('squeak')) v.st.squeak = {oiled:[false,false]};
+  return v;
+}
+function isDone(v, k){
+  const s = v.st[k];
+  switch(k){
+    case 'tire': return s.level >= 1;
+    case 'gas': return s.level >= 1;
+    case 'mud': return s.spots.every(p => p.dirt <= 0);
+    case 'light': return s.ok;
+    case 'dent': return s.hits >= 3;
+    case 'squeak': return s.oiled.every(Boolean);
+  }
+}
+const remaining = v => v.probs.filter(k => !isDone(v,k));
+
+// ---------- game state ----------
+let mode = 'title';       // title | arrive | fix | leave | end
+let dayCustomers = [], cars = [], carIdx = 0, car = null;
+let tool = null, hintTimer = 0, phaseT = 0, wrongCount = 0;
+let particles = [];
+const doneFlags = {};
+let pointer = {x:0, y:0, down:false, inside:false, lastX:0, lastY:0};
+
+function buildTools(){
+  const box = $('tools'); box.innerHTML = '';
+  for(const t of TOOLS){
+    const b = document.createElement('button');
+    b.className = 'tool'; b.id = 'tool-' + t.id; b.setAttribute('aria-label', t.n); b.setAttribute('aria-pressed','false');
+    b.innerHTML = `<span class="e" aria-hidden="true">${t.e}</span><span class="n">${t.n}</span>`;
+    b.addEventListener('click', () => chooseTool(t.id));
+    box.appendChild(b);
+  }
+}
+function renderTools(){
+  for(const t of TOOLS){
+    const b = $('tool-'+t.id);
+    b.classList.toggle('sel', tool === t.id);
+    b.setAttribute('aria-pressed', tool === t.id ? 'true' : 'false');
+  }
+}
+function setHints(ids){
+  for(const t of TOOLS) $('tool-'+t.id).classList.toggle('hint', ids.includes(t.id));
+  clearTimeout(hintTimer);
+  if(ids.length) hintTimer = setTimeout(() => setHints([]), 2600);
+}
+function renderJobs(){
+  const j = $('jobs'); j.innerHTML = '';
+  if(!car) return;
+  for(const k of car.probs){
+    const p = PROBS[k], d = isDone(car,k);
+    const c = document.createElement('div');
+    c.className = 'chip' + (d ? ' done' : '');
+    c.innerHTML = `<span aria-hidden="true">${d ? '✅' : p.icon}</span><span>${p.label}</span>`;
+    j.appendChild(c);
+  }
+}
+function renderDots(){
+  const d = $('dots'); d.innerHTML = '';
+  if(mode === 'title') return;
+  for(let i=0;i<DAY_LEN;i++){
+    const s = document.createElement('span');
+    s.textContent = i < carIdx ? dayCustomers[i].a : (i === carIdx && mode !== 'end' ? '🔧' : '⚪');
+    if(i <= carIdx) s.className = 'on';
+    d.appendChild(s);
+  }
+}
+
+function startDay(){
+  ac();
+  for(const id of ['titleOv','endOv','bookOv']) $(id).hidden = true;
+  dayCustomers = shuffle(CUSTOMERS.slice()).slice(0, DAY_LEN);
+  cars = []; carIdx = 0;
+  nextCar();
+}
+function nextCar(){
+  car = makeVehicle(carIdx); cars[carIdx] = car;
+  for(const k in doneFlags) delete doneFlags[k];
+  tool = null; wrongCount = 0; renderTools(); setHints([]);
+  mode = 'arrive'; phaseT = 0; car.x = -1;
+  SFX.vroom();
+  say(`Beep beep! Here comes ${car.who.n} in a ${SHAPE_NAME[car.shape]}!`);
+  renderJobs(); renderDots();
+}
+function startFixing(){
+  mode = 'fix';
+  const r = remaining(car);
+  const names = r.map(k => PROBS[k].label.toLowerCase());
+  const list = names.length === 1 ? names[0] : names.slice(0,-1).join(', ') + ' and ' + names[names.length-1];
+  say(`Oh no! ${car.who.a} ${car.who.n} has: ${list}. Pick a tool!`);
+}
+function chooseTool(id){
+  ac(); SFX.tap();
+  if(mode !== 'fix'){ tool = id; renderTools(); return; }
+  const need = remaining(car).map(k => PROBS[k].tool);
+  if(!need.includes(id)){
+    wrongCount++;
+    tool = null; renderTools(); SFX.oops();
+    const hintIds = [...new Set(need)];
+    setHints(hintIds);
+    car.bounce = 0.6;
+    say(wrongCount > 1
+      ? `Hmm, not the ${TOOL[id].n} this time. Try the wiggly ${TOOL[hintIds[0]].n}!`
+      : `Hmm, the ${TOOL[id].n} won't help this ${SHAPE_NAME[car.shape]}. Look at the wiggly tools!`);
+    return;
+  }
+  tool = id; renderTools(); setHints([]);
+  const k = remaining(car).find(k => PROBS[k].tool === id);
+  say(`${TOOL[id].e} Good pick! ${PROBS[k].how}`);
+}
+function problemFixed(k){
+  if(doneFlags[k]) return; doneFlags[k] = true;
+  SFX.fixed(); renderJobs();
+  const c = carCenter();
+  burst(c.x, c.y - 30*c.u, 16, ['⭐','✨','💫']);
+  tool = null; renderTools();
+  if(remaining(car).length === 0){
+    mode = 'leave'; phaseT = 0;
+    book.total++; book.who[car.who.n] = (book.who[car.who.n]||0) + 1; saveBook();
+    setTimeout(SFX.honk, 350);
+    say(`${PROBS[k].done} All fixed! ${car.who.n} says THANK YOU, Benny!`);
+  } else {
+    say(`${PROBS[k].done} What else needs fixing?`);
+  }
+}
+function endDay(){
+  mode = 'end'; book.days++; saveBook();
+  SFX.tada();
+  $('endTxt').textContent = `You fixed all ${DAY_LEN} vehicles today! Benny's garage is the best in town.`;
+  $('endRow').textContent = dayCustomers.map(c => c.a).join('');
+  $('endOv').hidden = false;
+  confettiRain();
+  renderDots(); say('Great garage day! You fixed everyone!');
+}
+function showBook(){
+  for(const id of ['titleOv','endOv']) $(id).hidden = true;
+  $('bookTxt').textContent = book.total
+    ? `You have fixed ${book.total} vehicle${book.total===1?'':'s'} in ${book.days} garage day${book.days===1?'':'s'}!`
+    : 'No fixes yet - open the garage to help your first friend!';
+  const g = $('bookGrid'); g.innerHTML = '';
+  for(const c of CUSTOMERS){
+    const n = book.who[c.n] || 0;
+    const d = document.createElement('div'); d.className = 'bk' + (n ? '' : ' none');
+    d.innerHTML = `<span class="e" aria-hidden="true">${c.a}</span>${c.n}<br><b>${n ? '🔧 × ' + n : '?'}</b>`;
+    g.appendChild(d);
+  }
+  $('bookOv').hidden = false;
+}
+function goHome(){
+  mode = 'title'; car = null; tool = null; renderTools(); setHints([]); renderJobs(); renderDots();
+  for(const id of ['endOv','bookOv']) $(id).hidden = true;
+  $('titleOv').hidden = false;
+  say("Hi! I'm Benny! Let's fix some cars!", false);
+}
+
+// ---------- coordinates ----------
+// gas pump stands at the left edge; the car parks in the space to its right
+function pumpBox(){
+  const pu = Math.min(W*0.0072, H*0.0105);
+  const gx = Math.max(6, W*0.015), gw = 18*pu;
+  return {gx, gw, gh: 62*pu, pu};
+}
+function carCenter(){
+  const pb = pumpBox(), left = pb.gx + pb.gw + 6;
+  const u = Math.min((W - left - 10)/112, H*0.0105);
+  const groundY = H*0.80;
+  const park = left + (W - left)/2;
+  const cx = car.x <= 0 ? park + car.x*(park + 60*u) : park + car.x*(W - park + 60*u);
+  return {x:cx, y:groundY, u};
+}
+function toScreen(px, py){ const c = carCenter(); return {x: c.x + px*c.u, y: c.y + py*c.u, u:c.u}; }
+function wheelY(){ return -11; }
+const dist = (ax,ay,bx,by) => Math.hypot(ax-bx, ay-by);
+
+// ---------- tool actions ----------
+function pumpAt(x, y, forced){
+  const s = car.st.tire; if(!s || s.level >= 1) return false;
+  const w = toScreen(car.g.wheels[s.wheel], wheelY());
+  if(!forced && dist(x,y,w.x,w.y) > Math.max(40, 18*w.u)) return false;
+  s.level = Math.min(1, s.level + 0.14); SFX.pump();
+  burst(w.x + 14*w.u, w.y, 4, ['💨']);
+  if(s.level >= 1) problemFixed('tire');
+  return true;
+}
+function bulbAt(x, y, forced){
+  const s = car.st.light; if(!s || s.ok) return false;
+  const p = toScreen(...car.g.light);
+  if(!forced && dist(x,y,p.x,p.y) > Math.max(40, 14*p.u)) return false;
+  s.ok = true; SFX.click(); burst(p.x, p.y, 10, ['✨','💛']);
+  problemFixed('light'); return true;
+}
+function hammerAt(x, y, forced){
+  const s = car.st.dent; if(!s || s.hits >= 3) return false;
+  const p = toScreen(s.x, s.y);
+  if(!forced && dist(x,y,p.x,p.y) > Math.max(40, 14*p.u)) return false;
+  s.hits++; SFX.bonk(); car.bounce = 0.5; burst(p.x, p.y, 5, ['💫']);
+  if(s.hits >= 3) problemFixed('dent');
+  else say(s.hits === 1 ? 'Bonk! Keep tapping!' : 'Bonk bonk! One more!', false);
+  return true;
+}
+function oilAt(x, y, forced){
+  const s = car.st.squeak; if(!s) return false;
+  for(let i=0;i<2;i++){
+    if(s.oiled[i]) continue;
+    const w = toScreen(car.g.wheels[i], wheelY());
+    if(forced || dist(x,y,w.x,w.y) < Math.max(40, 18*w.u)){
+      s.oiled[i] = true; SFX.drip(); burst(w.x, w.y - 10*w.u, 5, ['💧']);
+      if(s.oiled.every(Boolean)) problemFixed('squeak'); else say('Drip! Now the other wheel!', false);
+      return true;
+    }
+  }
+  return false;
+}
+function onCar(x, y){
+  const [bx0,bx1] = car.g.bodyBox; const a = toScreen(bx0-8, -car.g.h-6), b = toScreen(bx1+8, 4);
+  return x > a.x && x < b.x && y > a.y && y < b.y;
+}
+function scrub(x, y, amount){
+  const s = car.st.mud; if(!s) return false;
+  let hit = false;
+  for(const p of s.spots){
+    if(p.dirt <= 0) continue;
+    const q = toScreen(p.x, p.y);
+    if(dist(x,y,q.x,q.y) < p.r*q.u + 22){
+      p.dirt -= amount; hit = true;
+      if(p.dirt <= 0){ p.dirt = 0; burst(q.x, q.y, 4, ['🫧']); }
+    }
+  }
+  if(hit && Math.random() < 0.35) SFX.scrub();
+  if(hit && isDone(car,'mud')) problemFixed('mud');
+  return hit;
+}
+function useToolAt(x, y){
+  if(mode !== 'fix' || !tool) {
+    if(mode === 'fix' && !tool){ say('Pick a tool from the toolbox first!', false); setHints([...new Set(remaining(car).map(k => PROBS[k].tool))]); }
+    return;
+  }
+  if(tool === 'pump') pumpAt(x,y) || nudge();
+  else if(tool === 'bulb') bulbAt(x,y) || nudge();
+  else if(tool === 'hammer') hammerAt(x,y) || nudge();
+  else if(tool === 'oil') oilAt(x,y) || nudge();
+  else if(tool === 'sponge') scrub(x,y,0.2);
+}
+let nudgeT = 0;
+function nudge(){
+  if(tool === 'gas') return;
+  const now = performance.now(); if(now - nudgeT < 1200) return; nudgeT = now;
+  const tips = {pump:'Tap the flat tire - the one that is squished!', bulb:'Tap the dark headlight at the front!', hammer:'Tap right on the dent!', oil:'Tap a squeaky wheel!'};
+  say(tips[tool] + ' Look for the glowing ring.', false);
+}
+// keyboard / switch fallback: one step of the selected tool on the next target
+function useToolStep(){
+  if(mode !== 'fix' || !tool) return useToolAt(0,0);
+  if(tool === 'pump') pumpAt(0,0,true);
+  else if(tool === 'bulb') bulbAt(0,0,true);
+  else if(tool === 'hammer') hammerAt(0,0,true);
+  else if(tool === 'oil') oilAt(0,0,true);
+  else if(tool === 'gas' && car.st.gas){ car.st.gas.level = Math.min(1, car.st.gas.level + 0.25); glug(); if(car.st.gas.level >= 1) problemFixed('gas'); }
+  else if(tool === 'sponge' && car.st.mud){ const p = car.st.mud.spots.find(p => p.dirt > 0); if(p){ const q = toScreen(p.x,p.y); scrub(q.x, q.y, 0.5); } }
+}
+function glug(){ const now = performance.now(); if(now - lastGlug > 180){ lastGlug = now; tone(200 + (car.st.gas ? car.st.gas.level*300 : 0), 0.12, 'sine', 0.12, 60); } }
+
+// ---------- pointer ----------
+function pos(e){ const r = cv.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
+cv.addEventListener('pointerdown', e => {
+  ac(); const p = pos(e);
+  try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+  pointer = {x:p.x, y:p.y, down:true, inside:true, lastX:p.x, lastY:p.y};
+  if(mode === 'fix') useToolAt(p.x, p.y);
+  else if(mode === 'arrive'){ SFX.honk(); }
+});
+cv.addEventListener('pointermove', e => {
+  const p = pos(e);
+  const d = dist(p.x, p.y, pointer.lastX, pointer.lastY);
+  pointer.x = p.x; pointer.y = p.y; pointer.inside = true;
+  if(pointer.down && mode === 'fix' && tool === 'sponge' && d > 0){
+    // step along the path so fast swipes still scrub every spot they cross
+    const steps = Math.max(1, Math.ceil(d/8));
+    for(let i=1;i<=steps;i++){
+      const sx = pointer.lastX + (p.x - pointer.lastX)*i/steps, sy = pointer.lastY + (p.y - pointer.lastY)*i/steps;
+      scrub(sx, sy, (d/steps)/90);
+      if(!car.st.mud || isDone(car,'mud')) break;
+    }
+  }
+  pointer.lastX = p.x; pointer.lastY = p.y;
+});
+const up = () => { pointer.down = false; };
+cv.addEventListener('pointerup', up);
+cv.addEventListener('pointercancel', up);
+cv.addEventListener('pointerleave', () => { pointer.inside = false; });
+cv.addEventListener('keydown', e => {
+  if(e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); useToolStep(); }
+  const n = parseInt(e.key, 10); if(n >= 1 && n <= 6) chooseTool(TOOLS[n-1].id);
+});
+
+// ---------- particles ----------
+function burst(x, y, n, emojis){
+  const k = reduceMotion ? Math.ceil(n/3) : n;
+  for(let i=0;i<k;i++) particles.push({x, y, vx: rnd(-120,120), vy: rnd(-220,-60), life: 1, e: pick(emojis), s: rnd(16,26), g: 380});
+}
+function confettiRain(){
+  const n = reduceMotion ? 12 : 60;
+  for(let i=0;i<n;i++) particles.push({x: rnd(0,W), y: rnd(-H*0.5, 0), vx: rnd(-30,30), vy: rnd(40,140), life: 2.2, e: pick(['🎉','⭐','🎊','🔧','🚗','💛']), s: rnd(18,28), g: 60});
+}
+
+// ---------- drawing ----------
+function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function shade(hex, f){
+  const n = parseInt(hex.slice(1),16); let r = n>>16, g = (n>>8)&255, b = n&255;
+  r = Math.round(Math.min(255, Math.max(0, r*f))); g = Math.round(Math.min(255, Math.max(0, g*f))); b = Math.round(Math.min(255, Math.max(0, b*f)));
+  return `rgb(${r},${g},${b})`;
+}
+function emoji(e, x, y, size, alpha=1){
+  ctx.globalAlpha = alpha; ctx.fillStyle = '#000';
+  ctx.font = `${size}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(e, x, y); ctx.globalAlpha = 1;
+}
+function drawGarage(t){
+  const g = ctx.createLinearGradient(0,0,0,H*0.8);
+  g.addColorStop(0, '#bfe6ff'); g.addColorStop(1, '#eaf7ff');
+  ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+  // pegboard
+  const pbW = Math.min(W*0.7, 420), pbH = H*0.26, pbX = (W-pbW)/2, pbY = H*0.06;
+  ctx.fillStyle = '#e8c690'; roundRect(pbX, pbY, pbW, pbH, 12); ctx.fill();
+  ctx.fillStyle = 'rgba(120,80,30,.25)';
+  for(let x = pbX+12; x < pbX+pbW-6; x += 18) for(let y = pbY+12; y < pbY+pbH-6; y += 18){ ctx.beginPath(); ctx.arc(x,y,1.8,0,7); ctx.fill(); }
+  const deco = ['🔧','🪛','🔩','🪚','⚙️'];
+  deco.forEach((e,i) => emoji(e, pbX + pbW*(i+0.5)/deco.length, pbY + pbH/2, Math.min(34, pbH*0.5), 0.9));
+  // sign
+  // floor
+  const fy = H*0.80;
+  ctx.fillStyle = '#c9ced8'; ctx.fillRect(0, fy, W, H-fy);
+  ctx.fillStyle = '#b3b9c6'; ctx.fillRect(0, fy, W, 6);
+  ctx.fillStyle = '#ffd23f';
+  for(let x = -((t*0) % 60); x < W; x += 60) ctx.fillRect(x, fy + (H-fy)*0.55, 34, 6);
+  // gas pump at left
+  const {gx, gw, gh} = pumpBox();
+  ctx.fillStyle = '#e94f4f'; roundRect(gx, fy - gh, gw, gh, 6); ctx.fill();
+  ctx.fillStyle = '#fff'; roundRect(gx + gw*0.18, fy - gh*0.85, gw*0.64, gh*0.25, 4); ctx.fill();
+  emoji('⛽', gx + gw/2, fy - gh*0.72, gw*0.45);
+  return {gx: gx + gw, gy: fy - gh*0.45};
+}
+function ring(x, y, r, t){
+  const pulse = reduceMotion ? 0 : Math.sin(t*6)*0.15;
+  ctx.strokeStyle = 'rgba(255,79,139,.9)'; ctx.lineWidth = 4; ctx.setLineDash([8,6]);
+  ctx.beginPath(); ctx.arc(x, y, r*(1+pulse), 0, Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+}
+function drawVehicle(v, t, pumpPos){
+  const c = carCenter(), u = c.u, g = v.g;
+  const bob = Math.sin(v.bounce*Math.PI*4) * v.bounce * 5 * u * (reduceMotion ? 0.3 : 1);
+  const X = x => c.x + x*u, Y = y => c.y + y*u - bob;
+  // shadow
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(c.x, c.y+2, 56*u, 5*u, 0, 0, 7); ctx.fill();
+  // body
+  ctx.beginPath(); g.body.forEach(([x,y],i) => i ? ctx.lineTo(X(x),Y(y)) : ctx.moveTo(X(x),Y(y))); ctx.closePath();
+  ctx.fillStyle = v.color; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = shade(v.color, 0.6); ctx.stroke();
+  // stripe
+  const [bx0,bx1,by0,by1] = g.bodyBox;
+  ctx.fillStyle = shade(v.color, 1.25); ctx.fillRect(X(bx0), Y(by1-3), (bx1-bx0)*u, 3*u);
+  // windows
+  for(const w of g.wins){ ctx.beginPath(); w.forEach(([x,y],i) => i ? ctx.lineTo(X(x),Y(y)) : ctx.moveTo(X(x),Y(y))); ctx.closePath(); ctx.fillStyle = '#d6f1ff'; ctx.fill(); ctx.strokeStyle = shade(v.color,0.6); ctx.lineWidth = 2; ctx.stroke(); }
+  // driver
+  const happy = mode === 'leave' ? Math.sin(t*12)*2*u : 0;
+  emoji(v.who.a, X(g.drv[0]), Y(g.drv[1]) - happy, 13*u);
+  // bumper + tail light
+  ctx.fillStyle = '#8a8f99'; ctx.fillRect(X(g.body[0][0]) - 2*u, Y(-14), 4*u, 5*u);
+  ctx.fillStyle = '#ff3b3b'; ctx.fillRect(X(g.body[0][0]) - 1*u, Y(-26), 3*u, 5*u);
+  // gas cap
+  const capX = X(g.cap[0]), capY = Y(g.cap[1]);
+  ctx.fillStyle = shade(v.color,0.7); ctx.beginPath(); ctx.arc(capX + 3*u, capY, 3*u, 0, 7); ctx.fill();
+  // headlight
+  const lx = X(g.light[0]), ly = Y(g.light[1]);
+  const lightOk = !v.st.light || v.st.light.ok;
+  if(lightOk){
+    ctx.fillStyle = 'rgba(255,240,140,.35)'; ctx.beginPath(); ctx.moveTo(lx, ly-2*u); ctx.lineTo(lx + 40*u, ly - 12*u); ctx.lineTo(lx + 40*u, ly + 10*u); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff4a3';
+  } else ctx.fillStyle = '#6b6f78';
+  ctx.beginPath(); ctx.arc(lx, ly, 4*u, 0, 7); ctx.fill(); ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5; ctx.stroke();
+  if(!lightOk){ ctx.strokeStyle = '#222'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(lx-3*u, ly-3*u); ctx.lineTo(lx, ly); ctx.lineTo(lx-1*u, ly+3*u); ctx.moveTo(lx, ly); ctx.lineTo(lx+3*u, ly-1*u); ctx.stroke(); }
+  // dent
+  if(v.st.dent && v.st.dent.hits < 3){
+    const k = (3 - v.st.dent.hits)/3, dx = X(v.st.dent.x), dy = Y(v.st.dent.y);
+    ctx.fillStyle = `rgba(0,0,0,${0.25*k})`; ctx.beginPath(); ctx.ellipse(dx, dy, 7*u*k+2, 4*u*k+1, 0.3, 0, 7); ctx.fill();
+    ctx.strokeStyle = `rgba(40,20,20,${0.8*k})`; ctx.lineWidth = 2;
+    ctx.beginPath(); for(let i=0;i<5;i++){ const a = i*Math.PI*2/5 + 0.3; ctx.moveTo(dx, dy); ctx.lineTo(dx + Math.cos(a)*8*u*k, dy + Math.sin(a)*5*u*k); } ctx.stroke();
+  }
+  // mud
+  if(v.st.mud) for(const p of v.st.mud.spots){
+    if(p.dirt <= 0) continue;
+    ctx.fillStyle = `rgba(110,72,36,${0.92*Math.min(1,p.dirt+0.1)})`;
+    const px = X(p.x), py = Y(p.y), r = p.r*u*(0.6 + 0.4*p.dirt);
+    ctx.beginPath(); ctx.arc(px, py, r, 0, 7); ctx.arc(px + r*0.7, py + r*0.3, r*0.6, 0, 7); ctx.arc(px - r*0.6, py + r*0.4, r*0.5, 0, 7); ctx.fill();
+  }
+  // wheels
+  for(let i=0;i<2;i++){
+    const wx = X(g.wheels[i]); const r = 11*u;
+    let ry = r, rx = r;
+    if(v.st.tire && v.st.tire.wheel === i){ const L = v.st.tire.level; ry = r*(0.55 + 0.45*L); rx = r*(1 + 0.22*(1-L)); }
+    const wy = c.y - ry;               // wheels sit on the ground, body bobs above
+    ctx.fillStyle = '#2b2b33'; ctx.beginPath(); ctx.ellipse(wx, wy, rx, ry, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#c7ccd6'; ctx.beginPath(); ctx.ellipse(wx, wy, rx*0.5, ry*0.5, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#7d828c'; ctx.lineWidth = 2;
+    ctx.beginPath(); for(let s=0;s<4;s++){ const a = v.rot + s*Math.PI/2; ctx.moveTo(wx, wy); ctx.lineTo(wx + Math.cos(a)*rx*0.48, wy + Math.sin(a)*ry*0.48); } ctx.stroke();
+    if(v.st.squeak && !v.st.squeak.oiled[i]){
+      const wig = reduceMotion ? 0 : Math.sin(t*14 + i)*2;
+      ctx.strokeStyle = '#ff4f8b'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); for(let s=0;s<3;s++){ ctx.moveTo(wx - 6*u + s*6*u, wy - r - 4*u - wig); ctx.quadraticCurveTo(wx - 4*u + s*6*u, wy - r - 9*u - wig, wx - 6*u + s*6*u + 2*u, wy - r - 12*u - wig); } ctx.stroke();
+    } else if(v.st.squeak){
+      ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(wx - rx*0.4, wy - ry*0.4, 2*u, 0, 7); ctx.fill();
+    }
+  }
+  // gas gauge badge
+  if(v.st.gas){
+    const L = v.st.gas.level, gxx = X(g.cap[0]) + 4*u, gyy = Y(-g.h) - 12*u, R = 9*u;
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(gxx, gyy, R+3, Math.PI, 0); ctx.lineTo(gxx+R+3, gyy+3); ctx.lineTo(gxx-R-3, gyy+3); ctx.closePath(); ctx.fill();
+    ctx.lineWidth = 3*u > 6 ? 6 : 3*u;
+    ctx.strokeStyle = '#ff6b6b'; ctx.beginPath(); ctx.arc(gxx, gyy, R, Math.PI, Math.PI*1.33); ctx.stroke();
+    ctx.strokeStyle = '#ffd23f'; ctx.beginPath(); ctx.arc(gxx, gyy, R, Math.PI*1.33, Math.PI*1.66); ctx.stroke();
+    ctx.strokeStyle = '#35c26b'; ctx.beginPath(); ctx.arc(gxx, gyy, R, Math.PI*1.66, Math.PI*2); ctx.stroke();
+    const a = Math.PI + L*Math.PI;
+    ctx.strokeStyle = '#2b2340'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(gxx, gyy); ctx.lineTo(gxx + Math.cos(a)*R*0.9, gyy + Math.sin(a)*R*0.9); ctx.stroke();
+    // hose while filling
+    if(tool === 'gas' && mode === 'fix'){
+      ctx.strokeStyle = '#333'; ctx.lineWidth = Math.max(3, 2.5*u);
+      ctx.beginPath(); ctx.moveTo(pumpPos.gx, pumpPos.gy); ctx.quadraticCurveTo((pumpPos.gx + capX)/2, c.y + 4*u, capX, capY); ctx.stroke();
+      emoji('⛽', capX - 4*u, capY - 2*u, 10*u);
+    }
+  }
+  // target rings for the selected tool
+  if(mode === 'fix' && tool){
+    if(tool === 'pump' && v.st.tire && v.st.tire.level < 1){ ring(X(g.wheels[v.st.tire.wheel]), c.y - 8*u, 16*u, t); }
+    if(tool === 'bulb' && v.st.light && !v.st.light.ok) ring(lx, ly, 10*u, t);
+    if(tool === 'hammer' && v.st.dent && v.st.dent.hits < 3) ring(X(v.st.dent.x), Y(v.st.dent.y), 12*u, t);
+    if(tool === 'oil' && v.st.squeak) v.st.squeak.oiled.forEach((o,i) => { if(!o) ring(X(g.wheels[i]), c.y - 11*u, 15*u, t); });
+    if(tool === 'gas' && v.st.gas && v.st.gas.level < 1) ring(capX + 3*u, capY, 10*u, t);
+    if(tool === 'sponge' && v.st.mud) v.st.mud.spots.forEach(p => { if(p.dirt > 0) ring(X(p.x), Y(p.y), p.r*u + 4, t); });
+  }
+}
+function drawCursor(){
+  if(!(mode === 'fix' && tool && pointer.inside)) return;
+  const sz = 40; const wob = pointer.down && tool === 'hammer' ? -0.5 : 0;
+  ctx.save(); ctx.translate(pointer.x + 12, pointer.y - 18); ctx.rotate(wob);
+  emoji(TOOL[tool].e, 0, 0, sz); ctx.restore();
+}
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05, (now - last)/1000); last = now; const t = now/1000;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  const pumpPos = drawGarage(t);
+  if(car){
+    if(mode === 'arrive'){
+      phaseT += dt/1.4; const e = 1 - Math.pow(1 - Math.min(1, phaseT), 3);
+      car.x = -1 + e; car.rot += dt*10*(1 - e + 0.05);
+      if(phaseT >= 1){ car.x = 0; startFixing(); }
+    } else if(mode === 'leave'){
+      phaseT += dt;
+      if(phaseT > 1.3){ const k = (phaseT - 1.3)/1.2; car.x = k*k; car.rot += dt*14; if(phaseT > 1.3 && phaseT - dt <= 1.3) SFX.vroom(); }
+      if(phaseT > 2.6){ carIdx++; if(carIdx >= DAY_LEN){ car = null; renderJobs(); endDay(); } else nextCar(); }
+    } else if(mode === 'fix' && tool === 'gas' && pointer.down && car.st.gas && car.st.gas.level < 1 && onCar(pointer.x, pointer.y)){
+      car.st.gas.level = Math.min(1, car.st.gas.level + dt*0.5); glug();
+      if(car.st.gas.level >= 1) problemFixed('gas');
+    }
+    if(car){ car.bounce = Math.max(0, car.bounce - dt*1.5); drawVehicle(car, t, pumpPos); }
+  }
+  for(const p of particles){ p.life -= dt; p.vy += p.g*dt; p.x += p.vx*dt; p.y += p.vy*dt; }
+  particles = particles.filter(p => p.life > 0 && p.y < H + 40);
+  for(const p of particles) emoji(p.e, p.x, p.y, p.s, Math.min(1, p.life*1.5));
+  drawCursor();
+  requestAnimationFrame(frame);
+}
+
+// ---------- wiring ----------
+function setSound(on){
+  soundOn = on; try{ localStorage.setItem(KEY+'sound', on ? 'on' : 'off'); }catch(e){}
+  $('sndBtn').textContent = on ? '🔊' : '🔇';
+  $('sndBtn').setAttribute('aria-pressed', on ? 'true' : 'false');
+  $('sndBtn').setAttribute('aria-label', on ? 'Sound and voice on' : 'Sound and voice off');
+  if(!on && 'speechSynthesis' in window) speechSynthesis.cancel();
+}
+$('sndBtn').addEventListener('click', () => { setSound(!soundOn); if(soundOn) SFX.tap(); });
+$('homeBtn').addEventListener('click', goHome);
+$('startBtn').addEventListener('click', startDay);
+$('againBtn').addEventListener('click', startDay);
+$('bookBtn').addEventListener('click', showBook);
+$('endBookBtn').addEventListener('click', showBook);
+$('bookBack').addEventListener('click', () => { $('bookOv').hidden = true; if(mode === 'end') $('endOv').hidden = false; else if(mode === 'title') $('titleOv').hidden = false; });
+buildTools(); setSound(soundOn); goHome();
+requestAnimationFrame(frame);
+window.__garage = { get mode(){ return mode; }, get car(){ return car; }, get carIdx(){ return carIdx; }, get tool(){ return tool; }, remaining: () => car ? remaining(car) : [], toScreen, useToolStep, chooseTool, book: () => book };
+})();
+</script>
+</body>
+</html>
