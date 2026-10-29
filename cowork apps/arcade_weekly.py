@@ -7,7 +7,8 @@ saves test_reports/arcade-weekly.json and a line in arcade-weekly.log, and sends
 names and results to the house status page - the URLs in test_reports/report-to.txt
 (gitignored; this repo is public), with /door/apps swapped for /door/arcade.
 
-    python arcade_weekly.py                 every tile (~55 min)
+    python arcade_weekly.py                 every tile (~55 min), then the worksheet fill-in
+                                            check and the phone fit check (~25 min more)
     python arcade_weekly.py "^party-simon"  just the matching tile ids
 Runs from the "CoworkApps-ArcadeWeekly" scheduled task (pythonw, no window).
 """
@@ -44,6 +45,23 @@ def blanks_check():
     return bad
 
 
+def phone_fit(root):
+    """Every tile and game file on a phone with its browser bars showing (phone_fit_check.js,
+    28 Oct 2026). The nightly check covers NEW apps only; this catches an edit that pushes an
+    existing game under the toolbar. Returns what failed, shaped like broken tiles."""
+    r = subprocess.run([NODE, os.path.join(HERE, "phone_fit_check.js"), root], cwd=HERE, capture_output=True,
+                       text=True, encoding="utf-8", timeout=2 * 3600, creationflags=NO_WINDOW)
+    try:
+        results = json.loads(r.stdout)["results"]
+    except (ValueError, KeyError):
+        log("phone fit check failed (exit %s): %s" % (r.returncode, (r.stderr or r.stdout)[-300:].strip()))
+        return [{"name": "Phone fit check", "ok": False, "problems": ["the check itself failed"]}]
+    bad = [{"name": "Phone fit: %s (%s)" % (x["what"], x["how"]), "ok": False, "problems": x["problems"]}
+           for x in results if not x["ok"]]
+    log("phone fit: %d checks, %s" % (len(results), "%d cut off" % len(bad) if bad else "all fit"))
+    return bad
+
+
 def main():
     root = os.environ.get("ARCADE_ROOT") or os.path.dirname(HERE)      # a throwaway copy, for tests
     args = [NODE, os.path.join(HERE, "arcade_play_check.js"), root] + sys.argv[1:2]
@@ -58,6 +76,7 @@ def main():
     bad = [t for t in result["tiles"] if not t["ok"]]
     if not sys.argv[1:2]:
         bad += blanks_check()
+        bad += phone_fit(root)
     log("played %d tiles, %d need a look%s" % (len(result["tiles"]), len(bad),
         (": " + ", ".join(t["name"] for t in bad)) if bad else ""))
 
