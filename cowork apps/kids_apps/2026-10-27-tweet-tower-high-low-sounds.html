@@ -1,0 +1,248 @@
+<!-- CONCEPT: Tweet Tower - ear-training music game where kids hear two notes and tap Higher/Lower, then match a mystery note to the right stair so Tweety the chick climbs to the treetop nest (pitch high/low recognition). -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Tweet Tower - High &amp; Low Sounds</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;height:100%;font-family:"Trebuchet MS","Comic Sans MS",system-ui,sans-serif;background:linear-gradient(#8fdcff 0%,#d9f5ff 60%,#b8f0a0 60%,#8fdc6e 100%);color:#3b2a6b;overflow:hidden}
+#app{max-width:760px;margin:0 auto;height:100%;display:flex;flex-direction:column;padding:10px 12px}
+h1{margin:4px 0 0;font-size:clamp(26px,6vw,44px);text-align:center;color:#ff6a3d;text-shadow:3px 3px 0 #fff}
+.desc{text-align:center;font-size:clamp(15px,3.4vw,20px);margin:4px 0 8px;font-weight:bold}
+.screen{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:0}
+.screen.on{display:flex}
+button{font:inherit;border:0;cursor:pointer;border-radius:26px;padding:14px 26px;font-size:clamp(20px,5vw,30px);font-weight:bold;color:#fff;box-shadow:0 7px 0 rgba(0,0,0,.22);transition:transform .08s}
+button:active{transform:translateY(5px);box-shadow:0 2px 0 rgba(0,0,0,.22)}
+button:disabled{opacity:.5}
+.big{background:#d94a1f;font-size:clamp(28px,7vw,44px);padding:18px 44px}
+.big2{background:#3fb950}
+.hi{background:#2f9bff}.lo{background:#a35bff}.ok{background:#3fb950}
+#hud{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#eggs{display:flex;gap:4px;flex-wrap:wrap}
+.egg{width:24px;height:30px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;background:#fff;border:3px solid #ffb84d;transition:.3s}
+.egg.done{background:#ffd93d;transform:scale(1.15)}
+.egg.star{background:#ffd93d;box-shadow:0 0 10px #ffa800}
+#say{font-size:clamp(20px,4.8vw,30px);font-weight:bold;text-align:center;min-height:2.4em;margin:6px 0}
+#replay{background:#ff9f1c;padding:8px 18px;font-size:22px;border-radius:20px}
+#stage{position:relative;flex:1;width:100%;min-height:220px;display:flex;align-items:flex-end;justify-content:center;gap:6px}
+.step{flex:1;max-width:130px;border-radius:16px 16px 0 0;display:flex;align-items:flex-start;justify-content:center;font-size:30px;font-weight:bold;color:#fff;padding-top:8px;cursor:pointer;position:relative;box-shadow:inset 0 -8px 0 rgba(0,0,0,.15);transition:filter .15s,transform .15s}
+.step.lit{filter:brightness(1.35) saturate(1.2);transform:scaleY(1.04)}
+.step.sel{outline:6px solid #fff}
+.step.hint{animation:pulse .6s infinite alternate}
+.step.wob{animation:wob .4s}
+@keyframes pulse{to{transform:scale(1.07);filter:brightness(1.4)}}
+@keyframes wob{25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+#bird{position:absolute;font-size:clamp(44px,10vw,70px);transition:left .35s cubic-bezier(.3,1.6,.5,1),bottom .35s cubic-bezier(.3,1.6,.5,1);pointer-events:none;line-height:1}
+#bird.sing{animation:hop .35s}
+@keyframes hop{50%{margin-bottom:22px}}
+#nest{position:absolute;right:2%;top:0;font-size:clamp(40px,9vw,64px)}
+#btns{display:flex;gap:14px;justify-content:center;padding:10px 0 6px;flex-wrap:wrap}
+#btns button{min-width:150px}
+.panel{background:#fff;border-radius:28px;padding:20px 24px;text-align:center;box-shadow:0 8px 0 rgba(0,0,0,.15);max-width:520px;font-size:clamp(18px,4.4vw,24px);font-weight:bold}
+.panel .em{font-size:64px}
+#conf{position:fixed;inset:0;pointer-events:none;z-index:9}
+</style>
+</head>
+<body>
+<div id="app">
+  <h1>🐤 Tweet Tower 🎵</h1>
+  <p class="desc">Listen to the notes! Is the sound HIGH or LOW? Help Tweety climb up to the treetop nest.</p>
+
+  <div id="s-start" class="screen on">
+    <div class="panel"><div class="em">🐤⬆️🎶</div>Tweety sings two notes.<br>Is the second one <b style="color:#0977d0">higher</b> or <b style="color:#a35bff">lower</b>?<br>Then find mystery notes on the stairs!</div>
+    <button class="big" id="play">▶ Let's Play!</button>
+  </div>
+
+  <div id="s-game" class="screen">
+    <div id="hud" style="width:100%"><div id="eggs"></div><button id="replay">🔊 Again</button></div>
+    <div id="say"></div>
+    <div id="stage"><div id="nest">🌳</div><div id="bird">🐤</div></div>
+    <div id="btns"></div>
+  </div>
+
+  <div id="s-end" class="screen">
+    <div class="panel"><div class="em">🏆🐤🎉</div><div id="endtxt"></div></div>
+    <button class="big big2" id="again">↻ Play Again</button>
+  </div>
+</div>
+<canvas id="conf"></canvas>
+
+<script>
+(function(){
+const COLORS=['#ff5d5d','#ff9f1c','#ffd93d','#3fb950','#2f9bff'];
+const FREQ=[261.63,293.66,329.63,392.00,440.00];
+const TOTAL=10;
+let ac=null, round=0, mode='A', notes=[], tries=0, stars=0, locked=true, sel=-1, target=-1, prevTarget=-1, timers=[];
+const $=id=>document.getElementById(id);
+const stage=$('stage'), bird=$('bird');
+let steps=[];
+
+function audio(){ if(!ac){ try{ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } if(ac&&ac.state==='suspended') ac.resume(); }
+function tone(f,dur=0.5,type='triangle',vol=0.35,when=0){
+  if(!ac) return; const t=ac.currentTime+when;
+  const o=ac.createOscillator(), g=ac.createGain();
+  o.type=type; o.frequency.setValueAtTime(f,t);
+  g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(vol,t+0.03); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+dur+0.05);
+}
+function cheer(){[523,659,784,1047].forEach((f,i)=>tone(f,0.3,'triangle',0.3,i*0.1));}
+function boing(){tone(220,0.18,'sine',0.25);tone(247,0.2,'sine',0.25,0.12);}
+function later(fn,ms){const t=setTimeout(fn,ms);timers.push(t);}
+function clearTimers(){timers.forEach(clearTimeout);timers=[];}
+
+function buildStage(){
+  steps.forEach(s=>s.remove()); steps=[];
+  for(let i=0;i<5;i++){
+    const d=document.createElement('div'); d.className='step'; d.style.background=COLORS[i];
+    d.dataset.i=i; d.textContent=(mode==='B'?(i+1):'');
+    d.addEventListener('click',()=>stepTap(i)); stage.appendChild(d); steps.push(d);
+  }
+  stage.insertBefore(bird,null);
+}
+function sizeSteps(){const h=Math.max(150,stage.clientHeight-70);steps.forEach((d,i)=>d.style.height=Math.round(h*(0.3+i*0.175))+'px');}
+function placeBird(i,instant){sizeSteps();
+  const s=steps[i]; if(!s) return;
+  const sr=s.getBoundingClientRect(), pr=stage.getBoundingClientRect();
+  const left=sr.left-pr.left+sr.width/2-bird.offsetWidth/2;
+  const bottom=pr.bottom-sr.top-4;
+  if(instant){bird.style.transition='none';}
+  bird.style.left=left+'px'; bird.style.bottom=bottom+'px';
+  if(instant){void bird.offsetWidth;bird.style.transition='';}
+}
+function flash(i,ms=420){
+  const s=steps[i]; if(!s) return; s.classList.add('lit'); placeBird(i);
+  bird.classList.remove('sing'); void bird.offsetWidth; bird.classList.add('sing');
+  later(()=>s.classList.remove('lit'),ms);
+}
+function playNote(i,when=0,dur=0.55){
+  later(()=>{flash(i);tone(FREQ[i],dur);},when*1000);
+}
+function eggs(){
+  const e=$('eggs'); e.innerHTML='';
+  for(let i=0;i<TOTAL;i++){const d=document.createElement('div');d.className='egg'+(i<round?' done':'');e.appendChild(d);}
+}
+function setSay(t){$('say').textContent=t;}
+
+function pickA(){
+  const gap = round<2?3:1;
+  let a,b; do{a=Math.floor(Math.random()*5);b=Math.floor(Math.random()*5);}while(Math.abs(a-b)<gap);
+  return [a,b];
+}
+function startRound(){
+  clearTimers(); tries=0; sel=-1; locked=true;
+  mode = round<5?'A':'B';
+  const wasB = steps.length && steps[0].textContent!=='';
+  if((mode==='B')!==wasB || !steps.length) buildStage();
+  steps.forEach(s=>s.classList.remove('hint','sel','wob'));
+  eggs();
+  const btns=$('btns'); btns.innerHTML='';
+  if(mode==='A'){
+    notes=pickA();
+    setSay('Listen to two notes... 👂');
+    const up=mkBtn('⬆ Higher','hi',()=>answerA(true));
+    const dn=mkBtn('⬇ Lower','lo',()=>answerA(false));
+    btns.append(up,dn);
+    placeBird(0,true);
+    playSeqA(true);
+  }else{
+    do{ target = round<7 ? [0,2,4][Math.floor(Math.random()*3)] : Math.floor(Math.random()*5);}while(target===prevTarget);
+    prevTarget=target;
+    setSay(round===5?'Mystery note! Tap a step to hear it, then press ✔':'Which step sings the mystery note?');
+    const chk=mkBtn('✔ This One!','ok',()=>answerB());
+    chk.id='chk'; chk.disabled=true; btns.append(chk);
+    placeBird(0,true);
+    later(playMystery,500);
+  }
+}
+function mkBtn(t,c,fn){const b=document.createElement('button');b.className=c;b.textContent=t;b.onclick=()=>{audio();fn();};return b;}
+function playSeqA(first){
+  locked=true;
+  playNote(notes[0],0.2); playNote(notes[1],1.1);
+  later(()=>{locked=false;if(first)setSay('Was the 2nd note higher or lower? 🤔');},1900);
+}
+function playMystery(){
+  locked=true; steps.forEach(s=>s.classList.remove('lit'));
+  later(()=>{flash(0,0);},0); // park bird
+  tone(FREQ[target],0.9,'triangle',0.4);
+  bird.classList.remove('sing');void bird.offsetWidth;bird.classList.add('sing');
+  later(()=>{locked=false;},800);
+}
+function replay(){
+  audio(); if(locked) return;
+  if(mode==='A') playSeqA(false); else { if(sel>=0){} playMystery(); }
+}
+function stepTap(i){
+  audio();
+  if(locked) { return; }
+  if(mode==='A'){ playNote(i,0); return; }
+  sel=i; steps.forEach((s,k)=>s.classList.toggle('sel',k===i));
+  playNote(i,0); $('chk').disabled=false;
+}
+function answerA(saysHigher){
+  if(locked) return;
+  const correct = (notes[1]>notes[0])===saysHigher;
+  if(correct) success(); else gentle('Hmm, listen again! 🎧',()=>{tries++;playSeqA(false);});
+}
+function answerB(){
+  if(locked||sel<0) return;
+  if(sel===target) success();
+  else{
+    steps[sel].classList.add('wob'); boing(); tries++;
+    gentle('Almost! Listen again 🎧',()=>{
+      steps.forEach(s=>s.classList.remove('wob','sel'));$('chk').disabled=true;sel=-1;
+      if(tries>=2){steps[target].classList.add('hint');setSay('Try the bouncing step! ✨');}
+      playMystery();
+    });
+  }
+}
+function gentle(msg,fn){ locked=true; setSay(msg); later(fn,900); }
+function success(){
+  locked=true; cheer();
+  const first = tries===0; if(first) stars++;
+  const egg=document.querySelectorAll('.egg')[round]; if(egg) egg.classList.add('done',first?'star':'x');
+  if(mode==='B'){ placeBird(target); steps[target].classList.add('lit'); }
+  else placeBird(notes[1]);
+  setSay(first?'⭐ Wow, perfect! ⭐':'Great job! 🎉');
+  burst(first?60:30);
+  round++;
+  later(()=>{ round>=TOTAL?finish():startRound(); },1700);
+}
+function finish(){
+  clearTimers(); eggs();
+  show('s-end'); cheer(); later(cheer,500); burst(160);
+  const msg = stars>=8?'Super ears! You are a music star!':stars>=5?'Great listening! Tweety loves your ears!':'Tweety made it to the nest! Every play makes your ears stronger!';
+  $('endtxt').innerHTML = msg+'<br><br>First-try stars: '+'⭐'.repeat(stars)+(stars===0?'🌱':'')+' ('+stars+'/'+TOTAL+')';
+}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));}
+function newGame(){
+  audio(); round=0; stars=0; prevTarget=-1; mode='A'; show('s-game'); buildStage(); setTimeout(startRound,50);
+}
+$('play').onclick=newGame; $('again').onclick=newGame; $('replay').onclick=replay;
+window.addEventListener('resize',()=>{ if(steps.length){ placeBird(mode==='A'?(notes[1]||0):(sel>=0?sel:0),true);} });
+document.addEventListener('keydown',e=>{
+  if(!$('s-game').classList.contains('on')) { if(e.key==='Enter'||e.key===' '){ if($('s-start').classList.contains('on'))newGame(); else if($('s-end').classList.contains('on'))newGame(); } return; }
+  if(e.key==='ArrowUp'){e.preventDefault(); if(mode==='A')answerA(true); else {stepTap(Math.min(4,sel<0?0:sel+1));}}
+  else if(e.key==='ArrowDown'){e.preventDefault(); if(mode==='A')answerA(false); else {stepTap(Math.max(0,sel<0?0:sel-1));}}
+  else if(e.key==='Enter'||e.key===' '){e.preventDefault(); if(mode==='B')answerB(); else replay();}
+  else if(e.key==='r'||e.key==='R'){replay();}
+});
+
+/* confetti */
+const cv=$('conf'), cx=cv.getContext('2d'); let parts=[], raf=0;
+function fit(){cv.width=innerWidth;cv.height=innerHeight;} fit(); addEventListener('resize',fit);
+function burst(n){
+  for(let i=0;i<n;i++) parts.push({x:innerWidth/2+(Math.random()-.5)*200,y:innerHeight*0.45,vx:(Math.random()-.5)*14,vy:-Math.random()*13-3,c:COLORS[i%5],s:6+Math.random()*8,l:90+Math.random()*40});
+  if(!raf) raf=requestAnimationFrame(tick);
+}
+function tick(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  parts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=0.35;p.l--;cx.fillStyle=p.c;cx.fillRect(p.x,p.y,p.s,p.s);});
+  parts=parts.filter(p=>p.l>0&&p.y<cv.height);
+  raf = parts.length?requestAnimationFrame(tick):0; if(!raf)cx.clearRect(0,0,cv.width,cv.height);
+}
+})();
+</script>
+</body>
+</html>
