@@ -78,10 +78,21 @@ def private_names_in(text, path=None):
     return sorted(n for n in set(names) if re.search(r"\b%s\b" % re.escape(n), text, re.I))
 
 
+# A kids app whose file name says it teaches something goes in Learn & Play, not Little Kids
+# (28 Oct 2026: the regroup had to move 13 of them by hand).
+LEARN_WORDS = re.compile(r"math|count|number|add|subtract|letter|abc|alphabet|spell|phonic|rhym|read|"
+                         r"measur|shape|pattern|science|sink-or-float|weather|coin|money|clock|tell-time|"
+                         r"sudoku|fraction|vowel|sight-word|gear", re.I)
+
+
 def section_for(rel):
     """The Arcade section an app's folder belongs to, or None if the folder has none
     (the VR folders, review-kit, ... - not Arcade games, or not placed yet)."""
-    return SECTION_OF.get(rel.replace("\\", "/").split("/")[0])
+    rel = rel.replace("\\", "/")
+    sec = SECTION_OF.get(rel.split("/")[0])
+    if sec == "kids" and LEARN_WORDS.search(rel.split("/")[-1]):
+        return "learn"
+    return sec
 
 
 def waiting_ready(checked):

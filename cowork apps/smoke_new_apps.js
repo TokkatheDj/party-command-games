@@ -51,7 +51,8 @@ const IGNORE = /SpeechSynthesisErrorEvent|Speech synthesis error|ERR_REQUEST_RAN
 // browser bar while every check here passed - a test browser has no bars. phone_fit_check.js
 // imitates them; an app that leaves a button or its play area off the screen fails "does it play".
 const fit = require("./phone_fit_check");
-const AXE = "D:/Documents/Claude Local/canopy-hr/node_modules/axe-core/axe.min.js";
+// AXE_CORE overrides the path on a machine without the canopy-hr checkout (the Surface).
+const AXE = process.env.AXE_CORE || "D:/Documents/Claude Local/canopy-hr/node_modules/axe-core/axe.min.js";
 const axeSrc = fs.existsSync(AXE) ? fs.readFileSync(AXE, "utf8") : null;
 
 async function a11yScan(browser, rel) {

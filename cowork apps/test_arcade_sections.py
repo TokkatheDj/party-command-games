@@ -29,6 +29,14 @@ class Sections(unittest.TestCase):
         self.assertEqual(add_to_arcade.section_for("party_apps/x.html"), "party")
         self.assertIsNone(add_to_arcade.section_for("vr_puzzle_apps/x.html"))
 
+    def test_learning_kids_apps_go_to_learn(self):
+        f = add_to_arcade.section_for
+        self.assertEqual(f("kids_apps/2026-10-27-amigos-candy-math.html"), "learn")
+        self.assertEqual(f("kids_apps/2026-10-20-rhyme-time-train.html"), "learn")
+        self.assertEqual(f("kids_apps/2026-10-16-otto-sink-or-float-lab.html"), "learn")
+        self.assertEqual(f("kids_apps/2026-10-27-benny-fix-it-garage.html"), "kids")
+        self.assertEqual(f("party_apps/2026-10-28-trivia-vowel-play.html"), "party")   # only kids apps move
+
     def test_waiting_splits_placeable_from_unplaced(self):
         placeable, unplaced = add_to_arcade.waiting_ready(APPS)
         self.assertEqual(placeable, ["Action Games/a-reflex-game.html", "kids_apps/a-kids-game.html",
