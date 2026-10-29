@@ -387,7 +387,7 @@ body.answer-key-mode .glin-ans{display:inline;}
   @page{size:letter portrait;margin:.6in .6in;}
   body{background:#fff;}
   #global-header{display:none!important;}
-  #subject-bar{display:none!important;}
+  #subject-bar,#subject-subbar{display:none!important;}
   #topic-bar{display:none!important;}
   .editor-strip{display:none!important;}
   #teacher-panel{display:none!important;}
@@ -636,6 +636,9 @@ body.answer-key-mode .gph-layer{opacity:1;}
 }
 
 /* ── 6th GRADE COURSE (unit buttons, generated lessons) ── */
+#subject-subbar{background:#f3f8f5;border-bottom:1px solid #ddd;display:flex;align-items:center;padding:0 20px;overflow-x:auto;}
+#subject-subbar[hidden]{display:none;}
+#subject-subbar .subj-btn{padding:8px 14px;font-size:11px;}
 .subj-grp{width:auto;background:none;margin:0 2px 0 12px;padding:0 6px;font:700 10px var(--ui);color:#0f5c73;letter-spacing:.08em;text-transform:uppercase;align-self:center;white-space:nowrap;}
 .subj-btn[data-subj^="g6u"]{padding:10px 12px;}
 .subj-btn[data-subj^="g6u"].active{background:#0f5c73;color:#fff;}
@@ -792,6 +795,19 @@ body.answer-key-mode .gph-layer{opacity:1;}
   <button class="subj-btn active" data-subj="basic"       onclick="switchSubject('basic')">Basic Arithmetic</button>
   <button class="subj-btn" data-subj="elementary"  onclick="switchSubject('elementary')">Elementary Math</button>
   <button class="subj-btn" data-subj="prealgebra" onclick="switchSubject('prealgebra')">Pre-Algebra</button>
+  <span class="subj-divider" title="High School"></span>
+  <button class="subj-btn" data-subj="algebra1"   onclick="switchSubject('algebra1')">Algebra 1</button>
+  <button class="subj-btn" data-subj="algebra2"   onclick="switchSubject('algebra2')">Algebra 2</button>
+  <button class="subj-btn" data-subj="geometry"   onclick="switchSubject('geometry')">Geometry</button>
+  <button class="subj-btn" data-subj="trig"       onclick="switchSubject('trig')">Trigonometry</button>
+  <button class="subj-btn" data-subj="calculus"   onclick="switchSubject('calculus')">Calculus</button>
+  <span class="subj-divider" title="Life Skills"></span>
+  <button class="subj-btn" data-subj="finance"     onclick="switchSubject('finance')">Personal Finance</button>
+</div>
+<!-- Pre-Algebra's second row: its own topics, then the 6th Grade units (28 Oct 2026 - they used to
+     crowd the main row). Shown while Pre-Algebra or a unit is the subject. -->
+<div id="subject-subbar" role="navigation" aria-label="Pre-Algebra and 6th Grade units" hidden>
+  <button class="subj-btn" data-subj="prealgebra" onclick="switchSubject('prealgebra')">Pre-Algebra topics</button>
   <span class="subj-divider subj-grp" title="6th Grade Math &mdash; Big Ideas Math curriculum">6th Grade</span>
   <button class="subj-btn" data-subj="g6u1" title="Unit 1: Numerical Expressions and Factors" onclick="switchSubject('g6u1')">Unit 1</button>
   <button class="subj-btn" data-subj="g6u2" title="Unit 2: Fractions and Decimals" onclick="switchSubject('g6u2')">Unit 2</button>
@@ -803,14 +819,6 @@ body.answer-key-mode .gph-layer{opacity:1;}
   <button class="subj-btn" data-subj="g6u8" title="Unit 8: Integers, Number Lines, and the Coordinate Plane" onclick="switchSubject('g6u8')">Unit 8</button>
   <button class="subj-btn" data-subj="g6u9" title="Unit 9: Statistical Measures" onclick="switchSubject('g6u9')">Unit 9</button>
   <button class="subj-btn" data-subj="g6u10" title="Unit 10: Data Displays" onclick="switchSubject('g6u10')">Unit 10</button>
-  <span class="subj-divider" title="High School"></span>
-  <button class="subj-btn" data-subj="algebra1"   onclick="switchSubject('algebra1')">Algebra 1</button>
-  <button class="subj-btn" data-subj="algebra2"   onclick="switchSubject('algebra2')">Algebra 2</button>
-  <button class="subj-btn" data-subj="geometry"   onclick="switchSubject('geometry')">Geometry</button>
-  <button class="subj-btn" data-subj="trig"       onclick="switchSubject('trig')">Trigonometry</button>
-  <button class="subj-btn" data-subj="calculus"   onclick="switchSubject('calculus')">Calculus</button>
-  <span class="subj-divider" title="Life Skills"></span>
-  <button class="subj-btn" data-subj="finance"     onclick="switchSubject('finance')">Personal Finance</button>
 </div>
 
 <!-- TOPIC BAR (populated by JS) -->
@@ -2178,12 +2186,24 @@ G6_CURRICULUM.forEach(function(U){
 var currentSubject = 'basic';
 var currentModule  = 'counting';
 
+// Light the subject's buttons; a 6th Grade unit also keeps Pre-Algebra lit in the main row,
+// and Pre-Algebra's second row (its topics + the units) shows for either.
+function syncSubjectButtons(subj) {
+  var inPre = subj === 'prealgebra' || /^g6u/.test(subj);
+  document.querySelectorAll('.subj-btn').forEach(function(b){
+    var main = b.parentNode.id === 'subject-bar';
+    b.classList.toggle('active', b.dataset.subj === subj || (main && inPre && b.dataset.subj === 'prealgebra'));
+  });
+  var sub = document.getElementById('subject-subbar');
+  if(sub) sub.hidden = !inPre;
+  // a focused app with nothing left in the main row (6th Grade Math) drops the empty row
+  var bar = document.getElementById('subject-bar');
+  if(bar) bar.style.display = [].some.call(bar.querySelectorAll('.subj-btn'), function(b){ return b.style.display !== 'none'; }) ? '' : 'none';
+}
+
 function switchSubject(subj) {
   currentSubject = subj;
-  // update subject button styles
-  document.querySelectorAll('.subj-btn').forEach(function(b){
-    b.classList.toggle('active', b.dataset.subj === subj);
-  });
+  syncSubjectButtons(subj);
   // pick first topic in this subject
   var first = SUBJECTS[subj][0].id;
   renderTopicBar(subj, first);
@@ -9969,7 +9989,7 @@ document.querySelectorAll('.module').forEach(function(m){m.classList.remove('act
 
 renderTopicBar(currentSubject, currentModule);
 switchModule(currentModule);
-document.querySelectorAll('.subj-btn').forEach(function(b){ b.classList.toggle('active', b.dataset.subj===currentSubject); });
+syncSubjectButtons(currentSubject);
 updateAllMeta();
 // Inject toolbars after all modules have rendered
 setTimeout(injectToolbars, 100);
