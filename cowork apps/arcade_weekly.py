@@ -45,6 +45,44 @@ def blanks_check():
     return bad
 
 
+SUBJECTS_LIVE = ("https://tokkathedj.github.io/party-command-games/cowork%20apps/Educational%20Apps/"
+                 "educational_apps/2026-10-29-guided-subject-worksheets.html")
+
+
+def subjects_check():
+    """Every Science/English/Art/History/Spanish worksheet on the live site can be done in student
+    mode and checks answers right (subject_worksheets_check.js, built with the app 29 Oct 2026)."""
+    r = subprocess.run([NODE, os.path.join(HERE, "subject_worksheets_check.js"), SUBJECTS_LIVE], cwd=HERE,
+                       capture_output=True, text=True, encoding="utf-8", timeout=3600, creationflags=NO_WINDOW)
+    try:
+        res = json.loads(r.stdout[r.stdout.index("{"):])
+    except ValueError:
+        log("subject worksheets check failed (exit %s): %s" % (r.returncode, (r.stderr or r.stdout)[-300:].strip()))
+        return [{"name": "Subject worksheets", "ok": False, "problems": ["the check itself failed"]}]
+    probs = res.get("failures", []) + ["dialog: " + d for d in res.get("dialogs", [])] + res.get("errors", [])
+    log("subject worksheets: %s topics, %s problems, %s" % (res.get("topics"), res.get("problems"),
+        "%d need a look" % len(probs) if probs or not res.get("ok") else "all pass"))
+    return [] if res.get("ok") and not probs else [{"name": "Subject worksheets", "ok": False, "problems": probs or ["check not ok"]}]
+
+
+def worksheet_a11y():
+    """Every worksheet of both worksheet apps, live, passes the accessibility scan in student mode at
+    phone and desktop width (worksheet_a11y_check.js, 29 Oct 2026). The nightly scan sees only an
+    app's opening screen; the 29 Oct contrast slips were behind tabs."""
+    r = subprocess.run([NODE, os.path.join(HERE, "worksheet_a11y_check.js")], cwd=HERE, capture_output=True,
+                       text=True, encoding="utf-8", timeout=5400, creationflags=NO_WINDOW)
+    try:
+        pages = json.loads(r.stdout)["pages"]
+    except (ValueError, KeyError):
+        log("worksheet accessibility check failed (exit %s): %s" % (r.returncode, (r.stderr or r.stdout)[-300:].strip()))
+        return [{"name": "Worksheets: accessibility", "ok": False, "problems": ["the check itself failed"]}]
+    bad = [{"name": "Worksheets accessibility: " + p["url"].split("/")[-1], "ok": False,
+            "problems": p.get("issues", []) + p.get("errors", [])} for p in pages if not p["ok"]]
+    log("worksheet accessibility: %d views, %s" % (sum(p.get("views", 0) for p in pages),
+        "%d page(s) need a look" % len(bad) if bad else "clean"))
+    return bad
+
+
 def phone_fit(root):
     """Every tile and game file on a phone with its browser bars showing (phone_fit_check.js,
     28 Oct 2026). The nightly check covers NEW apps only; this catches an edit that pushes an
@@ -75,7 +113,7 @@ def main():
     json.dump(result, open(OUT, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
     bad = [t for t in result["tiles"] if not t["ok"]]
     if not sys.argv[1:2]:
-        bad += blanks_check()
+        bad += blanks_check() + subjects_check() + worksheet_a11y()
         bad += phone_fit(root)
     log("played %d tiles, %d need a look%s" % (len(result["tiles"]), len(bad),
         (": " + ", ".join(t["name"] for t in bad)) if bad else ""))
