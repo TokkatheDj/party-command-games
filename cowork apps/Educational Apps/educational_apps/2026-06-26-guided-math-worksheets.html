@@ -361,6 +361,15 @@ body.answer-key-mode .glin-ans{display:inline;}
 @media print{body.answer-key-mode .glin-fill{display:none!important;}body.answer-key-mode .glin-ans{display:inline!important;}}
 .glin-steps-col{min-width:0;}
 .graph-label{font-size:10px;color:#666;text-align:center;}
+.uc-tap{display:none;}
+body.student-mode .uc-tap{display:inline;color:#1d6a96;font-weight:700;}
+body.student-mode .uc-draw{cursor:crosshair;}
+body.student-mode .uc-draw svg{border-radius:50%;}
+body.student-mode .uc-draw:hover svg{background:#f3f8fc;}
+.uc-msg{font-size:11px;text-align:center;min-height:14px;max-width:200px;margin:2px auto 0;line-height:1.25;}
+.uc-msg.ok{color:#2e7d32;font-weight:700;}
+.uc-msg.no{color:#c62828;}
+@media print{.uc-try,.uc-msg{display:none!important;}}
 
 /* systems method badges */
 .prob-header{display:flex;align-items:baseline;gap:7px;margin-bottom:9px;}
@@ -449,8 +458,10 @@ body.streamlined-mode .prob-body .steps { display: none !important; }
 body.streamlined-mode .prob-score-badge { display: none !important; }
 body.streamlined-mode .direction-hint { display: none !important; }
 body.streamlined-mode .prob-check-bar .show-answer { display: none !important; }
-/* Scaffolded, stepped problems answer via the steps — hide the redundant "Type final answer" box. */
-body.student-mode:not(.streamlined-mode) .problem:has(.steps) .prob-check-bar { display: none !important; }
+/* Scaffolded problems with tap-through steps answer via those steps — hide the redundant "Type final answer"
+   box. Write-in steps (Unit Circle, Box Method...) grade nothing, so those keep the box (29 Oct 2026: Unit
+   Circle had no way to answer, and Check All popped "Type your answer first!" at boxes nobody could see). */
+body.student-mode:not(.streamlined-mode) .problem:has(.interactive-step) .prob-check-bar { display: none !important; }
 body.streamlined-mode .solution-box { margin-top: 18px; }
 /* Streamlined hides every step and the on-screen answer box is not printed, so a printed
    streamlined sheet used to be just the questions. Each problem gets working lines and an
@@ -2765,6 +2776,7 @@ var UC = (function(){
     svg+='<text x="'+(cx-r*0.7)+'" y="'+(cy+r*0.62)+'">III</text>';
     svg+='<text x="'+(cx+r*0.52)+'" y="'+(cy+r*0.62)+'">IV</text>';
     svg+='</g>';
+    svg+='<g class="ak-shade">';   // the drawn answer: answer key only
     var arcR=r*0.3,axEnd=cx+arcR,ayEnd=cy,axSt=cx+arcR*Math.cos(-rad),aySt=cy+arcR*Math.sin(-rad);
     var la=angleDeg>180?1:0;
     svg+='<path d="M '+axEnd+' '+ayEnd+' A '+arcR+' '+arcR+' 0 '+la+' 0 '+axSt+' '+aySt+'" fill="none" stroke="#1d6a96" stroke-width="1.2" stroke-dasharray="3,2"/>';
@@ -2772,6 +2784,7 @@ var UC = (function(){
     svg+='<circle cx="'+px+'" cy="'+py+'" r="3.5" fill="#1d6a96" stroke="#fff" stroke-width="1.2"/>';
     var mlx=cx+(arcR+8)*Math.cos(-rad/2),mly=cy+(arcR+8)*Math.sin(-rad/2);
     svg+='<text x="'+mlx+'" y="'+mly+'" font-size="8" font-family="sans-serif" fill="#1d6a96" text-anchor="middle">'+angleDeg+'°</text>';
+    svg+='</g><g class="uc-try"></g>';
     svg+='</svg>';return svg;
   }
 
@@ -2779,7 +2792,8 @@ var UC = (function(){
     var ri=refA(p.angle),qN=['','Quadrant I','Quadrant II','Quadrant III','Quadrant IV'][ri.quad];
     var h='<div class="problem"><div class="prob-num">'+(idx+1)+'.</div>';
     h+='<div class="prob-prompt">Draw <b>'+p.angle+'°</b> on the unit circle below, then find its reference angle.</div>';
-    h+='<div class="prob-body"><div class="graph-area"><div class="graph-label">Draw the angle.</div>'+makeCircle(p.angle)+'</div>';
+    h+='<div class="prob-body"><div class="graph-area"><div class="graph-label">Draw the angle.<span class="uc-tap"> Tap the circle where it ends.</span></div>'
+      +'<div class="uc-draw" data-idx="'+idx+'" data-angle="'+p.angle+'">'+makeCircle(p.angle)+'</div><div class="uc-msg" aria-live="polite"></div></div>';
     h+='<div class="steps">';
     h+='<div class="step"><div class="step-q"><b>Step 1.</b> Start from the positive x-axis and rotate <span class="choices"><span class="opt">counter-clockwise</span>/<span class="opt">clockwise</span></span> by <span class="blank sm"></span>°.</div></div>';
     h+='<div class="step"><div class="step-q"><b>Step 2.</b> The terminal side lies in <span class="choices"><span class="opt">Q I</span>/<span class="opt">Q II</span>/<span class="opt">Q III</span>/<span class="opt">Q IV</span></span>, because '+p.angle+'° is between <span class="blank sm"></span>° and <span class="blank sm"></span>°.</div></div>';
@@ -2796,10 +2810,41 @@ var UC = (function(){
     problems.forEach(function(p,i){var ri=refA(p.angle);h+='<div class="prow"><span class="prow-num">'+(i+1)+'.</span><div class="pf"><label>Angle (°)</label><input type="number" value="'+p.angle+'" min="0" max="360" oninput="UC.set('+i+',this.value)"></div><span style="font-size:10px;color:#6b6b6b;margin-left:4px;">'+['','Q I','Q II','Q III','Q IV'][ri.quad]+', ref='+ri.ref+'°</span><button class="pdel" onclick="UC.del('+i+')">&#x2715;</button></div>';});
     document.getElementById('uc-prob-list').innerHTML=h;
   }
-  function renderWS(){document.getElementById('uc-area').innerHTML=problems.map(probHTML).join('');document.getElementById('uc-meta').innerHTML=getMeta();}
+  function renderWS(){document.getElementById('uc-area').innerHTML=problems.map(probHTML).join('');document.getElementById('uc-meta').innerHTML=getMeta();restoreDraws();}
+  // the student's line: within 10 degrees counts, and then it snaps onto the exact angle
+  function drawTry(box, deg){
+    var target=+box.dataset.angle, diff=Math.abs(((deg-target)%360+540)%360-180), ok=diff<=10;
+    if(ok) deg=target;
+    var cx=100,cy=100,r=78,rad=deg*Math.PI/180,px=cx+r*Math.cos(-rad),py=cy+r*Math.sin(-rad);
+    var col=ok?'#2e7d32':'#c62828',arcR=r*0.3,la=deg>180?1:0;
+    var g='<path d="M '+(cx+arcR)+' '+cy+' A '+arcR+' '+arcR+' 0 '+la+' 0 '+(cx+arcR*Math.cos(-rad))+' '+(cy+arcR*Math.sin(-rad))+'" fill="none" stroke="'+col+'" stroke-width="1.2" stroke-dasharray="3,2"/>'
+      +'<line x1="'+cx+'" y1="'+cy+'" x2="'+px+'" y2="'+py+'" stroke="'+col+'" stroke-width="2.4" stroke-linecap="round"/>'
+      +'<circle cx="'+px+'" cy="'+py+'" r="4" fill="'+col+'" stroke="#fff" stroke-width="1.2"/>';
+    box.querySelector('.uc-try').innerHTML=g;
+    var msg=box.parentNode.querySelector('.uc-msg');
+    msg.className='uc-msg '+(ok?'ok':'no');
+    msg.textContent=ok?'✓ That\'s '+target+'°!':'That line is at '+deg+'°. Try again - start at 0° and turn counter-clockwise.';
+  }
+  function restoreDraws(){
+    if(typeof studentState==='undefined') return;
+    document.querySelectorAll('#uc-area .uc-draw').forEach(function(box){
+      var v=studentState.inputs['unitcircle:'+box.dataset.idx+':draw'];
+      if(v!==undefined && v!=='') drawTry(box, +v);
+    });
+  }
+  document.addEventListener('click',function(e){
+    var box=e.target.closest && e.target.closest('.uc-draw');
+    if(!box || !document.body.classList.contains('student-mode')) return;
+    var svg=box.querySelector('svg'), pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
+    var q=pt.matrixTransform(svg.getScreenCTM().inverse());
+    if(Math.hypot(q.x-100,q.y-100)<12) return;        // too close to the middle to tell a direction
+    var deg=Math.round(((Math.atan2(-(q.y-100),q.x-100)*180/Math.PI)+360)%360/5)*5%360;
+    studentState.inputs['unitcircle:'+box.dataset.idx+':draw']=deg; saveStudentState();
+    drawTry(box, deg);
+  });
   function render(){renderEditor();renderWS();}
   return{
-    render:render,
+    render:render,restoreDraws:restoreDraws,
     set:function(i,v){problems[i].angle=parseInt(v)||0;renderWS();},
     addProblem:function(){problems.push({angle:120});render();},
     del:function(i){problems.splice(i,1);render();},
@@ -11641,6 +11686,10 @@ function extractAnswer(solBox){
     if(num&&den) fr.textContent = num.textContent.trim()+'/'+den.textContent.trim();
   });
   clone.querySelectorAll('sup').forEach(function(sp){ sp.textContent = '^'+sp.textContent.trim(); });
+  // A matrix is a grid of spans: read it entry by entry ("[4, 8, 11, 2]"), not as run-together digits
+  clone.querySelectorAll('.mat-grid').forEach(function(g){
+    g.textContent = [].map.call(g.children, function(c){ return c.textContent.trim(); }).join(', ');
+  });
   // Get the inner math/text content
   var math = clone.querySelector('.math');
   if(math) return math.textContent.trim();
@@ -11993,7 +12042,8 @@ function answersMatch(student, expected){
   var eTok=scalarTokens(approxFinals(expected)), sTok=scalarTokens(student);
   if(eTok.length>=2){
     var isTuple=/^\(\s*-?[\d.\/]+\s*(?:,\s*-?[\d.\/]+\s*){1,2}\)$/.test(String(expected).trim());
-    var ordered=isTuple || /[<>≤≥]/.test(String(expected));
+    // a matrix answer ("[4, 8, 1, 12]") is ordered too: swapped entries are a different matrix
+    var ordered=isTuple || /[<>≤≥]/.test(String(expected)) || /^\[/.test(String(expected).trim());
     if(ordered){ if(orderedEqual(sTok,eTok)) return true; }
     else { if(multisetEqual(sTok,eTok)) return true; }
   }
@@ -12003,6 +12053,7 @@ function answersMatch(student, expected){
 // Convert all .blank elements in active module into typeable inputs
 // and add a check bar to each problem
 function activateInteractive(){
+  if(typeof UC !== 'undefined' && UC.restoreDraws) UC.restoreDraws();   // saved unit-circle lines
   var activeModule = document.querySelector('.module.active');
   if(!activeModule) return;
   var modId = activeModule.id.replace('mod-','');
@@ -12158,7 +12209,12 @@ function checkProblem(probKey){
   var solBox = prob.querySelector('.solution-box');
   if(!input || !solBox) return;
   var student = input.value.trim();
-  if(!student){ alert('Type your answer first!'); return; }
+  if(!student){
+    var note = document.getElementById('check-result-'+probKey.replace(':','-'));
+    if(note){ note.style.display = 'inline-flex'; note.classList.remove('correct'); note.classList.add('incorrect'); note.textContent = 'Type your answer first'; }
+    input.focus();
+    return;
+  }
   var expected = extractAnswer(solBox);
   var correct = answersMatch(student, expected);
   if(typeof G6!=='undefined') correct = G6.grade(modId, pIdx, student, expected, correct);
@@ -12193,10 +12249,7 @@ function revealAnswer(probKey){
   var prob = document.querySelectorAll('#mod-'+modId+' .worksheet .problem')[pIdx];
   if(!prob) return;
   var solBox = prob.querySelector('.solution-box');
-  if(!solBox){
-    alert('No stored answer for this problem.');
-    return;
-  }
+  if(!solBox) return;
   solBox.classList.add('revealed');
   // Mark as attempted (not correct, but seen)
   if(!studentState.results[probKey] || studentState.results[probKey] !== 'correct'){
@@ -12207,9 +12260,10 @@ function revealAnswer(probKey){
 }
 
 function checkAllProblems(){
+  // only the answers a student can see and has typed - an empty or hidden box isn't an attempt
   document.querySelectorAll('.module.active .prob-final-answer').forEach(function(fa){
-    var probKey = fa.dataset.key;
-    if(probKey) checkProblem(probKey);
+    var probKey = fa.dataset.key, inp = fa.querySelector('input');
+    if(probKey && inp && inp.value.trim() && fa.offsetParent) checkProblem(probKey);
   });
 }
 
@@ -12300,6 +12354,8 @@ function resetStudentProgress(){
   studentState.results = {};
   studentState.selections = {};
   studentState.inputs = {};
+  document.querySelectorAll('.uc-try').forEach(function(g){ g.innerHTML = ''; });
+  document.querySelectorAll('.uc-msg').forEach(function(m){ m.textContent = ''; m.className = 'uc-msg'; });
   studentState.elapsedSeconds = 0;
   studentState.startTime = Date.now();
   saveStudentState();
