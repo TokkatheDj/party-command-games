@@ -38,6 +38,7 @@ STATE = os.path.join(REPORTS, "new-apps.json")
 LOG = os.path.join(REPORTS, "new-apps.log")
 REPORT_TO = os.path.join(REPORTS, "report-to.txt")
 SHIP_QUEUE = os.path.join(REPORTS, "ship-queue.txt")   # path of the SHIP IT list (your-turn.json); gitignored
+SAVE_TRIES, SAVE_WAIT = 15, 0.2                         # up to 3 s for a reader to let go of that list
 ARCADE = "https://tokkathedj.github.io/party-command-games/"
 SKIP_DIRS = ("test_reports/", "node_modules/", "review-kit/", "_retired_launchers/", "_scheduler/",
              "test_results/", "test-results/", "test_screenshots/", "surface-setup/", "Reviews/",
@@ -266,7 +267,19 @@ def queue_arcade_step(known):
     tmp = qpath + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(q, f, indent=2, ensure_ascii=False)
-    os.replace(tmp, qpath)
+    # Windows refuses to replace a file another program has open at that instant (Amigo's
+    # SHIP IT page reads this list; on 28 Oct the same thing killed a ship.py run). Retry for
+    # a few seconds; if it stays locked, say so and let the rest of the night's report go on.
+    for attempt in range(SAVE_TRIES):
+        try:
+            os.replace(tmp, qpath)
+            break
+        except PermissionError:
+            if attempt == SAVE_TRIES - 1:
+                log("SHIP IT list stayed locked for %.0f s - tonight's step is in %s, not the list"
+                    % (SAVE_TRIES * SAVE_WAIT, os.path.basename(tmp)))
+                return
+            time.sleep(SAVE_WAIT)
     log("SHIP IT: %s" % ("arcade step for %d app(s)" % len(ok) if ok else "arcade step removed - nothing waiting"))
 
 

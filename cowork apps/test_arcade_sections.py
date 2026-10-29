@@ -85,6 +85,28 @@ class NightlyStep(unittest.TestCase):
         self.assertEqual(len(s["verify"]), 3)
         self.assertTrue(any("VR Room" in line for line in self.logged))
 
+    def test_waits_for_a_locked_list(self):
+        # 28 Oct 2026: Windows refuses os.replace on a file another program has open
+        real, calls = os.replace, []
+        def flaky(src, dst):
+            calls.append(1)
+            if len(calls) <= 2:
+                raise PermissionError("[WinError 5] Access is denied")
+            real(src, dst)
+        with mock.patch.object(new_app_check.os, "replace", flaky), mock.patch.object(new_app_check.time, "sleep"):
+            new_app_check.queue_arcade_step(APPS)
+        self.assertEqual(len(calls), 3)
+        self.assertIn("Reflex Game", self.step()["title"])
+
+    def test_a_list_that_stays_locked_is_logged_not_fatal(self):
+        def locked(src, dst):
+            raise PermissionError("[WinError 5] Access is denied")
+        with mock.patch.object(new_app_check.os, "replace", locked), mock.patch.object(new_app_check.time, "sleep"):
+            new_app_check.queue_arcade_step(APPS)          # must not raise: the night's report goes on
+        self.assertIsNone(self.step())                     # the list itself is unchanged
+        self.assertTrue(any("stayed locked" in line for line in self.logged))
+        self.assertTrue(os.path.exists(self.queue + ".tmp"))
+
     def test_leaves_a_hand_queued_arcade_step_alone(self):
         # 27 Oct 2026: a step queued by hand (id "arcade-add-amigos-candy-math") vanished at the
         # 21:30 run, because every waiting "arcade-add-" step was treated as last night's own.
