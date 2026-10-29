@@ -20,7 +20,8 @@ const LIVE = "https://tokkathedj.github.io/party-command-games/cowork%20apps/Edu
 const PAGES = process.argv.slice(2).length ? process.argv.slice(2)
   : [LIVE + "2026-06-26-guided-math-worksheets.html", LIVE + "2026-10-29-guided-subject-worksheets.html"];
 const AXE = fs.readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
-const WIDTHS = [390, 1280];
+// A11Y_WIDTHS=390 scans one width - a lighter run when the machine is short of memory
+const WIDTHS = process.env.A11Y_WIDTHS ? process.env.A11Y_WIDTHS.split(",").map(Number) : [390, 1280];
 
 function toUrl(p) {
   return /^(https?|file):/.test(p) ? p : "file:///" + path.resolve(p).replace(/\\/g, "/").replace(/ /g, "%20");
@@ -39,15 +40,26 @@ async function scan(page) {
   for (const p of PAGES) {
     const url = toUrl(p), issues = new Set(), errors = [];
     let views = 0;
-    try {
-      for (const w of WIDTHS) {
-        const page = await b.newPage({ viewport: { width: w, height: 900 } });
-        page.on("pageerror", e => errors.push(e.message.slice(0, 200)));
-        await page.goto(url + (url.includes("?") ? "&" : "?") + "v=" + Date.now(), { waitUntil: "load", timeout: 60000 });
-        await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
-        await page.reload({ waitUntil: "load" }); await page.waitForTimeout(800);
-        const subjects = await page.evaluate(() => Object.keys(SUBJECTS));
-        for (const s of subjects) {
+    // A11Y_SUBJECTS=algebra1,trig scans just those subjects (another way to split a long run)
+    const only = process.env.A11Y_SUBJECTS ? process.env.A11Y_SUBJECTS.split(",") : null;
+    async function open(w) {
+      const page = await b.newPage({ viewport: { width: w, height: 900 } });
+      page.on("pageerror", e => errors.push(e.message.slice(0, 200)));
+      await page.goto(url + (url.includes("?") ? "&" : "?") + "v=" + Date.now(), { waitUntil: "load", timeout: 60000 });
+      await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
+      await page.reload({ waitUntil: "load" }); await page.waitForTimeout(800);
+      return page;
+    }
+    for (const w of WIDTHS) {
+      let subjects = [];
+      try { const pg = await open(w); subjects = (await pg.evaluate(() => Object.keys(SUBJECTS))).filter(s => !only || only.includes(s)); await pg.close(); }
+      catch (e) { errors.push(`@${w}px: ` + String(e.message || e).slice(0, 300)); continue; }
+      // a fresh tab for each subject: one tab through all 134 math worksheets ran the headless
+      // browser out of memory on the Surface (29 Oct), and a crash then lost every later subject
+      for (const s of subjects) {
+        let page = null;
+        try {
+          page = await open(w);
           await page.evaluate(s => {
             switchSubject(s);
             if (!document.body.classList.contains("student-mode") && typeof toggleStudentMode === "function") toggleStudentMode();
@@ -72,10 +84,10 @@ async function scan(page) {
               views++;
             }
           }
-        }
-        await page.close();
+        } catch (e) { errors.push(`${s} @${w}px: ` + String(e.message || e).slice(0, 200)); }
+        if (page) await page.close().catch(() => {});
       }
-    } catch (e) { errors.push(String(e.message || e).slice(0, 300)); }
+    }
     pages.push({ url, views, issues: [...issues], errors, ok: views > 0 && !issues.size && !errors.length });
   }
   await b.close();
