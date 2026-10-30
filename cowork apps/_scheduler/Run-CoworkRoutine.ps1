@@ -25,7 +25,9 @@ param(
     [int]$MaxTurns     = 60,
     # Skip the pre-run registry rebuild (for hand-testing a prompt against a
     # deliberately stale registry).
-    [switch]$NoRegistry
+    [switch]$NoRegistry,
+    # Skip the GitHub pull before the run (for hand-testing an uncommitted prompt).
+    [switch]$NoPull
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,6 +44,13 @@ function W([string]$m) {
     $line = "$ts  $m"
     Write-Host $line
     Add-Content -LiteralPath $Log -Value $line -Encoding UTF8
+}
+
+# Fast-forward to GitHub first, so a prompt change pushed from the desktop is the one
+# this run reads (29 Oct 2026). Never blocks the run: see Update-Routines.ps1.
+if (-not $NoPull) {
+    . (Join-Path $SchedHome "Update-Routines.ps1")
+    $null = Update-Routines -Repo (Split-Path -Parent (Split-Path -Parent $SchedHome)) -Say ${function:W}
 }
 
 if (-not (Test-Path -LiteralPath $PromptFile)) {
