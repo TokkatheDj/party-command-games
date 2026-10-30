@@ -22,7 +22,21 @@ function Update-Routines {
         [Parameter(Mandatory)][scriptblock]$Say    # not $Log: the runner's W() reads a $Log file path by dynamic scope
     )
     $ErrorActionPreference = "Continue"     # local to this function
+    # ONE pull at a time (30 Oct 2026): waking the Surface at 14:55 started four missed routines
+    # in the same second; their four pulls collided ("Cannot fast-forward to multiple branches")
+    # and all four ran with old prompts. A named mutex per clone queues them: the first pulls,
+    # the rest find it already up to date. The name comes from a stable hash of the path
+    # (string.GetHashCode differs between PowerShell 7 processes).
+    $sha = [System.Security.Cryptography.SHA1]::Create()
+    $id = -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Repo.ToLowerInvariant())) | Select-Object -First 8 | ForEach-Object { $_.ToString("x2") })
+    $mutex = New-Object System.Threading.Mutex($false, "Global\CoworkRoutinesPull-$id")
+    $held = $false
     try {
+        try { $held = $mutex.WaitOne(120000) } catch [System.Threading.AbandonedMutexException] { $held = $true }
+        if (-not $held) {
+            & $Say "WARN: routines NOT updated - another run held the pull for 2 minutes -- using the prompts on disk"
+            return "kept"
+        }
         $git = (Get-Command git -ErrorAction SilentlyContinue).Source
         if (-not $git) { & $Say "routines: git not found - using the prompts on disk"; return "no-git" }
         $env:GIT_TERMINAL_PROMPT = "0"      # never sit waiting for a password
@@ -42,5 +56,8 @@ function Update-Routines {
     } catch {
         & $Say "WARN: routines NOT updated - $($_.Exception.Message) -- using the prompts on disk"
         return "kept"
+    } finally {
+        if ($held) { $mutex.ReleaseMutex() }
+        $mutex.Dispose()
     }
 }

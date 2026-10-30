@@ -80,6 +80,29 @@ try {
     $r = Update-Routines -Repo $surf -Say ${function:W}
     $text = if (Test-Path $Log) { Get-Content -Raw $Log } else { "" }
     Check "runner's W logs to its file" ($r -eq "updated" -and $text -match "routines updated") "$r / log: $text"
+
+    # 9. the Surface waking up (30 Oct, 14:55): its catch-up started four missed routines in the
+    #    same second, and their four pulls collided. Four processes, released together.
+    Push-Desk "Routines\Kids.txt" "v6"
+    $script = Join-Path $PSScriptRoot "Update-Routines.ps1"
+    $go = (Get-Date).AddSeconds(4)
+    $jobs = 1..4 | ForEach-Object {
+        Start-Job -ArgumentList $script, $surf, $go -ScriptBlock {
+            param($script, $repo, $go)
+            . $script
+            while ((Get-Date) -lt $go) { Start-Sleep -Milliseconds 5 }
+            $said = New-Object System.Collections.Generic.List[string]
+            $r = Update-Routines -Repo $repo -Say { param($m) $said.Add($m) }
+            "$r | $($said -join ' ; ')"
+        }
+    }
+    $got = $jobs | Wait-Job -Timeout 120 | Receive-Job
+    $jobs | Remove-Job -Force
+    $kinds = $got | ForEach-Object { ($_ -split ' \| ')[0] }
+    Check "four routines waking at once -> one pulls, three find it current, none fail" (
+        ($kinds | Where-Object { $_ -eq "updated" }).Count -eq 1 -and
+        ($kinds | Where-Object { $_ -eq "current" }).Count -eq 3 -and
+        (Get-Content "$surf\Routines\Kids.txt") -eq "v6") ($got -join "`n")
 } finally {
     Set-Location $env:TEMP
     Remove-Item -Recurse -Force -LiteralPath $tmp -ErrorAction SilentlyContinue
