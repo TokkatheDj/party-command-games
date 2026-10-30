@@ -29,7 +29,7 @@ it; a private one when it's older than RECENT_DAYS. Public waiting apps that pas
 once you've played them. It goes away by itself when nothing that passed is waiting.
 Runs from the "CoworkApps-NewAppCheck" scheduled task (pythonw, no window).
 """
-import hashlib, json, os, shutil, subprocess, sys, time, urllib.request
+import hashlib, json, os, re, shutil, subprocess, sys, time, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
@@ -48,6 +48,9 @@ BATCH = 8                       # apps per browser run; progress is saved after 
 REVIEWS = os.path.join(HERE, "Reviews")
 MARK = "<!-- played by new_app_check.py -->"
 NO_WINDOW = 0x08000000
+# The IDENTITY block (routines, 30 Oct 2026): every app made from this day on names a style card
+# and a sound kit in its CONCEPT header. Older apps have no tag and are left out of the look check.
+IDENTITY_FROM = "2026-10-30"
 # the scheduled task's PATH can be thinner than a terminal's
 NODE = shutil.which("node") or r"C:\Program Files\nodejs\node.exe"
 GIT = shutil.which("git") or r"C:\Program Files\Git\cmd\git.exe"
@@ -132,14 +135,53 @@ def note_reviews(known):
         lines = ["", "", MARK, "## Played (nightly check)", "",
                  "Each app loaded and played on a phone and a tablet screen: idle 15 s, then Start and 5 s of play. "
                  "Not a substitute for a person playing it; it catches what code-reading can't.", "",
-                 "| App | Played | What happened |", "|---|---|---|"]
+                 "| App | Played | Look | What happened |", "|---|---|---|---|"]
         for k, v in sorted(rows):
             what = "; ".join(v["problems"][:3] + ["accessibility: " + x for x in v.get("a11y", [])][:2]).replace("|", "/") \
                 or "nothing wrong seen"
-            lines.append("| %s | %s | %s |" % (os.path.basename(k), "✅ plays" if v["ok"] else "❌ broken", what[:400]))
+            looks = " / ".join(x for x in (v.get("style"), v.get("sound")) if x) or "untagged, " + (v.get("font") or "?")
+            lines.append("| %s | %s | %s | %s |" % (os.path.basename(k), "✅ plays" if v["ok"] else "❌ broken",
+                                                   looks.replace("|", "/"), what[:400]))
         lines.append("")
         lines.append("*%s*" % time.strftime("played %Y-%m-%d %H:%M"))
         open(path, "w", encoding="utf-8").write(text + "\n".join(lines) + "\n")
+
+
+def look(rel):
+    """The app's [style: / sound:] tag and main font, from the top of the file."""
+    try:
+        s = open(os.path.join(HERE, rel), encoding="utf-8", errors="ignore").read(60000)
+    except OSError:
+        return {}
+    tag = re.search(r"\[style:\s*([^/\]]+?)\s*/\s*sound:\s*([^\]]+?)\s*\]", s[:6000])
+    font = re.search(r"font-family:\s*([^;}{]+)", s)
+    first = font.group(1).split(",")[0].strip(" '\"") if font else ""
+    var = re.match(r"var\((--[\w-]+)", first)
+    if var:                                   # font-family: var(--font) -> what --font says
+        m = re.search(re.escape(var.group(1)) + r"\s*:\s*([^;}{]+)", s)
+        first = m.group(1).split(",")[0].strip(" '\"") if m else first
+    return {"style": tag.group(1) if tag else None, "sound": tag.group(2) if tag else None, "font": first or None}
+
+
+def look_summary(known):
+    """Do the apps made since the IDENTITY block still all look and sound alike?
+    Warns when one style, sound kit or font is on 3+ apps AND at least half of them, or
+    when new apps carry no tag at all (the generator ignored the block)."""
+    new = {k: v for k, v in known.items() if os.path.basename(k)[:10] >= IDENTITY_FROM}
+    count = lambda field: dict(sorted(
+        ((x, sum(1 for v in new.values() if v.get(field) == x)) for x in {v.get(field) for v in new.values()} if x),
+        key=lambda kv: -kv[1]))
+    styles, sounds, fonts = count("style"), count("sound"), count("font")
+    untagged = sorted(v["title"] for v in new.values() if not v.get("style"))
+    warn = []
+    for what, seen in (("style", styles), ("sound kit", sounds), ("font", fonts)):
+        for name, n in seen.items():
+            if n >= 3 and 2 * n >= len(new):
+                warn.append("Look: %d of %d new apps share the %s %s" % (n, len(new), what, name))
+    if untagged:
+        warn.append("Look: %d new app(s) carry no style tag: %s" % (len(untagged), ", ".join(untagged[:3])))
+    return {"apps": len(new), "styles": styles, "sounds": sounds, "fonts": fonts,
+            "untagged": len(untagged), "warnings": warn}
 
 
 def sha(rel):
@@ -175,7 +217,8 @@ def main():
             continue
         for a in result["apps"]:
             known[a["app"]] = {"sha": sha(a["app"]), "title": a["title"], "ok": a["ok"],
-                               "problems": a["problems"], "a11y": a.get("a11y", []), "checked": result["checked_at"]}
+                               "problems": a["problems"], "a11y": a.get("a11y", []), "checked": result["checked_at"],
+                               **look(a["app"])}
         save()                  # a long first run keeps what it has done
     for k, v in known.items():
         v["public"] = k not in hidden
@@ -188,6 +231,13 @@ def main():
     bad = [v["title"] for v in known.values() if not v["ok"]]
     log("played %d new/changed (%d batch(es) failed), %d on the list, %d need a look%s"
         % (len(todo), failed, len(known), len(bad), (": " + ", ".join(bad)) if bad else ""))
+    for k, v in known.items():               # apps checked before the look check existed
+        if "font" not in v:
+            v.update(look(k))
+    looks = look_summary(known)
+    if looks["apps"]:
+        log("look: %d apps since %s - styles %s, sounds %s%s" % (looks["apps"], IDENTITY_FROM, looks["styles"],
+            looks["sounds"], ("; " + "; ".join(looks["warnings"])) if looks["warnings"] else ""))
     try:
         note_reviews(known)
     except OSError as e:
@@ -203,7 +253,7 @@ def main():
               "apps": [{"title": v["title"][:80], "ok": ready(v), "waiting": v["waiting"],
                         "problems": [p[:200] for p in (v["problems"] + (["accessibility: " + x for x in v.get("a11y", [])]
                                                                         if v["waiting"] and v["public"] else []))[:4]]}
-                       for k, v in sorted(known.items()) if not ready(v) or v["waiting"]]}
+                       for k, v in sorted(known.items()) if not ready(v) or v["waiting"]], "look": looks}
     body = json.dumps(report).encode()
     try:
         urls = [u.strip() for u in open(REPORT_TO, encoding="utf-8") if u.strip() and not u.startswith("#")]
