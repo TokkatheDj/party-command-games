@@ -52,7 +52,9 @@ const IGNORE = /SpeechSynthesisErrorEvent|Speech synthesis error|ERR_REQUEST_RAN
 // imitates them; an app that leaves a button or its play area off the screen fails "does it play".
 const fit = require("./phone_fit_check");
 // AXE_CORE overrides the path on a machine without the canopy-hr checkout (the Surface).
-const AXE = process.env.AXE_CORE || "D:/Documents/Claude Local/canopy-hr/node_modules/axe-core/axe.min.js";
+// axe-core is a dev dependency of cowork apps since 29 Oct; the canopy-hr path is the desktop's old copy
+const AXE = process.env.AXE_CORE || [path.join(__dirname, "node_modules/axe-core/axe.min.js"),
+  "D:/Documents/Claude Local/canopy-hr/node_modules/axe-core/axe.min.js"].find(p => fs.existsSync(p)) || "axe-core";
 const axeSrc = fs.existsSync(AXE) ? fs.readFileSync(AXE, "utf8") : null;
 
 async function a11yScan(browser, rel) {
