@@ -57,7 +57,9 @@ if (-not (Test-Path -LiteralPath $PromptFile)) {
     W "ERROR: prompt file not found: $PromptFile"
     exit 1
 }
-$prompt = Get-Content -Raw -LiteralPath $PromptFile
+# -Encoding UTF8: Windows PowerShell 5.1 reads a BOM-less file as ANSI, so an em dash or accented letter in a prompt
+# reached the model garbled.
+$prompt = Get-Content -Raw -Encoding UTF8 -LiteralPath $PromptFile
 
 $claude = (Get-Command claude -ErrorAction SilentlyContinue).Source
 if (-not $claude) { $claude = "C:\Users\tokka\.local\bin\claude" }
@@ -94,7 +96,13 @@ $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $job = Start-Job -ScriptBlock {
     param($claude, $prompt, $allow, $root, $maxturns)
     Set-Location -LiteralPath $root
-    & $claude --permission-mode dontAsk -p $prompt --allowedTools $allow --max-turns $maxturns 2>&1
+    # The prompt goes in on STDIN, not as an argument. Windows PowerShell 5.1 does not escape a " inside
+    # a native-command argument, so every prompt was cut off at its first double quote: on 29 Oct the
+    # Data-viz prompt reached the model as 43 of its 141 lines (it stopped at  "WHAT IF"), and the house
+    # rules, style cards and accessibility block further down never arrived. UTF-8 both ways.
+    $OutputEncoding = New-Object System.Text.UTF8Encoding $false
+    try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}
+    $prompt | & $claude --permission-mode dontAsk -p --allowedTools $allow --max-turns $maxturns 2>&1
 } -ArgumentList $claude, $prompt, $allow, $Root, $MaxTurns
 
 if (Wait-Job $job -Timeout ($TimeoutMin * 60)) {
