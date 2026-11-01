@@ -1,0 +1,490 @@
+<!-- CONCEPT: ARCADE / ACTION (beam tracking) - Lumi's Lighthouse: little boats are lost in the dark sea, and kids drag the lighthouse beam onto each one and keep it there until its lantern lights up, then the captain toots and sails home to the pier; six nights add rocks, drifting fog, shy boats that scoot out of the light, a friendly whale and a stormy night lit by lightning, plus a Free Sail sea and a saved Harbour Book of every captain met. No timer, no losing - a lost boat that bumps a rock just goes "bonk" and keeps bobbing. Ages 4-11. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Lumi's Lighthouse</title>
+<style>
+:root{
+  --sky:#0b1440; --sea:#0d2a5c; --gold:#ffd84a; --gold2:#ff9f3a; --pink:#ff6fb5;
+  --panel:#16235a; --panel2:#22357d; --ink:#ffffff; --soft:#bcd0ff; --green:#4fe08a;
+  --font:"Comic Sans MS","Trebuchet MS",system-ui,sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--sky);color:var(--ink);font-family:var(--font);
+  touch-action:manipulation;user-select:none;-webkit-user-select:none}
+#app{display:flex;flex-direction:column;height:100%;max-width:900px;margin:0 auto}
+#bar{display:flex;align-items:center;gap:8px;padding:6px 8px;background:linear-gradient(180deg,#0a1236,#111c4c)}
+#titleWrap{flex:1;min-width:0;display:flex;align-items:center;gap:6px}
+#titleWrap .lh{font-size:clamp(22px,6vw,32px)}
+h1{margin:0;font-size:clamp(17px,4.8vw,28px);line-height:1.05;
+  background:linear-gradient(90deg,var(--gold),var(--gold2),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+#count{font-size:clamp(16px,4.5vw,22px);font-weight:bold;background:var(--panel2);border-radius:14px;padding:6px 10px;white-space:nowrap}
+.ibtn{width:52px;height:52px;border-radius:16px;border:none;background:var(--panel2);color:#fff;font-size:26px;cursor:pointer;
+  box-shadow:0 3px 0 #0a1440;flex:none}
+.ibtn:active{transform:translateY(2px);box-shadow:0 1px 0 #0a1440}
+#msg{height:40px;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 10px;
+  font-size:clamp(15px,4.2vw,21px);color:var(--soft);background:#0c1745;white-space:nowrap;overflow:hidden}
+#msg span{overflow:hidden;text-overflow:ellipsis}
+#stage{flex:1;position:relative;min-height:0}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:crosshair}
+.ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(5,9,30,.72);padding:14px;z-index:5}
+.ov[hidden]{display:none}
+.card{background:linear-gradient(180deg,var(--panel2),var(--panel));border-radius:26px;padding:18px 16px;width:min(94%,460px);
+  text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.5);max-height:100%;overflow-y:auto}
+.card h2{margin:4px 0 8px;font-size:clamp(24px,7vw,36px);background:linear-gradient(90deg,var(--gold),var(--pink));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.big{font-size:clamp(46px,14vw,72px);line-height:1.1}
+.card p{margin:6px 0 12px;font-size:clamp(16px,4.4vw,21px);color:var(--soft)}
+.btn{display:block;width:100%;min-height:64px;margin:10px 0 0;border:none;border-radius:20px;font-family:var(--font);
+  font-size:clamp(20px,5.5vw,26px);font-weight:bold;color:#2a1600;background:linear-gradient(180deg,#ffe36b,#ffb02e);
+  box-shadow:0 5px 0 #b46a00;cursor:pointer}
+.btn.alt{color:#fff;background:linear-gradient(180deg,#5c7cff,#3a52d6);box-shadow:0 5px 0 #1f2f8c}
+.btn.small{min-height:48px;font-size:17px;color:#fff;background:#2b3c86;box-shadow:0 3px 0 #16225a}
+.btn:active{transform:translateY(3px);box-shadow:0 2px 0 #b46a00}
+.caps{font-size:clamp(30px,9vw,42px);letter-spacing:4px;margin:6px 0}
+.nights{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.nt{min-height:84px;border-radius:16px;border:none;background:#2b3c86;color:#fff;font-family:var(--font);cursor:pointer;
+  font-size:14px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.nt b{font-size:28px}
+.nt.done{background:#2f7a52}
+.nt.locked{opacity:.4;cursor:default}
+.book{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;font-size:clamp(24px,7vw,32px);margin:6px 0}
+.book span{background:#0f1a48;border-radius:10px;padding:4px 0}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <div id="titleWrap"><span class="lh">🗼</span><h1>Lumi's Lighthouse</h1></div>
+    <div id="count">⛵ 0/3</div>
+    <button class="ibtn" id="bookBtn" aria-label="Harbour Book">📖</button>
+    <button class="ibtn" id="againBtn" aria-label="Restart night">🔄</button>
+  </div>
+  <div id="msg"><span id="msgT">Drag the light onto a boat!</span></div>
+  <div id="stage">
+    <canvas id="cv"></canvas>
+    <div class="ov" id="ovTitle">
+      <div class="card">
+        <div class="big">🗼⛵</div>
+        <h2>Lumi's Lighthouse</h2>
+        <p>Little boats are lost in the dark!<br>Shine the light on a boat until its lantern glows, and it sails home.</p>
+        <button class="btn" id="playBtn">▶ Play</button>
+        <button class="btn alt" id="freeBtn">🌊 Free Sail</button>
+        <button class="btn small" id="bookBtn2">📖 Harbour Book</button>
+      </div>
+    </div>
+    <div class="ov" id="ovIntro" hidden>
+      <div class="card">
+        <div class="big" id="inIcon">⭐</div>
+        <h2 id="inName">Night 1</h2>
+        <p id="inTip"></p>
+        <button class="btn" id="goBtn">Light it up! 💡</button>
+      </div>
+    </div>
+    <div class="ov" id="ovDone" hidden>
+      <div class="card">
+        <div class="big">🌅</div>
+        <h2 id="dnName">Good morning!</h2>
+        <p>Every boat is home safe. Thank you, Lighthouse Keeper!</p>
+        <div class="caps" id="dnCaps"></div>
+        <button class="btn" id="nextBtn">Next Night ▶</button>
+        <button class="btn alt" id="replayBtn">🔄 Play again</button>
+        <button class="btn small" id="bookBtn3">📖 Harbour Book</button>
+      </div>
+    </div>
+    <div class="ov" id="ovBook" hidden>
+      <div class="card">
+        <h2>📖 Harbour Book</h2>
+        <p>Tap a night to play it.</p>
+        <div class="nights" id="bkNights"></div>
+        <p>Captains you have met: <b id="bkCount">0</b></p>
+        <div class="book" id="bkCaps"></div>
+        <button class="btn alt" id="bkFree">🌊 Free Sail</button>
+        <button class="btn" id="bkClose">Close</button>
+        <button class="btn small" id="bkReset">Start the book over</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const NIGHTS=[
+  {name:'Starry Night',icon:'⭐',boats:3,speed:20,rocks:0,fog:0,shy:0,tip:'Drag your finger to move the light. Keep it on a boat until the lantern glows!'},
+  {name:'Rocky Cove',icon:'🪨',boats:4,speed:24,rocks:3,fog:0,shy:0,tip:'Rocks are in the water. The boats go bonk, but they are fine!'},
+  {name:'Foggy Night',icon:'🌫️',boats:5,speed:24,rocks:2,fog:3,shy:0,tip:'Fog is rolling in. Boats in the fog need the light a little longer.'},
+  {name:'Shy Boats',icon:'🙈',boats:5,speed:22,rocks:2,fog:0,shy:3,tip:'Some boats are shy and scoot out of the light. Follow them!'},
+  {name:'Whale Night',icon:'🐋',boats:6,speed:32,rocks:2,fog:1,shy:1,whale:true,tip:'The boats are zippy tonight, and a friendly whale says hi. Tap the whale!'},
+  {name:'Stormy Night',icon:'⛈️',boats:6,speed:28,rocks:3,fog:2,shy:2,storm:true,tip:'A storm! Lightning lights up the whole sea for a moment. Look quick!'}
+];
+const FREE={name:'Free Sail',icon:'🌊',boats:6,speed:24,rocks:2,fog:1,shy:1,whale:true,endless:true,tip:'Boats keep coming all night. Bring home as many as you like!'};
+const CAPTAINS=['🐻','🐰','🐸','🐱','🐶','🐼','🦊','🐧','🐷','🐵','🐨','🦁','🐯','🐮','🐭','🐹','🦒','🐢','🦆','🐙','🦦','🐳','🦭','🐊'];
+const COLORS=['#ff5a5f','#ffb02e','#4fe08a','#4cc3ff','#b57bff','#ff7ad9','#ffe14d','#5ef0d0'];
+const KEY='cowork-lumi-lighthouse-progress';
+
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const dark=document.createElement('canvas'),dctx=dark.getContext('2d');
+const $=id=>document.getElementById(id);
+let W=300,H=400,DPR=1,S=1,BR=20;
+let prog=loadProg();
+let night=null,nightIdx=0,boats=[],rocks=[],fogs=[],parts=[],stars=[],whale=null;
+let aim=-Math.PI/4,aimT=-Math.PI/4,lastInput=-1e9,now=0,lastT=0,playing=false,doneT=0,sunrise=0;
+let lastFind=0,hintBoat=null,flash=0,nextBolt=6,rain=[],nextWhale=4,homeCount=0,slotNext=0,capPool=[];
+
+function loadProg(){try{const p=JSON.parse(localStorage.getItem(KEY));if(p&&Array.isArray(p.done)&&Array.isArray(p.caps))return p}catch(e){}return{done:[],caps:[]}}
+function saveProg(){try{localStorage.setItem(KEY,JSON.stringify(prog))}catch(e){}}
+
+/* ---------- audio ---------- */
+let AC=null;
+function ac(){if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume();return AC}
+function tone(f,d,type='sine',v=.18,w=0,f2=0){const a=ac();if(!a)return;const t=a.currentTime+w,o=a.createOscillator(),g=a.createGain();
+  o.type=type;o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v,t+.02);g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+  o.connect(g).connect(a.destination);o.start(t);o.stop(t+d+.05)}
+function noise(d,v=.2,freq=800,w=0){const a=ac();if(!a)return;const t=a.currentTime+w,n=Math.floor(a.sampleRate*d),b=a.createBuffer(1,n,a.sampleRate),c=b.getChannelData(0);
+  for(let i=0;i<n;i++)c[i]=(Math.random()*2-1)*(1-i/n);const s=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();
+  s.buffer=b;f.type='lowpass';f.frequency.value=freq;g.gain.value=v;s.connect(f).connect(g).connect(a.destination);s.start(t)}
+const sFound=()=>{[523,659,784,1047].forEach((f,i)=>tone(f,.18,'triangle',.16,i*.07))};
+const sToot=()=>{tone(220,.35,'square',.07);tone(277,.35,'square',.06,.38)};
+const sBonk=()=>tone(180,.12,'sine',.12,0,90);
+const sTick=f=>tone(f,.06,'sine',.05);
+const sSplash=()=>{noise(.5,.25,1500);tone(300,.3,'sine',.1,0,700)};
+const sThunder=()=>noise(1.6,.35,260,.15);
+const sFanfare=()=>{[392,523,659,784,659,784,1047].forEach((f,i)=>tone(f,.25,'triangle',.15,i*.13))};
+
+/* ---------- layout ---------- */
+function lamp(){return{x:W*.2,y:H*.72}}
+function area(){return{x0:W*.07,x1:W*.93,y0:H*.1,y1:H*.62}}
+function pierY(){return H*.9}
+function slotPos(i,n){const x0=W*.44,w=W*.54;return{x:x0+(i+.5)*w/n,y:pierY()-BR*.55}}
+function resize(){
+  const r=cv.getBoundingClientRect();const nw=Math.max(200,r.width),nh=Math.max(240,r.height);
+  const sx=nw/W,sy=nh/H;
+  for(const b of boats){b.x*=sx;b.y*=sy;b.tx*=sx;b.ty*=sy}
+  for(const k of rocks){k.x*=sx;k.y*=sy}
+  for(const f of fogs){f.x*=sx;f.y*=sy}
+  W=nw;H=nh;DPR=Math.min(2,window.devicePixelRatio||1);S=Math.min(W,H)/420;
+  BR=Math.max(15,Math.min(30,Math.min(W,H)*.052));
+  for(const k of rocks)k.r=k.nr*BR;for(const f of fogs)f.r=f.nr*BR;
+  cv.width=W*DPR;cv.height=H*DPR;dark.width=cv.width;dark.height=cv.height;
+  ctx.setTransform(DPR,0,0,DPR,0,0);dctx.setTransform(DPR,0,0,DPR,0,0);
+  stars=[];for(let i=0;i<40;i++)stars.push({x:Math.random()*W,y:Math.random()*H*.62,p:Math.random()*6.3,s:Math.random()*1.6+.6});
+  for(const b of boats)if(b.state==='docked'){const p=slotPos(b.slot,slotCount());b.x=b.tx=p.x;b.y=b.ty=p.y}
+}
+new ResizeObserver(resize).observe(cv);
+function slotCount(){return night?night.boats:6}
+
+/* ---------- setup ---------- */
+function rnd(a,b){return a+Math.random()*(b-a)}
+function pickCap(){if(!capPool.length){capPool=CAPTAINS.slice().sort(()=>Math.random()-.5)}return capPool.pop()}
+function makeBoat(shy){
+  const A=area();let x,y,tries=0;
+  do{x=rnd(A.x0+BR,A.x1-BR);y=rnd(A.y0+BR,A.y1-BR);tries++}
+  while(tries<60&&(rocks.some(k=>Math.hypot(k.x-x,k.y-y)<k.r+BR*2)||boats.some(b=>b.state==='lost'&&Math.hypot(b.x-x,b.y-y)<BR*3)));
+  return{x,y,h:rnd(0,6.28),state:'lost',fill:0,bonk:0,shy:!!shy,cap:pickCap(),col:COLORS[Math.floor(Math.random()*COLORS.length)],
+    ph:rnd(0,6.28),tx:0,ty:0,wp:0,slot:-1,glow:0,tick:0}
+}
+function startNight(cfg,idx){
+  night=cfg;nightIdx=idx;boats=[];parts=[];rocks=[];fogs=[];rain=[];whale=null;homeCount=0;slotNext=0;
+  sunrise=0;doneT=0;flash=0;nextBolt=5;nextWhale=3;hintBoat=null;
+  const A=area();
+  for(let i=0;i<cfg.rocks;i++){let x,y,t=0;do{x=rnd(A.x0+BR*2,A.x1-BR*2);y=rnd(A.y0+BR*2,A.y1-BR);t++}
+    while(t<50&&rocks.some(k=>Math.hypot(k.x-x,k.y-y)<BR*4));const nr=rnd(1.1,1.6);rocks.push({x,y,nr,r:nr*BR,seed:Math.random()})}
+  for(let i=0;i<cfg.fog;i++){const nr=rnd(3,4.2);fogs.push({x:rnd(0,W),y:rnd(A.y0+BR*2,A.y1-BR*2),nr,r:nr*BR,v:rnd(8,16)*(Math.random()<.5?-1:1)})}
+  const n=cfg.endless?3:cfg.boats;
+  for(let i=0;i<n;i++)boats.push(makeBoat(i<cfg.shy));
+  lastFind=now;playing=true;updateCount();
+  setMsg(cfg.endless?'Free Sail! Bring the boats home.':'Drag the light onto a boat!');
+}
+function updateCount(){
+  if(!night)return;
+  $('count').textContent=night.endless?'⛵ '+homeCount:'⛵ '+homeCount+'/'+night.boats;
+}
+function setMsg(t){$('msgT').textContent=t}
+
+/* ---------- input ---------- */
+let down=false;
+function aimAt(e){
+  const r=cv.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,L=lamp();
+  let a=Math.atan2(py-L.y,px-L.x);
+  if(a>0)a=(px<L.x)?-Math.PI+.03:-.03;
+  aimT=Math.max(-Math.PI+.03,Math.min(-.03,a));lastInput=now;
+  return{px,py};
+}
+cv.addEventListener('pointerdown',e=>{ac();down=true;try{cv.setPointerCapture(e.pointerId)}catch(_){}
+  const p=aimAt(e);
+  if(whale&&whale.t>0&&Math.hypot(p.x-whale.x,p.y-whale.y)<BR*2.2)tapWhale();});
+cv.addEventListener('pointermove',e=>{if(down||e.pointerType==='mouse')aimAt(e)});
+const up=()=>{down=false};
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+window.addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft'){aimT=Math.max(-Math.PI+.03,aimT-.12);lastInput=now;e.preventDefault()}
+  if(e.key==='ArrowRight'){aimT=Math.min(-.03,aimT+.12);lastInput=now;e.preventDefault()}
+});
+function tapWhale(){
+  if(!whale||whale.tapped)return;whale.tapped=true;whale.spout=1.2;sSplash();
+  burst(whale.x,whale.y-BR,['💦','✨','💙'],14);setMsg('Splash! The whale says hello! 🐋');
+}
+
+/* ---------- particles ---------- */
+function burst(x,y,emo,n){for(let i=0;i<n;i++){const a=rnd(0,6.28),v=rnd(60,200)*S;
+  parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-80*S,life:rnd(.8,1.4),age:0,e:emo[i%emo.length],s:rnd(14,24)*S+6})}}
+function confetti(){const emo=['🎉','⭐','✨','🎈','💛','🌟'];for(let i=0;i<50;i++)
+  parts.push({x:rnd(0,W),y:rnd(-H*.3,0),vx:rnd(-40,40),vy:rnd(60,160),life:3,age:0,e:emo[i%emo.length],s:rnd(16,28)})}
+
+/* ---------- update ---------- */
+function inBeam(b){
+  const L=lamp(),d=Math.hypot(b.x-L.x,b.y-L.y),a=Math.atan2(b.y-L.y,b.x-L.x);
+  let df=Math.abs(a-aim);if(df>Math.PI)df=2*Math.PI-df;
+  return{hit:df<beamHalf()+Math.atan2(BR*.6,Math.max(d,1)),df,d,a};
+}
+function beamHalf(){return night&&night.storm?.19:.22}
+function bright(){return now-lastInput<2.5}
+function inFog(b){return fogs.some(f=>Math.hypot(f.x-b.x,f.y-b.y)<f.r*.8)}
+
+function update(dt){
+  // aim smoothing
+  aim+=(aimT-aim)*Math.min(1,dt*14);
+  if(!night)return;
+  const A=area(),sp=night.speed*S*(night.storm?1:1);
+  for(const f of fogs){f.x+=f.v*S*dt;if(f.x<-f.r)f.x=W+f.r;if(f.x>W+f.r)f.x=-f.r}
+  let lost=0;
+  for(const b of boats){
+    b.ph+=dt*(night.storm?3.2:2);b.bonk=Math.max(0,b.bonk-dt);b.glow=Math.max(0,b.glow-dt);
+    if(b.state==='lost'){
+      lost++;
+      b.h+=rnd(-1,1)*dt*1.2;
+      let v=sp;
+      const bm=inBeam(b),lit=bright()&&playing&&bm.hit;
+      if(b.shy&&bright()&&playing&&bm.df<beamHalf()*2.2&&b.fill<1){
+        // scoot sideways, away from the beam centre
+        const side=(((bm.a-aim+Math.PI*3)%(Math.PI*2))-Math.PI)>=0?1:-1;
+        const pa=aim+side*Math.PI/2;b.x+=Math.cos(pa)*sp*1.3*dt;b.y+=Math.sin(pa)*sp*1.3*dt;v*=.4;
+      }
+      if(lit){v*=.35;const rate=inFog(b)?1/2:1/0.95;b.fill=Math.min(1,b.fill+dt*rate);
+        b.tick-=dt;if(b.tick<=0){b.tick=.16;sTick(400+b.fill*600)}}
+      else b.fill=Math.max(0,b.fill-dt*.45);
+      b.x+=Math.cos(b.h)*v*dt;b.y+=Math.sin(b.h)*v*dt;
+      if(b.x<A.x0){b.x=A.x0;b.h=Math.PI-b.h}if(b.x>A.x1){b.x=A.x1;b.h=Math.PI-b.h}
+      if(b.y<A.y0){b.y=A.y0;b.h=-b.h}if(b.y>A.y1){b.y=A.y1;b.h=-b.h}
+      for(const k of rocks){const dx=b.x-k.x,dy=b.y-k.y,d=Math.hypot(dx,dy),m=k.r+BR*.7;
+        if(d<m){const ux=dx/(d||1),uy=dy/(d||1);b.x=k.x+ux*m;b.y=k.y+uy*m;b.h=Math.atan2(uy,ux)+rnd(-.5,.5);
+          if(b.bonk<=0){b.bonk=.5;sBonk()}}}
+      if(b.fill>=1)findBoat(b);
+    }else if(b.state==='sailing'){
+      const tx=b.wp===0?Math.max(b.x,W*.5):b.tx,ty=b.wp===0?H*.7:b.ty;
+      const dx=tx-b.x,dy=ty-b.y,d=Math.hypot(dx,dy),v=150*S+40;
+      if(d<v*dt+1){b.x=tx;b.y=ty;if(b.wp===0)b.wp=1;else{b.state='docked';dockBoat(b)}}
+      else{b.x+=dx/d*v*dt;b.y+=dy/d*v*dt;b.h=Math.atan2(dy,dx)}
+    }else if(b.state==='leaving'){
+      b.x+=160*S*dt;if(b.x>W+BR*3)b.gone=true;
+    }
+  }
+  boats=boats.filter(b=>!b.gone);
+  // endless top-up
+  if(night.endless&&playing&&lost<3)boats.push(makeBoat(Math.random()<.25));
+  // hint
+  hintBoat=null;
+  if(playing&&lost>0&&now-lastFind>9){
+    let best=null,bd=1e9;for(const b of boats)if(b.state==='lost'){const m=inBeam(b);if(m.df<bd){bd=m.df;best=b}}
+    hintBoat=best;if(Math.floor(now*2)%14===0)setMsg('Look for the twinkly lantern! ✨');
+  }
+  // storm
+  if(night.storm){
+    flash=Math.max(0,flash-dt*2.2);nextBolt-=dt;
+    if(nextBolt<=0){flash=1;nextBolt=rnd(5,8);sThunder()}
+    if(rain.length<90)for(let i=0;i<4;i++)rain.push({x:rnd(-W*.2,W),y:rnd(-20,H),v:rnd(500,800)});
+    for(const r of rain){r.y+=r.v*dt;r.x+=r.v*.25*dt;if(r.y>H){r.y=-20;r.x=rnd(-W*.2,W)}}
+  }
+  // whale
+  if(night.whale){
+    if(whale){whale.t-=dt;whale.spout=Math.max(0,whale.spout-dt);if(whale.t<=0)whale=null}
+    else{nextWhale-=dt;if(nextWhale<=0){nextWhale=rnd(7,11);
+      whale={x:rnd(W*.2,W*.85),y:rnd(A.y0+BR*2,A.y1),t:4.5,spout:0,tapped:false,dir:Math.random()<.5?-1:1}}}
+  }
+  // particles
+  for(const p of parts){p.age+=dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=200*S*dt}
+  parts=parts.filter(p=>p.age<p.life);
+  // night done
+  if(!night.endless&&playing&&homeCount>=night.boats){playing=false;doneT=1.3}
+  if(doneT>0){doneT-=dt;if(doneT<=0)finishNight()}
+  if(sunrise>0&&sunrise<1)sunrise=Math.min(1,sunrise+dt*.7);
+}
+function findBoat(b){
+  b.state='sailing';b.wp=0;b.glow=1.2;lastFind=now;
+  const n=slotCount();
+  if(night.endless){
+    const taken=boats.filter(o=>o!==b&&(o.state==='docked'||o.state==='sailing'));
+    if(taken.length>=n){const old=taken[0];old.state='leaving'}
+    b.slot=slotNext%n;slotNext++;
+    for(const o of boats)if(o!==b&&o.slot===b.slot&&o.state!=='leaving'&&o.state!=='lost')o.state='leaving';
+  }else{b.slot=slotNext++}
+  const p=slotPos(b.slot,n);b.tx=p.x;b.ty=p.y;
+  sFound();burst(b.x,b.y,['✨','⭐','💛'],10);
+  setMsg('You found Captain '+b.cap+'! Sailing home...');
+  if(!prog.caps.includes(b.cap)){prog.caps.push(b.cap);saveProg()}
+}
+function dockBoat(b){
+  homeCount++;updateCount();sToot();burst(b.x,b.y-BR,['🎈','✨'],6);
+  const left=night.endless?0:night.boats-homeCount;
+  setMsg(night.endless?'Toot toot! '+homeCount+' boats home!':left>0?'Toot toot! '+left+' more to find!':'Every boat is home! 🎉');
+}
+function finishNight(){
+  sunrise=.01;confetti();sFanfare();
+  if(!prog.done.includes(nightIdx)){prog.done.push(nightIdx);saveProg()}
+  setTimeout(()=>{
+    $('dnName').textContent=NIGHTS[nightIdx].name+' done!';
+    $('dnCaps').textContent=boats.filter(b=>b.state==='docked').map(b=>b.cap).join(' ');
+    $('nextBtn').style.display=nightIdx<NIGHTS.length-1?'block':'none';
+    show('ovDone');
+  },1600);
+}
+
+/* ---------- draw ---------- */
+function drawBoat(b,lit,scale=1){
+  const r=BR*scale,bob=Math.sin(b.ph)*r*.12,tilt=Math.sin(b.ph*.8)*(night&&night.storm?.18:.08)+(b.bonk>0?Math.sin(b.bonk*30)*.2:0);
+  ctx.save();ctx.translate(b.x,b.y+bob);ctx.rotate(tilt);
+  if(lit&&b.glow>0){ctx.globalAlpha=Math.min(1,b.glow);ctx.fillStyle='rgba(255,230,120,.35)';ctx.beginPath();ctx.arc(0,0,r*2.1,0,7);ctx.fill();ctx.globalAlpha=1}
+  // sail
+  ctx.fillStyle=lit?'#fff8e6':'#7d8bb5';ctx.beginPath();ctx.moveTo(-r*.05,-r*1.5);ctx.lineTo(-r*.05,-r*.3);ctx.lineTo(r*.75,-r*.3);ctx.closePath();ctx.fill();
+  ctx.fillStyle=lit?b.col:'#56628f';ctx.beginPath();ctx.moveTo(-r*.15,-r*1.3);ctx.lineTo(-r*.15,-r*.3);ctx.lineTo(-r*.7,-r*.3);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#5a3a1a';ctx.lineWidth=Math.max(2,r*.08);ctx.beginPath();ctx.moveTo(-r*.1,-r*1.55);ctx.lineTo(-r*.1,-r*.2);ctx.stroke();
+  // hull
+  ctx.fillStyle=lit?b.col:'#3e4a78';ctx.beginPath();ctx.moveTo(-r,-r*.25);ctx.lineTo(r,-r*.25);ctx.lineTo(r*.7,r*.4);ctx.lineTo(-r*.7,r*.4);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(-r*.85,-r*.12,r*1.7,r*.1);
+  // captain
+  ctx.globalAlpha=1;ctx.fillStyle='#000';ctx.font=(r*.85)+'px system-ui,"Segoe UI Emoji","Apple Color Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  if(lit)ctx.fillText(b.cap,r*.45,-r*.62);
+  // lantern
+  const tw=lit?1:(.45+.4*Math.sin(now*4+b.ph*3));
+  ctx.fillStyle=lit?'#ffe14d':'rgba(255,214,90,'+tw+')';ctx.beginPath();ctx.arc(-r*.85,-r*.45,r*.16,0,7);ctx.fill();
+  ctx.restore();
+  // fill ring
+  if(b.state==='lost'&&b.fill>0){ctx.strokeStyle='rgba(255,225,77,.95)';ctx.lineWidth=Math.max(4,r*.18);ctx.lineCap='round';
+    ctx.beginPath();ctx.arc(b.x,b.y-r*.4,r*1.5,-Math.PI/2,-Math.PI/2+b.fill*Math.PI*2);ctx.stroke()}
+}
+function drawRock(k){
+  ctx.fillStyle='#4b5470';ctx.beginPath();
+  for(let i=0;i<9;i++){const a=i/9*Math.PI*2,rr=k.r*(.8+.25*Math.sin(i*2.3+k.seed*9));ctx.lineTo(k.x+Math.cos(a)*rr,k.y+Math.sin(a)*rr*.7)}
+  ctx.closePath();ctx.fill();ctx.fillStyle='rgba(255,255,255,.18)';ctx.beginPath();ctx.ellipse(k.x-k.r*.25,k.y-k.r*.25,k.r*.3,k.r*.15,0,0,7);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,.35)';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(k.x,k.y+k.r*.55,k.r*1.05,k.r*.25,0,0,Math.PI);ctx.stroke();
+}
+function draw(){
+  const L=lamp(),hz=H*.07,sr=sunrise;
+  // sea + sky
+  let g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,mix('#0b1440','#ffb36b',sr));g.addColorStop(.07,mix('#13245e','#ffd9a0',sr));
+  g.addColorStop(.0701,mix('#123a7a','#3d9ad8',sr));g.addColorStop(1,mix('#0a2350','#1f6fb0',sr));
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=2;
+  for(let y=hz+20;y<H;y+=28){ctx.beginPath();for(let x=0;x<=W;x+=12)ctx.lineTo(x,y+Math.sin(x*.03+now*1.5+y)*4);ctx.stroke()}
+  if(night){for(const k of rocks)drawRock(k);for(const b of boats)if(b.state==='lost')drawBoat(b,false)}
+  if(night&&night.whale&&whale)drawWhale();
+  // darkness
+  const dA=Math.max(0,(.86-flash*.7)*(1-sr));
+  if(dA>0){
+    dctx.globalCompositeOperation='source-over';dctx.clearRect(0,0,W,H);dctx.fillStyle='rgba(3,6,24,'+dA+')';dctx.fillRect(0,0,W,H);
+    dctx.globalCompositeOperation='destination-out';
+    const len=Math.hypot(W,H),hb=beamHalf(),on=bright()?1:.45;
+    const bg=dctx.createRadialGradient(L.x,L.y,0,L.x,L.y,len);bg.addColorStop(0,'rgba(0,0,0,'+on+')');bg.addColorStop(1,'rgba(0,0,0,'+on*.55+')');
+    dctx.fillStyle=bg;dctx.beginPath();dctx.moveTo(L.x,L.y);dctx.arc(L.x,L.y,len,aim-hb,aim+hb);dctx.closePath();dctx.fill();
+    for(const b of boats)if(b.state==='lost'){const tw=.5+.4*Math.sin(now*4+b.ph*3);dctx.fillStyle='rgba(0,0,0,'+tw*.8+')';dctx.beginPath();dctx.arc(b.x-BR*.85,b.y-BR*.45,BR*.5,0,7);dctx.fill()}
+    dctx.beginPath();dctx.ellipse(W*.71,pierY(),W*.32,BR*2.4,0,0,7);dctx.fillStyle='rgba(0,0,0,.85)';dctx.fill();
+    ctx.drawImage(dark,0,0,W,H);
+    // warm beam tint
+    ctx.save();ctx.globalCompositeOperation='lighter';const tg=ctx.createRadialGradient(L.x,L.y,0,L.x,L.y,len);
+    tg.addColorStop(0,'rgba(255,220,120,'+(.28*on)+')');tg.addColorStop(1,'rgba(255,220,120,0)');
+    ctx.fillStyle=tg;ctx.beginPath();ctx.moveTo(L.x,L.y);ctx.arc(L.x,L.y,len,aim-hb,aim+hb);ctx.closePath();ctx.fill();ctx.restore();
+  }
+  // sky things
+  ctx.save();ctx.beginPath();ctx.rect(0,0,W,hz);ctx.clip();
+  for(const s of stars){ctx.fillStyle='rgba(255,255,255,'+((.4+.4*Math.sin(now*2+s.p))*(1-sr))+')';ctx.fillRect(s.x,s.y*hz/(H*.62),s.s,s.s)}
+  ctx.restore();
+  ctx.fillStyle=sr>0?'rgba(255,230,120,'+sr+')':'#fff6cf';ctx.beginPath();ctx.arc(W*.86,hz*.55,Math.min(hz*.38,16),0,7);ctx.fill();
+  // fog
+  for(const f of fogs){const fg=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.r);fg.addColorStop(0,'rgba(220,230,255,.42)');fg.addColorStop(1,'rgba(220,230,255,0)');
+    ctx.fillStyle=fg;ctx.beginPath();ctx.ellipse(f.x,f.y,f.r*1.3,f.r,0,0,7);ctx.fill()}
+  // island + lighthouse
+  ctx.fillStyle='#2b3350';ctx.beginPath();ctx.ellipse(L.x,H*.97,W*.22,H*.08,0,Math.PI,0);ctx.fill();
+  ctx.fillStyle='#3a6b3a';ctx.beginPath();ctx.ellipse(L.x,H*.93,W*.13,H*.03,0,Math.PI,0);ctx.fill();
+  const tw=BR*1.1,th=H*.93-L.y;
+  ctx.fillStyle='#f4f1ea';ctx.beginPath();ctx.moveTo(L.x-tw*.55,L.y+BR*.6);ctx.lineTo(L.x+tw*.55,L.y+BR*.6);ctx.lineTo(L.x+tw*.85,L.y+th);ctx.lineTo(L.x-tw*.85,L.y+th);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#ff5a5f';for(let i=1;i<3;i++){const y=L.y+BR*.6+th*i/3.2,w=tw*(.55+.3*i/3.2);ctx.fillRect(L.x-w-1,y,(w+1)*2,th*.12)}
+  ctx.fillStyle='#ffe14d';ctx.beginPath();ctx.arc(L.x,L.y,BR*.55,0,7);ctx.fill();
+  ctx.fillStyle='#ff5a5f';ctx.beginPath();ctx.moveTo(L.x-tw*.7,L.y-BR*.45);ctx.lineTo(L.x+tw*.7,L.y-BR*.45);ctx.lineTo(L.x,L.y-BR*1.3);ctx.closePath();ctx.fill();
+  // Lumi on the balcony
+  ctx.fillStyle='#000';ctx.font=(BR*.95)+'px system-ui,"Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('🦉',L.x+tw*1.05,L.y+BR*.35);
+  // pier
+  const py=pierY();ctx.fillStyle='#8a5a32';ctx.fillRect(W*.42,py,W*.58,BR*.5);
+  ctx.fillStyle='#6b4224';for(let i=0;i<8;i++)ctx.fillRect(W*.44+i*W*.075,py+BR*.5,BR*.22,H-py);
+  for(let i=0;i<3;i++){const x=W*.45+i*W*.25;ctx.fillStyle='#333';ctx.fillRect(x,py-BR*1.6,3,BR*1.6);
+    ctx.fillStyle='rgba(255,220,120,.25)';ctx.beginPath();ctx.arc(x+1.5,py-BR*1.6,BR*.8,0,7);ctx.fill();ctx.fillStyle='#ffe58a';ctx.beginPath();ctx.arc(x+1.5,py-BR*1.6,4,0,7);ctx.fill()}
+  // lit boats
+  if(night){for(const b of boats)if(b.state!=='lost')drawBoat(b,true,b.state==='docked'?.8:1);
+    // lost boats inside the beam get drawn in colour so they pop
+    if(bright())for(const b of boats)if(b.state==='lost'&&inBeam(b).hit){ctx.globalAlpha=.55+.45*b.fill;drawBoat(b,true);ctx.globalAlpha=1}
+    if(hintBoat){const p=.5+.5*Math.sin(now*6);ctx.strokeStyle='rgba(255,225,77,'+(.5+.5*p)+')';ctx.lineWidth=4;ctx.beginPath();ctx.arc(hintBoat.x,hintBoat.y-BR*.4,BR*(1.8+p*.6),0,7);ctx.stroke()}
+  }
+  // rain + flash
+  if(night&&night.storm&&sr<1){ctx.strokeStyle='rgba(180,200,255,.35)';ctx.lineWidth=1.5;ctx.beginPath();
+    for(const r of rain){ctx.moveTo(r.x,r.y);ctx.lineTo(r.x+5,r.y+18)}ctx.stroke();
+    if(flash>.6){ctx.fillStyle='rgba(255,255,255,'+(flash-.6)+')';ctx.fillRect(0,0,W,H)}}
+  // particles
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  for(const p of parts){ctx.globalAlpha=Math.max(0,1-p.age/p.life);ctx.fillStyle='#000';ctx.font=p.s+'px system-ui,"Segoe UI Emoji",sans-serif';ctx.fillText(p.e,p.x,p.y)}
+  ctx.globalAlpha=1;
+}
+function drawWhale(){
+  const w=whale,up=Math.min(1,(4.5-w.t)*2,w.t*2),y=w.y+(1-up)*BR;
+  ctx.save();ctx.globalAlpha=Math.max(0,up);ctx.fillStyle='#000';ctx.font=(BR*2.2)+'px system-ui,"Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.translate(w.x,y);if(w.dir<0)ctx.scale(-1,1);ctx.fillText('🐋',0,0);ctx.restore();
+  if(w.spout>0){ctx.fillStyle='rgba(170,220,255,'+Math.min(1,w.spout)+')';for(let i=0;i<7;i++){const a=-Math.PI/2+(i-3)*.25;ctx.beginPath();
+    ctx.arc(w.x+Math.cos(a)*BR*(1.2-w.spout*.4)*1.5,y-BR+Math.sin(a)*BR*1.6*(1.3-w.spout*.5),BR*.2,0,7);ctx.fill()}}
+}
+function mix(a,b,t){const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);const c=i=>Math.round(((pa>>i)&255)*(1-t)+((pb>>i)&255)*t);
+  return'rgb('+c(16)+','+c(8)+','+c(0)+')'}
+
+/* ---------- loop ---------- */
+function frame(t){
+  requestAnimationFrame(frame);
+  const ts=t/1000;let dt=lastT?ts-lastT:0;lastT=ts;dt=Math.max(0,Math.min(.05,dt));now+=dt;
+  try{update(dt);draw()}catch(e){console.error(e)}
+}
+requestAnimationFrame(frame);
+
+/* ---------- screens ---------- */
+const OVS=['ovTitle','ovIntro','ovDone','ovBook'];
+function show(id){OVS.forEach(o=>$(o).hidden=o!==id)}
+function hideAll(){OVS.forEach(o=>$(o).hidden=true)}
+function openIntro(idx){
+  const cfg=idx<0?FREE:NIGHTS[idx];
+  $('inIcon').textContent=cfg.icon;$('inName').textContent=idx<0?cfg.name:'Night '+(idx+1)+': '+cfg.name;$('inTip').textContent=cfg.tip;
+  $('goBtn').onclick=()=>{ac();hideAll();startNight(cfg,idx)};
+  playing=false;show('ovIntro');
+}
+function nextUnplayed(){for(let i=0;i<NIGHTS.length;i++)if(!prog.done.includes(i))return i;return 0}
+function openBook(){
+  playing=false;
+  const nb=$('bkNights');nb.innerHTML='';
+  NIGHTS.forEach((n,i)=>{const done=prog.done.includes(i),open=done||i===0||prog.done.includes(i-1);
+    const b=document.createElement('button');b.className='nt'+(done?' done':'')+(open?'':' locked');
+    b.innerHTML='<b>'+(open?n.icon:'🔒')+'</b><span>'+(i+1)+'. '+n.name+'</span><span>'+(done?'⭐':'')+'</span>';
+    if(open)b.onclick=()=>openIntro(i);nb.appendChild(b)});
+  $('bkCount').textContent=prog.caps.length+' / '+CAPTAINS.length;
+  $('bkCaps').innerHTML=CAPTAINS.map(c=>'<span>'+(prog.caps.includes(c)?c:'❔')+'</span>').join('');
+  show('ovBook');
+}
+$('playBtn').onclick=()=>{ac();openIntro(nextUnplayed())};
+$('freeBtn').onclick=()=>{ac();openIntro(-1)};
+$('bookBtn').onclick=openBook;$('bookBtn2').onclick=openBook;$('bookBtn3').onclick=openBook;
+$('bkFree').onclick=()=>openIntro(-1);
+$('bkClose').onclick=()=>{if(night&&homeCount<(night.endless?1e9:night.boats)&&sunrise===0){hideAll();playing=true}else show('ovTitle')};
+$('bkReset').onclick=()=>{if(confirm('Start the Harbour Book over?')){prog={done:[],caps:[]};saveProg();openBook()}};
+$('againBtn').onclick=()=>{ac();openIntro(night?nightIdx:nextUnplayed())};
+$('nextBtn').onclick=()=>openIntro(Math.min(NIGHTS.length-1,nightIdx+1));
+$('replayBtn').onclick=()=>openIntro(nightIdx);
+window.LUMI={get boats(){return boats},get night(){return night},get home(){return homeCount},get aim(){return aim},lamp,get playing(){return playing},prog:()=>prog};
+</script>
+</body>
+</html>
