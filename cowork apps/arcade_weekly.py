@@ -110,7 +110,8 @@ def main():
     except ValueError:
         log("checker failed (exit %s): %s" % (r.returncode, (r.stderr or r.stdout)[-300:].strip()))
         return 1
-    json.dump(result, open(OUT, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+    with open(OUT, "w", encoding="utf-8") as f:
+        json.dump(result, f, indent=1, ensure_ascii=False)
     bad = [t for t in result["tiles"] if not t["ok"]]
     if not sys.argv[1:2]:
         bad += blanks_check() + subjects_check() + worksheet_a11y()
@@ -124,8 +125,9 @@ def main():
                        "broken": [{"name": t["name"][:60], "problems": [p[:200] for p in t["problems"][:4]]}
                                   for t in bad[:20]]}).encode()
     try:
-        urls = [u.strip().replace("/door/apps", "/door/arcade") for u in open(REPORT_TO, encoding="utf-8")
-                if u.strip() and not u.startswith("#")]
+        with open(REPORT_TO, encoding="utf-8") as f:
+            urls = [u.strip().replace("/door/apps", "/door/arcade") for u in f
+                    if u.strip() and not u.startswith("#")]
     except OSError:
         urls = []
     for url in urls:
