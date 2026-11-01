@@ -2242,10 +2242,12 @@ def build_playlist_html(playlist_id, playlist, all_apps_map, data):
     pl_apps = [p for p in playlist.get("apps", []) if p not in removed_set]
 
     cards = ""
+    shown = 0                    # the header counts these, not the list: a game whose file is gone gets no card
     for path in pl_apps:
         app = all_apps_map.get(path)
         if app:
             cards += _make_card(app, favorites, ratings, removed_set, opened, now, threshold_new, playlists=playlists, mobile=mobile_set)
+            shown += 1
 
     if not cards:
         cards = '<p style="color:var(--muted);padding:1.5rem;text-align:center;font-style:italic">No apps in this playlist yet — pin apps using the \U0001f4cc button on any app card.</p>'
@@ -2253,7 +2255,7 @@ def build_playlist_html(playlist_id, playlist, all_apps_map, data):
     return (
         f'<div class="cat-nav">'
         f'<button class="back-btn pl-back-btn">&#8592; Playlists</button>'
-        f'<span class="cat-nav-title">{html.escape(pl_emoji)} {html.escape(pl_name)} <span class="count">{len(pl_apps)}</span></span>'
+        f'<span class="cat-nav-title">{html.escape(pl_emoji)} {html.escape(pl_name)} <span class="count">{shown}</span></span>'
         # Always visible, never hover-revealed. The tile's delete button is
         # opacity:0 until :hover, which means it does not exist on a phone --
         # and the phone is where he actually decides what to show people.
