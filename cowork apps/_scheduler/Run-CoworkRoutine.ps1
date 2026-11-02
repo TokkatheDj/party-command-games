@@ -27,7 +27,11 @@ param(
     # deliberately stale registry).
     [switch]$NoRegistry,
     # Skip the GitHub pull before the run (for hand-testing an uncommitted prompt).
-    [switch]$NoPull
+    [switch]$NoPull,
+    # Late-start guard (below): how far past its slot a SCHEDULED run may start, and a
+    # switch to run regardless (the guard already ignores catch-up and hand runs).
+    [int]$LateMin      = 30,
+    [switch]$AnyTime
 )
 
 $ErrorActionPreference = "Stop"
@@ -44,6 +48,41 @@ function W([string]$m) {
     $line = "$ts  $m"
     Write-Host $line
     Add-Content -LiteralPath $Log -Value $line -Encoding UTF8
+}
+
+# LATE-START GUARD (2 Nov 2026). This Surface uses Modern Standby: a task that comes due while it
+# sleeps is not skipped, it fires on the next wake - all of them at once, with no stagger. On
+# 30 Oct 13 routines started together at 14:54, and on 2 Nov the whole weekend's 27 at 07:54, the
+# same pile-up -StartWhenAvailable caused in August. A run started by its scheduled task (parent
+# wscript.exe, via run-hidden.vbs) more than $LateMin minutes after its slot - or before it, i.e. a
+# previous day's run - logs SKIP and exits. That leaves no "=== START" line, so Invoke-CatchUp
+# counts the routine as missed and reruns it later, one at a time (max 3). Catch-up and hand runs
+# call this script directly and are never skipped.
+if (-not $AnyTime) {
+    $skip = $false
+    try {
+        $parentId = (Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId
+        $parentName = (Get-Process -Id $parentId -ErrorAction Stop).ProcessName
+        if ($parentName -eq "wscript") {
+            # Assign first, then loop: Windows PowerShell 5.1 sends a JSON array down a pipeline as
+            # ONE object, so piping ConvertFrom-Json into Where-Object returned every routine at once.
+            $manifestItems = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $SchedHome "manifest.json") | ConvertFrom-Json
+            $entry = $null
+            foreach ($mi in $manifestItems) { if ($mi.safeName -eq $Name) { $entry = $mi; break } }
+            if ($entry -and $entry.localAt) {
+                $slot = [datetime]::ParseExact([string]$entry.localAt, "HH:mm", $null)
+                $late = ((Get-Date) - (Get-Date).Date.AddHours($slot.Hour).AddMinutes($slot.Minute)).TotalMinutes
+                if ($late -gt $LateMin -or $late -lt -5) {
+                    W ("SKIP: late start ({0:+0;-0} min from its {1} slot) - the machine was asleep when it was due; Invoke-CatchUp reruns missed routines one at a time" -f $late, $entry.localAt)
+                    $skip = $true
+                }
+            }
+        }
+    } catch {
+        # never let the guard itself stop a run
+        W "WARN: late-start guard failed ($($_.Exception.Message)) - running anyway"
+    }
+    if ($skip) { exit 0 }
 }
 
 # Fast-forward to GitHub first, so a prompt change pushed from the desktop is the one
