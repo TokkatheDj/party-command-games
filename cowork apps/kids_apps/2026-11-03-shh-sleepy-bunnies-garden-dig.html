@@ -1,0 +1,690 @@
+<!-- CONCEPT: Shh! Sleepy Bunnies – a gentle kids' minesweeper where you dig a garden without waking the hidden bunnies; a woken bunny just hops off with one of your carrots (lives), with garden sizes up to the 24 by 30 Warren Peace and carrot choices up to the unlimited Bottomless Basket. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Shh! Sleepy Bunnies</title>
+<style>
+/* One storybook garden, always daytime: bright sky over grass, sun-yellow buttons, pink only for bunnies. */
+:root {
+  --sky: #7fd8ff; --sky-low: #c9f3ff; --meadow: #6ccb3c; --meadow-deep: #3f8f22;
+  --grass-a: #8ee04f; --grass-b: #79d244; --soil-a: #f7e6bf; --soil-b: #f0d9a8;
+  --ink: #2f2413; --panel: #fffdf4; --sun: #ffd23f; --sun-deep: #d99a00;
+  --blush: #ffdbe8; --blush-deep: #e0568a; --leaf: #2e7d32; --carrot: #ff8a1f;
+  --font: "Comic Sans MS", "Trebuchet MS", system-ui, sans-serif;
+  --cell: 56px; --gap: 3px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; height: 100%; overflow: hidden;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  font-family: var(--font); color: var(--ink); color-scheme: light;
+  background: linear-gradient(var(--sky), var(--sky-low) 45%, var(--meadow) 100%);
+}
+button { font: inherit; color: inherit; cursor: pointer; border: 0; touch-action: manipulation; }
+button:focus-visible { outline: 3px solid #1b4dd8; outline-offset: 2px; }
+svg { display: block; }
+.hidden { display: none !important; }
+.screen { position: absolute; inset: 0; display: flex; flex-direction: column; }
+
+h1 {
+  margin: 0; font-weight: 900; line-height: 1.05;
+  background: linear-gradient(90deg, #c2185b, #e65100 60%, #2e7d32);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* Start screen */
+#start { overflow-y: auto; align-items: center; padding: 14px 16px 22px; gap: 12px; }
+#start .wrap { width: min(100%, 520px); display: flex; flex-direction: column; gap: 12px; margin: auto 0; }
+.hero { display: flex; align-items: center; gap: 10px; }
+.hero svg { width: clamp(72px, 22vw, 104px); height: clamp(72px, 22vw, 104px); flex: none; }
+.hero h1 { font-size: clamp(32px, 10vw, 50px); }
+.howto { margin: 0; padding: 10px 14px 10px 34px; background: var(--panel); border-radius: 18px; font-size: clamp(15px, 4vw, 18px); line-height: 1.35; }
+.howto li + li { margin-top: 3px; }
+.pick { display: flex; flex-direction: column; gap: 6px; }
+.pick h2 { margin: 0; font-size: clamp(18px, 5vw, 22px); }
+.choices { display: grid; gap: 8px; }
+#sizes { grid-template-columns: repeat(3, 1fr); }
+#sizes .choice:last-child { grid-column: span 2; }
+#lives { grid-template-columns: repeat(3, 1fr); }
+.choice {
+  min-height: 66px; padding: 7px 6px; border-radius: 16px; background: #ffffffd9; line-height: 1.15;
+  box-shadow: 0 4px 0 #0000002e; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.choice b { font-size: clamp(18px, 5vw, 22px); }
+.choice small { font-size: clamp(13px, 3.5vw, 15px); }
+.choice[aria-pressed="true"] { background: var(--sun); box-shadow: 0 4px 0 var(--sun-deep), inset 0 0 0 3px var(--ink); }
+.choice .row { display: flex; justify-content: center; }
+.choice .row { align-items: center; font-weight: 900; font-size: 20px; line-height: 19px; }
+.choice .row svg { width: 19px; height: 19px; margin: 0 -2px; }
+.big {
+  min-height: 62px; padding: 10px 24px; border-radius: 20px; font-weight: 900; font-size: clamp(22px, 6vw, 28px);
+  background: var(--sun); box-shadow: 0 6px 0 var(--sun-deep);
+}
+#play { position: sticky; bottom: 0; }
+.big:active { transform: translateY(4px); box-shadow: 0 2px 0 var(--sun-deep); }
+.big.quiet { background: #fff; box-shadow: 0 6px 0 #0000002e; font-size: clamp(18px, 5vw, 22px); }
+
+/* Game screen */
+.top { display: flex; align-items: center; gap: 8px; padding: 6px 8px 0; min-height: 50px; }
+.top h1 { flex: 1; font-size: clamp(21px, 6vw, 32px); }
+.iconbtn { min-width: 46px; height: 46px; padding: 0 10px; border-radius: 14px; background: #ffffffd9; font-weight: 800; font-size: 16px; box-shadow: 0 3px 0 #0000002e; }
+.tally { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 3px 10px; min-height: 40px; }
+#carrots { display: flex; align-items: center; }
+#carrots svg { width: 32px; height: 32px; transition: opacity .3s; }
+#carrots b { font-size: 30px; line-height: 1; margin: 0 8px 0 2px; }
+#carrots span { font-weight: 800; font-size: 16px; }
+#carrots svg.gone { opacity: .22; filter: grayscale(1); animation: hopoff .7s ease-out; }
+#toFind { display: flex; align-items: center; gap: 4px; font-weight: 900; font-size: 19px; background: #ffffffd9; border-radius: 14px; padding: 1px 12px 1px 5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#toFind svg { width: 30px; height: 30px; }
+#msg { min-height: 42px; padding: 0 12px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: clamp(14px, 3.9vw, 18px); font-weight: 700; line-height: 1.12; text-wrap: balance; }
+#stage { flex: 1; min-height: 0; overflow: auto; display: flex; padding: 8px; }
+#board {
+  margin: auto; flex: none; display: grid; gap: var(--gap);
+  grid-template-columns: repeat(var(--cols), var(--cell)); grid-auto-rows: var(--cell);
+  background: var(--meadow-deep); box-shadow: 0 0 0 4px var(--meadow-deep); border-radius: 8px;
+}
+.cell {
+  position: relative; padding: 0; border-radius: calc(var(--cell) * .13); display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: calc(var(--cell) * .6); line-height: 1; font-variant-numeric: tabular-nums;
+}
+.cell svg { width: 88%; height: 88%; pointer-events: none; }
+.cell.grass { background: var(--grass-a); box-shadow: inset 0 calc(var(--cell) * -.09) 0 #4fa32a, inset 0 calc(var(--cell) * .04) 0 #c4f28d; }
+.cell.grass.alt { background: var(--grass-b); }
+.cell.grass:active { transform: translateY(1px); box-shadow: inset 0 calc(var(--cell) * -.04) 0 #4fa32a; }
+.cell.soil { background: var(--soil-a); }
+.cell.soil.alt { background: var(--soil-b); }
+.cell.friend { background: var(--blush); }
+.cell.opened { animation: dug .24s ease-out backwards; }
+.cell.peek { filter: brightness(1.22); animation: wiggle .45s ease-in-out 2; z-index: 1; }
+.cell.nope { animation: wiggle .3s ease-in-out; }
+.cell.boing svg { animation: boing .8s cubic-bezier(.3, 1.6, .5, 1); }
+.cell.party svg { animation: hop .55s ease-in-out infinite alternate; }
+.n1 { color: #1450b4; } .n2 { color: #1f6f24; } .n3 { color: #bd1f1f; } .n4 { color: #6a1b9a; }
+.n5 { color: #a3124f; } .n6 { color: #00635a; } .n7 { color: #4e342e; } .n8 { color: #37474f; }
+
+.tools { display: flex; align-items: stretch; gap: 8px; padding: 2px 8px 8px; }
+.tool {
+  flex: 1; min-height: 56px; border-radius: 18px; background: #ffffffd9; font-weight: 900; white-space: nowrap; font-size: clamp(15px, 4.6vw, 22px);
+  display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 0 #0000002e;
+}
+.tool svg { width: 36px; height: 36px; }
+#zoomTool { flex: none; min-width: 78px; padding: 0 8px; font-size: clamp(15px, 4.4vw, 19px); }
+.tool[aria-pressed="true"] { background: var(--sun); box-shadow: 0 4px 0 var(--sun-deep), inset 0 0 0 3px var(--ink); }
+
+/* End card */
+#end { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: #1d4d1466; z-index: 5; }
+#end .card {
+  width: min(100%, 400px); max-height: 100%; overflow-y: auto; background: var(--panel); border-radius: 26px; padding: 16px 18px 20px; text-align: center;
+  display: flex; flex-direction: column; gap: 10px; box-shadow: 0 10px 0 #00000030; animation: pop .35s cubic-bezier(.3, 1.5, .5, 1);
+}
+#end svg.pic { width: 96px; height: 96px; margin: 0 auto; }
+#end h2 { margin: 0; font-size: clamp(28px, 8vw, 38px); line-height: 1.05; color: #b3154f; }
+#end p { margin: 0; font-size: clamp(16px, 4.4vw, 20px); line-height: 1.3; }
+#stars { font-size: 44px; line-height: 1; letter-spacing: 4px; color: #e0a200; }
+#stars i { font-style: normal; color: #d9d2bd; }
+#end .btns { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+
+.falling { position: fixed; top: -50px; width: 34px; height: 34px; pointer-events: none; z-index: 4; animation: fall linear forwards; }
+
+@keyframes dug { from { transform: scale(.7); filter: brightness(1.3); } }
+@keyframes wiggle { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+@keyframes boing { 0% { transform: translateY(70%) scale(.4); } 55% { transform: translateY(-34%) scale(1.15); } 100% { transform: none; } }
+@keyframes hop { to { transform: translateY(-14%) rotate(5deg); } }
+@keyframes hopoff { 0% { transform: none; opacity: 1; } 50% { transform: translateY(-22px) rotate(20deg); } }
+@keyframes pop { from { transform: scale(.75); opacity: 0; } }
+@keyframes fall { to { transform: translateY(112vh) rotate(420deg); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .falling { display: none; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <g id="bunny-head">
+      <ellipse cx="23" cy="19" rx="7" ry="16" fill="#fff" stroke="#b9a696" stroke-width="2"/>
+      <ellipse cx="41" cy="19" rx="7" ry="16" fill="#fff" stroke="#b9a696" stroke-width="2"/>
+      <ellipse cx="23" cy="20" rx="3.4" ry="10.5" fill="#ffb6cf"/>
+      <ellipse cx="41" cy="20" rx="3.4" ry="10.5" fill="#ffb6cf"/>
+      <circle cx="32" cy="41" r="20" fill="#fff" stroke="#b9a696" stroke-width="2"/>
+      <circle cx="19.5" cy="46" r="4.2" fill="#ffc9dc"/>
+      <circle cx="44.5" cy="46" r="4.2" fill="#ffc9dc"/>
+      <path d="M29 43.5h6l-3 3.4z" fill="#f0669a"/>
+    </g>
+    <symbol id="sleepy" viewBox="0 0 64 64">
+      <use href="#bunny-head"/>
+      <path d="M19.5 38q4.5 4 9 0M35.5 38q4.5 4 9 0" fill="none" stroke="#3a2c1c" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M28.5 50.5q3.5 2.6 7 0" fill="none" stroke="#3a2c1c" stroke-width="2" stroke-linecap="round"/>
+      <path d="M50 8h9l-9 9h9" fill="none" stroke="#1450b4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="awake" viewBox="0 0 64 64">
+      <use href="#bunny-head"/>
+      <circle cx="24" cy="37" r="4" fill="#3a2c1c"/><circle cx="40" cy="37" r="4" fill="#3a2c1c"/>
+      <circle cx="25.4" cy="35.6" r="1.4" fill="#fff"/><circle cx="41.4" cy="35.6" r="1.4" fill="#fff"/>
+      <path d="M24 48.5q8 8.5 16 0z" fill="#b3154f"/>
+      <rect x="29.4" y="48.5" width="5.2" height="4.4" rx="1" fill="#fff"/>
+    </symbol>
+    <symbol id="carrot" viewBox="0 0 64 64">
+      <path d="M32 21c-3-6-9-9-15-8 1 6 6 10 13 11M32 21c3-6 9-9 15-8-1 6-6 10-13 11M32 22V6" fill="#49b02f" stroke="#2e7d32" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M19 26c6-6 20-6 26 0 3 4-8 32-13 34-5-2-16-30-13-34z" fill="#ff8a1f" stroke="#c75d00" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M23 34l7 2M41 42l-7 2M27 47l5 1" stroke="#c75d00" stroke-width="2.5" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="sign" viewBox="0 0 64 64">
+      <rect x="28" y="30" width="8" height="30" rx="2" fill="#a26a2a" stroke="#5f3c12" stroke-width="2"/>
+      <rect x="6" y="9" width="52" height="30" rx="7" fill="#fff4cf" stroke="#5f3c12" stroke-width="3"/>
+      <text x="32" y="32" text-anchor="middle" font-family="Trebuchet MS, system-ui, sans-serif" font-size="21" font-weight="900" fill="#b3154f">Shh!</text>
+    </symbol>
+    <symbol id="shovel" viewBox="0 0 64 64">
+      <path d="M43 8l13 13M49.5 14.500L30 34" stroke="#7a4d1a" stroke-width="7" stroke-linecap="round" fill="none"/>
+      <path d="M36 28L10 34c-4 8-2 15 3 20 6 3 12 3 19-2l6-25z" transform="translate(-1 2)" fill="#a7b4bd" stroke="#4e5d66" stroke-width="3" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="daisy" viewBox="0 0 64 64">
+      <g fill="#fff" stroke="#e5d7a8" stroke-width="1.500"><circle cx="32" cy="19" r="7"/><circle cx="44" cy="28" r="7"/><circle cx="40" cy="42" r="7"/><circle cx="24" cy="42" r="7"/><circle cx="20" cy="28" r="7"/></g>
+      <circle cx="32" cy="31" r="7" fill="#ffc72c"/>
+    </symbol>
+  </defs>
+</svg>
+
+<section id="start" class="screen">
+  <div class="wrap">
+    <div class="hero">
+      <svg viewBox="0 0 64 64" role="img" aria-label="A sleeping bunny"><use href="#sleepy"/></svg>
+      <h1>Shh! Sleepy Bunnies</h1>
+    </div>
+    <ol class="howto">
+      <li>Tap the grass to dig up the whole garden.</li>
+      <li>A number tells you how many bunnies are napping right next to it.</li>
+      <li>Think a bunny is there? Put up a Shh sign. Dig one up and it hops off with a carrot.</li>
+    </ol>
+    <div class="pick">
+      <h2 id="sizeLabel">How big is your garden?</h2>
+      <div class="choices" id="sizes" role="group" aria-labelledby="sizeLabel"></div>
+    </div>
+    <div class="pick">
+      <h2 id="livesLabel">How many carrots do you bring?</h2>
+      <div class="choices" id="lives" role="group" aria-labelledby="livesLabel"></div>
+    </div>
+    <button class="big" id="play">Start digging!</button>
+  </div>
+</section>
+
+<section id="game" class="screen hidden">
+  <div class="top">
+    <h1>Shh! Sleepy Bunnies</h1>
+    <button class="iconbtn" id="sound" aria-label="Sound on" aria-pressed="true">🔊</button>
+    <button class="iconbtn" id="menu">Menu</button>
+  </div>
+  <div class="tally">
+    <div id="carrots" role="img"></div>
+    <div id="toFind" aria-live="polite"></div>
+  </div>
+  <div id="msg" aria-live="polite"></div>
+  <div id="stage"><div id="board" role="grid" aria-label="Garden"></div></div>
+  <div class="tools">
+    <button class="tool" id="digTool" aria-pressed="true"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#shovel"/></svg>Dig</button>
+    <button class="tool" id="signTool" aria-pressed="false"><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#sign"/></svg>Shh sign</button>
+    <button class="tool hidden" id="zoomTool" aria-pressed="false">🔍 Zoom</button>
+  </div>
+</section>
+
+<section id="end" class="hidden" role="dialog" aria-modal="true" aria-labelledby="endTitle">
+  <div class="card">
+    <svg class="pic" viewBox="0 0 64 64" aria-hidden="true"><use id="endPic" href="#awake"/></svg>
+    <h2 id="endTitle"></h2>
+    <div id="stars" class="hidden"></div>
+    <p id="endText"></p>
+    <div class="btns">
+      <button class="big" id="again">Play again</button>
+      <button class="big quiet" id="change">Pick a new garden</button>
+    </div>
+  </div>
+</section>
+
+<script>
+const SIZES = {
+  teeny:  { name: 'Teeny',  short: 5, long: 5,  bunnies: 3 },
+  little: { name: 'Little', short: 6, long: 7,  bunnies: 6 },
+  medium: { name: 'Medium', short: 7, long: 9,  bunnies: 10 },
+  big:    { name: 'Big',    short: 8, long: 10, bunnies: 14 },
+  warren: { name: 'Warren Peace', short: 24, long: 30, bunnies: 150 },
+};
+const LIVES = {
+  endless: { name: 'Bottomless Basket', n: 0 }, // 0 means the carrots never run out
+  some: { name: 'Some', n: 3 },
+  one:  { name: 'Brave', n: 1 },
+};
+const WAKE_LINES = [
+  'Boing! A bunny woke up and hopped off with a carrot.',
+  'Oopsie! That bunny wanted a snack.',
+  'Hee hee! A bunny popped up to say hi and took a carrot.',
+  'Peekaboo! A bunny found a carrot.',
+  'Yawn! A bunny woke up hungry and grabbed a carrot.',
+];
+const STORE = 'cowork-shh-sleepy-bunnies-settings';
+const $ = id => document.getElementById(id);
+const svgUse = (id, label) => `<svg viewBox="0 0 64 64"${label ? ` role="img" aria-label="${label}"` : ' aria-hidden="true"'}><use href="#${id}"/></svg>`;
+
+let settings = { size: 'little', lives: 'some', sound: true };
+try { settings = { ...settings, ...JSON.parse(localStorage.getItem(STORE) || '{}') }; } catch (e) { /* storage may be blocked */ }
+if (!SIZES[settings.size]) settings.size = 'little';
+if (!LIVES[settings.lives]) settings.lives = 'some';
+const saveSettings = () => { try { localStorage.setItem(STORE, JSON.stringify(settings)); } catch (e) { /* fine without it */ } };
+
+let G = null;       // the current game (plain JSON)
+let buttons = [];   // one <button> per cell
+let endTimer = 0;
+
+/* ---------- sound ---------- */
+let audio = null;
+function note(freq, start, dur, { type = 'sine', to = 0, vol = .16 } = {}) {
+  if (!settings.sound) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+    const t = audio.currentTime + start, o = audio.createOscillator(), g = audio.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + dur);
+    o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + dur);
+  } catch (e) { /* the game works silently */ }
+}
+const sfx = {
+  dig: () => note(330, 0, .1, { to: 190, type: 'triangle' }),
+  spread: () => [392, 494, 587].forEach((f, i) => note(f, i * .05, .12, { type: 'triangle', vol: .12 })),
+  sign: () => note(740, 0, .07, { type: 'triangle', vol: .12 }),
+  boing: () => { note(180, 0, .22, { to: 720 }); note(720, .22, .24, { to: 260 }); },
+  win: () => [523, 659, 784, 1047, 1319].forEach((f, i) => note(f, i * .12, .28, { type: 'triangle' })),
+  picnic: () => [392, 523, 440, 587, 523, 659].forEach((f, i) => note(f, i * .13, .2, { type: 'triangle' })),
+};
+
+/* ---------- game logic ---------- */
+function newGame() {
+  clearTimeout(endTimer);
+  const size = SIZES[settings.size];
+  const wide = innerWidth > innerHeight * 1.1;
+  const cols = wide ? size.long : size.short, rows = wide ? size.short : size.long;
+  G = {
+    cols, rows, bunnies: size.bunnies,
+    total: LIVES[settings.lives].n, left: LIVES[settings.lives].n,
+    endless: LIVES[settings.lives].n === 0, shared: 0,
+    started: false, over: '', tool: 'dig', msg: 'Tap any grass to start. Your first dig is always safe!',
+    cells: Array.from({ length: cols * rows }, () => ({ b: 0, n: 0, open: 0, sign: 0, woke: 0, daisy: Math.random() < .14 ? 1 : 0 })),
+  };
+  $('end').classList.add('hidden');
+  buildBoard();
+  renderAll();
+}
+
+function centerBoard() {
+  const st = $('stage');
+  st.scrollLeft = (st.scrollWidth - st.clientWidth) / 2;
+  st.scrollTop = (st.scrollHeight - st.clientHeight) / 2;
+}
+
+function neighbors(i) {
+  const out = [], x = i % G.cols, y = Math.floor(i / G.cols);
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const nx = x + dx, ny = y + dy;
+    if ((dx || dy) && nx >= 0 && ny >= 0 && nx < G.cols && ny < G.rows) out.push(ny * G.cols + nx);
+  }
+  return out;
+}
+
+// Bunnies are placed after the first dig, away from it, so the first tap always opens a patch.
+function plantBunnies(first) {
+  const keepClear = new Set([first, ...neighbors(first)]);
+  const spots = G.cells.map((_, i) => i).filter(i => !keepClear.has(i));
+  for (let k = spots.length - 1; k > 0; k--) {
+    const j = Math.floor(Math.random() * (k + 1));
+    [spots[k], spots[j]] = [spots[j], spots[k]];
+  }
+  spots.slice(0, G.bunnies).forEach(i => { G.cells[i].b = 1; });
+  G.cells.forEach((c, i) => { c.n = neighbors(i).filter(j => G.cells[j].b).length; });
+  G.started = true;
+}
+
+function toFind() {
+  if (G.over) return 0;
+  const known = G.cells.filter(c => (c.sign && !c.open) || c.woke).length;
+  return Math.max(0, G.bunnies - known);
+}
+
+function setMsg(text) { G.msg = text; $('msg').textContent = text; }
+
+function dig(i) {
+  const c = G.cells[i];
+  if (c.sign) { setMsg('Tap the Shh sign tool to move that sign first.'); nudge(i); return; }
+  if (!G.started) plantBunnies(i);
+  if (c.b) { wakeBunny(i); return; }
+
+  // Spread outward from an empty spot, one ring at a time, so the garden opens like a wave.
+  const queue = [[i, 0]];
+  c.open = 1;
+  let opened = 0;
+  while (queue.length) {
+    const [at, dist] = queue.shift();
+    opened++;
+    renderCell(at, Math.min(dist * 30, 420));
+    if (G.cells[at].n === 0) {
+      for (const j of neighbors(at)) {
+        const d = G.cells[j];
+        if (!d.open && !d.sign && !d.b) { d.open = 1; queue.push([j, dist + 1]); }
+      }
+    }
+  }
+  opened > 1 ? sfx.spread() : sfx.dig();
+  if (opened > 1) setMsg('Nice dig! Look at the numbers for clues.');
+  else if (c.n) setMsg(c.n === 1 ? '1 bunny is napping next to that spot.' : `${c.n} bunnies are napping next to that spot.`);
+  else setMsg('All clear!');
+  checkWin();
+}
+
+function wakeBunny(i) {
+  const c = G.cells[i];
+  c.open = 1; c.woke = 1;
+  G.shared++;
+  if (!G.endless) G.left--;
+  sfx.boing();
+  renderCell(i, 0);
+  buttons[i].classList.add('boing');
+  renderTally();
+  if (!G.endless && G.left <= 0) { finish('picnic'); return; }
+  const line = WAKE_LINES[Math.floor(Math.random() * WAKE_LINES.length)];
+  setMsg(G.endless ? `${line} The basket is still full!` : G.left === 1 ? `${line} One carrot left. You can do it!` : `${line} ${G.left} carrots left.`);
+  checkWin();
+}
+
+function toggleSign(i) {
+  const c = G.cells[i];
+  if (c.open || G.over) return;
+  c.sign = c.sign ? 0 : 1;
+  sfx.sign();
+  renderCell(i);
+  renderTally();
+  setMsg(c.sign ? 'Shh! You put up a sign so nobody digs here.' : 'You took the sign away.');
+  checkWin();
+}
+
+function explainNumber(i) {
+  const n = G.cells[i].n;
+  if (!n) return;
+  setMsg(n === 1 ? 'This 1 means 1 bunny is in the squares touching it.' : `This ${n} means ${n} bunnies are in the squares touching it.`);
+  const hidden = neighbors(i).filter(j => !G.cells[j].open);
+  hidden.forEach(j => {
+    buttons[j].classList.remove('peek');
+    void buttons[j].offsetWidth;
+    buttons[j].classList.add('peek');
+  });
+  setTimeout(() => hidden.forEach(j => buttons[j] && buttons[j].classList.remove('peek')), 950);
+}
+
+function nudge(i) {
+  const b = buttons[i];
+  b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope');
+}
+
+function checkWin() {
+  if (G.over) return;
+  if (G.cells.every(c => c.b || c.open)) finish('win');
+  // Only a sign on an empty spot is left in the way: say so, or a kid would feel stuck.
+  else if (G.cells.every(c => c.b || c.open || c.sign)) setMsg('So close! One of your Shh signs is on an empty spot. Try moving it.');
+}
+
+function finish(kind) {
+  G.over = kind;
+  G.cells.forEach(c => { if (c.b) { c.open = 1; c.sign = 0; } else if (c.sign) { c.sign = 0; c.open = 1; } });
+  renderAll();
+  if (kind === 'win') { sfx.win(); setMsg('You dug up the whole garden!'); }
+  else { sfx.picnic(); setMsg('Bunny picnic time! Everybody is hopping with joy.'); }
+  carrotRain();
+  endTimer = setTimeout(showEnd, 1300);
+}
+
+function showEnd() {
+  const won = G.over === 'win';
+  $('endPic').setAttribute('href', won ? '#sleepy' : '#awake');
+  $('endTitle').textContent = won ? 'You did it!' : 'Bunny picnic!';
+  const stars = $('stars');
+  stars.classList.toggle('hidden', !won);
+  if (won) {
+    const earned = !G.shared ? 3 : G.endless ? (G.shared <= G.bunnies / 10 ? 2 : 1) : Math.ceil(G.left / G.total * 3);
+    stars.innerHTML = '★'.repeat(earned) + `<i>${'★'.repeat(3 - earned)}</i>`;
+    stars.setAttribute('aria-label', `${earned} of 3 stars`);
+    $('endText').textContent = !G.shared
+      ? 'You dug the whole garden and not one bunny woke up. Super quiet digging!'
+      : G.endless
+      ? `You dug the whole garden and shared ${G.shared === 1 ? '1 carrot' : G.shared + ' carrots'} with the bunnies. They say thank you!`
+      : `You dug the whole garden and kept ${G.left === 1 ? '1 carrot' : G.left + ' carrots'}. The bunnies say good job!`;
+  } else {
+    $('endText').textContent = 'The bunnies ate all your carrots and threw a big party. They had so much fun and want you to come dig again!';
+  }
+  $('end').classList.remove('hidden');
+  $('again').focus();
+}
+
+function carrotRain() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (let k = 0; k < 26; k++) {
+    const holder = document.createElement('div');
+    holder.innerHTML = '<svg class="falling" viewBox="0 0 64 64" aria-hidden="true"><use href="#carrot"/></svg>';
+    const s = holder.firstChild;
+    s.style.left = Math.random() * 100 + 'vw';
+    s.style.animationDuration = 1.6 + Math.random() * 1.6 + 's';
+    s.style.animationDelay = Math.random() * .7 + 's';
+    s.addEventListener('animationend', () => s.remove());
+    document.body.appendChild(s);
+  }
+}
+
+/* ---------- drawing ---------- */
+function buildBoard() {
+  const board = $('board');
+  board.textContent = '';
+  board.style.setProperty('--cols', G.cols);
+  buttons = G.cells.map((_, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.i = i;
+    board.appendChild(b);
+    return b;
+  });
+  fit();
+}
+
+function fit() {
+  if (!G) return;
+  const st = $('stage');
+  const gap = G.cols >= 8 || G.rows >= 10 ? 1 : 3;
+  const w = st.clientWidth - 16 - gap * (G.cols - 1);
+  const h = st.clientHeight - 16 - gap * (G.rows - 1);
+  if (w <= 0 || h <= 0) return;
+  // The whole board always fits on screen. Only when squares get hard to tap does Zoom appear,
+  // which is the one thing that makes the board scroll, and only while it is on.
+  const fitted = Math.max(10, Math.min(92, Math.floor(Math.min(w / G.cols, h / G.rows))));
+  const small = fitted < 32;
+  $('zoomTool').classList.toggle('hidden', !small);
+  const cell = small && G.zoom ? 44 : fitted;
+  const board = $('board');
+  board.style.setProperty('--cell', cell + 'px');
+  board.style.setProperty('--gap', gap + 'px');
+}
+
+function renderCell(i, delay) {
+  const c = G.cells[i], b = buttons[i];
+  const x = i % G.cols, y = Math.floor(i / G.cols);
+  const alt = (x + y) % 2 ? ' alt' : '';
+  let cls, html = '', label;
+  if (!c.open) {
+    cls = 'grass' + alt;
+    html = c.sign ? svgUse('sign') : '';
+    label = c.sign ? 'Shh sign' : 'grass';
+  } else if (c.b) {
+    const sleeping = G.over === 'win' && !c.woke;
+    cls = 'friend' + (G.over === 'picnic' ? ' party' : '');
+    html = svgUse(sleeping ? 'sleepy' : 'awake');
+    label = sleeping ? 'sleeping bunny' : 'happy bunny';
+  } else if (c.n) {
+    cls = `soil${alt} n${c.n}`;
+    html = String(c.n);
+    label = `${c.n} ${c.n === 1 ? 'bunny' : 'bunnies'} next door`;
+  } else {
+    cls = 'soil' + alt;
+    html = c.daisy ? svgUse('daisy') : '';
+    label = 'empty soil';
+  }
+  b.className = 'cell ' + cls;
+  if (delay !== undefined && c.open) {
+    b.classList.add('opened');
+    b.style.animationDelay = delay + 'ms';
+  }
+  b.innerHTML = html;
+  b.setAttribute('aria-label', `Row ${y + 1}, column ${x + 1}: ${label}`);
+}
+
+function renderTally() {
+  if (G.endless) {
+    $('carrots').innerHTML = `${svgUse('carrot')}<b>∞</b>${G.shared ? `<span>${G.shared} shared</span>` : ''}`;
+    $('carrots').setAttribute('aria-label', `Unlimited carrots, ${G.shared} shared`);
+  } else {
+    $('carrots').innerHTML = Array.from({ length: G.total }, (_, k) =>
+      `<svg viewBox="0 0 64 64" aria-hidden="true"${k >= G.left ? ' class="gone"' : ''}><use href="#carrot"/></svg>`).join('');
+    $('carrots').setAttribute('aria-label', `${G.left} of ${G.total} carrots left`);
+  }
+  const n = toFind();
+  $('toFind').innerHTML = `${svgUse('sleepy')}<span>${n} still hiding</span>`;
+}
+
+function renderTools() {
+  $('digTool').setAttribute('aria-pressed', G.tool === 'dig');
+  $('signTool').setAttribute('aria-pressed', G.tool === 'sign');
+  $('zoomTool').setAttribute('aria-pressed', !!G.zoom);
+}
+
+function renderAll() {
+  G.cells.forEach((_, i) => renderCell(i));
+  renderTally();
+  renderTools();
+  $('msg').textContent = G.msg;
+  fit();
+}
+
+function renderPicker() {
+  $('sizes').innerHTML = Object.entries(SIZES).map(([k, s]) =>
+    `<button class="choice" data-size="${k}" aria-pressed="${settings.size === k}"><b>${s.name}</b><small>${s.short} by ${s.long}<br>${s.bunnies} bunnies</small></button>`).join('');
+  $('lives').innerHTML = Object.entries(LIVES).map(([k, l]) =>
+    `<button class="choice" data-lives="${k}" aria-pressed="${settings.lives === k}"><span class="row">${l.n ? svgUse('carrot').repeat(l.n) : svgUse('carrot') + '&nbsp;∞'}</span><b>${l.name}</b><small>${l.n ? `${l.n} carrot${l.n > 1 ? 's' : ''}` : 'Never runs out'}</small></button>`).join('');
+}
+
+function renderSound() {
+  $('sound').textContent = settings.sound ? '🔊' : '🔇';
+  $('sound').setAttribute('aria-label', settings.sound ? 'Sound on' : 'Sound off');
+  $('sound').setAttribute('aria-pressed', settings.sound);
+}
+
+function show(which) {
+  $('start').classList.toggle('hidden', which !== 'start');
+  $('game').classList.toggle('hidden', which !== 'game');
+  if (which === 'game') fit();
+}
+
+/* ---------- input ---------- */
+let pressTimer = 0, longFired = false;
+const board = $('board');
+const cellFrom = e => {
+  const b = e.target.closest && e.target.closest('.cell');
+  return b ? Number(b.dataset.i) : -1;
+};
+board.addEventListener('pointerdown', e => {
+  longFired = false;
+  const i = cellFrom(e);
+  if (i < 0 || (e.pointerType === 'mouse' && e.button !== 0)) return;
+  clearTimeout(pressTimer);
+  pressTimer = setTimeout(() => {
+    if (G.over || G.cells[i].open) return;
+    longFired = true;
+    toggleSign(i);
+    if (navigator.vibrate) navigator.vibrate(25);
+  }, 450);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach(t => board.addEventListener(t, () => clearTimeout(pressTimer)));
+$('stage').addEventListener('scroll', () => clearTimeout(pressTimer), { passive: true });
+board.addEventListener('click', e => {
+  const i = cellFrom(e);
+  if (i < 0 || G.over) return;
+  if (longFired) { longFired = false; return; }
+  const c = G.cells[i];
+  if (c.open) { explainNumber(i); return; }
+  G.tool === 'sign' ? toggleSign(i) : dig(i);
+});
+board.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const i = cellFrom(e);
+  if (i >= 0 && !longFired) toggleSign(i);
+});
+board.addEventListener('keydown', e => {
+  const i = cellFrom(e);
+  if (i < 0) return;
+  const step = { ArrowLeft: i % G.cols ? -1 : 0, ArrowRight: (i + 1) % G.cols ? 1 : 0, ArrowUp: -G.cols, ArrowDown: G.cols }[e.key];
+  if (step !== undefined) {
+    e.preventDefault();
+    const to = buttons[i + step];
+    if (to) to.focus();
+  } else if (e.key === 's' || e.key === 'S') {
+    toggleSign(i);
+  }
+});
+
+$('sizes').addEventListener('click', e => {
+  const b = e.target.closest('[data-size]');
+  if (!b) return;
+  settings.size = b.dataset.size; saveSettings(); sfx.sign(); renderPicker();
+  document.querySelector(`[data-size="${settings.size}"]`).focus();
+});
+$('lives').addEventListener('click', e => {
+  const b = e.target.closest('[data-lives]');
+  if (!b) return;
+  settings.lives = b.dataset.lives; saveSettings(); sfx.sign(); renderPicker();
+  document.querySelector(`[data-lives="${settings.lives}"]`).focus();
+});
+const begin = () => { show('game'); newGame(); };
+$('play').addEventListener('click', () => { sfx.dig(); begin(); });
+$('again').addEventListener('click', begin);
+const toMenu = () => { clearTimeout(endTimer); $('end').classList.add('hidden'); G = null; show('start'); };
+$('change').addEventListener('click', toMenu);
+$('menu').addEventListener('click', toMenu);
+$('sound').addEventListener('click', () => { settings.sound = !settings.sound; saveSettings(); renderSound(); sfx.sign(); });
+$('digTool').addEventListener('click', () => { G.tool = 'dig'; renderTools(); setMsg('Tap the grass to dig.'); });
+$('signTool').addEventListener('click', () => { G.tool = 'sign'; renderTools(); setMsg('Tap a spot where you think a bunny is sleeping.'); });
+$('zoomTool').addEventListener('click', () => {
+  G.zoom = !G.zoom;
+  renderTools();
+  fit();
+  centerBoard();
+  setMsg(G.zoom ? 'Swipe to look around. Tap Zoom again to see the whole garden.' : 'Here is your whole garden!');
+});
+addEventListener('resize', fit);
+if (window.ResizeObserver) new ResizeObserver(fit).observe($('stage')); // a longer message can shrink the board's space
+
+/* ---------- boot (keeps a game in progress if the page refreshes itself) ---------- */
+window.claude?.hot?.snapshot?.(() => ({ G }));
+const start = data => {
+  renderPicker();
+  renderSound();
+  if (data && data.G) {
+    G = data.G;
+    show('game');
+    buildBoard();
+    renderAll();
+    if (G.over) showEnd();
+  } else {
+    show('start');
+  }
+};
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+</script>
+</body>
+</html>
