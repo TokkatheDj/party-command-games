@@ -29,6 +29,9 @@ from applock import data_lock
 APPS_DIR = Path(__file__).parent
 # Overridable so a preview instance can run beside the live server on 8080.
 PORT = int(os.environ.get("APPVERSE_PORT", "8080"))
+# Search returns full cards for at most this many matches; a one-letter search can
+# match hundreds of apps, and every card carries its own buttons and note form.
+SEARCH_CARD_LIMIT = 150
 
 # Request log. The handler only ever printed to stdout, which goes to whichever
 # console window started the server -- so when the server runs from the scheduled
@@ -2865,6 +2868,9 @@ def generate_index(apps, reviews, base_url):
      it anyway, but draw it as provisional so an unchecked app never looks
      identical to one that passed. */
   body.mobile-only .mobile-exempt .app-item:not(.is-mobile) {{ display: block; }}
+  /* Search has always listed every match, phone filter or not; its cards keep that. */
+  body.mobile-only #search-results-list .app-item:not(.is-mobile) {{ display: block; }}
+  .search-more {{ color: var(--muted); font-size: 0.85rem; margin: 0.4rem 0 0.8rem; }}
   body.mobile-only .mobile-exempt .app-item:not(.is-mobile) .app-card {{
     border-style: dashed; border-color: var(--muted); opacity: 0.72;
   }}
@@ -3007,7 +3013,7 @@ def generate_index(apps, reviews, base_url):
     </div>
   </div>
   <div id="search-results-view" class="hidden" style="padding:0 1.5rem 2rem;max-width:700px;margin:0 auto;">
-    <div id="search-results-list"></div>
+    <div id="search-results-list" data-mobile-exempt></div>
   </div>
   <div id="cat-view-container" class="view-cat hidden"></div>
 {removed_section}
@@ -3245,18 +3251,50 @@ searchGlobal.addEventListener('input', () => {{
     bycat[a.safeCat].items.push(a);
   }});
 
+  // Plain links appear at once; the full cards (heart, stars, list pin) replace them
+  // a moment later from /api/search, so a match can be saved or rated right there.
+  // Until 5 Nov 2026 search results were plain links only, with nothing to tap.
+  renderSearchResults(bycat, null, 0);
+  const seq = ++searchSeq;
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {{
+    fetch('/api/search?q=' + encodeURIComponent(q))
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {{
+        if (seq !== searchSeq || !d || !d.cards) return;   // a newer search has started
+        renderSearchResults(bycat, d.cards, d.total);
+      }})
+      .catch(() => {{}});   // the plain links stay, which is how search worked before
+  }}, 150);
+}});
+
+let searchSeq = 0, searchTimer = null;
+function renderSearchResults(bycat, cards, total) {{
+  const list = document.getElementById('search-results-list');
   let html = '';
   Object.values(bycat).forEach(g => {{
     html += '<div class="search-result-cat">' + g.title + '</div><div class="cat-app-list view-' + currentViewMode + '">';
     g.items.forEach(a => {{
+      if (cards && cards[a.path]) {{ html += cards[a.path]; return; }}
       const mk = a.mobile ? ' <span class="search-mob" title="Mobile-friendly">&#128241;</span>' : '';
       html += '<a href="/' + a.path + '" class="app-link search-result-link"><div class="app-card"><div class="app-main"><span class="app-name">' + a.name + mk + '</span></div></div></a>';
     }});
     html += '</div>';
   }});
-
-  document.getElementById('search-results-list').innerHTML = html || '<p class="no-results">No apps found.</p>';
-}});
+  if (cards && total > Object.keys(cards).length) {{
+    html = '<p class="search-more">Showing hearts and stars for the first ' + Object.keys(cards).length +
+           ' of ' + total + ' matches. Keep typing to narrow it down.</p>' + html;
+  }}
+  list.innerHTML = html || '<p class="no-results">No apps found.</p>';
+  if (!cards) return;
+  // Cards hide the phone marker that plain results showed, so put it back on the name.
+  Object.values(bycat).forEach(g => g.items.forEach(a => {{
+    if (!a.mobile || !cards[a.path]) return;
+    const name = list.querySelector('.app-card[data-path="' + a.path + '"] .app-name');
+    if (name) name.insertAdjacentHTML('beforeend', ' <span class="search-mob" title="Mobile-friendly">&#128241;</span>');
+  }}));
+  attachCatListeners(list);
+}}
 
 async function apiPost(endpoint, body) {{
   try {{
@@ -4006,6 +4044,33 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                     self._json({"html": html})
                     return
             self._json({"error": "not found"}, status=404)
+        elif path == "/api/search":
+            # Full cards for search results, so a match can be favorited, rated or
+            # added to a list without opening its category (5 Nov 2026). The match
+            # rule mirrors the page's own: the name contains the query.
+            from urllib.parse import parse_qs
+            query = self.path.split("?", 1)[1] if "?" in self.path else ""
+            q = parse_qs(query).get("q", [""])[0].lower().strip()
+            data = load_data()
+            removed_set = set(data.get("removed", []))
+            favorites = set(data.get("favorites", []))
+            ratings = data.get("ratings", {})
+            opened = set(data.get("opened", []))
+            playlists = data.get("playlists", {})
+            mobile_set = set(data.get("mobile", []))
+            now = time.time()
+            cards, total = {}, 0
+            if q:
+                for items in discover_apps().values():
+                    for app in items:
+                        if app["path"] in removed_set or q not in app["name"].lower():
+                            continue
+                        total += 1
+                        if len(cards) < SEARCH_CARD_LIMIT:
+                            cards[app["path"]] = _make_card(
+                                app, favorites, ratings, removed_set, opened, now, 48 * 3600,
+                                playlists=playlists, mobile=mobile_set)
+            self._json({"cards": cards, "total": total})
         elif path.startswith("/api/playlist/"):
             playlist_id = path[len("/api/playlist/"):]
             data = load_data()
