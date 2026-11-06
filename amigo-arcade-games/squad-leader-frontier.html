@@ -108,6 +108,7 @@ h3{margin:14px 0 6px;font-size:clamp(15px,4vw,18px);color:var(--gold)}
 .ord .oi{display:block;font-size:20px;line-height:1.2;opacity:.65}
 .ord.on{border:3px solid var(--gold);background:linear-gradient(180deg,#d9a61c,#9c7410);color:#fff;font-weight:900;box-shadow:0 0 12px rgba(255,216,102,.75)}
 .ord.on .oi{opacity:1}
+.forms{flex-wrap:wrap}.forms .ord{flex:1 1 22%;min-width:64px}.forms svg{display:block;width:54px;height:36px;margin:0 auto 2px}.forms .ord.on svg path{fill:#fff}
 .cur{display:inline-block;width:12px;height:12px;vertical-align:-1px;margin-right:4px}
 .cur.scrap{background:#c9b48a}
 .cur.crystal{background:#f6c;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);width:14px;height:18px;vertical-align:-3px}
@@ -381,6 +382,20 @@ const WORLD=3600,SAFE_R=700;
 const CALLSIGNS=['VIPER','ACE','GHOST','COMET','ROOK','BLAZE','ECHO','NOVA','HAWK','JET','SPARK','BOLT','ORBIT','RAZOR','DASH','STORM'];
 const RANKS=['ROOKIE','PILOT','VETERAN','ACE'],RANK_AT=[0,60,180,420];
 const MATE_OFF=[[-40,-44],[-40,44],[-84,-24],[-84,24],[-20,-84],[-20,84]];
+// wingmate formations: [forward, sideways] from your ship for flying mate i of n (Squad menu)
+const FORMS={v:'Arrow',line:'Side by side',trail:'Follow me',ring:'Shield'};
+function formOff(i,n,k,t){
+  k=FORMS[k]?k:'v';
+  if(k==='line')return [-4,(i%2?1:-1)*52*(1+(i>>1))];
+  if(k==='trail')return [-50*(i+1),0];
+  if(k==='ring'){const a=(t||0)*1.1+i/Math.max(1,n)*6.283;return [Math.cos(a)*74,Math.sin(a)*74];}
+  return MATE_OFF[Math.min(i,MATE_OFF.length-1)];
+}
+function formSvg(k){   // a picture of the formation: you in cyan pointing up, four wingmates as dots
+  let h='<svg viewBox="0 0 60 40" aria-hidden="true"><path d="M30 9 L25 19 L30 16 L35 19 Z" fill="#4df"/>';
+  for(let i=0;i<4;i++){const o=formOff(i,4,k,0),x=30+o[1]*0.17,y=15-o[0]*0.17;h+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3.2" fill="#9df"/>';}
+  return h+'</svg>';
+}
 const SAVE_KEY='cowork-squad-frontier-save',CASUAL_KEY='cowork-squad-frontier-casual';
 
 const ET={
@@ -777,6 +792,7 @@ function migrate(g){
   if(g.hintQ===undefined){g.hintQ=g.quest;g.hintN=0;}
   if(g.beacons===undefined)g.beacons=g.casual?(g.bossDead||[]).filter(Boolean).length:0;   // bosses already beaten still count
   if(g.viewZ===undefined)g.viewZ=1;
+  if(!FORMS[g.form])g.form='v';
   if(g.eventT===undefined)g.eventT=90;
   if(g.eventN===undefined)g.eventN=0;
   if(!g.tips)g.tips={};
@@ -1363,8 +1379,19 @@ function padRead(){
   let list=[];try{list=[...navigator.getGamepads()].filter(q=>q&&q.connected&&q.buttons&&q.buttons.length);}catch(e){return null;}
   if(!list.length)return null;
   const live=list.find(q=>q.buttons.some(b=>b.pressed)); /* Windows can list a phantom controller first, so the one being used wins */
-  if(live)padIdx=live.index;
+  if(live&&!list.some(q=>q.index===padIdx))padIdx=live.index;   // player 1 keeps the first controller used; another one is player 2
   return list.find(q=>q.index===padIdx)||list[0];
+}
+let pad2Prev=[];
+function pad2Read(){   // any controller that isn't player 1's
+  if(!navigator.getGamepads||padIdx<0)return null;
+  let list=[];try{list=[...navigator.getGamepads()].filter(q=>q&&q.connected&&q.buttons&&q.buttons.length&&q.index!==padIdx);}catch(e){return null;}
+  return list.find(q=>q.buttons.some(b=>b.pressed)||(q.axes||[]).some(a=>Math.abs(a)>0.5))||list[0]||null;
+}
+function pad2Tick(){
+  const g=pad2Read();if(!g){pad2Prev=[];return;}
+  const prev=pad2Prev,cur=g.buttons.map(b=>!!b&&(b.pressed||b.value>0.3)),edge=i=>cur[i]&&!prev[i];pad2Prev=cur;
+  if(state==='play'&&!ui&&!coop&&player&&(edge(0)||edge(9))){setCoop(true);SFX.power();pop(player.x,player.y-60,'P2 JOINED!','#b6ff3a',2);}
 }
 function padDead(x,y){const m=Math.hypot(x,y);if(m<0.22)return [0,0];const k=Math.min(1,(m-0.22)/0.78)/m;return [x*k,y*k];}
 function padRumble(p){
@@ -1621,6 +1648,7 @@ $('panel').addEventListener('click',e=>{
   else if(d.startsWith('shop:')){const it=G.shop.find(o=>o.id===+d.slice(5));if(it&&G.crystal>=itemPrice(it)){G.crystal-=itemPrice(it);G.shop=G.shop.filter(o=>o!==it);addItem(it);SFX.power();save();openSquad(null,true);}}
   else if(d.startsWith('fly:')){const k=d.slice(4);if(G.ships[k]){G.ship=k;player.hp=Math.min(maxHp(),player.hp);player.energy=Math.min(maxEnergy(),player.energy);SFX.power();questTick();save();openSquad(null,true);}}
   else if(d.startsWith('buy:')){const k=d.slice(4),sp=SHIPS[k];if(sp&&!G.ships[k]&&sumLv('shipyard')>=sp.yard&&canPay(sp.cost)){pay(sp.cost);G.ships[k]=1;G.ship=k;player.hp=maxHp();player.energy=maxEnergy();SFX.rankUp();questTick();save();openSquad(null,true);}}
+  else if(d.startsWith('form:')){const k=d.slice(5);if(FORMS[k]){G.form=k;SFX.drone();save();openSquad(null,true);}}
   else if(d.startsWith('order:')){const [,i,k]=d.split(':'),m=player.mates[+i];if(m){const was=m.explore;m.guard=k==='guard';m.explore=k==='explore';if(m.explore&&!was)m.ex=null;SFX.drone();save();openSquad(null,true);}}
   else if(d==='cadet'||d==='pilot'||d==='captain'){$('panel').classList.add('hide');ui=null;newGame(d,pickCasual,aimPick[d]);}
   else if(d.startsWith('aimp:')){const k=d.slice(5);aimPick[k]=!aimPick[k];SFX.deflect();askDiff();}
@@ -1685,6 +1713,7 @@ function openSquad(tab,keep){
     h+='</div>';
   }else if(sqTab==='squad'){
     h+='<h3>Your squad ('+player.mates.filter(m=>!m.down).length+'/'+mateSlots()+' flying)</h3><p class="muted">Guards defend your base. Explorers fly off alone and bring back loot.</p>';
+    h+='<h3>Formation</h3><div class="orders forms" role="group" aria-label="Formation">'+Object.keys(FORMS).map(k=>{const on=(G.form||'v')===k;return '<button class="ord'+(on?' on':'')+'" data-do="form:'+k+'" aria-pressed="'+on+'">'+formSvg(k)+FORMS[k]+'</button>';}).join('')+'</div>';
     if(!player.mates.length)h+='<p class="muted">No wingmates yet. Rescue pilots from distress pods.</p>';
     player.mates.forEach((m,i)=>{h+='<div class="card mate"><div class="grow"><b>'+m.name+'</b> · '+RANKS[m.rank]+(m.down?' <span style="color:var(--bad)">· back at the station in '+Math.ceil(m.down)+'s</span>':'')+' <span class="muted">· '+m.kills+' kills</span></div><div class="orders" role="group" aria-label="Orders for '+m.name+'">'+[['fly','✈️','Fly with me'],['guard','🏠','Guard base'],['explore','🧭','Explore']].map(([k,ic,n])=>{const on=(m.explore?'explore':m.guard?'guard':'fly')===k;return '<button class="ord'+(on?' on':'')+'" data-do="order:'+i+':'+k+'" aria-pressed="'+on+'"><span class="oi">'+ic+'</span>'+n+'</button>';}).join('')+'</div></div>';});
   }else{
@@ -1747,7 +1776,7 @@ function helpHtml(){const K=keyHints(),k=s=>K?' ('+s+')':'';return '<h2>How to P
  '<p><b>⭐ Level up</b>'+k('C')+': spend skill points. <b>🗺️ Map</b>'+k('N')+': tap a Beacon to warp to it. <b>📜 Quests</b>'+k('J')+': Amigo tells you what to try next, but you can go anywhere, any time.</p>'+
  '<p><b>🃏 Rogue (Cards)</b> has its own save. Level up, pick 1 of 3 cards, and your base builds itself using your scrap and crystal.</p>'+
  '<p><b>🎯 Auto-Aim</b>: when it is ON your ship aims and fires by itself. When it is OFF you aim and fire (phone: you shoot where you fly, hold FIRE). Choose it next to your rank, or change it any time in Pause.</p>'+
- '<p><b>👥 Co-pilot</b>: a second player flies the green P2 ship. Turn it on at the start screen or in Pause. On a tablet, player one drags on the left half of the screen and player two on the right half'+(K?'. On a keyboard, WASD flies you and the arrow keys fly P2':'')+'. P2 aims and fires by itself, grabs loot it touches, and comes back '+COOP_DOWN+' seconds after it goes down.</p>'+
+ '<p><b>👥 Co-pilot</b>: a second player flies the green P2 ship. Turn it on at the start screen or in Pause. On a tablet, player one drags on the left half of the screen and player two on the right half'+(K?'. On a keyboard, WASD flies you and the arrow keys fly P2':'')+'. With two game controllers, the second one flies P2: press A on it to join. P2 aims and fires by itself, grabs loot it touches, and comes back '+COOP_DOWN+' seconds after it goes down.</p>'+
  (NET.ok?'<p><b>📡 Two devices</b>: at home, player two can fly P2 from their own phone or tablet. Player one taps ⏸️ then 📡 Second device; player two opens this game and taps 🎮 Join as P2. Both need the home Wi-Fi.</p>':'')+
  '<p><b>🔊 Stuck?</b> Tap the goal under your meters and the arrow shows where to go. With Amigo Talks on, he says what to do too. The 🔊 buttons in 📜 always read aloud.</p>'+
  '<p><b>📡 Beacons in Rogue</b>: every boss you beat earns one. Tap the 📡 button to claim land right where you are.</p>'+
@@ -2435,7 +2464,8 @@ function copilotTick(c,dt){
   if(c.down>0){c.down-=dt;if(c.down<=0){c.down=0;c.sh=c.max;c.inv=1.5;copilotBeside();if(respawnT<=0)pop(c.x,c.y-30,'P2 IS BACK!','#b6ff3a',1.4);}return;}
   let mx=0,my=0;
   if(keys.ArrowLeft)mx-=1;if(keys.ArrowRight)mx+=1;if(keys.ArrowUp)my-=1;if(keys.ArrowDown)my+=1;
-  if(NET.peer&&performance.now()-netIn.at<2000){mx+=netIn.mx;my+=netIn.my;}   // a thumb on the other device; 2 s of silence counts as let go
+  if(NET.peer&&performance.now()-netIn.at<2000){mx+=netIn.mx;my+=netIn.my;}
+  {const g2=pad2Read();if(g2){const a=g2.axes||[],L2=padDead(a[0]||0,a[1]||0);mx+=L2[0];my+=L2[1];if(g2.buttons[12]&&g2.buttons[12].pressed)my-=1;if(g2.buttons[13]&&g2.buttons[13].pressed)my+=1;if(g2.buttons[14]&&g2.buttons[14].pressed)mx-=1;if(g2.buttons[15]&&g2.buttons[15].pressed)mx+=1;}}   // a second controller   // a thumb on the other device; 2 s of silence counts as let go
   if(stick2.id!==null){const dx=stick2.x-stick2.sx,dy=stick2.y-stick2.sy,m=Math.hypot(dx,dy);if(m>6){const k=Math.min(1,m/44);mx+=dx/m*k;my+=dy/m*k;}}
   const ml=Math.hypot(mx,my);if(ml>1){mx/=ml;my/=ml;}
   if(ml>0.05){const sp=shipSpeed();c.x+=mx*sp*dt;c.y+=my*sp*dt;c.idle=0;}
@@ -2609,14 +2639,14 @@ function update(dt){
   }
 
   /* ---- wingmates ---- */
-  let i=0;
+  let i=0;const flyN=p.mates.filter(m=>!m.down&&!m.guard&&!m.explore).length;
   for(const m of p.mates){
     if(m.down>0){m.down-=dt;if(m.down<=0){m.down=0;m.x=coreStruct().x;m.y=coreStruct().y;m.sh=m.max;if(respawnT<=0)pop(p.x,p.y-40,m.name+' IS BACK!','#9df',1.4);}continue;}
     if(m.explore){exploreTick(m,dt);continue;}
     let tx,ty;
     if(m.guard){const c=coreStruct(),ga=time*0.35+m.t;tx=c.x+Math.cos(ga)*120;ty=c.y+Math.sin(ga)*120;}
     else{
-      const o=MATE_OFF[Math.min(i,MATE_OFF.length-1)];i++;
+      const o=formOff(i,flyN,G.form,time);i++;
       const ca=Math.cos(p.ang),sa=Math.sin(p.ang);
       tx=p.x+o[0]*ca-o[1]*sa;ty=p.y+o[0]*sa+o[1]*ca+Math.sin(time*3+m.t)*4;
     }
@@ -3329,7 +3359,7 @@ function drawHUD(){
     ctx.fillText(nm,x,my+5);
     if(down){bar(bx,my,bw,10,1-m.down/45,'#a44');ctx.fillStyle='#fff';ctx.font='bold 9px system-ui';ctx.fillText('DOWN '+Math.ceil(m.down)+'s',bx+3,my+5);}
     else bar(bx,my,bw,10,v,v>0.5?'#5cf':v>0.25?'#fc6':'#f55');
-    ctx.font='12px system-ui';ctx.textAlign='right';ctx.fillStyle='#fff';ctx.fillText(down?'💥':m.guard?'🏠':m.explore?'🧭':'✈️',x+w,my+5);ctx.textAlign='left';
+    ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillStyle='#fff';ctx.fillText(down?'💥':m.guard?'🏠':m.explore?'🧭':'✈️',x+w-8,my+5);ctx.textAlign='left';
   });
 
   // radar
@@ -3504,7 +3534,7 @@ function frame(now){
   // still struggling after 4 seconds of slow frames? draw fewer pixels. Gameplay is untouched.
   if(state==='play'&&!paused&&realDt<0.5&&dpr>1){slowT2=realDt>0.03?slowT2+realDt:Math.max(0,slowT2-realDt*0.5);if(slowT2>4){slowT2=0;qualityCap=Math.max(1,dpr-0.25);resize();}}
   ctx.setTransform(dpr*scale,0,0,dpr*scale,0,0);
-  padTick(Math.min(0.1,realDt));
+  padTick(Math.min(0.1,realDt));pad2Tick();
   if(state==='title'){time+=dt;drawTitle(dt);musicTick();return;}
   if(!paused){
     if(slowT>0){slowT-=dt;dt*=0.35;}
