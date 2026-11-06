@@ -170,5 +170,40 @@ class Relay(unittest.TestCase):
         self.assertEqual(self.call("POST", "open", {})[0], 429)
 
 
+class ThroughAppVerse(unittest.TestCase):
+    """The same routes through AppVerse's own request handler (serve_apps.AppHandler).
+    Only the handler class is used: serve_apps' start-up (which touches saved data) never runs.
+    Added 6 Nov after the relay passed the tests above but crashed inside AppVerse's do_GET."""
+
+    @classmethod
+    def setUpClass(cls):
+        import serve_apps
+        cls.srv = Server(("127.0.0.1", 0), serve_apps.AppHandler)
+        cls.base = "http://127.0.0.1:%d" % cls.srv.server_address[1]
+        threading.Thread(target=cls.srv.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown()
+
+    def setUp(self):
+        mp_relay._rooms.clear()
+
+    call = Relay.call
+    read_stream = Relay.read_stream
+
+    def test_open_list_join_send_stream_close(self):
+        self.assertEqual(self.call("GET", "rooms"), (200, {"rooms": []}))
+        s, h = self.call("POST", "open", {"name": "Level 1 Story"})
+        self.assertEqual(s, 200)
+        s, g = self.call("POST", "join", {"room": h["room"]})
+        self.assertEqual(s, 200)
+        self.assertEqual(self.call("POST", "send", {"room": h["room"], "from": g["guest"], "to": "host", "msg": {"t": "in", "mx": 1, "my": 0}})[0], 200)
+        got = self.read_stream("room=%s&as=host&token=%s" % (h["room"], h["token"]), 2)
+        self.assertEqual([m["t"] for m in got], ["joined", "from"])
+        self.assertEqual(self.call("POST", "close", {"room": h["room"], "token": h["token"]})[0], 200)
+        self.assertEqual(self.call("GET", "rooms"), (200, {"rooms": []}))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -26,7 +26,9 @@ from urllib.parse import unquote
 
 from applock import data_lock
 import mp_relay
-from urllib.parse import parse_qs
+# its own name: do_GET imports parse_qs locally further down, which makes a bare
+# parse_qs a not-yet-assigned local everywhere in that method
+from urllib.parse import parse_qs as mp_parse_qs
 
 APPS_DIR = Path(__file__).parent
 # Overridable so a preview instance can run beside the live server on 8080.
@@ -4002,7 +4004,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         path = unquote(self.path.split("?")[0])
         # Two-device games (Squad Leader: Frontier): in-memory relay, no files, see mp_relay.py
         if path.startswith("/api/mp/"):
-            q = {k: v[0] for k, v in parse_qs(self.path.partition("?")[2]).items()}
+            q = {k: v[0] for k, v in mp_parse_qs(self.path.partition("?")[2]).items()}
             mp_relay.handle(self, "GET", path, q, {})
             return
         if path in ("/", "/index.html", ""):
