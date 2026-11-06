@@ -55,6 +55,10 @@ h3{margin:14px 0 6px;font-size:clamp(15px,4vw,18px);color:var(--gold)}
 .actrow{display:flex;gap:10px}
 .act.fire{border-color:#f66;background:rgba(90,20,20,.6);color:#fbb}
 .act.laser{border-color:var(--gold);background:rgba(90,70,10,.6);color:var(--gold)}
+#netPad{position:absolute;inset:0;z-index:40;background:#070b18;display:flex;flex-direction:column;touch-action:none;user-select:none;-webkit-user-select:none}
+#netPad.hide{display:none}#netTop{flex:0 0 auto;position:relative;z-index:1;display:flex;align-items:center;gap:12px;padding:12px 16px;color:#fff;font:600 18px system-ui;background:#0d1530;border-bottom:2px solid #f9c}
+#netTop .grow{flex:1}#netSt{font-weight:400;color:#cfe;margin-top:4px;font-size:17px}#netPad canvas{position:static;width:auto;height:auto}#netShip{width:56px;height:56px;flex:0 0 auto}#netLeave{min-width:0;flex:0 0 auto}
+#netCv{flex:1 1 0;height:0!important;width:100%!important;min-height:0;display:block}
 #panel{position:absolute;inset:0;background:rgba(3,6,16,.72);display:flex;align-items:center;justify-content:center;padding:10px}
 #sheet{width:min(620px,100%);max-height:100%;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:16px}
 #sheet p{margin:6px 0;color:var(--ink);font-size:clamp(14px,3.7vw,16px);line-height:1.4}
@@ -162,8 +166,10 @@ h3{margin:14px 0 6px;font-size:clamp(15px,4vw,18px);color:var(--gold)}
     <button class="big primary cont hide" id="btnRogue"></button>
     <button class="big pulse" id="btnNew">New Game</button>
     <button class="big alt" id="btnHelp">How to Play</button>
+    <button class="big alt hide" id="btnJoin">🎮 Join as P2</button>
   </div>
 </div>
+<div id="netPad" class="hide"><div id="netTop"><canvas id="netShip" width="72" height="72"></canvas><div class="grow"><b>You fly P2, the pink ship</b><div id="netSt">Connecting…</div></div><button class="big alt" id="netLeave">Leave</button></div><canvas id="netCv"></canvas></div>
 
 <div id="tools" class="hide">
   <button class="tool" id="tSquad" aria-label="Squad and skills">⭐<span class="dot hide" id="skillDot">!</span></button>
@@ -856,6 +862,7 @@ let wakeLock=null;
 function keepAwake(){try{if(navigator.wakeLock&&!wakeLock&&state==='play'&&!document.hidden)navigator.wakeLock.request('screen').then(l=>{wakeLock=l;l.addEventListener('release',()=>{wakeLock=null;});}).catch(()=>{});}catch(e){}}
 function canFull(){return !!(document.fullscreenEnabled&&document.documentElement.requestFullscreen);}
 function toTitle(){
+  netClose();
   if(wakeLock){try{wakeLock.release();}catch(e){}wakeLock=null;}
   hush();
   save();state='title';paused=false;ui=null;
@@ -1539,7 +1546,7 @@ cv.addEventListener('pointerdown',e=>{
     if(e.button===2)mouseShield=true;else if(e.button===0)mouseFire=true;
     return;
   }
-  if(copilot&&p.x>VW*COOP_SPLIT){if(stick2.id===null){stick2.id=e.pointerId;stick2.sx=stick2.x=p.x;stick2.sy=stick2.y=p.y;}return;}
+  if(copilot&&!NET.peer&&p.x>VW*COOP_SPLIT){if(stick2.id===null){stick2.id=e.pointerId;stick2.sx=stick2.x=p.x;stick2.sy=stick2.y=p.y;}return;}
   if(stick.id===null){stick.id=e.pointerId;stick.sx=stick.x=p.x;stick.sy=stick.y=p.y;}
 });
 cv.addEventListener('pointermove',e=>{
@@ -1598,6 +1605,7 @@ $('panel').addEventListener('click',e=>{
   else if(d==='closeHelp'){if(state==='play')closeUi();else{$('panel').classList.add('hide');ui=null;}}
   else if(d==='title'){$('panel').classList.add('hide');toTitle();}
   else if(d==='backpause')openPause();
+  else if(d==='netrooms')netRooms();
   else if(d==='askquit'){
     const mins=sessionSnap?Math.max(1,Math.round((performance.now()-sessionSnap.at)/60000)):0,fresh=sessionSnap&&sessionSnap.raw===null;
     openPanel('<h2>Quit without saving?</h2><p>'+(fresh?'This game will be deleted.':'Your game goes back to how it was when you started playing it this time.')+' You will lose the last '+mins+' minute'+(mins===1?'':'s')+' of progress.</p><div class="row" style="margin-top:10px"><button class="big primary" data-do="backpause">Keep playing</button><button class="big alt" data-do="quitno">Quit and lose it</button></div>');
@@ -1620,6 +1628,9 @@ $('panel').addEventListener('click',e=>{
   else if(d.startsWith('readc:')){const c=G.contracts[+d.slice(6)];if(c)speak(cInfo(c).say,true);}
   else if(d==='talk'){G.talk=!G.talk;hush();save();openPause();if(G.talk)speak('Hi Commander!');}
   else if(d==='aimtoggle'){G.autoAim=!G.autoAim;SFX.power();showTouch();save();openPause();}
+  else if(d==='net'){if(NET.room)netPanel();else netHost();}
+  else if(d==='netoff'){netClose();openPause();}
+  else if(d.startsWith('netjoin:'))netJoin(d.slice(8));
   else if(d==='copilot'){setCoop(!coop);SFX.power();openPause();if(coop)say('Co-pilot is on! Player two, drag on the right side of the screen to fly the pink ship.');}
   else if(d==='modeStory')pickMode(false);
   else if(d==='modeRogue')pickMode(true);
@@ -1726,7 +1737,7 @@ function openQuests(){
 }
 function openPause(){
   hush();
-  openPanel('<h2>Paused</h2><p class="muted">Your game saves by itself.'+(G.diff!=='cadet'?' Threat level: <b>'+threat()+'</b>. It climbs as you level up, and jumps with every boss you beat.':'')+'</p><div class="row" style="margin-top:10px"><button class="big primary" data-do="close">Resume</button><button class="big alt" data-do="help">How to Play</button><button class="big alt" data-do="aimtoggle">🎯 Auto-Aim: '+(G.autoAim?'ON':'OFF')+'</button><button class="big alt" data-do="copilot">👥 Co-pilot: '+(coop?'ON':'OFF')+'</button><button class="big alt" data-do="talk">🔊 Amigo talks: '+(G.talk?'ON':'OFF')+'</button><button class="big alt" data-do="music">Music: '+(musicOn?'ON':'OFF')+'</button>'+(canFull()?'<button class="big alt" data-do="full">⛶ Full Screen: '+(document.fullscreenElement?'ON':'OFF')+'</button>':'')+'<button class="big alt" data-do="title">Save and quit</button><button class="big alt" data-do="askquit">Quit without saving</button></div>');
+  openPanel('<h2>Paused</h2><p class="muted">Your game saves by itself.'+(G.diff!=='cadet'?' Threat level: <b>'+threat()+'</b>. It climbs as you level up, and jumps with every boss you beat.':'')+'</p><div class="row" style="margin-top:10px"><button class="big primary" data-do="close">Resume</button><button class="big alt" data-do="help">How to Play</button><button class="big alt" data-do="aimtoggle">🎯 Auto-Aim: '+(G.autoAim?'ON':'OFF')+'</button><button class="big alt" data-do="copilot">👥 Co-pilot: '+(coop?'ON':'OFF')+'</button>'+(NET.ok?'<button class="big alt" data-do="net">📡 Second device: '+(NET.room?(NET.peer?'P2 JOINED':'WAITING'):'OFF')+'</button>':'')+'<button class="big alt" data-do="talk">🔊 Amigo talks: '+(G.talk?'ON':'OFF')+'</button><button class="big alt" data-do="music">Music: '+(musicOn?'ON':'OFF')+'</button>'+(canFull()?'<button class="big alt" data-do="full">⛶ Full Screen: '+(document.fullscreenElement?'ON':'OFF')+'</button>':'')+'<button class="big alt" data-do="title">Save and quit</button><button class="big alt" data-do="askquit">Quit without saving</button></div>');
 }
 function helpHtml(){const K=keyHints(),k=s=>K?' ('+s+')':'';return '<h2>How to Play</h2>'+(padActive?'<p><b>🎮 Controller</b>: left stick flies. A or LT is the shield, RT fires, the right stick aims and fires, X is the laser. Y builds, B says your goal, Back opens the map, Start pauses, LB zooms the view, RB drops a Beacon. D-pad up is your squad, right is quests, down zooms the mini map. In menus, move with the stick or D-pad, A chooses and B goes back. Building: the stick moves a crosshair, A places, the D-pad goes back to the buttons.</p>':'')+'<p><b>Fly anywhere.</b> '+(K?'Touch: drag to fly. Keyboard: WASD to fly, mouse to aim, Space or click to fire.':'Drag to fly.')+'</p>'+
  '<p><b>🪞 Mirror Shield</b> ('+(K?'SHIELD, Shift, or right-click':'SHIELD')+'): press it just before a shot hits and the shot flies back, harder. Hold it to block, but that drains energy.</p>'+
@@ -1736,6 +1747,7 @@ function helpHtml(){const K=keyHints(),k=s=>K?' ('+s+')':'';return '<h2>How to P
  '<p><b>🃏 Rogue (Cards)</b> has its own save. Level up, pick 1 of 3 cards, and your base builds itself using your scrap and crystal.</p>'+
  '<p><b>🎯 Auto-Aim</b>: when it is ON your ship aims and fires by itself. When it is OFF you aim and fire (phone: you shoot where you fly, hold FIRE). Choose it next to your rank, or change it any time in Pause.</p>'+
  '<p><b>👥 Co-pilot</b>: a second player flies the pink P2 ship. Turn it on in Pause. On a tablet, player one drags on the left half of the screen and player two on the right half'+(K?'. On a keyboard, WASD flies you and the arrow keys fly P2':'')+'. P2 aims and fires by itself, grabs loot it touches, and comes back '+COOP_DOWN+' seconds after it goes down.</p>'+
+ (NET.ok?'<p><b>📡 Two devices</b>: at home, player two can fly P2 from their own phone or tablet. Player one taps ⏸️ then 📡 Second device; player two opens this game and taps 🎮 Join as P2. Both need the home Wi-Fi.</p>':'')+
  '<p><b>🔊 Stuck?</b> Tap the goal under your meters and the arrow shows where to go. With Amigo Talks on, he says what to do too. The 🔊 buttons in 📜 always read aloud.</p>'+
  '<p><b>📡 Beacons in Rogue</b>: every boss you beat earns one. Tap the 📡 button to claim land right where you are.</p>'+
  '<p><b>🔍 Zoom</b>: the button under the mini map pulls the view out. Tap the mini map to zoom just the map.</p>'+
@@ -1813,6 +1825,147 @@ $('btnNew').onclick=()=>{initAudio();askMode();};
 $('btnContinue').onclick=()=>{initAudio();const g=loadSave();if(g){snapTake(false);const old=g.v<2;G=migrate(g);enterWorld();say(old?'Welcome back, Commander! Big news: gear, new ships, contracts and new buildings. Tap ⭐ and 📜 to see them.':'Welcome back, Commander.');}};
 $('btnRogue').onclick=()=>{initAudio();const g=loadSave(true);if(g){snapTake(true);G=migrate(g);enterWorld();say(G.tidyMsg||'Welcome back, Commander.');delete G.tidyMsg;}};
 $('btnHelp').onclick=()=>{initAudio();showHelp();};
+/* ---------- two devices: a second phone or tablet flies P2, on the home Wi-Fi through AppVerse (mp_relay.py) ----------
+   Round 1: the other device is P2's thumb-stick and sees P2's shield; the game itself is drawn on the host. */
+const NET={ok:false,room:null,token:null,es:null,guest:null,peer:null,sendT:0,st:null,stAt:0,roomsT:0,lastSent:'',sentAt:0,ended:false};
+const netIn={mx:0,my:0,at:0};
+const netStick={id:null,sx:0,sy:0,x:0,y:0};
+const netClean=s=>String(s).replace(/[<>&"]/g,'');
+function mpFetch(name,body){
+  return fetch('/api/mp/'+name,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{cache:'no-store'})
+    .then(r=>r.json().catch(()=>({})).then(j=>{if(!r.ok)throw new Error(j.error||('error '+r.status));return j;}));
+}
+function netProbe(){   // only AppVerse has the relay: anywhere else the buttons stay hidden
+  const ac=new AbortController();setTimeout(()=>ac.abort(),1500);
+  fetch('/api/mp/rooms',{cache:'no-store',signal:ac.signal}).then(r=>r.ok?r.json():null)
+    .then(j=>{NET.ok=!!(j&&Array.isArray(j.rooms));$('btnJoin').classList.toggle('hide',!NET.ok);}).catch(()=>{});
+}
+function netSend(msg){
+  if(!NET.room)return;
+  const body=NET.guest?{room:NET.room,from:NET.guest,to:'host',msg}:{room:NET.room,from:'host',token:NET.token,to:'guests',msg};
+  mpFetch('send',body).catch(()=>{});
+}
+function netListen(as){
+  if(NET.es)NET.es.close();
+  const es=new EventSource('/api/mp/stream?room='+NET.room+'&as='+(as==='host'?'host&token='+NET.token:NET.guest));
+  NET.es=es;
+  es.onmessage=e=>{let m;try{m=JSON.parse(e.data);}catch(err){return;}netGot(m);};
+  es.onerror=()=>{if(es.readyState===2&&NET.es===es)netGone();};   // CLOSED: the room is gone (EventSource retries anything else itself)
+}
+function netGot(m){
+  if(NET.guest){
+    if(m.t==='st'){NET.st=m;NET.stAt=performance.now();}
+    else if(m.t==='ended')netGone();
+    return;
+  }
+  if(m.t==='joined'){
+    NET.peer=m.guest;netIn.at=0;
+    if(player&&!copilot)copilot=copilotMake();
+    if(state==='play'){pop(player.x,player.y-60,'P2 JOINED!','#f9c',2);SFX.power();if(ui==='panel'&&/Play on two devices/.test($('sheet').textContent))closeUi();}
+  }else if(m.t==='left'||(m.t==='from'&&m.msg&&m.msg.t==='bye')){
+    if(m.guest!==NET.peer)return;
+    NET.peer=null;if(!coop)copilot=null;
+    if(state==='play')pop(player.x,player.y-60,'P2 LEFT','#f88',2);
+  }else if(m.t==='from'&&m.msg&&m.msg.t==='in'&&m.guest===NET.peer){
+    const mx=+m.msg.mx||0,my=+m.msg.my||0,l=Math.hypot(mx,my);
+    netIn.mx=l>1?mx/l:mx;netIn.my=l>1?my/l:my;netIn.at=performance.now();
+  }
+}
+function netPanel(){
+  openPanel('<h2>📡 Play on two devices</h2><p>On the other phone or tablet, open <b>Squad Leader: Frontier</b> in AppVerse and tap <b>🎮 Join as P2</b>.</p>'+
+    '<p class="muted">Both need to be on the home Wi-Fi. '+(NET.peer?'P2 is flying now.':'Waiting for player two…')+'</p>'+
+    '<div class="row"><button class="big primary" data-do="close">Keep flying</button><button class="big alt" data-do="netoff">Stop</button></div>');
+}
+function netHost(){
+  mpFetch('open',{name:'Level '+G.lvl+' '+(G.casual?'Rogue':'Story'),rank:G.diff}).then(j=>{
+    NET.room=j.room;NET.token=j.token;NET.peer=null;netListen('host');netPanel();
+  }).catch(e=>openPanel('<h2>📡 Second device</h2><p>That did not work ('+netClean(e.message)+'). Is AppVerse still running?</p><div class="row"><button class="big" data-do="backpause">Back</button></div>'));
+}
+function netClose(){   // the host stops sharing (or leaves the game)
+  if(!NET.room||NET.guest)return;
+  mpFetch('close',{room:NET.room,token:NET.token}).catch(()=>{});
+  if(NET.es)NET.es.close();
+  NET.es=null;NET.room=null;NET.token=null;NET.peer=null;
+  if(!coop)copilot=null;
+}
+function netGone(){   // the relay says the game is over
+  if(NET.es)NET.es.close();NET.es=null;
+  if(NET.guest){
+    NET.guest=null;NET.room=null;NET.st=null;netStick.id=null;$('netPad').classList.add('hide');
+    $('panel').classList.remove('hide');ui='panel';
+    $('sheet').innerHTML='<h2>Game over for now</h2><p>Player one stopped the game, or the Wi-Fi dropped.</p><div class="row"><button class="big primary" data-do="netrooms">Join again</button><button class="big alt" data-do="closeHelp">OK</button></div>';
+  }else if(NET.room){
+    NET.room=null;NET.token=null;NET.peer=null;if(!coop)copilot=null;
+    if(state==='play')pop(player.x,player.y-60,'SECOND DEVICE DISCONNECTED','#f88',2.4);
+  }
+}
+/* the guest's side */
+function netRooms(){
+  $('panel').classList.remove('hide');ui='panel';
+  mpFetch('rooms').then(j=>j.rooms).catch(()=>[]).then(rooms=>{
+    if(NET.guest||state==='play'||$('panel').classList.contains('hide'))return;
+    const open=rooms.filter(r=>!r.full);
+    $('sheet').innerHTML='<h2>🎮 Join as P2</h2>'+(open.length?'<div class="modes">'+open.map(r=>
+      '<button class="modeb" data-do="netjoin:'+netClean(r.room)+'"><img src="'+amigoPortrait(1)+'" alt=""><div><b>Fly with '+netClean(r.name)+'</b><span>Tap to join as the pink ship</span></div></button>').join('')+'</div>'
+      :'<p>No game to join yet.</p><p class="muted">On the other tablet: start a game, tap ⏸️, then 📡 Second device. This list updates by itself.</p>')+
+      '<div class="row"><button class="big alt" data-do="closeHelp">Back</button></div>';
+    clearTimeout(NET.roomsT);NET.roomsT=setTimeout(()=>{if(!NET.guest&&state!=='play'&&!$('panel').classList.contains('hide')&&/Join as P2/.test($('sheet').textContent))netRooms();},2000);
+  });
+}
+function netJoin(room){
+  mpFetch('join',{room}).then(j=>{
+    NET.room=room;NET.guest=j.guest;NET.st=null;NET.stAt=performance.now();NET.lastSent='';
+    $('panel').classList.add('hide');ui=null;$('netPad').classList.remove('hide');netPadSize();netShipIcon();
+    try{if(navigator.wakeLock&&!wakeLock)navigator.wakeLock.request('screen').then(l=>{wakeLock=l;l.addEventListener('release',()=>{wakeLock=null;});}).catch(()=>{});}catch(e){}
+    netListen('guest');
+  }).catch(e=>{$('sheet').innerHTML='<h2>🎮 Join as P2</h2><p>'+netClean(e.message)+'.</p><div class="row"><button class="big primary" data-do="netrooms">Try again</button><button class="big alt" data-do="closeHelp">Back</button></div>';});
+}
+function netLeave(){
+  netSend({t:'bye'});
+  if(NET.es)NET.es.close();NET.es=null;NET.guest=null;NET.room=null;NET.st=null;netStick.id=null;
+  $('netPad').classList.add('hide');
+  if(wakeLock){try{wakeLock.release();}catch(e){}wakeLock=null;}
+}
+const netCv=$('netCv'),nctx=netCv.getContext('2d');
+function netPadSize(){const r=netCv.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1);netCv.width=Math.max(1,r.width*d);netCv.height=Math.max(1,r.height*d);nctx.setTransform(d,0,0,d,0,0);}
+function netShipIcon(){const c=$('netShip').getContext('2d');c.clearRect(0,0,72,72);c.save();c.translate(36,36);c.rotate(-Math.PI/2);c.scale(2.4,2.4);c.fillStyle='#3a1030';c.strokeStyle='#f9c';c.lineWidth=1.6;c.beginPath();c.moveTo(13,0);c.lineTo(-9,-8);c.lineTo(-5,0);c.lineTo(-9,8);c.closePath();c.fill();c.stroke();c.restore();}
+function netXY(e){const r=netCv.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+netCv.addEventListener('pointerdown',e=>{e.preventDefault();if(netStick.id!==null)return;const p=netXY(e);netStick.id=e.pointerId;netStick.sx=netStick.x=p.x;netStick.sy=netStick.y=p.y;try{netCv.setPointerCapture(e.pointerId);}catch(err){}});
+netCv.addEventListener('pointermove',e=>{if(netStick.id!==e.pointerId)return;const p=netXY(e);netStick.x=p.x;netStick.y=p.y;});
+const netUp=e=>{if(netStick.id===e.pointerId)netStick.id=null;};
+netCv.addEventListener('pointerup',netUp);netCv.addEventListener('pointercancel',netUp);
+$('netLeave').onclick=()=>{netLeave();};
+window.addEventListener('resize',()=>{if(NET.guest)netPadSize();});
+const NET_R=70;   // how far the thumb moves for full speed
+function netPadFrame(now){
+  // what the thumb (or the arrow keys / WASD) says, sent when it changes and every 200 ms while held
+  let mx=0,my=0;
+  if(keys.KeyA||keys.ArrowLeft)mx-=1;if(keys.KeyD||keys.ArrowRight)mx+=1;if(keys.KeyW||keys.ArrowUp)my-=1;if(keys.KeyS||keys.ArrowDown)my+=1;
+  if(netStick.id!==null){const dx=netStick.x-netStick.sx,dy=netStick.y-netStick.sy,m=Math.hypot(dx,dy);if(m>6){const k=Math.min(1,m/NET_R);mx+=dx/m*k;my+=dy/m*k;}}
+  const q=v=>Math.round(Math.max(-1,Math.min(1,v))*10)/10,key=q(mx)+','+q(my),moving=key!=='0,0';
+  if(key!==NET.lastSent||(moving&&now-NET.sentAt>200)){NET.lastSent=key;NET.sentAt=now;netSend({t:'in',mx:q(mx),my:q(my)});}
+  // the screen
+  const W=netCv.width/(Math.min(2,window.devicePixelRatio||1)),H=netCv.height/(Math.min(2,window.devicePixelRatio||1));
+  nctx.fillStyle='#070b18';nctx.fillRect(0,0,W,H);
+  nctx.fillStyle='rgba(255,255,255,.35)';for(let i=0;i<40;i++){const x=(i*137.5%1)*W,y=((i*61.8+now*0.004*(1+i%3))%H);nctx.fillRect((i*97)%W,y,2,2);}
+  const st=NET.st,stale=now-NET.stAt>2000;
+  let line;
+  if(!st)line=stale?'Waiting for player one…':'Connecting…';
+  else if(stale)line='⏸️ Player one has paused';
+  else if(st.down>0)line='P2 is down: back in '+st.down;
+  else line='Shield '+'💗'.repeat(Math.max(0,st.sh))+'🤍'.repeat(Math.max(0,st.max-st.sh))+'   Hits: '+st.kills;
+  const el=$('netSt');if(el.textContent!==line)el.textContent=line;
+  if(netStick.id===null&&!moving){
+    nctx.fillStyle='#f9c';nctx.textAlign='center';nctx.font='bold '+Math.min(34,W*0.07)+'px system-ui';nctx.fillText('Put your thumb anywhere',W/2,H/2-10);
+    nctx.font=Math.min(22,W*0.05)+'px system-ui';nctx.fillStyle='#cfe';nctx.fillText('and slide it to fly',W/2,H/2+26);
+  }else if(netStick.id!==null){
+    nctx.strokeStyle='rgba(255,150,200,.6)';nctx.lineWidth=3;nctx.beginPath();nctx.arc(netStick.sx,netStick.sy,NET_R,0,6.283);nctx.stroke();
+    const dx=netStick.x-netStick.sx,dy=netStick.y-netStick.sy,m=Math.hypot(dx,dy)||1,k=Math.min(NET_R,m);
+    nctx.fillStyle='rgba(255,150,200,.45)';nctx.beginPath();nctx.arc(netStick.sx+dx/m*k,netStick.sy+dy/m*k,30,0,6.283);nctx.fill();
+  }
+}
+$('btnJoin').onclick=()=>{initAudio();netRooms();};
+netProbe();
 $('tBuild').onclick=()=>{if(state==='play'){if(ui==='build')closeUi();else if(!ui)openBuild();}};
 $('tSquad').onclick=()=>{if(state==='play'&&!ui)openSquad(G.pts>0?'pilot':G.newGear?'gear':undefined);};   // go straight to whatever is waiting
 $('tQuest').onclick=()=>{if(state==='play'&&!ui)openQuests();};
@@ -2269,7 +2422,7 @@ function treasureTick(){
 }
 function copilotMake(){const p=player;return {name:'P2',copilot:true,x:p.x+40,y:p.y+56,ang:p.ang,sh:4,max:4,inv:1.5,down:0,fire:0.3,kills:0,idle:0};}
 function copilotBeside(){if(copilot){copilot.x=player.x+40;copilot.y=player.y+56;}}
-function setCoop(on){coop=!!on;try{localStorage.setItem('cowork-squad-frontier-copilot',coop?'on':'off');}catch(e){}copilot=coop&&player?copilotMake():null;stick2.id=null;}
+function setCoop(on){coop=!!on;try{localStorage.setItem('cowork-squad-frontier-copilot',coop?'on':'off');}catch(e){}copilot=(coop||NET.peer)&&player?(copilot||copilotMake()):null;stick2.id=null;}
 function copilotDamage(c){
   c.sh-=1;c.inv=0.8;SFX.droneHit();
   if(c.sh<=0){c.down=COOP_DOWN;c.sh=c.max;SFX.droneLost();boom(c.x,c.y,'#f9c',18,240);pop(c.x,c.y-20,'P2 DOWN! BACK IN '+COOP_DOWN,'#f88');}
@@ -2279,6 +2432,7 @@ function copilotTick(c,dt){
   if(c.down>0){c.down-=dt;if(c.down<=0){c.down=0;c.sh=c.max;c.inv=1.5;copilotBeside();if(respawnT<=0)pop(c.x,c.y-30,'P2 IS BACK!','#f9c',1.4);}return;}
   let mx=0,my=0;
   if(keys.ArrowLeft)mx-=1;if(keys.ArrowRight)mx+=1;if(keys.ArrowUp)my-=1;if(keys.ArrowDown)my+=1;
+  if(NET.peer&&performance.now()-netIn.at<2000){mx+=netIn.mx;my+=netIn.my;}   // a thumb on the other device; 2 s of silence counts as let go
   if(stick2.id!==null){const dx=stick2.x-stick2.sx,dy=stick2.y-stick2.sy,m=Math.hypot(dx,dy);if(m>6){const k=Math.min(1,m/44);mx+=dx/m*k;my+=dy/m*k;}}
   const ml=Math.hypot(mx,my);if(ml>1){mx/=ml;my/=ml;}
   if(ml>0.05){const sp=shipSpeed();c.x+=mx*sp*dt;c.y+=my*sp*dt;c.idle=0;}
@@ -2476,6 +2630,7 @@ function update(dt){
   }
 
   if(copilot)copilotTick(copilot,dt);
+  if(NET.peer&&copilot){NET.sendT-=dt;if(NET.sendT<=0){NET.sendT=0.25;netSend({t:'st',sh:copilot.sh,max:copilot.max,down:Math.ceil(copilot.down),kills:copilot.kills,lvl:G.lvl});}}
 
   /* ---- the world around you ---- */
   nearT-=dt;
@@ -3270,7 +3425,7 @@ function drawHUD(){
   if(bannerT>0){ctx.globalAlpha=Math.min(1,bannerT*2);ctx.fillStyle='#fff';ctx.font='bold '+Math.min(38,VW*0.07)+'px system-ui';ctx.textAlign='center';glow('#4df',14);ctx.fillText(banner,VW/2,VH*0.3);noGlow();ctx.globalAlpha=1;ctx.textAlign='left';}
   if(respawnT>0){ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(0,0,VW,VH);ctx.fillStyle='#fff';ctx.font='bold 26px system-ui';ctx.textAlign='center';ctx.fillText('SHIP DOWN',VW/2,VH*0.44);ctx.font='17px system-ui';ctx.fillStyle='#9df';ctx.fillText('Waking up at the station in '+Math.ceil(respawnT)+'...',VW/2,VH*0.44+32);ctx.textAlign='left';}
   // with a co-pilot, a faint line shows where your half ends and P2's begins
-  if(copilot&&touchMode&&!ui){ctx.strokeStyle='rgba(255,150,200,.16)';ctx.lineWidth=2;ctx.setLineDash([10,14]);ctx.beginPath();ctx.moveTo(VW*COOP_SPLIT,VH*0.2);ctx.lineTo(VW*COOP_SPLIT,VH*0.8);ctx.stroke();ctx.setLineDash([]);}
+  if(copilot&&!NET.peer&&touchMode&&!ui){ctx.strokeStyle='rgba(255,150,200,.16)';ctx.lineWidth=2;ctx.setLineDash([10,14]);ctx.beginPath();ctx.moveTo(VW*COOP_SPLIT,VH*0.2);ctx.lineTo(VW*COOP_SPLIT,VH*0.8);ctx.stroke();ctx.setLineDash([]);}
   if(stick2.id!==null&&!ui){ctx.strokeStyle='rgba(255,150,200,.45)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(stick2.sx,stick2.sy,44,0,6.283);ctx.stroke();ctx.fillStyle='rgba(255,150,200,.3)';const dx=stick2.x-stick2.sx,dy=stick2.y-stick2.sy,m=Math.hypot(dx,dy)||1,k=Math.min(44,m);ctx.beginPath();ctx.arc(stick2.sx+dx/m*k,stick2.sy+dy/m*k,20,0,6.283);ctx.fill();}
   // the floating stick, so you can see what your thumb is doing
   if(stick.id!==null&&!ui){ctx.strokeStyle='rgba(255,255,255,.3)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(stick.sx,stick.sy,44,0,6.283);ctx.stroke();ctx.fillStyle='rgba(255,255,255,.25)';const dx=stick.x-stick.sx,dy=stick.y-stick.sy,m=Math.hypot(dx,dy)||1,k=Math.min(44,m);ctx.beginPath();ctx.arc(stick.sx+dx/m*k,stick.sy+dy/m*k,20,0,6.283);ctx.fill();}
@@ -3340,6 +3495,7 @@ let titleStart=-1;function titleTime(t){if(titleStart<0)titleStart=t;return t-ti
 let lastT=0;
 function frame(now){
   requestAnimationFrame(frame);
+  if(NET.guest){netPadFrame(now);return;}
   const realDt=(now-lastT)/1000||0;
   let dt=Math.min(0.05,realDt);lastT=now;
   // still struggling after 4 seconds of slow frames? draw fewer pixels. Gameplay is untouched.
@@ -3356,7 +3512,7 @@ function frame(now){
   if(ui!=='build')drawHUD();
   drawPadCursor();
 }
-if(location.hash==='#test')window.__sf={get banner(){return banner;},questTick,startQuest,get sessionSnap(){return sessionSnap;},MOTHER_LAIR,BOSS_KINDS,finalTick,wakeBoss,threat,rampHp,rampHit,rampFire,rampPop,rampRaid,rampBoss,hurt,get msg(){return msg;},say,pad,get padActive(){return padActive;},get padFocus(){return padFocus;},mapRect,mapTo,keyHints,qText,helpHtml,get moving(){return moving;},get picked(){return picked;},get buildSel(){return buildSel;},get hover(){return hover;},placeProblem,refundOf,upCost,get G(){return G;},get player(){return player;},get enemies(){return enemies;},get structs(){return structs;},get bullets(){return bullets;},get ebullets(){return ebullets;},get raid(){return raid;},get ui(){return ui;},get state(){return state;},get respawnT(){return respawnT;},get pickups(){return pickups;},STICKERS,stickerTick,foundTreasure,exSafe,homeCap,countHome,coreRing,dropTurrets,tidySave,speak,CARD_COOL,EX_RANGE,get crates(){return crates;},VIEW_ZOOM,viewZoom,radarTap,radarHit,RADAR_ZOOM,get ev(){return ev;},get awayT(){return awayT;},set awayT(v){awayT=v;},startEvent,baseEventsTick,isHome,SFX,saveSummary,refreshTitle,get titleEnd(){return titleEnd;},renderSfx(name,secs,arg){audioRendering=true;const off=new OfflineAudioContext(2,44100*(secs||3),44100),keep=[AC,master,send,noiseBuf,musBus];buildAudio(off);if(name==='music'){musicOn=true;musBus.gain.value=MUS_VOL;let tt=0.02,st=0;const spb=60/76/4;while(tt<(secs||3)-0.5){musicStep(st,tt,arg==='boss',spb,arg==='calm');tt+=spb;st++;}}else SFX[name](arg);return off.startRendering().then(b=>{[AC,master,send,noiseBuf,musBus]=keep;gates={};audioRendering=false;const out=[];for(let ch=0;ch<b.numberOfChannels;ch++)out.push(Array.from(b.getChannelData(ch)));const L=out[0],R2=out[1];let peak=0,sum=0,bad=0,diff=0;const tailFrom=Math.floor(L.length*0.5);let tail=0;for(let i=0;i<L.length;i++){const v=L[i];if(!isFinite(v))bad++;peak=Math.max(peak,Math.abs(v),Math.abs(R2[i]));sum+=v*v;diff+=Math.abs(v-R2[i]);if(i>=tailFrom)tail+=v*v;}return {peak:+peak.toFixed(3),rms:+Math.sqrt(sum/L.length).toFixed(4),tail:+Math.sqrt(tail/(L.length-tailFrom)).toFixed(5),wide:+(diff/L.length).toFixed(5),bad};});},qInfo,cInfo,sayObjective,questHit,get questRect(){return questRect;},get arrowPulse(){return arrowPulse;},beaconTap,syncBeacon,get dpr(){return dpr;},set qualityCap(v){qualityCap=v;resize();},get TOOL_H(){return TOOL_H;},get TOOL_W(){return TOOL_W;},radarInfo(){const rs=Math.min(124,VW*0.23),toolH=TOOL_H/scale,rx=VW-rs-10,ry=toolH+6;return {rs,rx,ry,scale,dpr,VW,VH};},aimPick,DIFF,diffOf,get touchFire(){return touchFire;},CARDS,CARD_BY,RAR,dealHand,grantCard,pickCard,autoBuild,buildFree,countOf,BUILD_PLAN,get cardGap(){return cardGap;},set cardGap(v){cardGap=v;},nests,lairs,pods,asteroids,hazards,ZONES,SHIPS,KING_LAIR,zoneAt,makeItem,addItem,equip,sigItem,addContract,contractsTick,cHave,itemScore,maxEnergy,shipSpeed,parryWin,migrate,shieldR,get curZone(){return curZone;},get flareWarn(){return flareWarn;},get flareT(){return flareT;},set flareT(v){flareT=v;},get nearMines(){return nearMines;},update,newGame,save,loadSave,spawnE,startRaid,openBuild,closeUi,buildTap,toView:p=>p,cam,STRUCTS,QUESTS,placeProblem,maxHp,gunDmg,xpNeed,sumLv,mateSlots,keys,killNest,fireLaser,get copilot(){return copilot;},get coop(){return coop;},stick,stick2,copilotBeside,openPause,get nearRocks(){return nearRocks;},set nearRocks(v){nearRocks=v;},
+if(location.hash==='#test')window.__sf={get banner(){return banner;},questTick,startQuest,get sessionSnap(){return sessionSnap;},MOTHER_LAIR,BOSS_KINDS,finalTick,wakeBoss,threat,rampHp,rampHit,rampFire,rampPop,rampRaid,rampBoss,hurt,get msg(){return msg;},say,pad,get padActive(){return padActive;},get padFocus(){return padFocus;},mapRect,mapTo,keyHints,qText,helpHtml,get moving(){return moving;},get picked(){return picked;},get buildSel(){return buildSel;},get hover(){return hover;},placeProblem,refundOf,upCost,get G(){return G;},get player(){return player;},get enemies(){return enemies;},get structs(){return structs;},get bullets(){return bullets;},get ebullets(){return ebullets;},get raid(){return raid;},get ui(){return ui;},get state(){return state;},get respawnT(){return respawnT;},get pickups(){return pickups;},STICKERS,stickerTick,foundTreasure,exSafe,homeCap,countHome,coreRing,dropTurrets,tidySave,speak,CARD_COOL,EX_RANGE,get crates(){return crates;},VIEW_ZOOM,viewZoom,radarTap,radarHit,RADAR_ZOOM,get ev(){return ev;},get awayT(){return awayT;},set awayT(v){awayT=v;},startEvent,baseEventsTick,isHome,SFX,saveSummary,refreshTitle,get titleEnd(){return titleEnd;},renderSfx(name,secs,arg){audioRendering=true;const off=new OfflineAudioContext(2,44100*(secs||3),44100),keep=[AC,master,send,noiseBuf,musBus];buildAudio(off);if(name==='music'){musicOn=true;musBus.gain.value=MUS_VOL;let tt=0.02,st=0;const spb=60/76/4;while(tt<(secs||3)-0.5){musicStep(st,tt,arg==='boss',spb,arg==='calm');tt+=spb;st++;}}else SFX[name](arg);return off.startRendering().then(b=>{[AC,master,send,noiseBuf,musBus]=keep;gates={};audioRendering=false;const out=[];for(let ch=0;ch<b.numberOfChannels;ch++)out.push(Array.from(b.getChannelData(ch)));const L=out[0],R2=out[1];let peak=0,sum=0,bad=0,diff=0;const tailFrom=Math.floor(L.length*0.5);let tail=0;for(let i=0;i<L.length;i++){const v=L[i];if(!isFinite(v))bad++;peak=Math.max(peak,Math.abs(v),Math.abs(R2[i]));sum+=v*v;diff+=Math.abs(v-R2[i]);if(i>=tailFrom)tail+=v*v;}return {peak:+peak.toFixed(3),rms:+Math.sqrt(sum/L.length).toFixed(4),tail:+Math.sqrt(tail/(L.length-tailFrom)).toFixed(5),wide:+(diff/L.length).toFixed(5),bad};});},qInfo,cInfo,sayObjective,questHit,get questRect(){return questRect;},get arrowPulse(){return arrowPulse;},beaconTap,syncBeacon,get dpr(){return dpr;},set qualityCap(v){qualityCap=v;resize();},get TOOL_H(){return TOOL_H;},get TOOL_W(){return TOOL_W;},radarInfo(){const rs=Math.min(124,VW*0.23),toolH=TOOL_H/scale,rx=VW-rs-10,ry=toolH+6;return {rs,rx,ry,scale,dpr,VW,VH};},aimPick,DIFF,diffOf,get touchFire(){return touchFire;},CARDS,CARD_BY,RAR,dealHand,grantCard,pickCard,autoBuild,buildFree,countOf,BUILD_PLAN,get cardGap(){return cardGap;},set cardGap(v){cardGap=v;},nests,lairs,pods,asteroids,hazards,ZONES,SHIPS,KING_LAIR,zoneAt,makeItem,addItem,equip,sigItem,addContract,contractsTick,cHave,itemScore,maxEnergy,shipSpeed,parryWin,migrate,shieldR,get curZone(){return curZone;},get flareWarn(){return flareWarn;},get flareT(){return flareT;},set flareT(v){flareT=v;},get nearMines(){return nearMines;},update,newGame,save,loadSave,spawnE,startRaid,openBuild,closeUi,buildTap,toView:p=>p,cam,STRUCTS,QUESTS,placeProblem,maxHp,gunDmg,xpNeed,sumLv,mateSlots,keys,killNest,fireLaser,get copilot(){return copilot;},get coop(){return coop;},stick,stick2,copilotBeside,openPause,get nearRocks(){return nearRocks;},set nearRocks(v){nearRocks=v;},NET,netIn,netStick,netHost,netClose,netRooms,netJoin,netLeave,netProbe,
   place(k,x,y){const d=STRUCTS[k],prob=placeProblem(k,x,y);if(prob)return prob;structs.push({t:k,x,y,lv:1,hp:d.hp,cool:0,aim:0,flash:0});G.stats.built++;questTick();return null;},
   shootAtShip(sp){const a=-1.2;ebullets.push({x:player.x+Math.cos(a)*200,y:player.y+Math.sin(a)*200,vx:-Math.cos(a)*(sp||300),vy:-Math.sin(a)*(sp||300),r:6,life:3,dmg:1});}};
 requestAnimationFrame(frame);

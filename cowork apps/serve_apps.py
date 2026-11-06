@@ -25,6 +25,8 @@ import urllib.request
 from urllib.parse import unquote
 
 from applock import data_lock
+import mp_relay
+from urllib.parse import parse_qs
 
 APPS_DIR = Path(__file__).parent
 # Overridable so a preview instance can run beside the live server on 8080.
@@ -3998,6 +4000,11 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = unquote(self.path.split("?")[0])
+        # Two-device games (Squad Leader: Frontier): in-memory relay, no files, see mp_relay.py
+        if path.startswith("/api/mp/"):
+            q = {k: v[0] for k, v in parse_qs(self.path.partition("?")[2]).items()}
+            mp_relay.handle(self, "GET", path, q, {})
+            return
         if path in ("/", "/index.html", ""):
             base_url = get_base_url()
             apps = discover_apps()
@@ -4200,6 +4207,11 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         # for the length of a child's question.
         if path == "/api/ask_amigo":
             self._handle_ask_amigo(payload)
+            return
+        # The two-device game relay keeps its own lock and touches no saved data,
+        # so a game's 5-a-second messages never queue behind hearts and notes.
+        if path.startswith("/api/mp/"):
+            mp_relay.handle(self, "POST", path, {}, payload if isinstance(payload, dict) else {})
             return
         with DATA_LOCK, data_lock():
             self._handle_post(path, payload)
