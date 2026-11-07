@@ -1777,7 +1777,7 @@ function helpHtml(){const K=keyHints(),k=s=>K?' ('+s+')':'';return '<h2>How to P
  '<p><b>🃏 Rogue (Cards)</b> has its own save. Level up, pick 1 of 3 cards, and your base builds itself using your scrap and crystal.</p>'+
  '<p><b>🎯 Auto-Aim</b>: when it is ON your ship aims and fires by itself. When it is OFF you aim and fire (phone: you shoot where you fly, hold FIRE). Choose it next to your rank, or change it any time in Pause.</p>'+
  '<p><b>👥 Co-pilot</b>: a second player flies the green P2 ship. Turn it on at the start screen or in Pause. On a tablet, player one drags on the left half of the screen and player two on the right half'+(K?'. On a keyboard, WASD flies you and the arrow keys fly P2':'')+(padActive?'. With two game controllers, the second one flies P2: press A on it to join':'')+'. P2 aims and fires by itself, grabs loot it touches, and comes back '+COOP_DOWN+' seconds after it goes down.</p>'+
- (NET.ok?'<p><b>📡 Two devices</b>: at home, player two can fly P2 from their own phone or tablet. Player one taps ⏸️ then 📡 Second device; player two opens this game and taps 🎮 Join as P2. Both need the home Wi-Fi. Player two sees the game on their own screen, following the green ship, and can fly off exploring: an arrow at the edge of each screen points to the other player.</p>':'')+
+ (NET.ok?'<p><b>📡 Two devices</b>: at home, player two can fly P2 from their own phone or tablet. Player one taps ⏸️ then 📡 Second device; player two opens this game and taps 🎮 Join as P2. Both need the home Wi-Fi. Player two sees the game on their own screen, following the green ship, and can fly off exploring: an arrow at the edge of each screen points to the other player. Sounds from the green ship play on the second device too.</p>':'')+
  '<p><b>🔊 Stuck?</b> Tap the goal under your meters and the arrow shows where to go. With Amigo Talks on, he says what to do too. The 🔊 buttons in 📜 always read aloud.</p>'+
  '<p><b>📡 Beacons in Rogue</b>: every boss you beat earns one. Tap the 📡 button to claim land right where you are.</p>'+
  '<p><b>🔍 Zoom</b>: the button under the mini map pulls the view out. Tap the mini map to zoom just the map.</p>'+
@@ -1858,7 +1858,7 @@ $('btnHelp').onclick=()=>{initAudio();showHelp();};
 $('btnCoop').onclick=()=>{initAudio();setCoop(!coop);SFX.power();};coopLabel();
 /* ---------- two devices: a second phone or tablet flies P2, on the home Wi-Fi through AppVerse (mp_relay.py) ----------
    Round 1: the other device is P2's thumb-stick and sees P2's shield; the game itself is drawn on the host. */
-const NET={ok:false,room:null,token:null,es:null,guest:null,peer:null,sendT:0,slowT:0,st:null,stAt:0,roomsT:0,lastSent:'',sentAt:0,ended:false,view:false,seq:0,sentSeq:{},rtt:0,needT:0,lastF:0,frames:0};
+const NET={ok:false,room:null,token:null,es:null,guest:null,peer:null,sendT:0,slowT:0,st:null,stAt:0,roomsT:0,lastSent:'',sentAt:0,ended:false,view:false,snd:null,played:{},seq:0,sentSeq:{},rtt:0,needT:0,lastF:0,frames:0};
 const netIn={mx:0,my:0,at:0,seq:0};
 const netStick={id:null,sx:0,sy:0,x:0,y:0};
 const netClean=s=>String(s).replace(/[<>&"]/g,'');
@@ -1974,7 +1974,7 @@ function netFast(){
   const p=player,c=copilot;
   return {t:'f',seq:netIn.seq,rs:respawnT>0?1:0,
     p:[p.x,p.y,p.ang,p.inv,p.laser,p.laserAng,p.pulse,p.boostT||0,p.sh.on?1:0,p.sh.t,p.sh.broken,p.energy,p.stormT||0].map(netR),
-    c:c?[c.x,c.y,c.ang,c.sh,c.max,c.down,c.inv,c.kills].map(netR):null,
+    c:c?[c.x,c.y,c.ang,c.sh,c.max,c.down,c.inv,c.kills,c.shots||0,c.hits||0,c.loot||0].map(netR):null,
     m:p.mates.map(m=>[m.x,m.y,m.ang===undefined?null:m.ang,m.down,m.explore?1:0,m.guard?1:0,m.sh,m.max,m.rank,m.inv].map(netR).concat(m.name)),
     e:enemies.filter(netNear).map(e=>SNAP_E.map(k=>netR(e[k]))),
     b:bullets.filter(netNear).map(q=>[q.x,q.y,q.vx,q.vy,q.r,(q.ref?1:0)|(q.tur?2:0)|(q.ace?4:0)|(q.p2?8:0)|(q.mate?16:0)|(q.miss?32:0)].map(Math.round)),
@@ -1999,7 +1999,7 @@ function netWorld(g){   // the host's game arrives: set the scene, but never as 
   player={x:G.x,y:G.y,ang:-Math.PI/2,hp:1,energy:1,sh:{on:false,t:0,cd:0,parried:false,broken:0},inv:0,laser:0,laserAng:0,pulse:0,boostT:0,stormT:1,mates:[],rapid:0,wide:0,missile:0};
   copilot=copilotMake();
   cam.zoom=VIEW_ZOOM[1]||0.8;cam.px=cam.py=0;cam.x=copilot.x;cam.y=copilot.y;nearT=0;
-  state='netview';ui=null;NET.view=true;NET.frames=0;
+  state='netview';ui=null;NET.view=true;NET.frames=0;NET.snd=null;
   $('netPad').classList.add('view');$('title').classList.add('hide');
 }
 function netApplyFast(f){
@@ -2010,7 +2010,7 @@ function netApplyFast(f){
   if(Math.hypot(P.tx-P.x,P.ty-P.y)>600){P.x=P.tx;P.y=P.ty;}   // a warp or a respawn: jump there, don't glide across the map
   if(f.c){const c=copilot,q=f.c;c.tx=q[0];c.ty=q[1];c.ang=q[2];c.sh=q[3];c.max=q[4];c.down=q[5];c.inv=q[6];c.kills=q[7];
     if(Math.hypot(c.tx-c.x,c.ty-c.y)>600){c.x=c.tx;c.y=c.ty;}
-    NET.st={sh:q[3],max:q[4],down:Math.ceil(q[5]),kills:q[7]};NET.stAt=now;}
+    NET.st={sh:q[3],max:q[4],down:Math.ceil(q[5]),kills:q[7]};NET.stAt=now;netSounds(q);}
   const old=P.mates;
   P.mates=f.m.map((q,i)=>Object.assign(old[i]||{x:q[0],y:q[1],t:i,age:0,kills:0},{tx:q[0],ty:q[1],ang:q[2]===null?undefined:q[2],down:q[3],explore:!!q[4],guard:!!q[5],sh:q[6],max:q[7],rank:q[8],inv:q[9],name:q[10]}));
   enemies=f.e.map(q=>{const e={};SNAP_E.forEach((k,i)=>{if(q[i]!==null)e[k]=q[i];});return e;});
@@ -2018,6 +2018,16 @@ function netApplyFast(f){
   ebullets=f.eb.map(q=>({x:q[0],y:q[1],vx:q[2],vy:q[3],r:q[4]}));
   pickups=f.pk.map(q=>({x:q[0],y:q[1],k:q[2],it:{r:q[3]||0}}));
   pops=f.po.map(q=>({x:q[0],y:q[1],txt:q[2],col:q[3],t:q[4]}));
+}
+function netSounds(q){   // P2's own sounds on P2's own device: shots, hits, kills, loot, going down, coming back
+  const n={shots:q[8]||0,hits:q[9]||0,loot:q[10]||0,kills:q[7]||0,down:q[5]>0},o=NET.snd;NET.snd=n;
+  if(!o)return;   // the first snapshot only sets the counts
+  const play=k=>{NET.played[k]=(NET.played[k]||0)+1;try{SFX[k]();}catch(e){}};
+  if(n.down&&!o.down)play('droneLost');else if(!n.down&&o.down)play('power');
+  else if(n.hits>o.hits)play('droneHit');
+  if(n.kills>o.kills)play('boom');
+  if(n.loot>o.loot)play('deflect');
+  if(n.shots>o.shots)play('shoot');
 }
 function netApplySlow(s){
   structs=s.st.map(q=>({t:q[0],x:q[1],y:q[2],lv:q[3],hp:q[4],aim:q[5],flash:q[6],cool:0}));
@@ -2050,7 +2060,7 @@ const netCv=$('netCv'),nctx=netCv.getContext('2d');
 function netPadSize(){const r=netCv.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1);netCv.width=Math.max(1,r.width*d);netCv.height=Math.max(1,r.height*d);nctx.setTransform(d,0,0,d,0,0);}
 function netShipIcon(){const c=$('netShip').getContext('2d');c.clearRect(0,0,72,72);c.save();c.translate(36,36);c.rotate(-Math.PI/2);c.scale(2.4,2.4);c.fillStyle='#1f3a0c';c.strokeStyle='#b6ff3a';c.lineWidth=1.6;c.beginPath();c.moveTo(13,0);c.lineTo(-9,-8);c.lineTo(-5,0);c.lineTo(-9,8);c.closePath();c.fill();c.stroke();c.restore();}
 function netXY(e){const r=netCv.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
-netCv.addEventListener('pointerdown',e=>{e.preventDefault();if(netStick.id!==null)return;const p=netXY(e);netStick.id=e.pointerId;netStick.sx=netStick.x=p.x;netStick.sy=netStick.y=p.y;try{netCv.setPointerCapture(e.pointerId);}catch(err){}});
+netCv.addEventListener('pointerdown',e=>{e.preventDefault();initAudio();if(netStick.id!==null)return;const p=netXY(e);netStick.id=e.pointerId;netStick.sx=netStick.x=p.x;netStick.sy=netStick.y=p.y;try{netCv.setPointerCapture(e.pointerId);}catch(err){}});
 netCv.addEventListener('pointermove',e=>{if(netStick.id!==e.pointerId)return;const p=netXY(e);netStick.x=p.x;netStick.y=p.y;});
 const netUp=e=>{if(netStick.id===e.pointerId)netStick.id=null;};
 netCv.addEventListener('pointerup',netUp);netCv.addEventListener('pointercancel',netUp);
@@ -2548,7 +2558,7 @@ function copilotBeside(){if(copilot){copilot.x=player.x+40;copilot.y=player.y+56
 function coopLabel(){const b=$('btnCoop');if(!b)return;b.innerHTML='👥 Co-pilot: '+(coop?'<span style="color:#b6ff3a">● ON</span>':'<span style="color:#8fa6c8">○ OFF</span>');b.setAttribute('aria-pressed',coop?'true':'false');b.style.borderColor=coop?'#b6ff3a':'';}
 function setCoop(on){coop=!!on;coopLabel();try{localStorage.setItem('cowork-squad-frontier-copilot',coop?'on':'off');}catch(e){}copilot=(coop||NET.peer)&&player?(copilot||copilotMake()):null;stick2.id=null;}
 function copilotDamage(c){
-  c.sh-=1;c.inv=0.8;SFX.droneHit();
+  c.sh-=1;c.inv=0.8;SFX.droneHit();c.hits=(c.hits||0)+1;
   if(c.sh<=0){c.down=COOP_DOWN;c.sh=c.max;SFX.droneLost();boom(c.x,c.y,'#b6ff3a',18,240);pop(c.x,c.y-20,'P2 DOWN! BACK IN '+COOP_DOWN,'#f88');}
 }
 function copilotTick(c,dt){
@@ -2576,7 +2586,7 @@ function copilotTick(c,dt){
   if(!bt){let rb=340;for(const a of nearRocks){if(a.gone>0)continue;const d=dist(a,c);if(d<rb){rb=d;bt=a;}}}
   const want=bt?Math.atan2(bt.y-c.y,bt.x-c.x):ml>0.1?Math.atan2(my,mx):c.ang;
   let da=want-c.ang;while(da>Math.PI)da-=6.283;while(da<-Math.PI)da+=6.283;c.ang+=da*Math.min(1,14*dt);
-  if(bt&&c.fire<=0&&respawnT<=0){c.fire=0.22;const a=c.ang;bullets.push({x:c.x+Math.cos(a)*18,y:c.y+Math.sin(a)*18,vx:Math.cos(a)*900,vy:Math.sin(a)*900,dmg:gunDmg()*ship().dmg*0.8,r:4,life:0.7,mate:c,p2:true});SFX.shoot();}
+  if(bt&&c.fire<=0&&respawnT<=0){c.fire=0.22;const a=c.ang;bullets.push({x:c.x+Math.cos(a)*18,y:c.y+Math.sin(a)*18,vx:Math.cos(a)*900,vy:Math.sin(a)*900,dmg:gunDmg()*ship().dmg*0.8,r:4,life:0.7,mate:c,p2:true});SFX.shoot();c.shots=(c.shots||0)+1;}
 }
 let pointerLast=null;   // for the tests: where the last off-screen arrow was drawn
 function drawPointer(o,label,col){   // an arrow at the screen's edge, pointing to a ship that's off-screen
@@ -3002,7 +3012,7 @@ function update(dt){
     if(d<mag&&respawnT<=0){const sp=360*(1-d/mag)+120;pk.vx=(p.x-pk.x)/d*sp;pk.vy=(p.y-pk.y)/d*sp;}
     pk.x+=pk.vx*dt;pk.y+=pk.vy*dt;
     if(d<26&&respawnT<=0){pk.dead=true;collect(pk);}
-    else if(copilot&&!copilot.down&&respawnT<=0&&Math.hypot(copilot.x-pk.x,copilot.y-pk.y)<30){pk.dead=true;collect(pk);}
+    else if(copilot&&!copilot.down&&respawnT<=0&&Math.hypot(copilot.x-pk.x,copilot.y-pk.y)<30){pk.dead=true;collect(pk);copilot.loot=(copilot.loot||0)+1;}
   }
   for(const q of parts){q.t-=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vx*=0.97;q.vy*=0.97;}
   for(const q of pops){q.t-=dt;q.y-=30*dt;}
