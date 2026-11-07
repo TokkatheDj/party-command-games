@@ -8,7 +8,8 @@ disappears 30 seconds after its host stops talking. Messages travel as JSON:
   GET  /api/mp/rooms                      -> open rooms, for the guest's "join" buttons
   POST /api/mp/open   {name, rank}        -> {room, token}       (the host)
   POST /api/mp/join   {room}              -> {guest}             (a second device)
-  POST /api/mp/send   {room, from, token?, to, msg}              ("host" -> "guests" or a guest id; guest -> "host")
+  POST /api/mp/send   {room, from, token?, to, msg, latest?}     ("host" -> "guests" or a guest id; guest -> "host";
+                                                                  latest: replaces a queued message of the same "t")
   POST /api/mp/close  {room, token}
   GET  /api/mp/stream?room=..&as=host|<guest id>   Server-Sent Events, one "data:" line per message.
 A stream ends by itself after STREAM_SECS so no server thread lives forever; the browser's
@@ -28,7 +29,8 @@ RETRY_MS = 800
 MAX_ROOMS = 8
 MAX_GUESTS = 3          # the game uses one today; the room can hold more later
 QUEUE_MAX = 64          # per listener; old messages drop first
-MAX_MSG = 4096          # bytes of one message's JSON
+MAX_MSG = 4096          # bytes of one guest message's JSON (a thumb-stick)
+MAX_HOST_MSG = 65536    # the host sends the game itself: its save once, then snapshots (~5 KB busy)
 
 _lock = threading.Condition()
 _rooms = {}             # code -> room dict
@@ -52,9 +54,14 @@ def _sweep():
                 _push(r, "host", {"t": "left", "guest": gid})
 
 
-def _push(room, who, msg):
+def _push(room, who, msg, latest=False):
     q = room["queues"].get(who)
     if q is not None:
+        if latest and isinstance(msg, dict):
+            # a newer snapshot makes any still-queued one of the same kind stale: replace it, don't pile up
+            kind = msg.get("t")
+            for old in [m for m in q if isinstance(m, dict) and m.get("t") == kind]:
+                q.remove(old)
         q.append(msg)
         _lock.notify_all()
 
@@ -107,7 +114,7 @@ def join(payload):
 
 def send(payload):
     raw = json.dumps(payload.get("msg"), separators=(",", ":"))
-    if len(raw) > MAX_MSG:
+    if len(raw) > (MAX_HOST_MSG if payload.get("from") == "host" else MAX_MSG):
         return 413, {"error": "message too big"}
     msg = json.loads(raw)
     with _lock:
@@ -123,7 +130,7 @@ def send(payload):
             r["host_seen"] = _now()
             targets = list(r["guests"]) if to == "guests" else [to] if to in r["guests"] else []
             for gid in targets:
-                _push(r, gid, msg)
+                _push(r, gid, msg, latest=bool(payload.get("latest")))
         elif frm in r["guests"]:
             r["guests"][frm] = _now()
             if to != "host":

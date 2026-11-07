@@ -107,7 +107,24 @@ class Relay(unittest.TestCase):
     def test_unknown_room_and_big_messages(self):
         self.assertEqual(self.call("POST", "join", {"room": "9999"})[0], 404)
         h = self.call("POST", "open", {})[1]
-        self.assertEqual(self.call("POST", "send", {"room": h["room"], "from": "host", "token": h["token"], "to": "guests", "msg": "x" * 5000})[0], 413)
+        g = self.call("POST", "join", {"room": h["room"]})[1]["guest"]
+        # a guest only sends a thumb-stick: 4 KB is plenty
+        self.assertEqual(self.call("POST", "send", {"room": h["room"], "from": g, "to": "host", "msg": "x" * 5000})[0], 413)
+        # the host sends the game itself: a 5 KB snapshot goes, 70 KB doesn't
+        self.assertEqual(self.call("POST", "send", {"room": h["room"], "from": "host", "token": h["token"], "to": "guests", "msg": "x" * 5000})[0], 200)
+        self.assertEqual(self.call("POST", "send", {"room": h["room"], "from": "host", "token": h["token"], "to": "guests", "msg": "x" * 70000})[0], 413)
+
+    def test_latest_replaces_a_queued_snapshot(self):
+        h = self.call("POST", "open", {})[1]
+        gid = self.call("POST", "join", {"room": h["room"]})[1]["guest"]
+        send = lambda m, latest: self.call("POST", "send", {"room": h["room"], "from": "host", "token": h["token"], "to": "guests", "msg": m, "latest": latest})
+        send({"t": "world", "n": 1}, False)
+        for n in range(5):
+            send({"t": "f", "n": n}, True)       # five fast snapshots while the guest's stream is down
+        send({"t": "s", "n": 0}, True)
+        send({"t": "f", "n": 5}, True)
+        got = self.read_stream("room=%s&as=%s" % (h["room"], gid), 3)
+        self.assertEqual(got, [{"t": "world", "n": 1}, {"t": "s", "n": 0}, {"t": "f", "n": 5}])
 
     def test_room_full_after_max_guests(self):
         room = self.call("POST", "open", {})[1]["room"]
@@ -125,7 +142,12 @@ class Relay(unittest.TestCase):
     def test_a_closed_game_leaves_the_list_at_once_even_with_the_host_stream_open(self):
         # found by test24: the host's still-open stream kept refreshing a closed room
         h = self.call("POST", "open", {})[1]
-        th = threading.Thread(target=lambda: self.read_stream("room=%s&as=host&token=%s" % (h["room"], h["token"]), 99, secs=2))
+        def hold_host_stream():   # keeps the host's stream open meanwhile; it ends by timing out, which is fine
+            try:
+                self.read_stream("room=%s&as=host&token=%s" % (h["room"], h["token"]), 99, secs=2)
+            except OSError:
+                pass
+        th = threading.Thread(target=hold_host_stream)
         th.start()
         time.sleep(0.3)
         self.call("POST", "close", {"room": h["room"], "token": h["token"]})
