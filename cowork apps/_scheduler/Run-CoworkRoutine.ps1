@@ -70,10 +70,17 @@ if (-not $AnyTime) {
             $entry = $null
             foreach ($mi in $manifestItems) { if ($mi.safeName -eq $Name) { $entry = $mi; break } }
             if ($entry -and $entry.localAt) {
-                $slot = [datetime]::ParseExact([string]$entry.localAt, "HH:mm", $null)
-                $late = ((Get-Date) - (Get-Date).Date.AddHours($slot.Hour).AddMinutes($slot.Minute)).TotalMinutes
-                if ($late -gt $LateMin -or $late -lt -5) {
-                    W ("SKIP: late start ({0:+0;-0} min from its {1} slot) - the machine was asleep when it was due; Invoke-CatchUp reruns missed routines one at a time" -f $late, $entry.localAt)
+                # 9 Nov 2026: measure against when Windows ACTUALLY fires the task, not the manifest's
+                # localAt. The triggers store a fixed UTC moment, so after the clocks went back on 1 Nov
+                # they fire an hour early, and the old guard skipped every one (103 skips). See LateStart.ps1.
+                . (Join-Path $SchedHome "LateStart.ps1")
+                $boundary = $null
+                try {
+                    $boundary = (Get-ScheduledTask -TaskName ([string]$entry.taskName) -ErrorAction Stop).Triggers[0].StartBoundary
+                } catch { $boundary = $null }   # unreadable -> Get-MinutesLate falls back to localAt
+                $r = Get-MinutesLate -Now (Get-Date) -StartBoundary $boundary -LocalAt ([string]$entry.localAt)
+                if ($r -and ($r.Late -gt $LateMin -or $r.Late -lt -5)) {
+                    W ("SKIP: late start ({0:+0;-0} min from its {1} firing, by the {2}) - the machine was asleep when it was due; Invoke-CatchUp reruns missed routines one at a time" -f $r.Late, $entry.localAt, $r.From)
                     $skip = $true
                 }
             }
