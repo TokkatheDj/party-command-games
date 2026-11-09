@@ -152,7 +152,7 @@ async function checkOne(browser, rel, vp) {
 (async () => {
   const apps = process.argv.slice(2);
   const server = await serve();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: ["--mute-audio"] });   // never play through the speakers (9 Nov 2026: test runs once played Amigo's voice for hours)
   const out = { checked_at: new Date().toISOString(), apps: [] };
   for (const rel of apps) {
     const problems = []; let title = rel;

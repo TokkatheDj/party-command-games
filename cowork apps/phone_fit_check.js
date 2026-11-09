@@ -140,7 +140,7 @@ module.exports = { PHONES, imitateBars, check, fitProblems };
 
 if (require.main === module) (async () => {
   const server = await serve();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: ["--mute-audio"] });   // never play through the speakers (9 Nov 2026: test runs once played Amigo's voice for hours)
   const results = {};
   for (const phone of PHONES) {
     const ctx = await browser.newContext({ viewport: { width: phone.width, height: phone.height }, isMobile: true, hasTouch: true, serviceWorkers: "block" });
