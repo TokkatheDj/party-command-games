@@ -1,0 +1,616 @@
+<!-- CONCEPT: Tether — a Kropki dots logic puzzle: fill the N×N square so every row and column holds 1…N once, where a white dot between two squares means their digits are consecutive, a black dot means one is exactly double the other, and a blank edge means NEITHER (unlike Futoshiki the marks say "one apart" / "double" rather than greater-than, and a missing dot is itself a constraint; unlike Solstice the grid is a full 1…N Latin square, not suns and moons); six tiers from a 4×4 warm-up to a 9×9 Kropki Sudoku with boxes, every board generated live from a random Latin square and stripped clue-by-clue against a deduction solver (singles + dot logic, plus single-step contradiction on Hard and up), so most boards start with no digits at all and every one has exactly one answer reachable by pure logic, with a hint that names the deduction. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tether — Kropki Dots</title>
+<style>
+:root{
+  --bg:#0f1420; --panel:#171e2e; --panel2:#1e2739; --line:#2b3650; --thick:#8193b8;
+  --ink:#e6ecf7; --muted:#8d9ab3; --a:#2dd4bf; --b:#60a5fa;
+  --given:#d5deec; --user:#5eead4; --err:#f87171; --sel:#33507f; --peer:#1f2b45; --same:#1d4a52;
+  --wdot:#f4f7fb; --bdot:#05070c; --gap:8px; --radius:12px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0;touch-action:manipulation;user-select:none;-webkit-user-select:none;overflow:hidden;
+  background:var(--bg);color:var(--ink);font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
+body{height:100vh;height:100dvh;display:flex;flex-direction:column;align-items:center;padding:6px var(--gap) 8px}
+.wrap{width:100%;max-width:640px;height:100%;display:flex;flex-direction:column;gap:6px}
+header{display:flex;align-items:center;gap:10px;min-height:44px}
+h1{margin:0;font-size:clamp(22px,6vw,30px);font-weight:800;letter-spacing:.5px;
+  background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--muted);font-size:clamp(11px,3vw,13px);line-height:1.15}
+.spacer{flex:1}
+#timer{font-variant-numeric:tabular-nums;color:var(--muted);font-size:clamp(14px,3.8vw,17px);min-width:52px;text-align:right}
+.iconbtn{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+  font-size:20px;font-weight:700;cursor:pointer}
+#tiers{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.tier{min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--muted);
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px;font:inherit;line-height:1.1}
+.tier b{font-size:clamp(13px,3.6vw,16px);color:var(--ink)}
+.tier span{font-size:clamp(9px,2.4vw,11px)}
+.tier.on{border-color:var(--a);background:linear-gradient(180deg,#173a3f,#152034);color:var(--a)}
+.tier.won b::after{content:" ✓";color:var(--a);font-size:.8em}
+#msg{height:38px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);
+  font-size:clamp(12px,3.3vw,14px);line-height:1.25;overflow:hidden;padding:0 4px}
+#msg span{display:block}
+#msg.hot{color:var(--ink)}
+#stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+#board{position:relative;--bsz:300px;width:var(--bsz);height:var(--bsz);border:2px solid var(--thick);border-radius:6px;
+  background:var(--panel);display:grid;overflow:visible}
+.cell{position:relative;border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;align-items:center;
+  justify-content:center;cursor:pointer;font-weight:700;font-size:calc(var(--bsz) / var(--n) * .52);color:var(--user);
+  transition:background .12s}
+.cell.rlast{border-right:none}.cell.blast{border-bottom:none}
+.cell.bx-r{border-right:2px solid var(--thick)}.cell.bx-b{border-bottom:2px solid var(--thick)}
+.cell.given{color:var(--given)}
+.cell.peer{background:var(--peer)}
+.cell.same{background:var(--same)}
+.cell.sel{background:var(--sel)}
+.cell.err{color:var(--err)}
+.cell.flash{animation:flash 1.1s ease}
+@keyframes flash{0%,60%{background:#3b5f3a}100%{}}
+.cell.wrong{box-shadow:inset 0 0 0 3px var(--err)}
+.notes{position:absolute;inset:6%;display:grid;grid-template-columns:repeat(var(--nc),1fr);grid-auto-rows:1fr;
+  font-size:calc(var(--bsz) / var(--n) * var(--nf));font-weight:600;color:var(--muted);text-align:center;align-items:center}
+#dots{position:absolute;inset:0;pointer-events:none}
+.dot{position:absolute;width:calc(var(--bsz) / var(--n) * .27);height:calc(var(--bsz) / var(--n) * .27);
+  max-width:20px;max-height:20px;min-width:9px;min-height:9px;border-radius:50%;transform:translate(-50%,-50%)}
+.dot.w{background:var(--wdot);box-shadow:0 0 0 1.5px #0b1020}
+.dot.k{background:var(--bdot);box-shadow:0 0 0 2px #c6d2e6}
+.dot.n{display:none}
+.dot.bad{box-shadow:0 0 0 3px var(--err)!important}
+.dot.n.bad{display:block;width:6px;height:calc(var(--bsz) / var(--n) * .45);border-radius:3px;background:var(--err);box-shadow:none!important}
+.dot.n.v.bad{width:calc(var(--bsz) / var(--n) * .45);height:6px}
+.dot.glow{animation:glow 1.2s ease}
+@keyframes glow{0%,60%{box-shadow:0 0 0 4px #facc15}}
+#pad{display:grid;gap:6px}
+.key{min-height:46px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);
+  font-size:clamp(20px,5.5vw,24px);font-weight:700;cursor:pointer;font-family:inherit}
+.key.full{opacity:.35}
+.key:active,.act:active{transform:scale(.96)}
+#actions{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.act{min-height:48px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;font:inherit;font-size:clamp(10px,2.7vw,12px);gap:1px;padding:2px}
+.act i{font-style:normal;font-size:18px;line-height:1}
+.act.on{border-color:var(--a);color:var(--a);background:#132f33}
+.act.warn{border-color:#f59e0b;color:#fbbf24}
+.overlay{position:fixed;inset:0;background:rgba(5,8,14,.78);display:flex;align-items:center;justify-content:center;padding:14px;z-index:10}
+.overlay[hidden]{display:none}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;max-width:460px;width:100%;max-height:92vh;overflow:auto;
+  padding:18px 18px 14px;box-shadow:0 20px 60px rgba(0,0,0,.5);user-select:text;-webkit-user-select:text}
+.card h2{margin:0 0 8px;font-size:clamp(20px,5.5vw,24px);background:linear-gradient(90deg,var(--a),var(--b));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.card p,.card li{color:#c3cde0;font-size:clamp(13px,3.6vw,15px);line-height:1.45}
+.card ul{padding-left:18px;margin:6px 0}
+.legend{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;margin-right:4px}
+.legend.w{background:var(--wdot);box-shadow:0 0 0 1.5px #0b1020}
+.legend.k{background:var(--bdot);box-shadow:0 0 0 2px #c6d2e6}
+.row{display:flex;gap:8px;margin-top:12px}
+.btn{flex:1;min-height:46px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);
+  font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+.btn.pri{background:linear-gradient(90deg,#0f766e,#1d4ed8);border-color:transparent}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 4px;text-align:center}
+.stats div{background:var(--panel2);border-radius:10px;padding:8px 4px}
+.stats b{display:block;font-size:20px;color:var(--ink)}
+.stats span{font-size:12px;color:var(--muted)}
+@media (min-width:700px){ .key{min-height:52px} .act{min-height:54px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Tether</h1>
+      <div class="sub">Kropki dots · consecutive &amp; double</div>
+    </div>
+    <div class="spacer"></div>
+    <div id="timer">0:00</div>
+    <button class="iconbtn" id="rulesBtn" aria-label="How to play">?</button>
+  </header>
+  <nav id="tiers"></nav>
+  <div id="msg"><span>Tap a square, then a digit.</span></div>
+  <div id="stage"><div id="board"></div></div>
+  <div id="pad"></div>
+  <div id="actions">
+    <button class="act" id="aNotes"><i>✎</i>Notes</button>
+    <button class="act" id="aErase"><i>⌫</i>Erase</button>
+    <button class="act" id="aUndo"><i>↶</i>Undo</button>
+    <button class="act" id="aHint"><i>💡</i>Hint</button>
+    <button class="act" id="aRestart"><i>↺</i>Restart</button>
+    <button class="act" id="aNew"><i>✦</i>New</button>
+  </div>
+</div>
+
+<div class="overlay" id="rules" hidden>
+  <div class="card">
+    <h2>How to play</h2>
+    <p>Fill every square so each <b>row</b> and <b>column</b> holds every digit from 1 to N exactly once. The dots between neighbouring squares tell you how their digits relate:</p>
+    <ul>
+      <li><span class="legend w"></span><b>White dot</b>: the two digits are consecutive (they differ by exactly 1, like 4 and 5).</li>
+      <li><span class="legend k"></span><b>Black dot</b>: one digit is exactly double the other (like 3 and 6).</li>
+      <li><b>No dot</b>: the digits are <i>neither</i> consecutive nor double. Blank edges are clues too.</li>
+      <li>1 and 2 are both consecutive and double, so a pair of them shows <i>one</i> dot, which may be either colour.</li>
+      <li><b>Kropki Sudoku</b> (9×9) adds the thick 3×3 boxes, which each hold 1–9 once as well.</li>
+    </ul>
+    <p>Most boards start with no digits at all. Every one has a single answer you can reach by pure logic, no guessing. On Hard and above you sometimes need to try a digit and follow the dots until it breaks.</p>
+    <p><b>Notes</b> toggles pencil marks. <b>Hint</b> places one square and tells you which deduction gets it. Clashes and broken dots show in red. Keyboard: digits, arrows, Backspace, N for notes, U for undo.</p>
+    <div class="row"><button class="btn pri" id="rulesClose">Let's go</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="win" hidden>
+  <div class="card">
+    <h2 id="winTitle">Solved!</h2>
+    <p id="winText"></p>
+    <div class="stats">
+      <div><b id="wTime">0:00</b><span>time</span></div>
+      <div><b id="wHints">0</b><span>hints</span></div>
+      <div><b id="wBest">—</b><span>best (no hints)</span></div>
+    </div>
+    <div class="row"><button class="btn" id="winClose">Admire</button><button class="btn pri" id="winNext">Next puzzle</button></div>
+  </div>
+</div>
+
+<script>
+/* ---------------- engine ---------------- */
+const rnd = n => Math.floor(Math.random() * n);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const pc = m => { let n = 0; while (m) { m &= m - 1; n++; } return n; };
+const lowBit = m => { for (let v = 1; v < 16; v++) if (m & (1 << v)) return v; return 0; };
+const isW = (a, b) => Math.abs(a - b) === 1;
+const isK = (a, b) => a === 2 * b || b === 2 * a;
+const rel = (a, b, t) => t === 1 ? isW(a, b) : t === 2 ? isK(a, b) : (!isW(a, b) && !isK(a, b));
+
+const TIERS = [
+  { id: 'warm',   size: '4×4', name: 'Warm-up',  N: 4, level: 1, minGiv: 3 },
+  { id: 'easy',   size: '5×5', name: 'Easy',     N: 5, level: 1, minGiv: 1 },
+  { id: 'med',    size: '6×6', name: 'Medium',   N: 6, level: 1, minGiv: 0 },
+  { id: 'hard',   size: '7×7', name: 'Hard',     N: 7, level: 2, minGiv: 0, need2: true },
+  { id: 'fiend',  size: '8×8', name: 'Fiendish', N: 8, level: 2, minGiv: 0, need2: true },
+  { id: 'sudoku', size: '9×9', name: 'Sudoku',   N: 9, level: 2, minGiv: 0, need2: true, boxes: true },
+];
+
+function buildEdges(N) {
+  const E = [];
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    if (c < N - 1) E.push({ a: r * N + c, b: r * N + c + 1, h: true, r, c });
+    if (r < N - 1) E.push({ a: r * N + c, b: (r + 1) * N + c, h: false, r, c });
+  }
+  return E;
+}
+function buildLines(N, boxes) {
+  const L = [];
+  for (let r = 0; r < N; r++) L.push({ kind: 'row', k: r, cells: [...Array(N)].map((_, c) => r * N + c) });
+  for (let c = 0; c < N; c++) L.push({ kind: 'column', k: c, cells: [...Array(N)].map((_, r) => r * N + c) });
+  if (boxes) for (let b = 0; b < 9; b++) {
+    const cells = [];
+    for (let i = 0; i < 9; i++) cells.push((Math.floor(b / 3) * 3 + Math.floor(i / 3)) * 9 + (b % 3) * 3 + i % 3);
+    L.push({ kind: 'box', k: b, cells });
+  }
+  return L;
+}
+function makeP(puz) {
+  const N = puz.N, E = buildEdges(N);
+  E.forEach((e, i) => e.t = puz.et[i]);
+  const sup = E.map(e => { const s = []; for (let x = 1; x <= N; x++) { let m = 0; for (let y = 1; y <= N; y++) if (rel(x, y, e.t)) m |= 1 << y; s[x] = m; } return s; });
+  const lines = buildLines(N, puz.boxes);
+  const cellLines = [...Array(N * N)].map(() => []);
+  lines.forEach((L, li) => L.cells.forEach(i => cellLines[i].push(li)));
+  const cellEdges = [...Array(N * N)].map(() => []);
+  E.forEach((e, ei) => { cellEdges[e.a].push(ei); cellEdges[e.b].push(ei); });
+  return { N, boxes: !!puz.boxes, E, sup, lines, cellLines, cellEdges, full: (1 << (N + 1)) - 2 };
+}
+function propagate(P, cand) {
+  const { N, E, sup, lines } = P;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < E.length; i++) {
+      const e = E[i], s = sup[i], ma = cand[e.a], mb = cand[e.b];
+      let na = 0, nb = 0;
+      for (let x = 1; x <= N; x++) if ((ma & (1 << x)) && (s[x] & mb)) { na |= 1 << x; nb |= s[x] & mb; }
+      if (na !== ma) { cand[e.a] = na; changed = true; }
+      if (nb !== mb) { cand[e.b] = nb; changed = true; }
+      if (!na || !nb) return false;
+    }
+    for (const L of lines) {
+      const cs = L.cells;
+      for (const i of cs) if (pc(cand[i]) === 1) for (const j of cs) if (j !== i && (cand[j] & cand[i])) {
+        cand[j] &= ~cand[i]; changed = true; if (!cand[j]) return false;
+      }
+      for (let v = 1; v <= N; v++) {
+        let cnt = 0, last = -1;
+        for (const i of cs) if (cand[i] & (1 << v)) { cnt++; last = i; }
+        if (cnt === 0) return false;
+        if (cnt === 1 && cand[last] !== (1 << v)) { cand[last] = 1 << v; changed = true; }
+      }
+    }
+  }
+  return true;
+}
+const solvedC = c => c.every(m => pc(m) === 1);
+function logic(P, cand, level) {
+  cand = cand.slice();
+  if (!propagate(P, cand)) return null;
+  if (level >= 2) {
+    let prog = true;
+    while (prog && !solvedC(cand)) {
+      prog = false;
+      for (let i = 0; i < cand.length && !prog; i++) {
+        if (pc(cand[i]) < 2) continue;
+        for (let v = 1; v <= P.N; v++) if (cand[i] & (1 << v)) {
+          const t = cand.slice(); t[i] = 1 << v;
+          if (!propagate(P, t)) { cand[i] &= ~(1 << v); prog = true; if (!propagate(P, cand)) return null; break; }
+        }
+      }
+    }
+  }
+  return cand;
+}
+function fillLatin(N, boxes) {
+  const g = Array(N * N).fill(0);
+  const ok = (k, v) => {
+    const r = Math.floor(k / N), c = k % N;
+    for (let i = 0; i < c; i++) if (g[r * N + i] === v) return false;
+    for (let i = 0; i < r; i++) if (g[i * N + c] === v) return false;
+    if (boxes) { const br = r - r % 3, bc = c - c % 3; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) if (g[(br + i) * N + bc + j] === v) return false; }
+    return true;
+  };
+  const bt = k => {
+    if (k === N * N) return true;
+    for (const v of shuffle([...Array(N)].map((_, i) => i + 1))) if (ok(k, v)) { g[k] = v; if (bt(k + 1)) return true; g[k] = 0; }
+    return false;
+  };
+  bt(0);
+  return g;
+}
+function generate(tier) {
+  const T = TIERS.find(t => t.id === tier), N = T.N;
+  let fallback = null;
+  const t0 = performance.now();
+  for (let att = 0; att < 40; att++) {
+    const sol = fillLatin(N, T.boxes);
+    const et = buildEdges(N).map(e => {
+      const x = sol[e.a], y = sol[e.b], w = isW(x, y), k = isK(x, y);
+      return w && k ? (Math.random() < .5 ? 1 : 2) : w ? 1 : k ? 2 : 0;
+    });
+    const puz = { N, boxes: !!T.boxes, sol, et, giv: sol.slice() };
+    const P = makeP(puz), giv = puz.giv;
+    const mk = () => giv.map(v => v ? 1 << v : P.full);
+    for (const i of shuffle([...Array(N * N).keys()])) {
+      if (giv.filter(Boolean).length <= T.minGiv) break;
+      const keep = giv[i]; giv[i] = 0;
+      const l = logic(P, mk(), T.level);
+      if (!(l && solvedC(l))) giv[i] = keep;
+    }
+    if (T.need2) {
+      const l1 = logic(P, mk(), 1);
+      if (l1 && solvedC(l1)) { fallback = fallback || puz; if (performance.now() - t0 < 2500) continue; return fallback; }
+    }
+    return puz;
+  }
+  return fallback;
+}
+
+/* ---------------- state ---------------- */
+const KEY = 'cowork-tether-';
+const load = (k, d) => { try { const v = JSON.parse(localStorage.getItem(KEY + k)); return v == null ? d : v; } catch (e) { return d; } };
+const store = (k, v) => { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch (e) {} };
+
+let games = load('games', {});
+let best = load('best', {});
+let tier = load('tier', 'warm');
+if (!TIERS.some(t => t.id === tier)) tier = 'warm';
+let G = null, P = null;           // current game state & compiled puzzle
+let sel = -1, notesMode = false, undo = [];
+let cells = [], dotEls = [], keys = [];
+let tickStart = 0;
+
+function newGame(t) {
+  const puz = generate(t);
+  return { tier: t, puz, vals: puz.giv.slice(), notes: Array(puz.N * puz.N).fill(0), elapsed: 0, hints: 0, done: false };
+}
+function save() {
+  if (G) { syncTime(); games[G.tier] = G; }
+  store('games', games); store('tier', tier); store('best', best);
+}
+function syncTime() {
+  if (G && !G.done && tickStart) { const now = performance.now(); G.elapsed += (now - tickStart) / 1000; tickStart = now; }
+}
+
+/* ---------------- DOM ---------------- */
+const $ = id => document.getElementById(id);
+const board = $('board'), stage = $('stage'), pad = $('pad'), msgEl = $('msg');
+
+function say(html, hot) { msgEl.innerHTML = '<span>' + html + '</span>'; msgEl.classList.toggle('hot', !!hot); }
+
+function buildTiers() {
+  const nav = $('tiers'); nav.innerHTML = '';
+  TIERS.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'tier' + (t.id === tier ? ' on' : '') + (games[t.id] && games[t.id].done ? ' won' : '');
+    b.innerHTML = `<b>${t.size}</b><span>${t.name}</span>`;
+    b.onclick = () => switchTier(t.id);
+    nav.appendChild(b);
+  });
+}
+function switchTier(t) {
+  if (G) { syncTime(); games[G.tier] = G; }
+  tier = t;
+  if (games[t] && games[t].puz) G = games[t]; else { G = newGame(t); games[t] = G; }
+  startGame();
+}
+function startGame() {
+  P = makeP(G.puz);
+  sel = -1; undo = []; tickStart = performance.now();
+  buildBoard(); buildPad(); buildTiers(); render(); fit(); save();
+  const T = TIERS.find(t => t.id === tier);
+  const g = G.puz.giv.filter(Boolean).length;
+  if (G.done) say('Solved. Tap <b>New</b> for another board.');
+  else say(`${T.name} ${T.size}: ${g ? g + ' given digit' + (g > 1 ? 's' : '') : 'no given digits'}. ${T.level > 1 ? 'You will need to test a digit at some point.' : 'Singles and dot logic will crack it.'}`);
+}
+function buildBoard() {
+  const N = P.N;
+  board.innerHTML = '';
+  board.style.setProperty('--n', N);
+  board.style.setProperty('--nc', N <= 4 ? 2 : 3);
+  board.style.setProperty('--nf', N <= 4 ? .3 : .24);
+  board.style.gridTemplateColumns = `repeat(${N},1fr)`;
+  board.style.gridTemplateRows = `repeat(${N},1fr)`;
+  cells = [];
+  for (let i = 0; i < N * N; i++) {
+    const r = Math.floor(i / N), c = i % N, d = document.createElement('div');
+    d.className = 'cell' + (c === N - 1 ? ' rlast' : '') + (r === N - 1 ? ' blast' : '');
+    if (P.boxes) { if (c % 3 === 2 && c < N - 1) d.classList.add('bx-r'); if (r % 3 === 2 && r < N - 1) d.classList.add('bx-b'); }
+    d.dataset.i = i;
+    d.addEventListener('pointerdown', ev => { ev.preventDefault(); select(i); });
+    board.appendChild(d); cells.push(d);
+  }
+  const layer = document.createElement('div'); layer.id = 'dots'; board.appendChild(layer);
+  dotEls = P.E.map(e => {
+    const d = document.createElement('div');
+    d.className = 'dot ' + (e.t === 1 ? 'w' : e.t === 2 ? 'k' : 'n') + (e.h ? '' : ' v');
+    d.style.left = (e.h ? (e.c + 1) / N : (e.c + .5) / N) * 100 + '%';
+    d.style.top = (e.h ? (e.r + .5) / N : (e.r + 1) / N) * 100 + '%';
+    layer.appendChild(d); return d;
+  });
+}
+function buildPad() {
+  const N = P.N; pad.innerHTML = ''; keys = [];
+  pad.style.gridTemplateColumns = `repeat(${N <= 6 ? N : Math.ceil(N / 2)},1fr)`;
+  for (let v = 1; v <= N; v++) {
+    const b = document.createElement('button'); b.className = 'key'; b.textContent = v;
+    b.onclick = () => input(v); pad.appendChild(b); keys.push(b);
+  }
+}
+function fit() {
+  const r = stage.getBoundingClientRect();
+  const s = Math.max(120, Math.floor(Math.min(r.width, r.height) - 4));
+  board.style.setProperty('--bsz', s + 'px');
+}
+new ResizeObserver(fit).observe(stage);
+window.addEventListener('resize', fit);
+
+function conflicts() {
+  const bad = new Set(), badE = new Set(), v = G.vals;
+  for (const L of P.lines) {
+    const seen = {};
+    for (const i of L.cells) if (v[i]) (seen[v[i]] = seen[v[i]] || []).push(i);
+    for (const k in seen) if (seen[k].length > 1) seen[k].forEach(i => bad.add(i));
+  }
+  P.E.forEach((e, ei) => { const a = v[e.a], b = v[e.b]; if (a && b && !rel(a, b, e.t)) { badE.add(ei); bad.add(e.a); bad.add(e.b); } });
+  return { bad, badE };
+}
+function render() {
+  const N = P.N, { bad, badE } = conflicts(), sv = sel >= 0 ? G.vals[sel] : 0;
+  const peers = new Set();
+  if (sel >= 0) P.cellLines[sel].forEach(li => P.lines[li].cells.forEach(i => peers.add(i)));
+  cells.forEach((d, i) => {
+    const val = G.vals[i];
+    d.classList.toggle('given', !!G.puz.giv[i]);
+    d.classList.toggle('sel', i === sel);
+    d.classList.toggle('peer', i !== sel && peers.has(i));
+    d.classList.toggle('same', i !== sel && !!sv && val === sv);
+    d.classList.toggle('err', bad.has(i) && !G.puz.giv[i]);
+    if (val) { if (d.textContent !== String(val) || d.firstChild && d.firstChild.nodeType !== 3) d.textContent = val; }
+    else {
+      const m = G.notes[i];
+      let h = '';
+      if (m) { h = '<div class="notes">'; for (let x = 1; x <= N; x++) h += `<span>${m & (1 << x) ? x : ''}</span>`; h += '</div>'; }
+      if (d.innerHTML !== h) d.innerHTML = h;
+    }
+  });
+  dotEls.forEach((d, ei) => d.classList.toggle('bad', badE.has(ei)));
+  const counts = Array(N + 1).fill(0);
+  G.vals.forEach(x => { if (x) counts[x]++; });
+  keys.forEach((k, j) => k.classList.toggle('full', counts[j + 1] >= N));
+  $('aNotes').classList.toggle('on', notesMode);
+  $('timer').textContent = fmt(G.elapsed);
+}
+const fmt = s => { s = Math.floor(s); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+
+/* ---------------- input ---------------- */
+function select(i) {
+  sel = i; render();
+  document.querySelectorAll('.cell.wrong').forEach(c => c.classList.remove('wrong'));
+}
+function change(list) { // list of [i, newVal, newNotes]
+  const rec = list.map(([i]) => [i, G.vals[i], G.notes[i]]);
+  let any = false;
+  list.forEach(([i, v, n]) => { if (G.vals[i] !== v || G.notes[i] !== n) any = true; G.vals[i] = v; G.notes[i] = n; });
+  if (any) undo.push(rec);
+  if (undo.length > 400) undo.shift();
+}
+function input(v) {
+  if (G.done) return;
+  if (sel < 0) { say('Tap a square first.'); return; }
+  if (G.puz.giv[sel]) { say('That digit is given; it can\'t change.'); return; }
+  if (notesMode && !G.vals[sel]) {
+    change([[sel, 0, G.notes[sel] ^ (1 << v)]]);
+  } else {
+    const nv = G.vals[sel] === v ? 0 : v;
+    const list = [[sel, nv, 0]];
+    if (nv) { // clear that digit from peer notes
+      const seen = new Set([sel]);
+      P.cellLines[sel].forEach(li => P.lines[li].cells.forEach(j => {
+        if (!seen.has(j) && (G.notes[j] & (1 << nv))) { seen.add(j); list.push([j, G.vals[j], G.notes[j] & ~(1 << nv)]); }
+      }));
+    }
+    change(list);
+  }
+  after();
+}
+function erase() {
+  if (G.done || sel < 0 || G.puz.giv[sel]) return;
+  change([[sel, 0, 0]]); after();
+}
+function doUndo() {
+  if (G.done) return;
+  const rec = undo.pop(); if (!rec) { say('Nothing to undo.'); return; }
+  rec.forEach(([i, v, n]) => { G.vals[i] = v; G.notes[i] = n; });
+  after();
+}
+function after() {
+  render(); checkWin(); save();
+}
+function checkWin() {
+  if (G.done) return;
+  if (G.vals.every((v, i) => v === G.puz.sol[i])) {
+    syncTime(); G.done = true;
+    let rec = false;
+    if (!G.hints && (!best[G.tier] || G.elapsed < best[G.tier])) { best[G.tier] = Math.floor(G.elapsed); rec = true; }
+    save(); render(); buildTiers();
+    const T = TIERS.find(t => t.id === G.tier);
+    $('winTitle').textContent = rec ? 'Solved: new best!' : 'Solved!';
+    $('winText').textContent = `${T.name} ${T.size} cleared${G.hints ? ' with ' + G.hints + ' hint' + (G.hints > 1 ? 's' : '') : ' with no hints'}. Every dot and every blank edge checks out.`;
+    $('wTime').textContent = fmt(G.elapsed); $('wHints').textContent = G.hints;
+    $('wBest').textContent = best[G.tier] ? fmt(best[G.tier]) : '—';
+    setTimeout(() => { $('win').hidden = false; }, 350);
+    say('Solved! Every dot checks out.', true);
+  } else if (G.vals.every(Boolean)) {
+    say('The board is full but something is off. Red marks show clashes; <b>Hint</b> finds a wrong digit.', true);
+  }
+}
+
+/* ---------------- hints ---------------- */
+function flashCell(i, edges) {
+  const d = cells[i]; d.classList.remove('flash'); void d.offsetWidth; d.classList.add('flash');
+  (edges || []).forEach(ei => { const e = dotEls[ei]; e.classList.remove('glow'); void e.offsetWidth; e.classList.add('glow'); });
+}
+function lineName(L) { return L.kind === 'box' ? 'this box' : `${L.kind} ${L.k + 1}`; }
+function hint() {
+  if (G.done) return;
+  const N = P.N, sol = G.puz.sol, v = G.vals;
+  const wrong = v.findIndex((x, i) => x && x !== sol[i]);
+  if (wrong >= 0) {
+    sel = wrong; render(); cells[wrong].classList.add('wrong');
+    say(`This ${v[wrong]} doesn't belong here. Erase it and anything built on it.`, true);
+    return;
+  }
+  // basic candidates: only same-line eliminations
+  const basic = v.map((x, i) => {
+    if (x) return 1 << x;
+    let m = P.full;
+    P.cellLines[i].forEach(li => P.lines[li].cells.forEach(j => { if (v[j]) m &= ~(1 << v[j]); }));
+    return m;
+  });
+  let pick = -1, why = '', edges = [];
+  // a) naked single
+  for (let i = 0; i < N * N && pick < 0; i++) if (!v[i] && pc(basic[i]) === 1) {
+    pick = i; why = `Only ${sol[i]} is left here: every other digit is already in its row, column${P.boxes ? ' or box' : ''}.`;
+  }
+  // b) hidden single (line logic only)
+  if (pick < 0) for (const L of P.lines) {
+    for (let d = 1; d <= N && pick < 0; d++) {
+      if (L.cells.some(i => v[i] === d)) continue;
+      const spots = L.cells.filter(i => !v[i] && (basic[i] & (1 << d)));
+      if (spots.length === 1) { pick = spots[0]; why = `${d} has only one place left in ${lineName(L)}.`; }
+    }
+    if (pick >= 0) break;
+  }
+  // c) dot logic (full propagation)
+  if (pick < 0) {
+    const c = basic.slice(); propagate(P, c);
+    let bestScore = -1;
+    for (let i = 0; i < N * N; i++) if (!v[i] && pc(c[i]) === 1) {
+      const sc = P.cellEdges[i].filter(ei => P.E[ei].t).length;
+      if (sc > bestScore) { bestScore = sc; pick = i; }
+    }
+    if (pick >= 0) {
+      const es = P.cellEdges[pick], w = es.filter(ei => P.E[ei].t === 1).length, k = es.filter(ei => P.E[ei].t === 2).length, n = es.length - w - k;
+      const parts = [];
+      if (w) parts.push(`${w} white`); if (k) parts.push(`${k} black`); if (n) parts.push(`${n} blank`);
+      why = `Dot logic: its edges (${parts.join(', ')}) plus its row and column leave only ${sol[pick]}.`;
+      edges = es;
+    }
+  }
+  // d) contradiction
+  if (pick < 0) {
+    const c = logic(P, basic, 2);
+    if (c) for (let i = 0; i < N * N; i++) if (!v[i] && pc(c[i]) === 1) { pick = i; break; }
+    if (pick < 0) pick = v.findIndex(x => !x);
+    why = `Contradiction: any other digit here breaks a line a few dot-steps later. Only ${sol[pick]} survives.`;
+    edges = P.cellEdges[pick];
+  }
+  if (pick < 0) return;
+  G.hints++;
+  change([[pick, sol[pick], 0]]);
+  sel = pick; render(); flashCell(pick, edges); say(why, true); checkWin(); save();
+}
+
+/* ---------------- buttons ---------------- */
+function confirmBtn(btn, label, fn) {
+  if (G.done || G.vals.every((x, i) => x === G.puz.giv[i])) { fn(); return; }
+  if (btn.dataset.armed) { delete btn.dataset.armed; btn.classList.remove('warn'); btn.lastChild.textContent = label; fn(); return; }
+  btn.dataset.armed = 1; btn.classList.add('warn'); btn.lastChild.textContent = 'Sure?';
+  setTimeout(() => { if (btn.dataset.armed) { delete btn.dataset.armed; btn.classList.remove('warn'); btn.lastChild.textContent = label; } }, 2200);
+}
+$('aNotes').onclick = () => { notesMode = !notesMode; render(); say(notesMode ? 'Notes on: digits go in as pencil marks.' : 'Notes off.'); };
+$('aErase').onclick = erase;
+$('aUndo').onclick = doUndo;
+$('aHint').onclick = hint;
+$('aRestart').onclick = () => confirmBtn($('aRestart'), 'Restart', () => {
+  G.vals = G.puz.giv.slice(); G.notes = G.notes.map(() => 0); G.elapsed = 0; G.hints = 0; G.done = false;
+  tickStart = performance.now(); undo = []; sel = -1; render(); buildTiers(); save(); say('Board cleared. Same puzzle, fresh start.');
+});
+$('aNew').onclick = () => confirmBtn($('aNew'), 'New', () => { G = newGame(tier); games[tier] = G; startGame(); });
+$('rulesBtn').onclick = () => { $('rules').hidden = false; };
+$('rulesClose').onclick = () => { $('rules').hidden = true; store('seen', 1); };
+$('winClose').onclick = () => { $('win').hidden = true; };
+$('winNext').onclick = () => { $('win').hidden = true; G = newGame(tier); games[tier] = G; startGame(); };
+
+document.addEventListener('keydown', e => {
+  if (!$('rules').hidden || !$('win').hidden) { if (e.key === 'Escape') { $('rules').hidden = true; $('win').hidden = true; } return; }
+  const N = P.N;
+  if (/^[1-9]$/.test(e.key) && +e.key <= N) { input(+e.key); e.preventDefault(); }
+  else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') { erase(); e.preventDefault(); }
+  else if (e.key.startsWith('Arrow')) {
+    if (sel < 0) sel = 0; else {
+      let r = Math.floor(sel / N), c = sel % N;
+      if (e.key === 'ArrowUp') r = (r + N - 1) % N; if (e.key === 'ArrowDown') r = (r + 1) % N;
+      if (e.key === 'ArrowLeft') c = (c + N - 1) % N; if (e.key === 'ArrowRight') c = (c + 1) % N;
+      sel = r * N + c;
+    }
+    render(); e.preventDefault();
+  }
+  else if (e.key === 'n' || e.key === 'N') $('aNotes').click();
+  else if (e.key === 'u' || e.key === 'U' || (e.key === 'z' && (e.ctrlKey || e.metaKey))) { doUndo(); e.preventDefault(); }
+  else if (e.key === 'h' || e.key === 'H') hint();
+});
+
+setInterval(() => {
+  if (!G || G.done || document.hidden) return;
+  syncTime(); $('timer').textContent = fmt(G.elapsed);
+}, 500);
+document.addEventListener('visibilitychange', () => { if (document.hidden) { syncTime(); save(); } else tickStart = performance.now(); });
+window.addEventListener('pagehide', () => save());
+
+/* ---------------- boot ---------------- */
+switchTier(tier);
+if (!load('seen', 0)) $('rules').hidden = false;
+</script>
+</body>
+</html>
