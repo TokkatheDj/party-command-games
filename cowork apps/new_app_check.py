@@ -43,7 +43,8 @@ ARCADE = "https://tokkathedj.github.io/party-command-games/"
 SKIP_DIRS = ("test_reports/", "node_modules/", "review-kit/", "_retired_launchers/", "_scheduler/",
              "test_results/", "test-results/", "test_screenshots/", "surface-setup/", "Reviews/",
              "vr_prompts/", "__pycache__/")
-RECENT_DAYS = 3                 # covers a night or two with the desktop asleep
+RECENT_DAYS = 3                 # the least it looks back; see lookback_days()
+MAX_LOOKBACK = 21               # the most, so a long-dead state file can't trigger a huge replay
 BATCH = 8                       # apps per browser run; progress is saved after each
 REVIEWS = os.path.join(HERE, "Reviews")
 MARK = "<!-- played by new_app_check.py -->"
@@ -84,10 +85,25 @@ def waiting_apps():
     return sorted(set(out))
 
 
-def recent_apps():
-    """Every app made in the last RECENT_DAYS days, in any folder (private ones too)."""
-    days = {time.strftime("%Y-%m-%d", time.localtime(time.time() - i * 86400)) for i in range(RECENT_DAYS)}
-    cutoff = time.time() - RECENT_DAYS * 86400
+def lookback_days(state, now=None):
+    """Days to look back: back to the LAST RUN, not a fixed 3 (10 Nov 2026).
+
+    From 2 to 9 Nov nothing played new apps; a fixed 3-day window would then have skipped most
+    of that week for good. Now a missed night (or week) is covered by the next run. At least
+    RECENT_DAYS, at most MAX_LOOKBACK; no readable last run means RECENT_DAYS."""
+    now = time.time() if now is None else now
+    try:
+        last = time.mktime(time.strptime(state["run_at"], "%Y-%m-%dT%H:%M:%S"))
+    except (KeyError, TypeError, ValueError, OverflowError):
+        return RECENT_DAYS
+    gap = int((now - last) // 86400) + 1
+    return max(RECENT_DAYS, min(MAX_LOOKBACK, gap + 1))
+
+
+def recent_apps(look=RECENT_DAYS):
+    """Every app made in the last `look` days, in any folder (private ones too)."""
+    days = {time.strftime("%Y-%m-%d", time.localtime(time.time() - i * 86400)) for i in range(look)}
+    cutoff = time.time() - look * 86400
     out = []
     for root, dirs, files in os.walk(HERE):
         dirs[:] = [d for d in dirs if d not in ("node_modules", ".git", "__pycache__")]
@@ -199,7 +215,8 @@ def main():
     except (OSError, RuntimeError) as e:
         log(str(e))
         return 1
-    recent = recent_apps()
+    lookback = lookback_days(state)
+    recent = recent_apps(lookback)
     every = sorted(set(waiting) | set(recent))
     hidden = private(every)
     redo = "--all-again" in sys.argv
@@ -249,7 +266,7 @@ def main():
     # private apps' accessibility only goes in the review files.
     def ready(v):
         return v["ok"] and not (v["waiting"] and v["public"] and v.get("a11y"))
-    report = {"run_at": run_at, "played": len(known), "days": RECENT_DAYS,
+    report = {"run_at": run_at, "played": len(known), "days": lookback,
               "apps": [{"title": v["title"][:80], "ok": ready(v), "waiting": v["waiting"],
                         "problems": [p[:200] for p in (v["problems"] + (["accessibility: " + x for x in v.get("a11y", [])]
                                                                         if v["waiting"] and v["public"] else []))[:4]]}
