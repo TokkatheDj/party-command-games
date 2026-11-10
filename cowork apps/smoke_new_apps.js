@@ -156,6 +156,12 @@ async function checkOne(browser, rel, vp) {
   const out = { checked_at: new Date().toISOString(), apps: [] };
   for (const rel of apps) {
     const problems = []; let title = rel;
+    // 10 Nov 2026: a generator run that dies part-way leaves /*__ENGINE__*/-style placeholders and an EMPTY
+    // page. That loads without a single error, so it passed here (Blacklight Kitchen, 2 Nov; Line Check, 17 Sep).
+    try {
+      const left = fs.readFileSync(path.join(ROOT, rel), "utf8").match(/\/\*__[A-Z0-9_]+__\*\//g);
+      if (left) problems.push(`unfinished build: ${left.length} empty placeholder(s) left (${[...new Set(left)].slice(0, 4).join(" ")}) - the generator stopped before writing that code`);
+    } catch (e) { /* unreadable file: the load check below reports it */ }
     for (const vp of VIEWPORTS) {
       const r = await checkOne(browser, rel, vp);
       title = r.title; problems.push(...r.problems);
