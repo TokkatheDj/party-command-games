@@ -67,13 +67,41 @@ try {
     $r = Update-Routines -Repo $surf -Say $log
     Check "untracked file in the way -> kept, the file survives" ($r -eq "kept" -and (Get-Content "$surf\Routines\New.txt") -eq "untracked copy") "$r / $($logged[-1])"
 
+    # 6b. the SAME untracked file, now identical to GitHub's (the 9 Nov case: the desktop committed
+    #     three apps the Surface already had; it sat 17 behind). Moved aside, never deleted, then pulled.
+    $moved = Join-Path $tmp "moved"
+    Set-Content "$surf\Routines\New.txt" "tracked version"
+    $r = Update-Routines -Repo $surf -Say $log -MovedTo $moved
+    $copy = Get-ChildItem -Recurse -File $moved -ErrorAction SilentlyContinue | Where-Object Name -eq "New.txt"
+    $tracked = [bool](& git -C $surf ls-files Routines/New.txt)
+    Check "identical untracked copy -> moved aside, pulled, now tracked" ($r -eq "updated" -and $tracked -and @($copy).Count -eq 1 -and (Get-Content "$surf\Routines\New.txt") -eq "tracked version" -and $logged[-1] -like "*moved 1 untracked*") "$r / $($logged[-1])"
+
+    # 6c. two blocking files, one identical and one different: touch NOTHING (could be real work)
+    Push-Desk "Routines\A.txt" "same"; Push-Desk "Routines\B.txt" "github b"
+    Set-Content "$surf\Routines\A.txt" "same"; Set-Content "$surf\Routines\B.txt" "surface b"
+    $movedBefore = @(Get-ChildItem -Directory $moved -ErrorAction SilentlyContinue).Count
+    $r = Update-Routines -Repo $surf -Say $log -MovedTo $moved
+    $movedAfter = @(Get-ChildItem -Directory $moved -ErrorAction SilentlyContinue).Count
+    Check "one identical + one different -> kept, both left in place, nothing moved" ($r -eq "kept" -and (Get-Content "$surf\Routines\A.txt") -eq "same" -and (Get-Content "$surf\Routines\B.txt") -eq "surface b" -and $movedAfter -eq $movedBefore -and $logged[-1] -like "*B.txt*" -and $logged[-1] -notlike "*A.txt*") "$r / $($logged[-1])"
+    Remove-Item "$surf\Routines\A.txt", "$surf\Routines\B.txt"; G $surf pull -q --ff-only     # test cleanup
+
+    # 6d. the real paths have a space in them ("cowork apps/kids_apps/...")
+    New-Item -ItemType Directory -Force "$desk\cowork apps\kids_apps" | Out-Null
+    Push-Desk "cowork apps\kids_apps\2026-11-09-flipsy.html" "<p>flipsy</p>"
+    New-Item -ItemType Directory -Force "$surf\cowork apps\kids_apps" | Out-Null
+    Set-Content "$surf\cowork apps\kids_apps\2026-11-09-flipsy.html" "<p>flipsy</p>"
+    $r = Update-Routines -Repo $surf -Say $log -MovedTo $moved
+    $tracked = [bool](& git -C $surf ls-files "cowork apps/kids_apps/2026-11-09-flipsy.html")
+    Check "path with a space -> moved aside and pulled" ($r -eq "updated" -and $tracked) "$r / $($logged[-1])"
+
     # 7. not a git repo at all
     $r = Update-Routines -Repo $tmp -Say $log
     Check "not a repo -> kept, warned" ($r -eq "kept" -and $logged[-1] -like "WARN*") "$r / $($logged[-1])"
 
     # 8. called the way Run-CoworkRoutine.ps1 calls it: its W() writes to a script-level
     #    $Log FILE PATH, which a function parameter of the same name would shadow
-    Remove-Item "$surf\Routines\New.txt"; G $surf pull -q --ff-only     # clear case 6's leftover
+    if (-not (& git -C $surf ls-files Routines/New.txt)) { Remove-Item "$surf\Routines\New.txt" -ErrorAction SilentlyContinue }
+    G $surf pull -q --ff-only     # clear case 6's leftover (after 6b New.txt is tracked: keep it)
     $Log = Join-Path $tmp "routine.log"
     function W([string]$m) { Add-Content -LiteralPath $Log -Value "ts  $m" -Encoding UTF8 }
     Push-Desk "Routines\Kids.txt" "v5"

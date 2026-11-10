@@ -8,6 +8,8 @@
 #   * `git pull --ff-only`: if the Surface has its own unpushed commits, uncommitted
 #     edits in the way, or untracked files the pull would overwrite, git refuses and
 #     changes NOTHING. We log why and run with the prompt already on disk.
+#     One exception (10 Nov 2026): untracked files IDENTICAL to GitHub's copies are moved
+#     aside (never deleted) and the pull retried once - see the block near the end.
 #   * never checkout/reset/stash - an earlier `git checkout -- Routines` once threw away
 #     copied-in prompts that weren't committed yet.
 #   * offline or GitHub slow: gives up after ~20 s without data and carries on.
@@ -19,7 +21,9 @@
 function Update-Routines {
     param(
         [Parameter(Mandatory)][string]$Repo,
-        [Parameter(Mandatory)][scriptblock]$Say    # not $Log: the runner's W() reads a $Log file path by dynamic scope
+        [Parameter(Mandatory)][scriptblock]$Say,   # not $Log: the runner's W() reads a $Log file path by dynamic scope
+        # Where identical untracked copies are moved when they block a pull (gitignored by default).
+        [string]$MovedTo = (Join-Path $Repo "cowork apps\_scheduler\Logs\pull-moved")
     )
     $ErrorActionPreference = "Continue"     # local to this function
     # ONE pull at a time (30 Oct 2026): waking the Surface at 14:55 started four missed routines
@@ -49,6 +53,43 @@ function Update-Routines {
             if ($after -eq $before) { & $Say "routines up to date ($after)"; return "current" }
             & $Say "routines updated $before -> $after"
             return "updated"
+        }
+        # IDENTICAL UNTRACKED COPIES (10 Nov 2026). An app the factory wrote here, then committed from
+        # the desktop, sits untracked on the Surface and blocks every fast-forward ("untracked working
+        # tree files would be overwritten"). It sat 17 commits behind for a week that way. If EVERY
+        # blocking file is byte-for-byte what GitHub has (git's own normalised hash, so line endings
+        # don't count), they are MOVED (never deleted) into Logs\pull-moved\<time>\ and the pull is tried
+        # once more. If even one differs, nothing is touched: that could be real work.
+        if (($out -join "`n") -match "untracked working tree files would be overwritten") {
+            $paths = @($out | Where-Object { $_ -match "^\t" } | ForEach-Object { $_.Trim().Trim('"') })
+            $differ = @()
+            foreach ($p in $paths) {
+                # Collect ALL output, then read the exit code: in Windows PowerShell 5.1, piping a native
+                # command into Select-Object -First 1 stops it early and reports exit code -1.
+                $lo = @(& $git -C $Repo hash-object -- $p 2>&1 | ForEach-Object { "$_" }); $lrc = $LASTEXITCODE
+                $ro = @(& $git -C $Repo rev-parse "@{u}:$p" 2>&1 | ForEach-Object { "$_" }); $rrc = $LASTEXITCODE
+                $local = if ($lo.Count) { $lo[0].Trim() } else { "" }
+                $remote = if ($ro.Count) { $ro[0].Trim() } else { "" }
+                if ($lrc -ne 0 -or $rrc -ne 0 -or -not $local -or $local -ne $remote) { $differ += $p }
+            }
+            if ($paths.Count -and -not $differ.Count) {
+                $dest = Join-Path $MovedTo (Get-Date -Format "yyyy-MM-dd_HHmmss")
+                foreach ($p in $paths) {
+                    $to = Join-Path $dest $p
+                    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
+                    Move-Item -LiteralPath (Join-Path $Repo $p) -Destination $to
+                }
+                $out = & $git -C $Repo -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=20 `
+                           pull --ff-only --quiet 2>&1 | ForEach-Object { "$_" }
+                if ($LASTEXITCODE -eq 0) {
+                    $after = (& $git -C $Repo rev-parse --short HEAD 2>&1 | Select-Object -First 1) -as [string]
+                    & $Say "routines updated $before -> $after (moved $($paths.Count) untracked copies identical to GitHub's aside to $dest)"
+                    return "updated"
+                }
+            } elseif ($differ.Count) {
+                & $Say "WARN: routines NOT updated - untracked file(s) differ from GitHub's and were left alone: $($differ -join ', ') -- using the prompts on disk"
+                return "kept"
+            }
         }
         $why = (($out | Where-Object { $_ -match '\S' }) | Select-Object -First 2) -join " / "
         & $Say "WARN: routines NOT updated - git pull --ff-only refused or failed: $why -- using the prompts on disk"
