@@ -131,10 +131,26 @@ def play(apps):
                        capture_output=True, text=True, encoding="utf-8", timeout=60 * (2 + 2 * len(apps)),
                        creationflags=NO_WINDOW)
     try:
-        return json.loads(r.stdout)
+        out = json.loads(r.stdout)
     except ValueError:
         log("checker failed (exit %s): %s" % (r.returncode, (r.stderr or r.stdout)[-300:].strip()))
         return None
+    # 10 Nov 2026: also MEASURE fast flashing (seizure risk; Light Jockey strobed the whole screen 8-9 times a
+    # second). A breach fails the app. If flash_check itself can't run, say so and keep the smoke results.
+    try:
+        f = subprocess.run([NODE, os.path.join(HERE, "flash_check.js"), "--seconds", "6"] + apps, cwd=HERE,
+                           capture_output=True, text=True, encoding="utf-8", timeout=60 + 30 * len(apps),
+                           creationflags=NO_WINDOW)
+        fl = {a["app"]: a for a in json.loads(f.stdout)["apps"]}
+        for a in out.get("apps", []):
+            m = fl.get(a["app"])
+            if m and not m["ok"]:
+                a["ok"] = False
+                a.setdefault("problems", []).append(
+                    "flashes a large area %d times a second (seizure limit is 3)" % m["maxPerSec"])
+    except (subprocess.SubprocessError, ValueError, KeyError, OSError) as e:
+        log("flash check skipped: %s" % type(e).__name__)
+    return out
 
 
 def note_reviews(known):
