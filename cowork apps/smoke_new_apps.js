@@ -106,6 +106,27 @@ async function checkOne(browser, rel, vp) {
     const atLoad = await text();
     if (errors.length) add("errors while loading: " + errors.splice(0).slice(0, 3).join(" | "));
 
+    // 1b. the 988 note can be read (11 Nov 2026: the note added on 9 Nov sat below a page that can't
+    // scroll in 8 therapy apps, and beside the app in Butterfly Hug, squeezing it to 210px)
+    const note = await page.evaluate(() => {
+      const n = document.querySelector('[data-safe988="note"]'); if (!n) return null;
+      // scroll only what a finger can: scrollIntoView also moves overflow:hidden pages, which people can't
+      const fingerScrolls = e => /(auto|scroll)/.test(getComputedStyle(e).overflowY);
+      for (let e = n.parentElement; e && e !== document.documentElement; e = e.parentElement) if (fingerScrolls(e)) e.scrollTop = e.scrollHeight;
+      const hid = e => /(hidden|clip)/.test(getComputedStyle(e).overflowY);
+      if (!hid(document.documentElement) && !hid(document.body)) scrollTo(0, document.scrollingElement.scrollHeight);
+      const r = n.getBoundingClientRect(), at = document.elementFromPoint(Math.min(innerWidth - 2, r.left + r.width / 2), Math.min(innerHeight - 2, r.top + Math.min(10, r.height / 2)));
+      return { w: Math.round(r.width), top: Math.round(r.top), bottom: Math.round(r.bottom), ih: innerHeight, onTop: !!at && (at === n || n.contains(at)), vis: getComputedStyle(n).visibility };
+    }).catch(() => null);
+    if (note) {
+      const why = [];
+      if (note.w < Math.min(300, vp.width - 40)) why.push(`only ${note.w}px wide`);
+      if (note.top < 0 || note.bottom > note.ih + 1) why.push("nothing scrolls to it");
+      if (!note.onTop || note.vis !== "visible") why.push("it is covered or hidden");
+      if (why.length) add("the 988 note can't be read: " + why.join(", "));
+      await page.evaluate(() => { for (let e = document.querySelector('[data-safe988="note"]'); e; e = e.parentElement) e.scrollTop = 0; scrollTo(0, 0); }).catch(() => {});
+    }
+
     // 2. nobody touches it
     await page.waitForTimeout(IDLE_S * 1000);
     const idle = await text();
