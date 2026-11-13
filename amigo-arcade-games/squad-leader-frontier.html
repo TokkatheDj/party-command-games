@@ -59,7 +59,7 @@ h3{margin:14px 0 6px;font-size:clamp(15px,4vw,18px);color:var(--gold)}
 .act.p2b.on{background:rgba(120,190,40,.55);color:#fff}.act.p2m.ready{box-shadow:0 0 16px #b6ff3a;color:#fff}.act.p2b.low{opacity:.45}
 body.coopL #act{right:auto;left:10px;align-items:flex-start}body.coopL .actrow{flex-direction:row-reverse}
 body.coopL #tools{right:auto;left:50%;transform:translateX(-50%)}
-#netAct{position:absolute;right:14px;bottom:max(18px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;z-index:2}
+#netAct{position:absolute;right:14px;top:52%;transform:translateY(-50%);display:flex;flex-direction:column;gap:14px;z-index:2}#netAct .p2b{width:clamp(96px,22vw,128px);height:clamp(84px,19vw,112px);font-size:clamp(15px,3.8vw,19px)}
 .act.laser{border-color:var(--gold);background:rgba(90,70,10,.6);color:var(--gold)}
 #netPad{position:absolute;inset:0;z-index:40;background:#070b18;display:flex;flex-direction:column;touch-action:none;user-select:none;-webkit-user-select:none}
 #netPad.hide{display:none}#netPad.view{background:transparent}#netPad.view #netTop{background:rgba(13,21,48,.82)}#netTop{flex:0 0 auto;position:relative;z-index:1;display:flex;align-items:center;gap:12px;padding:12px 16px;color:#fff;font:600 18px system-ui;background:#0d1530;border-bottom:2px solid #b6ff3a}
@@ -177,7 +177,7 @@ body.coopL #tools{right:auto;left:50%;transform:translateX(-50%)}
     <button class="big alt hide" id="btnJoin">🎮 Join as P2</button>
   </div>
 </div>
-<div id="netPad" class="hide"><div id="netTop"><canvas id="netShip" width="72" height="72"></canvas><div class="grow"><b>You fly P2, the green ship</b><div id="netSt">Connecting…</div></div><button class="big alt" id="netLeave">Leave</button></div><canvas id="netCv"></canvas><div id="netAct"><button class="act p2b" id="nShield" aria-label="Shield">🛡️<br>SHIELD</button><button class="act p2b p2m" id="nMiss" aria-label="Missile barrage">🚀<br><span id="nMissTxt">0%</span></button></div></div>
+<div id="netPad" class="hide"><div id="netTop"><canvas id="netShip" width="72" height="72"></canvas><div class="grow"><b>You fly P2, the green ship</b><div id="netSt">Connecting…</div></div><button class="big alt" id="netLeave">Leave</button></div><canvas id="netCv"></canvas><div id="netAct"><button class="act p2b" id="nShield" aria-label="Shield">🛡️<br>SHIELD</button><button class="act p2b p2m" id="nMiss" aria-label="Missile barrage">🚀 MISSILES<br><span id="nMissTxt">0%</span></button></div></div>
 
 <div id="tools" class="hide">
   <button class="tool" id="tSquad" aria-label="Squad and skills">⭐<span class="dot hide" id="skillDot">!</span></button>
@@ -876,6 +876,7 @@ function enterWorld(){
   for(const m of G.mates)player.mates.push({name:m.name,rank:m.rank,age:m.age,kills:m.kills||0,sh:m.sh,max:m.max,down:m.down||0,guard:!!m.guard,explore:!!m.explore,x:player.x,y:player.y,inv:0,fire:rnd(0,0.4),t:rnd(0,6)});
   cam.x=player.x;cam.y=player.y;cam.zoom=viewZoom();cam.px=cam.py=0;
   copilot=coop?copilotMake():null;stick2.id=null;
+  if(coop)coopZoomOut();
   state='play';paused=false;ui=null;respawnT=0;
   $('title').classList.add('hide');$('tools').classList.remove('hide');$('tView').classList.remove('gone');syncView();syncBeacon();
   stickerTick(true);showTouch();syncDots();keepAwake();
@@ -1924,6 +1925,7 @@ function netGot(m){
   if(m.t==='joined'){
     NET.peer=m.guest;netIn.at=0;netIn.sh=false;netIn.mb=0;
     if(player&&!copilot)copilot=copilotMake();
+    coopZoomOut();
     if(G)netSend({t:'w',g:G});NET.sendT=0;NET.slowT=0;
     if(state==='play'){pop(player.x,player.y-60,'P2 JOINED!','#b6ff3a',2);SFX.power();if(ui==='panel'&&/Play on two devices/.test($('sheet').textContent))closeUi();}
   }else if(m.t==='left'||(m.t==='from'&&m.msg&&m.msg.t==='bye')){
@@ -2029,7 +2031,7 @@ function netWorld(g){   // the host's game arrives: set the scene, but never as 
   syncLairs();
   player={x:G.x,y:G.y,ang:-Math.PI/2,hp:1,energy:1,sh:{on:false,t:0,cd:0,parried:false,broken:0},inv:0,laser:0,laserAng:0,pulse:0,boostT:0,stormT:1,mates:[],rapid:0,wide:0,missile:0};
   copilot=copilotMake();
-  cam.zoom=VIEW_ZOOM[1]||0.8;cam.px=cam.py=0;cam.x=copilot.x;cam.y=copilot.y;nearT=0;
+  cam.zoom=VIEW_ZOOM[VIEW_ZOOM.length-1];cam.px=cam.py=0;cam.x=copilot.x;cam.y=copilot.y;nearT=0;
   state='netview';ui=null;NET.view=true;NET.frames=0;NET.snd=null;
   $('netPad').classList.add('view');$('title').classList.add('hide');
 }
@@ -2595,7 +2597,11 @@ function treasureTick(){
     banner='TREASURE!  +'+s+' SCRAP';bannerT=2.6;SFX.bossDown();boom(T.x,T.y,'#fb3',40,320);save();
   }
 }
-function copilotMake(){const p=player;return {name:'P2',copilot:true,x:p.x+40,y:p.y+56,ang:p.ang,sh:4,max:4,inv:1.5,down:0,fire:0.3,kills:0,idle:0,en:P2_EN,shOn:false,shT:0,shCd:0,shBroken:0,mb:0,parries:0,barrages:0};}
+function p2Max(){return Math.min(12,4+Math.floor((((G&&G.lvl)||1)-1)/2));}   // P2's shield grows with your level
+function p2Speed(c){   // a little faster than you, your Home Boost too, and faster still when it falls behind
+  const d=player?Math.hypot(c.x-player.x,c.y-player.y):0;
+  return shipSpeed()*1.15*(player&&player.boostT>0?1.25:1)*(1+Math.max(0,Math.min(0.6,(d-260)/600)));}
+function copilotMake(){const p=player,m=p2Max();return {name:'P2',copilot:true,x:p.x+40,y:p.y+56,ang:p.ang,sh:m,max:m,inv:1.5,down:0,fire:0.3,kills:0,idle:0,en:P2_EN,shOn:false,shT:0,shCd:0,shBroken:0,mb:100,parries:0,barrages:0};}
 function p2Missiles(){   // P2's special: a fan of homing missiles, once the charge is full
   const c=copilot;if(!c||c.down||(c.mb||0)<100||state!=='play'||respawnT>0)return false;
   c.mb=0;c.barrages=(c.barrages||0)+1;SFX.missile();shake=Math.max(shake,5);
@@ -2605,13 +2611,16 @@ function p2Missiles(){   // P2's special: a fan of homing missiles, once the cha
 }
 function copilotBeside(){if(copilot){copilot.x=player.x+40;copilot.y=player.y+56;}}
 function coopLabel(){const b=$('btnCoop');if(!b)return;b.innerHTML='👥 Co-pilot: '+(coop?'<span style="color:#b6ff3a">● ON</span>':'<span style="color:#8fa6c8">○ OFF</span>');b.setAttribute('aria-pressed',coop?'true':'false');b.style.borderColor=coop?'#b6ff3a':'';}
-function setCoop(on){coop=!!on;coopLabel();try{localStorage.setItem('cowork-squad-frontier-copilot',coop?'on':'off');}catch(e){}copilot=(coop||NET.peer)&&player?(copilot||copilotMake()):null;stick2.id=null;}
+function coopZoomOut(){   // with a co-pilot the view starts all the way out, so P2 stays easy to find
+  if(!G)return;G.viewZ=VIEW_ZOOM.length-1;cam.zoom=viewZoom();if(state==='play')syncView();}
+function setCoop(on){if(on&&!coop)coopZoomOut();coop=!!on;coopLabel();try{localStorage.setItem('cowork-squad-frontier-copilot',coop?'on':'off');}catch(e){}copilot=(coop||NET.peer)&&player?(copilot||copilotMake()):null;stick2.id=null;}
 function copilotDamage(c){
   c.sh-=1;c.inv=0.8;SFX.droneHit();c.hits=(c.hits||0)+1;
   if(c.sh<=0){c.down=COOP_DOWN;c.sh=c.max;c.shOn=false;SFX.droneLost();boom(c.x,c.y,'#b6ff3a',18,240);pop(c.x,c.y-20,'P2 DOWN! BACK IN '+COOP_DOWN,'#f88');}
 }
 function copilotTick(c,dt){
   const p=player;
+  {const m=p2Max();if(c.max!==m){if(m>c.max){c.sh+=m-c.max;if(!c.down)pop(c.x,c.y-44,'P2 LEVEL UP!','#b6ff3a',1.4);}c.max=m;c.sh=Math.min(c.sh,m);}}
   if(c.down>0){c.down-=dt;if(c.down<=0){c.down=0;c.sh=c.max;c.inv=1.5;copilotBeside();if(respawnT<=0)pop(c.x,c.y-30,'P2 IS BACK!','#b6ff3a',1.4);}return;}
   let mx=0,my=0;
   if(keys.ArrowLeft)mx-=1;if(keys.ArrowRight)mx+=1;if(keys.ArrowUp)my-=1;if(keys.ArrowDown)my+=1;
@@ -2620,7 +2629,7 @@ function copilotTick(c,dt){
   {const g2=pad2Read();if(g2){const a=g2.axes||[],L2=padDead(a[0]||0,a[1]||0);mx+=L2[0];my+=L2[1];if((g2.buttons[0]&&g2.buttons[0].pressed)||(g2.buttons[6]&&(g2.buttons[6].pressed||g2.buttons[6].value>0.3)))wantSh=true;if(g2.buttons[12]&&g2.buttons[12].pressed)my-=1;if(g2.buttons[13]&&g2.buttons[13].pressed)my+=1;if(g2.buttons[14]&&g2.buttons[14].pressed)mx-=1;if(g2.buttons[15]&&g2.buttons[15].pressed)mx+=1;}}   // a second controller   // a thumb on the other device; 2 s of silence counts as let go
   if(stick2.id!==null){const dx=stick2.x-stick2.sx,dy=stick2.y-stick2.sy,m=Math.hypot(dx,dy);if(m>6){const k=Math.min(1,m/44);mx+=dx/m*k;my+=dy/m*k;}}
   const ml=Math.hypot(mx,my);if(ml>1){mx/=ml;my/=ml;}
-  if(ml>0.05){const sp=shipSpeed();c.x+=mx*sp*dt;c.y+=my*sp*dt;c.idle=0;}
+  if(ml>0.05){const sp=p2Speed(c);c.x+=mx*sp*dt;c.y+=my*sp*dt;c.idle=0;}
   else{c.idle+=dt;if(c.idle>(NET.peer?6:3)){const ca=Math.cos(p.ang),sa=Math.sin(p.ang),tx=p.x-10*ca-76*sa,ty=p.y-10*sa+76*ca,k=Math.min(1,2*dt);c.x+=(tx-c.x)*k;c.y+=(ty-c.y)*k;}}   // left alone, P2 drifts back to your side
   if(NET.peer){   // P2 has its own screen on the other device: free to roam, within range of you
     const dx=c.x-p.x,dy=c.y-p.y,d=Math.hypot(dx,dy);if(d>COOP_RANGE){c.x=p.x+dx/d*COOP_RANGE;c.y=p.y+dy/d*COOP_RANGE;}
@@ -2637,7 +2646,7 @@ function copilotTick(c,dt){
   if(c.shOn){c.shT+=dt;if(c.shT>P2_PARRY)c.en-=SHIELD_HOLD_DRAIN*dt;
     if(!wantSh||c.en<=0){c.shOn=false;c.shCd=0.45;if(c.en<=0){c.en=0;c.shBroken=1.8;pop(c.x,c.y-34,'P2 SHIELD DOWN','#f88',0.9);}}}
   else c.en=Math.min(P2_EN,c.en+(c.shBroken>0?9:20)*dt);
-  const mbWas=c.mb;c.mb=Math.min(100,(c.mb||0)+1.5*dt);   // a slow trickle, so the youngest player still gets one
+  const mbWas=c.mb;c.mb=Math.min(100,(c.mb||0)+3*dt);   // a slow trickle, so the youngest player still gets one
   if(mbWas<100&&c.mb>=100){SFX.ultReady();pop(c.x,c.y-44,'P2 MISSILES READY!','#b6ff3a',1.4);}
   // P2 aims and fires by itself: enemies first, then nests, then rocks to mine
   let bt=null,bb=470;for(const e of enemies){const d=dist(e,c);if(d<bb){bb=d;bt=e;}}
@@ -2645,9 +2654,26 @@ function copilotTick(c,dt){
   if(!bt){let rb=340;for(const a of nearRocks){if(a.gone>0)continue;const d=dist(a,c);if(d<rb){rb=d;bt=a;}}}
   const want=bt?Math.atan2(bt.y-c.y,bt.x-c.x):ml>0.1?Math.atan2(my,mx):c.ang;
   let da=want-c.ang;while(da>Math.PI)da-=6.283;while(da<-Math.PI)da+=6.283;c.ang+=da*Math.min(1,14*dt);
-  if(bt&&c.fire<=0&&respawnT<=0&&!c.shOn){c.fire=0.22;const a=c.ang;bullets.push({x:c.x+Math.cos(a)*18,y:c.y+Math.sin(a)*18,vx:Math.cos(a)*900,vy:Math.sin(a)*900,dmg:gunDmg()*ship().dmg*0.8,r:4,life:0.7,mate:c,p2:true});SFX.shoot();c.shots=(c.shots||0)+1;}
+  if(bt&&c.fire<=0&&respawnT<=0&&!c.shOn){c.fire=0.22;const a=c.ang;bullets.push({x:c.x+Math.cos(a)*18,y:c.y+Math.sin(a)*18,vx:Math.cos(a)*900,vy:Math.sin(a)*900,dmg:gunDmg()*ship().dmg,r:4,life:0.7,mate:c,p2:true});SFX.shoot();c.shots=(c.shots||0)+1;}
 }
 let pointerLast=null;   // for the tests: where the last off-screen arrow was drawn
+let coopSidesLast=null,coopActR=0,coopActT=-9;   // for the tests: what drawCoopSides drew; where your buttons end
+function drawCoopSides(){   // co-pilot v2: who flies which ship, and on one tablet which half is whose
+  const p=player;if(!p)return;
+  const sx=VW/2+(p.x-cam.x-cam.px)*cam.zoom,sy=VH/2+(p.y-cam.y-cam.py)*cam.zoom;
+  if(respawnT<=0&&onView(p.x,p.y,-10)){ctx.fillStyle='#4df';ctx.font='bold 13px system-ui';ctx.textAlign='center';glow('#4df',8);ctx.fillText('YOU',sx,sy-34*cam.zoom-10);noGlow();}
+  if(NET.peer||!touchMode){ctx.textAlign='left';coopSidesLast={labels:false};return;}
+  const x=VW*COOP_SPLIT,L=stick.id===null,R=stick2.id===null;
+  ctx.fillStyle='rgba(68,221,255,'+(L?0.06:0.03)+')';ctx.fillRect(0,0,x,VH);
+  ctx.fillStyle='rgba(182,255,58,'+(R?0.06:0.03)+')';ctx.fillRect(x,0,VW-x,VH);
+  ctx.strokeStyle='rgba(230,240,255,.45)';ctx.lineWidth=3;ctx.setLineDash([14,12]);ctx.beginPath();ctx.moveTo(x,VH*0.14);ctx.lineTo(x,VH*0.94);ctx.stroke();ctx.setLineDash([]);
+  const y=VH-28,f=Math.round(Math.min(22,Math.max(15,VW*0.017)));ctx.font='bold '+f+'px system-ui';ctx.textAlign='center';
+  if(time-coopActT>1){coopActT=time;const a=$('act'),r=a&&!a.classList.contains('hide')?a.getBoundingClientRect():null;coopActR=r&&r.width&&r.bottom>innerHeight*0.6?r.right*VW/innerWidth:0;}   // your buttons sit bottom-left: keep the label clear of them
+  const lt='◀ YOU: thumb here flies the BLUE ship',tw=ctx.measureText(lt).width,lx=Math.min(x-tw/2-12,Math.max(x/2,coopActR+14+tw/2));
+  ctx.globalAlpha=L?0.95:0.45;ctx.fillStyle='#4df';glow('#4df',10);ctx.fillText(lt,lx,y);
+  ctx.globalAlpha=R?0.95:0.45;ctx.fillStyle='#b6ff3a';glow('#b6ff3a',10);ctx.fillText('P2: thumb here flies the GREEN ship ▶',x+(VW-x)/2,y);
+  noGlow();ctx.globalAlpha=1;ctx.textAlign='left';coopSidesLast={labels:true,split:Math.round(x),y:Math.round(y)};
+}
 function drawPointer(o,label,col){   // an arrow at the screen's edge, pointing to a ship that's off-screen
   if(!o||onView(o.x,o.y,-24))return;
   const sx=VW/2+(o.x-cam.x-cam.px)*cam.zoom,sy=VH/2+(o.y-cam.y-cam.py)*cam.zoom,dx=sx-VW/2,dy=sy-VH/2,a=Math.atan2(dy,dx);
@@ -3644,10 +3670,10 @@ function drawHUD(){
   if(bannerT>0){ctx.globalAlpha=Math.min(1,bannerT*2);ctx.fillStyle='#fff';ctx.font='bold '+Math.min(38,VW*0.07)+'px system-ui';ctx.textAlign='center';glow('#4df',14);ctx.fillText(banner,VW/2,VH*0.3);noGlow();ctx.globalAlpha=1;ctx.textAlign='left';}
   if(respawnT>0){ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(0,0,VW,VH);ctx.fillStyle='#fff';ctx.font='bold 26px system-ui';ctx.textAlign='center';ctx.fillText('SHIP DOWN',VW/2,VH*0.44);ctx.font='17px system-ui';ctx.fillStyle='#9df';ctx.fillText('Waking up at the station in '+Math.ceil(respawnT)+'...',VW/2,VH*0.44+32);ctx.textAlign='left';}
   // with a co-pilot, a faint line shows where your half ends and P2's begins
-  if(copilot&&!NET.peer&&touchMode&&!ui){ctx.strokeStyle='rgba(255,150,200,.16)';ctx.lineWidth=2;ctx.setLineDash([10,14]);ctx.beginPath();ctx.moveTo(VW*COOP_SPLIT,VH*0.2);ctx.lineTo(VW*COOP_SPLIT,VH*0.8);ctx.stroke();ctx.setLineDash([]);}
-  if(stick2.id!==null&&!ui){ctx.strokeStyle='rgba(255,150,200,.45)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(stick2.sx,stick2.sy,44,0,6.283);ctx.stroke();ctx.fillStyle='rgba(255,150,200,.3)';const dx=stick2.x-stick2.sx,dy=stick2.y-stick2.sy,m=Math.hypot(dx,dy)||1,k=Math.min(44,m);ctx.beginPath();ctx.arc(stick2.sx+dx/m*k,stick2.sy+dy/m*k,20,0,6.283);ctx.fill();}
+  if(copilot&&!ui&&!NET.guest)drawCoopSides();
+  if(stick2.id!==null&&!ui){ctx.strokeStyle='rgba(182,255,58,.7)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(stick2.sx,stick2.sy,44,0,6.283);ctx.stroke();ctx.fillStyle='#b6ff3a';ctx.font='bold 15px system-ui';ctx.textAlign='center';ctx.fillText('P2',stick2.sx,stick2.sy-54);ctx.textAlign='left';ctx.fillStyle='rgba(182,255,58,.4)';const dx=stick2.x-stick2.sx,dy=stick2.y-stick2.sy,m=Math.hypot(dx,dy)||1,k=Math.min(44,m);ctx.beginPath();ctx.arc(stick2.sx+dx/m*k,stick2.sy+dy/m*k,20,0,6.283);ctx.fill();}
   // the floating stick, so you can see what your thumb is doing
-  if(stick.id!==null&&!ui){ctx.strokeStyle='rgba(255,255,255,.3)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(stick.sx,stick.sy,44,0,6.283);ctx.stroke();ctx.fillStyle='rgba(255,255,255,.25)';const dx=stick.x-stick.sx,dy=stick.y-stick.sy,m=Math.hypot(dx,dy)||1,k=Math.min(44,m);ctx.beginPath();ctx.arc(stick.sx+dx/m*k,stick.sy+dy/m*k,20,0,6.283);ctx.fill();}
+  if(stick.id!==null&&!ui){const co=copilot&&!NET.peer;ctx.strokeStyle=co?'rgba(68,221,255,.7)':'rgba(255,255,255,.3)';ctx.lineWidth=co?3:2;ctx.beginPath();ctx.arc(stick.sx,stick.sy,44,0,6.283);ctx.stroke();if(co){ctx.fillStyle='#4df';ctx.font='bold 15px system-ui';ctx.textAlign='center';ctx.fillText('YOU',stick.sx,stick.sy-54);ctx.textAlign='left';}ctx.fillStyle=co?'rgba(68,221,255,.35)':'rgba(255,255,255,.25)';const dx=stick.x-stick.sx,dy=stick.y-stick.sy,m=Math.hypot(dx,dy)||1,k=Math.min(44,m);ctx.beginPath();ctx.arc(stick.sx+dx/m*k,stick.sy+dy/m*k,20,0,6.283);ctx.fill();}
 }
 /* ---------- the home screen: flying through a nebula, with a dogfight going on ---------- */
 let nebula=null,nebulaKey='',titleEnd=0;
