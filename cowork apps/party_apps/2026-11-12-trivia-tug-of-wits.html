@@ -1,0 +1,912 @@
+<!-- CONCEPT: HEAD-TO-HEAD TRIVIA (tug-of-war duel) - "Tug of Wits": two teams share one screen, each with its own answer pad; every question a rotating puller from each team races to tap the right answer - a correct answer hauls the rope 2 (3 if you were faster), a wrong one lets it slip 1 toward the rivals, and dragging the knot into the other team's mud wins the bout; Twist questions (Heave-Ho double pulls, Greased Rope, Quick Draw, Underdog, Tag Team), sudden-death Snap, best-of-1/3/5 bouts, 246 questions in 8 decks, used questions remembered, keyboard keys for laptops, table mode flips the top pad for a phone laid flat, awards | Players: 2-10 in 2 teams | ~10-20 min [style: Comic Panel / sound: Cartoon FX] -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tug of Wits</title>
+<style>
+:root{
+  --bg:#fff8dc; --panel:#ffffff; --ink:#111111; --muted:#4a4a4a;
+  --btn:#c8102e; --btnInk:#ffffff; --hi:#ffd23f; --hiInk:#111111;
+  --teamA:#c8102e; --teamB:#0b5cad; --good:#1e854a; --dot:#f1e2a4;
+  --mud:#6b4423; --rope:#c99a5b;
+  --head:"Bangers","Comic Sans MS","Comic Neue","Chalkboard SE",cursive;
+  --body:"Comic Neue","Comic Sans MS","Chalkboard SE","Trebuchet MS",cursive;
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+body{background-color:var(--bg);background-image:radial-gradient(var(--dot) 1.3px,transparent 1.6px);background-size:11px 11px;color:var(--ink);font-family:var(--body);font-size:clamp(14px,3.6vw,18px)}
+button{font-family:inherit;cursor:pointer;color:var(--ink)}
+.screen{position:absolute;inset:0;display:none}
+.screen.on{display:flex}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- headings ---------- */
+h1,h2,h3{font-family:var(--head);font-weight:900;letter-spacing:1px;margin:0}
+.title{font-size:clamp(44px,13vw,86px);line-height:.95;background:linear-gradient(90deg,var(--teamA),#8a0b52 50%,var(--teamB));-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:1px #111}
+.panel{background:var(--panel);border:4px solid var(--ink);box-shadow:6px 6px 0 var(--ink)}
+.bubble{position:relative;background:#fff;border:3px solid var(--ink);border-radius:18px;padding:8px 14px}
+.bubble::after{content:"";position:absolute;left:28px;bottom:-14px;width:18px;height:14px;background:#fff;border-left:3px solid var(--ink);border-bottom:3px solid var(--ink);transform:skewX(-30deg)}
+
+/* ---------- setup ---------- */
+#setup{overflow-y:auto;justify-content:center;align-items:flex-start;padding:16px 12px 40px}
+.setupWrap{width:min(760px,100%);display:flex;flex-direction:column;gap:16px}
+.hero{padding:16px 18px;text-align:center;transform:rotate(-1deg)}
+.hero p{margin:8px 0 0}
+.meta{display:inline-block;margin-top:10px;background:var(--hi);color:var(--hiInk);border:3px solid var(--ink);padding:4px 12px;font-weight:700}
+.rule{padding:12px 16px}
+.rule b{font-family:var(--head);font-size:1.25em;letter-spacing:1px;font-weight:400}
+.teams{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:560px){.teams{grid-template-columns:1fr}}
+.teamCard{padding:12px}
+.teamCard .th{font-size:1.5em;margin-bottom:6px}
+.teamCard.a .th{color:var(--teamA)} .teamCard.b .th{color:var(--teamB)}
+label.lab{display:block;font-weight:700;margin:6px 0 4px;color:var(--ink)}
+.hint{color:var(--muted);font-size:.85em}
+input[type=text],textarea{width:100%;font-family:var(--body);font-size:16px;color:var(--ink);background:#fff;border:3px solid var(--ink);padding:8px;border-radius:0}
+textarea{min-height:110px;resize:vertical}
+.opts{padding:12px 14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 12px}
+.row .lab{width:100%;margin-bottom:0}
+.tog{min-height:46px;min-width:46px;padding:6px 12px;border:3px solid var(--ink);background:#fff;font-weight:700;font-size:15px;box-shadow:3px 3px 0 var(--ink)}
+.tog[aria-pressed="true"]{background:var(--ink);color:#fff}
+.tog:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.big{min-height:60px;padding:10px 28px;font-family:var(--head);font-size:clamp(26px,7vw,36px);letter-spacing:2px;background:var(--btn);color:var(--btnInk);border:4px solid var(--ink);box-shadow:6px 6px 0 var(--ink)}
+.big:active{transform:translate(3px,3px);box-shadow:3px 3px 0 var(--ink)}
+.big.alt{background:var(--hi);color:var(--hiInk)}
+.err{color:var(--teamA);font-weight:700;min-height:1.2em;text-align:center}
+
+/* ---------- game ---------- */
+#game{flex-direction:column;height:100%}
+#game.land{display:none}
+.stage{flex:1;display:grid;min-height:0;grid-template-rows:minmax(0,1fr) auto minmax(0,1fr);grid-template-columns:minmax(0,1fr);gap:6px;padding:6px}
+.stage>*{min-width:0}
+#padA{grid-row:1} #strip{grid-row:2} #padB{grid-row:3}
+@media (min-aspect-ratio:1/1) and (min-width:700px){
+  .stage{grid-template-rows:auto minmax(0,1fr);grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;padding:10px}
+  #strip{grid-row:1;grid-column:1 / span 2}
+  #padA{grid-row:2;grid-column:1} #padB{grid-row:2;grid-column:2}
+}
+.table #padA{transform:rotate(180deg)}
+@media (min-aspect-ratio:1/1) and (min-width:700px){.table #padA{transform:none}}
+
+.pad{background:var(--panel);border:4px solid var(--ink);display:flex;flex-direction:column;min-height:0;overflow:hidden;position:relative}
+.padHead{display:flex;align-items:center;gap:8px;padding:4px 10px;color:#fff;font-weight:700}
+#padA .padHead{background:var(--teamA)} #padB .padHead{background:var(--teamB)}
+.padHead .tn{font-family:var(--head);font-weight:400;font-size:1.3em;letter-spacing:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.padHead .pl{margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
+.tbar{height:7px;background:#e6e1cc;border-bottom:3px solid var(--ink)}
+.tbar i{display:block;height:100%;width:100%;background:var(--ink);transform-origin:left center}
+.padBody{flex:1;display:flex;flex-direction:column;padding:6px 8px 8px;gap:6px;min-height:0}
+.q{font-weight:700;font-size:clamp(15px,min(4.2vw,2.6vh),26px);line-height:1.2;text-align:center;flex:0 0 auto;padding:0 2px}
+.twistTag{align-self:center;background:var(--hi);color:var(--hiInk);border:2px solid var(--ink);padding:0 8px;font-weight:700;font-size:.8em}
+.ans{flex:1;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:6px;min-height:94px}
+@media (max-height:600px){.padBody{padding:4px 6px 4px;gap:4px}.lockNote,.padBody .twistTag{display:none}.field{height:42px}.ans{min-height:92px}.q{font-size:14px;line-height:1.15}.padHead{padding:2px 10px}#strip{padding:4px 6px;gap:2px}.say{height:40px}}
+.ans button{border:3px solid var(--ink);background:#fff;font-weight:700;font-size:clamp(13px,min(3.8vw,2.3vh),22px);line-height:1.1;padding:4px 6px 4px 30px;position:relative;text-align:left;min-height:44px;box-shadow:3px 3px 0 var(--ink)}
+.ans button .k{position:absolute;left:5px;top:50%;transform:translateY(-50%);width:20px;height:20px;border:2px solid var(--ink);border-radius:50%;font-size:12px;display:flex;align-items:center;justify-content:center;background:var(--hi);color:var(--hiInk)}
+.ans button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.ans button[disabled]{cursor:default;background:#ece7d4;box-shadow:none}
+.ans button.mine{color:#fff;box-shadow:none}
+#padA .ans button.mine{background:var(--teamA)} #padB .ans button.mine{background:var(--teamB)}
+.ans button.right{background:var(--good) !important;color:#fff !important}
+.ans button.wrong{background:var(--ink) !important;color:#fff !important}
+.ans button.mine .k,.ans button.right .k,.ans button.wrong .k{background:#fff;color:#111}
+.padMsg{position:absolute;inset:38px 0 0 0;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px;background:var(--panel);gap:6px}
+.padMsg.on{display:flex}
+.padMsg .bigName{font-family:var(--head);font-size:clamp(28px,8vw,52px);letter-spacing:1px}
+.lockNote{text-align:center;font-weight:700;min-height:1.2em;font-size:.9em}
+
+#strip{background:var(--panel);border:4px solid var(--ink);padding:6px 8px;display:flex;flex-direction:column;gap:4px}
+.stripTop{display:flex;align-items:center;gap:6px;flex-wrap:nowrap}
+.stripTop .info{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.pips{display:flex;gap:3px;align-items:center}
+.pip{width:14px;height:14px;border:2px solid var(--ink);background:#fff}
+.pip.a{background:var(--teamA)} .pip.b{background:var(--teamB)}
+.iconBtn{min-width:44px;min-height:44px;border:3px solid var(--ink);background:#fff;font-size:18px;font-weight:700;padding:0 8px;box-shadow:2px 2px 0 var(--ink)}
+.iconBtn[aria-pressed="true"]{background:var(--ink);color:#fff}
+.field{position:relative;height:clamp(54px,9vh,90px);border:3px solid var(--ink);background:#d9efb4;overflow:hidden}
+.mud{position:absolute;top:0;bottom:0;width:10%;background:var(--mud)}
+.mud.l{left:0;border-right:3px dashed var(--ink)} .mud.r{right:0;border-left:3px dashed var(--ink)}
+.mid{position:absolute;left:50%;top:0;bottom:0;border-left:3px dotted var(--ink)}
+.ropeRig{position:absolute;top:0;bottom:0;left:50%;width:0;transition:left .7s cubic-bezier(.3,1.6,.5,1)}
+.rope{position:absolute;top:50%;left:-60vw;width:120vw;height:10px;margin-top:-5px;background:repeating-linear-gradient(60deg,var(--rope) 0 8px,#8a6232 8px 12px);border:2px solid var(--ink)}
+.knot{position:absolute;top:50%;left:-13px;width:26px;height:26px;margin-top:-13px;background:var(--hi);border:3px solid var(--ink);border-radius:50%}
+.flag{position:absolute;left:-2px;bottom:50%;width:4px;height:42%;background:var(--ink)}
+.flag::after{content:"";position:absolute;left:4px;top:0;width:18px;height:12px;background:var(--hi);border:2px solid var(--ink)}
+.puller{position:absolute;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border:3px solid var(--ink);border-radius:50%;color:#fff;font-family:var(--head);font-size:20px;display:flex;align-items:center;justify-content:center;transition:left .7s cubic-bezier(.3,1.6,.5,1),transform .3s}
+.puller.a{left:16%;background:var(--teamA)} .puller.b{left:84%;background:var(--teamB)}
+.say{height:46px;display:flex;align-items:center;justify-content:center;gap:8px;overflow:hidden}
+.say .bubble{font-weight:700;padding:3px 12px;text-align:center;min-width:0;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+@media (max-width:620px){.say .notes{display:none}}
+.say .bubble::after{display:none}
+.kapow{font-family:var(--head);font-size:1.25em;letter-spacing:1px}
+.kapow.a{color:var(--teamA)} .kapow.b{color:var(--teamB)}
+.nextBtn{min-height:44px;padding:0 14px;border:3px solid var(--ink);background:var(--hi);color:var(--hiInk);font-weight:700;box-shadow:2px 2px 0 var(--ink);white-space:nowrap}
+
+/* ---------- overlays ---------- */
+.ov{position:absolute;inset:0;background:rgba(17,17,17,.55);display:none;align-items:center;justify-content:center;padding:14px;z-index:5}
+.ov.on{display:flex}
+.ovCard{width:min(560px,100%);max-height:100%;overflow-y:auto;padding:18px;text-align:center;display:flex;flex-direction:column;gap:12px;transform:rotate(-1deg)}
+.ovCard h2{font-size:clamp(34px,10vw,60px);line-height:1}
+.ovBtns{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+.score{display:flex;justify-content:center;gap:16px;font-family:var(--head);font-size:clamp(28px,8vw,44px)}
+.score .a{color:var(--teamA)} .score .b{color:var(--teamB)}
+.awards{display:grid;grid-template-columns:1fr;gap:8px;text-align:left}
+.award{border:3px solid var(--ink);padding:6px 10px;background:#fff}
+.award b{font-family:var(--head);font-weight:400;font-size:1.2em;letter-spacing:1px}
+.tableStats{width:100%;border-collapse:collapse;font-size:.9em}
+.tableStats th,.tableStats td{border:2px solid var(--ink);padding:3px 6px}
+.tableStats th{background:var(--hi);color:var(--hiInk)}
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP ============ -->
+<section id="setup" class="screen on" aria-label="Game setup">
+ <div class="setupWrap">
+  <header class="panel hero">
+   <h1 class="title">TUG OF WITS</h1>
+   <p>Trivia tug-of-war! Two teams, one rope. Answer faster and smarter to drag the knot into the other team's mud.</p>
+   <span class="meta">2 teams · 2–10 players · ~10–20 min</span>
+  </header>
+
+  <div class="bubble rule" style="margin-bottom:8px">
+   <b>HOW TO PLAY:</b> Each question, one puller from each team taps an answer on their own pad. Right = haul the rope 2 (3 if you were faster than the rival). Wrong = the rope slips 1 their way. Pull the knot into their mud to win the bout!
+  </div>
+
+  <div class="teams">
+   <div class="panel teamCard a">
+    <h2 class="th">Team 1</h2>
+    <label class="lab" for="nameA">Team name</label>
+    <input type="text" id="nameA" maxlength="16" value="Red Rockets">
+    <label class="lab" for="plA">Players (one per line)</label>
+    <textarea id="plA">Ana
+Ben
+Cleo</textarea>
+   </div>
+   <div class="panel teamCard b">
+    <h2 class="th">Team 2</h2>
+    <label class="lab" for="nameB">Team name</label>
+    <input type="text" id="nameB" maxlength="16" value="Blue Barnacles">
+    <label class="lab" for="plB">Players (one per line)</label>
+    <textarea id="plB">Dev
+Ella
+Finn</textarea>
+   </div>
+  </div>
+
+  <div class="panel opts">
+   <div class="row" id="deckRow"><span class="lab">Question decks</span></div>
+   <div class="row" id="boutRow"><span class="lab">Bouts to play</span></div>
+   <div class="row" id="timeRow"><span class="lab">Seconds per question</span></div>
+   <div class="row">
+    <span class="lab">Screen</span>
+    <button class="tog" id="tableTog" aria-pressed="false">Phone flat on table (flip top pad)</button>
+    <button class="tog" id="muteTog" aria-pressed="false">Sound muted</button>
+   </div>
+   <p class="hint">Laptop keys: Team 1 uses <b>1 2 3 4</b>, Team 2 uses <b>7 8 9 0</b>. Twist questions appear every few rounds. Questions you've seen are saved so the next game feels new.</p>
+  </div>
+  <p class="err" id="err" role="alert"></p>
+  <div style="text-align:center"><button class="big" id="startBtn">PICK UP THE ROPE!</button></div>
+ </div>
+</section>
+
+<!-- ============ GAME ============ -->
+<section id="game" class="screen" aria-label="Tug of Wits game">
+ <div class="stage" id="stage">
+  <div class="pad" id="padA">
+   <div class="padHead"><span class="tn" id="tnA">Team 1</span><span class="pl" id="plNameA"></span></div>
+   <div class="tbar"><i id="tbarA"></i></div>
+   <div class="padBody">
+    <span class="twistTag" id="twA" hidden></span>
+    <div class="q" id="qA"></div>
+    <div class="ans" id="ansA"></div>
+    <div class="lockNote" id="lockA" aria-live="polite"></div>
+   </div>
+   <div class="padMsg" id="msgA"></div>
+  </div>
+
+  <div id="strip">
+   <div class="stripTop">
+    <div class="pips" id="pipsA" aria-hidden="true"></div>
+    <div class="info" id="info">Bout 1</div>
+    <div class="pips" id="pipsB" aria-hidden="true"></div>
+    <button class="iconBtn" id="muteBtn" aria-pressed="false" aria-label="Mute sound">🔊</button>
+    <button class="iconBtn" id="pauseBtn" aria-label="Pause menu">❚❚</button>
+   </div>
+   <div class="field" aria-hidden="true">
+    <div class="mud l"></div><div class="mud r"></div><div class="mid"></div>
+    <div class="ropeRig" id="rig">
+     <div class="rope"></div>
+     <div class="knot"></div><div class="flag"></div>
+    </div>
+    <div class="puller a" id="pullA">R</div>
+    <div class="puller b" id="pullB">B</div>
+   </div>
+   <div class="say" id="say" aria-live="polite"></div>
+  </div>
+
+  <div class="pad" id="padB">
+   <div class="padHead"><span class="tn" id="tnB">Team 2</span><span class="pl" id="plNameB"></span></div>
+   <div class="tbar"><i id="tbarB"></i></div>
+   <div class="padBody">
+    <span class="twistTag" id="twB" hidden></span>
+    <div class="q" id="qB"></div>
+    <div class="ans" id="ansB"></div>
+    <div class="lockNote" id="lockB" aria-live="polite"></div>
+   </div>
+   <div class="padMsg" id="msgB"></div>
+  </div>
+ </div>
+
+ <div class="ov" id="pauseOv" role="dialog" aria-modal="true" aria-labelledby="pauseH">
+  <div class="panel ovCard">
+   <h2 id="pauseH">TIME OUT!</h2>
+   <p>The rope is frozen. Nobody can answer while paused.</p>
+   <div class="ovBtns">
+    <button class="big" id="resumeBtn">RESUME</button>
+    <button class="big alt" id="quitBtn">QUIT TO SETUP</button>
+   </div>
+  </div>
+ </div>
+
+ <div class="ov" id="boutOv" role="dialog" aria-modal="true" aria-labelledby="boutH">
+  <div class="panel ovCard">
+   <h2 id="boutH">SPLAT!</h2>
+   <p id="boutTxt"></p>
+   <div class="score" id="boutScore"></div>
+   <div class="ovBtns"><button class="big" id="nextBoutBtn">NEXT BOUT</button></div>
+  </div>
+ </div>
+
+ <div class="ov" id="finalOv" role="dialog" aria-modal="true" aria-labelledby="finalH">
+  <div class="panel ovCard">
+   <h2 id="finalH">CHAMPIONS!</h2>
+   <p id="finalTxt"></p>
+   <div class="score" id="finalScore"></div>
+   <div class="awards" id="awards"></div>
+   <table class="tableStats" id="stats"></table>
+   <div class="ovBtns">
+    <button class="big" id="rematchBtn">REMATCH</button>
+    <button class="big alt" id="newBtn">NEW GAME</button>
+   </div>
+  </div>
+ </div>
+</section>
+
+<script>
+/* ================= QUESTIONS ================= */
+const DECKS={
+ animals:{name:'Animals',icon:'🐘'}, food:{name:'Food',icon:'🍕'}, science:{name:'Science',icon:'🔬'},
+ geo:{name:'Geography',icon:'🌍'}, space:{name:'Space',icon:'🚀'}, sports:{name:'Sports & Games',icon:'⚽'},
+ words:{name:'Words',icon:'🔤'}, history:{name:'History',icon:'🏛️'}
+};
+const RAW={
+animals:`
+How many legs does a spider have?|8|6|10|12
+What is a baby kangaroo called?|Joey|Cub|Kid|Calf
+Which animal is the tallest in the world?|Giraffe|Elephant|Camel|Moose
+What is the largest animal ever known to have lived?|Blue whale|African elephant|T. rex|Giant squid
+Which bird is famous for copying human speech?|Parrot|Penguin|Owl|Flamingo
+How many hearts does an octopus have?|3|1|2|5
+What do giant pandas mostly eat?|Bamboo|Fish|Berries|Grass seeds
+What is a group of lions called?|A pride|A pack|A herd|A school
+Which mammal can truly fly?|Bat|Flying squirrel|Sugar glider|Lemur
+What colour is a polar bear's skin?|Black|White|Pink|Grey
+What is the fastest land animal?|Cheetah|Lion|Pronghorn|Greyhound
+Which of these is NOT a fish?|Dolphin|Shark|Salmon|Eel
+How many legs does an insect have?|6|8|4|10
+What do caterpillars turn into?|Butterflies or moths|Beetles|Dragonflies|Bees
+A frog starts its life as a…?|Tadpole|Pupa|Nymph|Chick
+Which animal has black and white stripes?|Zebra|Leopard|Giraffe|Hippo
+What is a male deer called?|Stag|Bull|Ram|Boar
+Which bird can't fly but is the fastest runner on two legs?|Ostrich|Penguin|Kiwi|Puffin
+Where do emperor penguins live?|Antarctica|The Arctic|Iceland|Canada
+What does a herbivore eat?|Plants|Meat|Only insects|Fish
+How many arms does a starfish usually have?|5|4|6|8
+Which is the largest living cat?|Tiger|Lion|Jaguar|Leopard
+What is a baby goat called?|Kid|Lamb|Foal|Calf
+Which insect makes honey?|Bee|Wasp|Ant|Butterfly
+Which lizard is famous for changing colour?|Chameleon|Gecko|Iguana|Komodo dragon
+What do you call an animal that is active at night?|Nocturnal|Diurnal|Migratory|Dormant
+Which of these animals lays eggs?|Platypus|Dolphin|Bat|Kangaroo
+An elephant's long nose is called a…?|Trunk|Tusk|Snout|Horn
+Which animal is known for carrying its home on its back?|Snail|Slug|Worm|Beetle
+What is a group of fish swimming together called?|A school|A flock|A gaggle|A troop
+Which animal can sleep standing up?|Horse|Cat|Dog|Rabbit
+`,
+food:`
+Which fruit is dried to make raisins?|Grapes|Plums|Figs|Cherries
+What is the main ingredient in guacamole?|Avocado|Peas|Cucumber|Lime
+Which country is famous for inventing pizza?|Italy|France|Greece|USA
+What is tofu made from?|Soybeans|Rice|Wheat|Coconut
+Which vegetable makes your eyes water when you cut it?|Onion|Carrot|Celery|Potato
+Popcorn is made from which grain?|Corn|Rice|Wheat|Oats
+Which nut is used to make marzipan?|Almond|Peanut|Cashew|Walnut
+What colour is the inside of a kiwi fruit usually?|Green|Orange|Purple|White
+Sushi traditionally comes from which country?|Japan|China|Thailand|Korea
+Which fruit wears its seeds on the outside?|Strawberry|Raspberry|Blueberry|Cherry
+Hot chocolate is made from which beans?|Cocoa beans|Coffee beans|Vanilla beans|Jelly beans
+Which spice is the most expensive by weight?|Saffron|Cinnamon|Pepper|Paprika
+Pasta shaped like little bow ties is called…?|Farfalle|Penne|Fusilli|Rigatoni
+Which spiky fruit is famous for its very strong smell?|Durian|Mango|Pineapple|Papaya
+Hummus is made mainly from which ingredient?|Chickpeas|Lentils|Peas|Rice
+Pickles are usually made from which vegetable?|Cucumber|Zucchini|Carrot|Beetroot
+What makes bread dough rise?|Yeast|Salt|Sugar|Butter
+What is the main ingredient of an omelette?|Eggs|Cheese|Milk|Flour
+Which of these is NOT a type of cheese?|Paprika|Brie|Cheddar|Gouda
+Which orange vegetable grows underground?|Carrot|Pumpkin|Pepper|Corn
+Paella is a famous rice dish from which country?|Spain|Mexico|Italy|India
+Maple syrup comes from the sap of which tree?|Maple|Oak|Pine|Palm
+Which of these is a citrus fruit?|Orange|Apple|Grape|Peach
+What is the main green ingredient in traditional pesto?|Basil|Spinach|Lettuce|Mint
+Which grain is used to make most bread?|Wheat|Rice|Corn|Barley
+Botanically speaking, which of these is a fruit?|Tomato|Carrot|Lettuce|Potato
+What do you call the sweet course at the end of a meal?|Dessert|Starter|Appetiser|Side dish
+Which country grows the most coffee?|Brazil|Colombia|Italy|Canada
+What is the yellow part of an egg called?|Yolk|White|Shell|Albumen
+Which nut grows underground?|Peanut|Walnut|Almond|Hazelnut
+`,
+science:`
+What gas do plants take in from the air?|Carbon dioxide|Oxygen|Helium|Neon
+H2O is better known as…?|Water|Salt|Sugar|Air
+What is the hardest natural substance?|Diamond|Gold|Iron|Quartz
+At what temperature does water freeze in Celsius?|0 °C|10 °C|32 °C|-10 °C
+What force keeps us on the ground?|Gravity|Magnetism|Friction|Static
+How many bones does an adult human have?|206|106|306|156
+Which organ pumps blood around your body?|Heart|Lungs|Liver|Brain
+What do bees collect from flowers to make honey?|Nectar|Sap|Dew|Seeds
+At sea level, water boils at what temperature in Celsius?|100 °C|90 °C|120 °C|212 °C
+Which part of a plant makes food using sunlight?|Leaves|Roots|Bark|Seeds
+What is the largest organ of the human body?|Skin|Liver|Brain|Lungs
+Which three states of matter do we usually learn first?|Solid, liquid, gas|Hot, warm, cold|Rock, water, air|Metal, wood, glass
+Sound travels fastest through which of these?|Steel|Air|Water|Empty space
+What colour do you get mixing blue and yellow paint?|Green|Purple|Orange|Brown
+How many colours are in a rainbow, traditionally?|7|5|6|9
+What is the centre of an atom called?|Nucleus|Electron|Shell|Molecule
+Which metal is liquid at room temperature?|Mercury|Iron|Silver|Aluminium
+What do you call an animal with a backbone?|Vertebrate|Invertebrate|Amphibian|Insect
+What does a thermometer measure?|Temperature|Weight|Speed|Height
+What is the chemical symbol for gold?|Au|Go|Gd|Ag
+Which vitamin does your skin make in sunlight?|Vitamin D|Vitamin C|Vitamin A|Vitamin K
+Which of these does a magnet attract?|Iron|Plastic|Wood|Glass
+Which blood cells fight germs?|White blood cells|Red blood cells|Platelets|Skin cells
+Hot melted rock under the ground is called…?|Magma|Clay|Granite|Quartz
+What kind of energy does a moving object have?|Kinetic|Potential|Chemical|Nuclear
+What is the main gas in the air we breathe?|Nitrogen|Oxygen|Carbon dioxide|Hydrogen
+A seesaw is which simple machine?|Lever|Pulley|Wedge|Screw
+What is a scientist who studies rocks called?|Geologist|Biologist|Astronomer|Botanist
+What does DNA carry?|Genetic instructions|Oxygen|Electricity|Sugar
+How many teeth does an adult usually have?|32|28|24|40
+Which of these is a mammal?|Whale|Shark|Trout|Octopus
+`,
+geo:`
+What is the largest ocean?|Pacific|Atlantic|Indian|Arctic
+What is the longest river in Africa?|Nile|Congo|Niger|Zambezi
+What is the capital of France?|Paris|Lyon|Rome|Madrid
+Mount Everest sits on the border of Nepal and which country?|China|India|Bhutan|Pakistan
+Which is the largest country by area?|Russia|Canada|China|USA
+What is the capital of Japan?|Tokyo|Kyoto|Osaka|Seoul
+What is the largest hot desert in the world?|Sahara|Gobi|Kalahari|Mojave
+How many continents are there?|7|5|6|8
+Which country is shaped like a boot?|Italy|Greece|Spain|Chile
+What is the capital of Australia?|Canberra|Sydney|Melbourne|Perth
+Which country has the most people?|India|China|USA|Brazil
+The Amazon rainforest is mostly in which country?|Brazil|Peru|Colombia|Mexico
+What is the smallest country in the world?|Vatican City|Monaco|Malta|San Marino
+Which US state is a chain of islands in the Pacific?|Hawaii|Alaska|Florida|Maine
+What is the capital of Canada?|Ottawa|Toronto|Vancouver|Montreal
+Which country is home to the pyramids of Giza?|Egypt|Mexico|Peru|Greece
+What is the tallest mountain in Africa?|Kilimanjaro|Mount Kenya|Mont Blanc|Table Mountain
+Rio de Janeiro is a city in which country?|Brazil|Argentina|Spain|Portugal
+What is the largest island in the world?|Greenland|Madagascar|Borneo|Iceland
+Which river flows through London?|Thames|Seine|Danube|Rhine
+Which country has a maple leaf on its flag?|Canada|Japan|Switzerland|Norway
+What is the capital of Egypt?|Cairo|Alexandria|Luxor|Casablanca
+Which is the coldest continent?|Antarctica|Europe|Asia|North America
+What imaginary line splits Earth into northern and southern halves?|The equator|The Prime Meridian|The Arctic Circle|The Date Line
+The Great Barrier Reef lies off the coast of which country?|Australia|Indonesia|Brazil|Japan
+Which city is nicknamed the Big Apple?|New York|Chicago|Los Angeles|Boston
+What is the capital of Spain?|Madrid|Barcelona|Seville|Lisbon
+Kenya is in which continent?|Africa|Asia|South America|Europe
+Which city is famous for canals and gondolas?|Venice|Berlin|Madrid|Vienna
+Which mountain range runs down western South America?|Andes|Alps|Rockies|Himalayas
+What is the capital of Italy?|Rome|Milan|Venice|Naples
+`,
+space:`
+What is the closest star to Earth?|The Sun|Proxima Centauri|Sirius|The North Star
+Which planet is known as the Red Planet?|Mars|Jupiter|Venus|Mercury
+What is the largest planet in our solar system?|Jupiter|Saturn|Neptune|Earth
+How many planets are in our solar system?|8|9|7|10
+Which planet has the most famous rings?|Saturn|Mercury|Mars|Venus
+Who was the first person to walk on the Moon?|Neil Armstrong|Buzz Aldrin|Yuri Gagarin|John Glenn
+Which planet is closest to the Sun?|Mercury|Venus|Mars|Earth
+What is the name of our galaxy?|The Milky Way|Andromeda|Orion|The Big Dipper
+A space rock that lands on Earth is called a…?|Meteorite|Comet|Nebula|Quasar
+Which is the hottest planet?|Venus|Mercury|Mars|Jupiter
+How long does Earth take to travel around the Sun?|About 365 days|About 30 days|About 24 hours|About 100 days
+How long does Earth take to spin around once?|About 24 hours|About 12 hours|About 365 days|About 7 days
+Why does the Moon shine?|It reflects sunlight|It is on fire|Its rocks glow|It has lights
+Who was the first human in space?|Yuri Gagarin|Neil Armstrong|Sally Ride|Alan Shepard
+What is a "shooting star" really?|A meteor|A falling star|A planet|A satellite
+Which planet spins tipped over on its side?|Uranus|Neptune|Mars|Venus
+What is the Sun mostly made of?|Hydrogen|Oxygen|Iron|Carbon
+Which planet has the Great Red Spot storm?|Jupiter|Mars|Saturn|Venus
+Which big space telescope launched in December 2021?|James Webb|Hubble|Kepler|Galileo
+How many moons does Earth have?|1|2|0|3
+Stars that form a picture in the sky are called a…?|Constellation|Galaxy|Nebula|Comet
+What was the first animal to orbit Earth?|Laika the dog|Ham the chimp|A cat|A mouse
+Which planet is farthest from the Sun?|Neptune|Uranus|Saturn|Jupiter
+What pulls on Earth's oceans to make the tides?|Mostly the Moon|The wind|Earth's core|Whales
+Which NASA programme first landed people on the Moon?|Apollo|Gemini|Artemis|Voyager
+A light-year measures…?|Distance|Time|Brightness|Weight
+Which planet is often called the Morning Star?|Venus|Mars|Mercury|Jupiter
+What is at the centre of our solar system?|The Sun|Earth|Jupiter|The Moon
+What shape is a planet's path around the Sun?|An ellipse (oval)|A square|A zigzag|A triangle
+Which world was called a planet until 2006?|Pluto|Ceres|The Moon|Titan
+`,
+sports:`
+How many players does a soccer team have on the field?|11|9|10|12
+In which sport do you score a touchdown?|American football|Basketball|Tennis|Golf
+How many rings are on the Olympic flag?|5|4|6|7
+In tennis, what is a score of zero called?|Love|Nil|Zip|Duck
+Which sport uses a shuttlecock?|Badminton|Squash|Table tennis|Volleyball
+How many squares are on a chessboard?|64|81|100|49
+In chess, which piece moves only diagonally?|Bishop|Rook|Knight|King
+How many points for a basketball shot from beyond the arc?|3|2|4|5
+What colour is the bullseye of an archery target?|Yellow|Red|Blue|Black
+How many holes are in a standard round of golf?|18|9|12|20
+In which sport would you do a slam dunk?|Basketball|Volleyball|Tennis|Baseball
+How many sides does a standard die have?|6|4|8|12
+In bowling, knocking down every pin with your first ball is a…?|Strike|Spare|Split|Gutter
+Which country invented judo?|Japan|China|Korea|Brazil
+Roughly how long is a marathon?|42 km|10 km|21 km|100 km
+In baseball, how many strikes make an out?|3|2|4|5
+Which sport is played at Wimbledon?|Tennis|Cricket|Golf|Rugby
+How often are the Summer Olympics usually held?|Every 4 years|Every year|Every 2 years|Every 10 years
+In which sport do players hit a puck?|Ice hockey|Curling|Lacrosse|Polo
+In checkers, a piece that reaches the far side becomes a…?|King|Queen|Knight|Castle
+How many squares are on a tic-tac-toe board?|9|6|12|16
+Which sport is nicknamed "the beautiful game"?|Soccer|Cricket|Golf|Tennis
+How many players per team are on a basketball court?|5|6|7|4
+Three goals by one player in one game is called a…?|Hat-trick|Triple dip|Grand slam|Home run
+Which sport uses the words birdie, eagle and bogey?|Golf|Cricket|Rugby|Tennis
+Gymnasts balance on a narrow wooden…?|Beam|Plank|Rail|Log
+Usain Bolt is famous for which sport?|Sprinting|Swimming|Boxing|Cycling
+In a relay race, what do runners hand to each other?|A baton|A ball|A flag|A torch
+How many minutes is a regular soccer match?|90|60|80|100
+In rock-paper-scissors, paper beats…?|Rock|Scissors|Paper|Nothing
+In which sport do you try to knock over pins with a ball?|Bowling|Croquet|Billiards|Darts
+`,
+words:`
+What is the plural of "mouse"?|Mice|Mouses|Meese|Mousen
+Which word means the same as "happy"?|Joyful|Gloomy|Angry|Sleepy
+What is the opposite of "ancient"?|Modern|Old|Huge|Broken
+Which of these words is a noun?|Banana|Quickly|Jump|Blue
+How many letters are in the English alphabet?|26|24|25|28
+Which letter is used most often in English?|E|A|T|Z
+A word that reads the same backwards, like "level", is a…?|Palindrome|Anagram|Acronym|Synonym
+Which word is spelled correctly?|Necessary|Neccessary|Necesary|Neccesary
+Which word is an anagram of "listen"?|Silent|Lisp|Stolen|Linen
+Which of these letters is a vowel?|U|B|R|T
+What does "bilingual" mean?|Speaks two languages|Has two jobs|Lives in two homes|Has two pets
+What is the past tense of "run"?|Ran|Runned|Running|Runs
+Which word means "very big"?|Enormous|Tiny|Narrow|Fragile
+Which punctuation mark ends a question?|Question mark|Full stop|Comma|Colon
+"Sea" and "see" sound alike but mean different things. They are…?|Homophones|Antonyms|Synonyms|Adjectives
+Which word is an adjective?|Fluffy|Run|Table|Slowly
+The word "kindergarten" comes from which language?|German|French|Dutch|Spanish
+What is the opposite of "generous"?|Stingy|Kind|Brave|Clever
+How many syllables are in "banana"?|3|2|4|1
+Which word rhymes with "bear"?|Chair|Beer|Bore|Burr
+Which of these words is a verb?|Swim|Purple|Chair|Softly
+A word that sounds like its meaning, like "buzz", is an example of…?|Onomatopoeia|Alliteration|Metaphor|Simile
+Which word has the most letters?|Extraordinary|Fantastic|Wonderful|Brilliant
+"Big", "large" and "huge" are all…?|Synonyms|Antonyms|Homophones|Verbs
+What is the plural of "child"?|Children|Childs|Childes|Childer
+Which letter comes right after Q?|R|P|S|T
+Good, ___, best. What fills the gap?|Better|Gooder|Bestest|Goodest
+A name made from first letters, like NASA, is an…?|Acronym|Palindrome|Pronoun|Idiom
+The "un" in "unhappy" is called a…?|Prefix|Suffix|Root|Vowel
+Which word is the odd one out?|Carrot|Apple|Pear|Plum
+What is the plural of "goose"?|Geese|Gooses|Geeses|Goosen
+`,
+history:`
+Who painted the Mona Lisa?|Leonardo da Vinci|Michelangelo|Picasso|Van Gogh
+Which ancient people built the pyramids of Giza?|Egyptians|Romans|Greeks|Vikings
+Who received the famous 1876 patent for the telephone?|Alexander Graham Bell|Thomas Edison|Isaac Newton|Henry Ford
+In which country did the ancient Olympic Games begin?|Greece|Italy|Egypt|France
+What did the Wright brothers fly in 1903?|An airplane|A rocket|A hot-air balloon|A helicopter
+Which ship sank in 1912 after hitting an iceberg?|Titanic|Mayflower|Santa Maria|Endeavour
+Who was the first President of the United States?|George Washington|Abraham Lincoln|Thomas Jefferson|John Adams
+Which famous wall stretches across northern China?|The Great Wall|Hadrian's Wall|The Berlin Wall|The Western Wall
+What kind of ships did the Vikings sail?|Longships|Galleons|Steamships|Submarines
+Who came up with the theory of relativity?|Albert Einstein|Isaac Newton|Charles Darwin|Galileo
+Who wrote "Romeo and Juliet"?|William Shakespeare|Charles Dickens|Jane Austen|Mark Twain
+Who built a famous printing press in Europe around 1440?|Johannes Gutenberg|Leonardo da Vinci|Benjamin Franklin|James Watt
+Which Roman town was buried by the volcano Vesuvius?|Pompeii|Athens|Troy|Sparta
+In which year did people first land on the Moon?|1969|1959|1979|1989
+Who discovered penicillin?|Alexander Fleming|Marie Curie|Louis Pasteur|Charles Darwin
+The Statue of Liberty was a gift from which country?|France|England|Spain|Italy
+Marie Curie won Nobel Prizes for work on…?|Radioactivity|Electricity|Vaccines|Dinosaurs
+Where did Roman gladiators fight?|The Colosseum|The Parthenon|Stonehenge|The Acropolis
+Who sailed across the Atlantic in 1492 and reached the Americas?|Christopher Columbus|Ferdinand Magellan|James Cook|Marco Polo
+Howard Carter found whose tomb in 1922?|Tutankhamun|Cleopatra|Julius Caesar|Alexander the Great
+Which invention lets us see tiny germs?|Microscope|Telescope|Periscope|Stethoscope
+Which animals did Hannibal famously march over the Alps?|Elephants|Camels|Rhinos|Bears
+What falling fruit supposedly inspired Isaac Newton's ideas about gravity?|An apple|A pear|A banana|A coconut
+Who was known as the Maid of Orléans?|Joan of Arc|Marie Antoinette|Queen Victoria|Cleopatra
+What language did the ancient Romans speak?|Latin|Greek|Italian|French
+Which civilisation built Machu Picchu?|The Inca|The Aztecs|The Romans|The Vikings
+Who was the first woman to fly solo across the Atlantic?|Amelia Earhart|Bessie Coleman|Sally Ride|Harriet Quimby
+What did Benjamin Franklin famously fly in a thunderstorm?|A kite|A balloon|A plane|A flag
+In which city is the bell called Big Ben?|London|Paris|Berlin|Rome
+In which year did the Berlin Wall fall?|1989|1961|1975|1999
+Who invented the World Wide Web?|Tim Berners-Lee|Bill Gates|Steve Jobs|Alan Turing
+`
+};
+const QS=[];
+for(const d in RAW){RAW[d].trim().split('\n').forEach((line,i)=>{const f=line.split('|').map(s=>s.trim());if(f.length===5)QS.push({id:d+i,deck:d,q:f[0],a:f[1],w:f.slice(2)});});}
+
+/* ================= SOUND: Cartoon FX ================= */
+let AC=null,master=null,muted=false,noiseBuf=null;
+function ac(){
+ if(!AC){
+  const C=window.AudioContext||window.webkitAudioContext; if(!C) return null;
+  AC=new C(); const comp=AC.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=4;
+  master=AC.createGain(); master.gain.value=muted?0:0.8; master.connect(comp); comp.connect(AC.destination);
+  noiseBuf=AC.createBuffer(1,AC.sampleRate*0.5,AC.sampleRate); const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+ }
+ if(AC.state==='suspended') AC.resume();
+ return AC;
+}
+function envGain(t,a,peak,rel){const g=AC.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+rel);g.connect(master);return g;}
+function boing(dt=0,f1=200,f2=600,dur=.38,vol=.35){
+ if(!ac()) return; const t=AC.currentTime+dt; const o=AC.createOscillator(); o.type='sine';
+ o.frequency.setValueAtTime(f1,t); o.frequency.exponentialRampToValueAtTime(f2,t+dur*.55); o.frequency.exponentialRampToValueAtTime(f2*.9,t+dur);
+ const l=AC.createOscillator(); l.frequency.value=16; const lg=AC.createGain(); lg.gain.value=f2*.05; l.connect(lg); lg.connect(o.frequency);
+ const g=envGain(t,.012,vol,dur); o.connect(g); o.start(t); l.start(t); o.stop(t+dur+.05); l.stop(t+dur+.05);
+}
+function pop(dt=0,vol=.3,f=900){
+ if(!ac()) return; const t=AC.currentTime+dt;
+ const n=AC.createBufferSource(); n.buffer=noiseBuf; const bp=AC.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1400; bp.Q.value=1.2;
+ const gn=envGain(t,.005,vol*.9,.035); n.connect(bp); bp.connect(gn); n.start(t); n.stop(t+.06);
+ const o=AC.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(f,t); o.frequency.exponentialRampToValueAtTime(f*1.6,t+.04);
+ const go=envGain(t,.005,vol*.7,.04); o.connect(go); o.start(t); o.stop(t+.06);
+}
+function slide(dt=0,f1=400,f2=1200,dur=.45,vol=.25){
+ if(!ac()) return; const t=AC.currentTime+dt; const o=AC.createOscillator(); o.type='sine';
+ o.frequency.setValueAtTime(f1,t); o.frequency.linearRampToValueAtTime(f2,t+dur);
+ const l=AC.createOscillator(); l.frequency.value=6; const lg=AC.createGain(); lg.gain.value=12; l.connect(lg); lg.connect(o.frequency);
+ const g=envGain(t,.02,vol,dur); o.connect(g); o.start(t); l.start(t); o.stop(t+dur+.05); l.stop(t+dur+.05);
+}
+const SFX={
+ tap:()=>pop(0,.28,900),
+ tick:()=>pop(0,.14,600),
+ right:()=>{boing(0,220,660,.34,.33);},
+ wrong:()=>{slide(0,700,220,.5,.24);},
+ pull:()=>{slide(0,300,900,.25,.18);pop(.24,.3,1100);},
+ motif:()=>{boing(0,200,400,.26,.3);boing(.22,300,600,.26,.3);pop(.46,.32,1000);slide(.56,400,1300,.5,.24);},
+ splat:()=>{slide(0,900,160,.6,.26);pop(.55,.4,300);}
+};
+
+/* ================= STATE ================= */
+const $=id=>document.getElementById(id);
+const LS='cowork-tugofwits-';
+const WIN=10, MAXQ=12;
+const TWISTS=[
+ {k:'heave',name:'HEAVE-HO!',desc:'Every pull counts double'},
+ {k:'grease',name:'GREASED ROPE',desc:'A wrong answer slips 3, not 1'},
+ {k:'quick',name:'QUICK DRAW',desc:'Only the first right answer pulls - it pulls 3'},
+ {k:'under',name:'UNDERDOG',desc:'The team losing ground gets +2 for a right answer'},
+ {k:'tag',name:'TAG TEAM',desc:'Two pullers per team - you may whisper together'}
+];
+const CFG={decks:new Set(Object.keys(DECKS)),bouts:3,time:15,table:false};
+let G=null, timerRAF=0, nextTO=0, introTO=0, tickLast=-1;
+
+function loadCfg(){
+ try{const c=JSON.parse(localStorage.getItem(LS+'cfg')||'null'); if(c){
+  if(Array.isArray(c.decks)&&c.decks.length) CFG.decks=new Set(c.decks.filter(d=>DECKS[d]));
+  if([1,3,5].includes(c.bouts)) CFG.bouts=c.bouts; if([10,15,20].includes(c.time)) CFG.time=c.time;
+  CFG.table=!!c.table; muted=!!c.muted;
+  if(c.nameA) $('nameA').value=c.nameA; if(c.nameB) $('nameB').value=c.nameB;
+  if(c.plA) $('plA').value=c.plA; if(c.plB) $('plB').value=c.plB;
+ }}catch(e){}
+}
+function saveCfg(){
+ try{localStorage.setItem(LS+'cfg',JSON.stringify({decks:[...CFG.decks],bouts:CFG.bouts,time:CFG.time,table:CFG.table,muted,
+  nameA:$('nameA').value,nameB:$('nameB').value,plA:$('plA').value,plB:$('plB').value}));}catch(e){}
+}
+function getUsed(){try{return new Set(JSON.parse(localStorage.getItem(LS+'used')||'[]'));}catch(e){return new Set();}}
+function addUsed(id){const u=getUsed();u.add(id);try{localStorage.setItem(LS+'used',JSON.stringify([...u]));}catch(e){}}
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
+
+/* ================= SETUP UI ================= */
+function buildSetup(){
+ const dr=$('deckRow');
+ for(const k in DECKS){const b=document.createElement('button');b.className='tog';b.dataset.deck=k;b.textContent=DECKS[k].icon+' '+DECKS[k].name;
+  b.addEventListener('click',()=>{SFX.tap();if(CFG.decks.has(k)){if(CFG.decks.size>1)CFG.decks.delete(k);}else CFG.decks.add(k);syncSetup();});dr.appendChild(b);}
+ [1,3,5].forEach(n=>{const b=document.createElement('button');b.className='tog';b.dataset.bouts=n;b.textContent=n===1?'1 bout':'Best of '+n;
+  b.addEventListener('click',()=>{SFX.tap();CFG.bouts=n;syncSetup();});$('boutRow').appendChild(b);});
+ [10,15,20].forEach(n=>{const b=document.createElement('button');b.className='tog';b.dataset.time=n;b.textContent=n+' s';
+  b.addEventListener('click',()=>{SFX.tap();CFG.time=n;syncSetup();});$('timeRow').appendChild(b);});
+ $('tableTog').addEventListener('click',()=>{SFX.tap();CFG.table=!CFG.table;syncSetup();});
+ $('muteTog').addEventListener('click',()=>{setMute(!muted);SFX.tap();});
+ $('startBtn').addEventListener('click',startGame);
+}
+function syncSetup(){
+ document.querySelectorAll('[data-deck]').forEach(b=>b.setAttribute('aria-pressed',CFG.decks.has(b.dataset.deck)));
+ document.querySelectorAll('[data-bouts]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.bouts===CFG.bouts));
+ document.querySelectorAll('[data-time]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.time===CFG.time));
+ $('tableTog').setAttribute('aria-pressed',CFG.table);
+ $('muteTog').setAttribute('aria-pressed',muted);
+ saveCfg();
+}
+function setMute(m){
+ muted=m; if(master) master.gain.setTargetAtTime(m?0:0.8,AC.currentTime,.02);
+ $('muteTog').setAttribute('aria-pressed',m);
+ $('muteBtn').setAttribute('aria-pressed',m); $('muteBtn').textContent=m?'🔇':'🔊';
+ saveCfg();
+}
+const parseNames=(txt,fallback)=>{const n=txt.split(/[\n,]/).map(s=>s.trim().slice(0,14)).filter(Boolean);return n.length?n:[fallback];};
+
+/* ================= GAME FLOW ================= */
+function startGame(){
+ ac();
+ const nA=$('nameA').value.trim().slice(0,16)||'Red Rockets', nB=$('nameB').value.trim().slice(0,16)||'Blue Barnacles';
+ const pA=parseNames($('plA').value,'Red puller'), pB=parseNames($('plB').value,'Blue puller');
+ if(nA.toLowerCase()===nB.toLowerCase()){$('err').textContent='Give the two teams different names.';return;}
+ if(pA.length+pB.length>12){$('err').textContent='Up to 10 players works best - trim the lists a little.';}
+ $('err').textContent='';
+ saveCfg();
+ const stats={};
+ [...pA.map(n=>[n,0]),...pB.map(n=>[n,1])].forEach(([n,t])=>{stats[t+':'+n]={name:n,team:t,asked:0,right:0,times:[]};});
+ G={teams:[{name:nA,players:pA},{name:nB,players:pB}],boutsWon:[0,0],bout:0,turn:[0,0],stats,pullsMade:[0,0],need:Math.ceil(CFG.bouts/2),paused:false};
+ $('tnA').textContent=nA; $('tnB').textContent=nB;
+ $('pullA').textContent=nA[0].toUpperCase(); $('pullB').textContent=nB[0].toUpperCase();
+ $('game').classList.toggle('table',CFG.table);
+ show('game'); SFX.motif(); newBout();
+}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));}
+function newBout(){
+ G.bout++; G.rope=0; G.q=0; G.snap=false; G.history=G.history||[]; G.phase='start';
+ ['boutOv','finalOv','pauseOv'].forEach(o=>$(o).classList.remove('on'));
+ drawRope(); drawPips();
+ say(`<span class="bubble">Bout ${G.bout} - grab the rope!</span>`);
+ clearTimeout(nextTO); nextTO=setTimeout(nextQuestion,900);
+}
+function pickQuestion(){
+ const used=getUsed();
+ let pool=QS.filter(q=>CFG.decks.has(q.deck)&&!used.has(q.id)&&!G.history.includes(q.id));
+ if(pool.length<4){ // deck exhausted: forget the used list for these decks
+  const keep=[...used].filter(id=>!QS.some(q=>q.id===id&&CFG.decks.has(q.deck)));
+  try{localStorage.setItem(LS+'used',JSON.stringify(keep));}catch(e){}
+  pool=QS.filter(q=>CFG.decks.has(q.deck)&&!G.history.includes(q.id));
+ }
+ const q=pool[Math.floor(Math.random()*pool.length)];
+ G.history.push(q.id); addUsed(q.id); return q;
+}
+function pullerNames(t){
+ const p=G.teams[t].players, i=G.turn[t]%p.length;
+ if(G.twist&&G.twist.k==='tag'&&p.length>1) return [p[i],p[(i+1)%p.length]];
+ return [p[i]];
+}
+function nextQuestion(){
+ if(!G||G.paused||G.phase==='over') return;
+ G.q++;
+ if(G.q>MAXQ && !G.snap){
+  if(G.rope<0) return boutOver(0,'more ground'); if(G.rope>0) return boutOver(1,'more ground');
+  G.snap=true;
+ }
+ G.twist=null;
+ if(G.snap) G.twist={k:'snap',name:'SUDDEN SNAP',desc:'Dead level! First right answer wins the bout'};
+ else if(G.q>=3 && G.q%3===0) G.twist=TWISTS[Math.floor(Math.random()*TWISTS.length)];
+ G.cur=pickQuestion();
+ G.opts=shuffle([G.cur.a,...G.cur.w]);
+ G.ans=[null,null]; G.phase='intro';
+ G.pullers=[pullerNames(0),pullerNames(1)];
+ $('info').textContent=G.snap?`Bout ${G.bout} · SUDDEN SNAP`:`Bout ${G.bout} · Q${G.q} of ${MAXQ} · ${DECKS[G.cur.deck].name}`;
+ [0,1].forEach(t=>{
+  const s=sfx(t);
+  $('plName'+s).textContent=G.pullers[t].join(' + ');
+  const m=$('msg'+s); m.classList.add('on');
+  m.innerHTML=(G.twist?`<span class="twistTag">${G.twist.name}</span><div>${G.twist.desc}</div>`:'')+
+   `<div>Puller${G.pullers[t].length>1?'s':''} up:</div><div class="bigName">${esc(G.pullers[t].join(' + '))}</div><div class="hint">${DECKS[G.cur.deck].icon} ${DECKS[G.cur.deck].name}</div>`;
+  $('q'+s).textContent=''; $('ans'+s).innerHTML=''; $('lock'+s).textContent='';
+  const tw=$('tw'+s); tw.hidden=!G.twist; tw.textContent=G.twist?G.twist.name+' - '+G.twist.desc:'';
+  $('tbar'+s).style.transform='scaleX(1)';
+ });
+ say(G.twist?`<span class="bubble"><span class="kapow">${G.twist.name}</span> ${G.twist.desc}</span>`:`<span class="bubble">Get ready…</span>`);
+ if(G.twist) boing(0,180,520,.4,.3); else SFX.tick();
+ clearTimeout(introTO); introTO=setTimeout(ask,G.twist?2600:1500);
+}
+function ask(){
+ if(G.paused){G.resumeAsk=true;return;}
+ G.phase='ask';
+ [0,1].forEach(t=>{
+  const s=sfx(t); $('msg'+s).classList.remove('on');
+  $('q'+s).textContent=G.cur.q;
+  const box=$('ans'+s); box.innerHTML='';
+  G.opts.forEach((o,i)=>{
+   const b=document.createElement('button');
+   const key=t===0?['1','2','3','4'][i]:['7','8','9','0'][i];
+   b.innerHTML=`<span class="k" aria-hidden="true">${key}</span>${esc(o)}`;
+   b.addEventListener('click',()=>answer(t,i));
+   box.appendChild(b);
+  });
+ });
+ say(`<span class="bubble">Pull! Tap your answer.</span>`);
+ G.start=performance.now(); G.pausedFor=0; tickLast=-1;
+ cancelAnimationFrame(timerRAF); timerRAF=requestAnimationFrame(tick);
+}
+function tick(){
+ if(!G||G.phase!=='ask') return;
+ timerRAF=requestAnimationFrame(tick);
+ if(G.paused) return;
+ const el=(performance.now()-G.start-G.pausedFor)/1000, left=Math.max(0,CFG.time-el), f=left/CFG.time;
+ ['A','B'].forEach((s,t)=>{ if(!G.ans[t]) $('tbar'+s).style.transform=`scaleX(${f})`; });
+ const sec=Math.ceil(left); if(sec<=3&&sec>0&&sec!==tickLast){tickLast=sec;SFX.tick();}
+ if(left<=0) resolve();
+}
+function answer(t,i){
+ if(!G||G.phase!=='ask'||G.paused||G.ans[t]) return;
+ const time=(performance.now()-G.start-G.pausedFor)/1000;
+ G.ans[t]={i,time,right:G.opts[i]===G.cur.a};
+ SFX.tap();
+ const s=sfx(t), btns=$('ans'+s).querySelectorAll('button');
+ btns.forEach((b,j)=>{b.disabled=true;if(j===i)b.classList.add('mine');});
+ $('lock'+s).textContent=`Locked in at ${time.toFixed(1)} s - waiting for the rivals…`;
+ const o=1-t;
+ if(G.ans[o]) return resolve();
+ if((G.twist&&(G.twist.k==='quick'||G.twist.k==='snap'))&&G.ans[t].right) return resolve();
+}
+function resolve(){
+ if(G.phase!=='ask') return;
+ G.phase='reveal'; cancelAnimationFrame(timerRAF);
+ const A=G.ans, k=G.twist?G.twist.k:'';
+ const rights=[0,1].filter(t=>A[t]&&A[t].right);
+ const first=rights.length===2?(A[0].time<=A[1].time?0:1):(rights.length?rights[0]:-1);
+ let pulls=[0,0]; const notes=[];
+ if(k==='snap'){
+  reveal();
+  if(first>=0){ recordStats(); SFX.right(); G.phase='over'; return setTimeout(()=>boutOver(first,'the Sudden Snap'),1400); }
+  say(`<span class="bubble">Nobody snapped it - another Sudden Snap!</span>`); SFX.wrong(); recordStats();
+  return scheduleNext();
+ }
+ [0,1].forEach(t=>{
+  if(!A[t]) return;
+  if(A[t].right){
+   if(k==='quick'){ if(t===first) pulls[t]+=3; }
+   else{
+    pulls[t]+=2; if(t===first&&!(rights.length===2&&A[0].time===A[1].time)) pulls[t]+=1;
+    if(k==='under'){ const losing=(t===0&&G.rope>0)||(t===1&&G.rope<0); if(losing) pulls[t]+=2; }
+   }
+  } else { pulls[1-t]+=(k==='grease'?3:1); }
+ });
+ if(k==='heave') pulls=pulls.map(p=>p*2);
+ G.pullsMade[0]+=pulls[0]; G.pullsMade[1]+=pulls[1];
+ const net=pulls[1]-pulls[0];
+ G.rope=Math.max(-WIN,Math.min(WIN,G.rope+net));
+ reveal(); recordStats();
+ // commentary
+ const TN=G.teams.map(x=>x.name);
+ [0,1].forEach(t=>{
+  if(!A[t]) notes.push(`${esc(TN[t])}: no answer`);
+  else if(A[t].right) notes.push(`${esc(TN[t])}: ✓ ${A[t].time.toFixed(1)}s`);
+  else notes.push(`${esc(TN[t])}: ✗ slip!`);
+ });
+ let head;
+ if(net===0) head=pulls[0]?`<span class="kapow">STALEMATE!</span>`:`<span class="kapow">WOBBLE…</span>`;
+ else{ const w=net<0?0:1; head=`<span class="kapow ${w?'b':'a'}">${['HEAVE!','YANK!','KAPOW!','WHOOMPH!'][Math.floor(Math.random()*4)]} ${esc(TN[w])} +${Math.abs(net)}</span>`; }
+ say(`<span class="bubble">${head} <span class="hint notes">${notes.join(' · ')}</span></span>`);
+ if(rights.length) SFX.right(); else SFX.wrong();
+ if(net!==0) setTimeout(SFX.pull,250);
+ drawRope(net);
+ if(Math.abs(G.rope)>=WIN){ G.phase='over'; const w=G.rope<0?0:1; return setTimeout(()=>boutOver(w,'the mud'),1300); }
+ scheduleNext();
+}
+function scheduleNext(){
+ const btn=document.createElement('button'); btn.className='nextBtn'; btn.textContent='Next ▶';
+ btn.addEventListener('click',()=>{SFX.tap();clearTimeout(nextTO);nextQuestion();});
+ $('say').appendChild(btn);
+ clearTimeout(nextTO); nextTO=setTimeout(nextQuestion,3600);
+}
+function reveal(){
+ [0,1].forEach(t=>{
+  const s=sfx(t), btns=$('ans'+s).querySelectorAll('button');
+  btns.forEach((b,j)=>{b.disabled=true; if(G.opts[j]===G.cur.a) b.classList.add('right'); else if(G.ans[t]&&G.ans[t].i===j) b.classList.add('wrong');});
+  const a=G.ans[t];
+  $('lock'+s).textContent=!a?`Time's up! Answer: ${G.cur.a}`:a.right?`Correct! (${a.time.toFixed(1)} s)`:`Not quite - it was ${G.cur.a}`;
+  $('tbar'+s).style.transform='scaleX(0)';
+ });
+}
+function recordStats(){
+ [0,1].forEach(t=>{
+  G.pullers[t].forEach(n=>{const st=G.stats[t+':'+n]; if(!st) return; st.asked++; const a=G.ans[t]; if(a&&a.right){st.right++;st.times.push(a.time);} });
+  G.turn[t]+=G.pullers[t].length;
+ });
+}
+function boutOver(w,how){
+ if(!G||G.boutDone===G.bout) return;
+ G.boutDone=G.bout; G.phase='over'; clearTimeout(nextTO); cancelAnimationFrame(timerRAF);
+ G.boutsWon[w]++; drawPips();
+ G.rope=w===0?-WIN:WIN; drawRope(w===0?-1:1);
+ SFX.splat(); setTimeout(SFX.motif,700);
+ const loser=G.teams[1-w].name, winner=G.teams[w].name;
+ if(G.boutsWon[w]>=G.need) return setTimeout(()=>final(w),1100);
+ $('boutH').textContent=how==='the mud'?'SPLAT!':'SNAP!';
+ $('boutH').style.color=w?'var(--teamB)':'var(--teamA)';
+ $('boutTxt').textContent=how==='the mud'?`${winner} dragged ${loser} into the mud!`:how==='more ground'?`Time! ${winner} held more rope after ${MAXQ} questions.`:`${winner} won ${how}!`;
+ $('boutScore').innerHTML=scoreHTML();
+ setTimeout(()=>{$('boutOv').classList.add('on');$('nextBoutBtn').focus();},900);
+}
+function scoreHTML(){return `<span class="a">${esc(G.teams[0].name)} ${G.boutsWon[0]}</span><span>–</span><span class="b">${G.boutsWon[1]} ${esc(G.teams[1].name)}</span>`;}
+function final(w){
+ $('finalH').textContent=G.teams[w].name.toUpperCase()+' WIN!';
+ $('finalH').style.color=w?'var(--teamB)':'var(--teamA)';
+ $('finalTxt').textContent=`${G.teams[w].name} take the match ${G.boutsWon[w]}–${G.boutsWon[1-w]}. Shake hands across the rope!`;
+ $('finalScore').innerHTML=scoreHTML();
+ const st=Object.values(G.stats).filter(s=>s.asked>0);
+ const aw=[];
+ const best=(arr,f)=>arr.length?arr.reduce((a,b)=>f(b)>f(a)?b:a):null;
+ const mvp=best(st,s=>s.right*100-s.asked); if(mvp&&mvp.right) aw.push(['💪 MVP PULLER',`${mvp.name} - ${mvp.right} right answers`]);
+ const quick=best(st.filter(s=>s.times.length>=2),s=>-avg(s.times)); if(quick) aw.push(['⚡ LIGHTNING HANDS',`${quick.name} - right answers in ${avg(quick.times).toFixed(1)} s on average`]);
+ const fast=best(st.filter(s=>s.times.length),s=>-Math.min(...s.times)); if(fast) aw.push(['🏎️ FASTEST GRAB',`${fast.name} - ${Math.min(...fast.times).toFixed(1)} s`]);
+ const anchor=best(st.filter(s=>s.asked>=3),s=>s.right/s.asked); if(anchor) aw.push(['⚓ IRON ANCHOR',`${anchor.name} - ${Math.round(anchor.right/anchor.asked*100)}% accuracy`]);
+ aw.push(['🧶 ROPE HAULED',`${G.teams[0].name} ${G.pullsMade[0]} · ${G.teams[1].name} ${G.pullsMade[1]}`]);
+ $('awards').innerHTML=aw.map(a=>`<div class="award"><b>${a[0]}</b><br>${esc(a[1])}</div>`).join('');
+ $('stats').innerHTML='<tr><th scope="col">Player</th><th scope="col">Team</th><th scope="col">Right</th><th scope="col">Avg s</th></tr>'+
+  Object.values(G.stats).sort((a,b)=>b.right-a.right).map(s=>`<tr><td>${esc(s.name)}</td><td>${esc(G.teams[s.team].name)}</td><td>${s.right}/${s.asked}</td><td>${s.times.length?avg(s.times).toFixed(1):'-'}</td></tr>`).join('');
+ $('finalOv').classList.add('on'); $('rematchBtn').focus();
+}
+const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+
+/* ================= DRAW ================= */
+function drawRope(net){
+ const pos=50+G.rope*4;
+ $('rig').style.left=pos+'%';
+ $('pullA').style.left=Math.max(5,pos-34)+'%'; $('pullB').style.left=Math.min(95,pos+34)+'%';
+ const lean=v=>`rotate(${v}deg)`;
+ $('pullA').style.transform=net<0?lean(-25):''; $('pullB').style.transform=net>0?lean(25):'';
+ if(net) setTimeout(()=>{$('pullA').style.transform='';$('pullB').style.transform='';},650);
+}
+function drawPips(){
+ ['A','B'].forEach((s,t)=>{const p=$('pips'+s);p.innerHTML='';for(let i=0;i<G.need;i++){const d=document.createElement('span');d.className='pip'+(i<G.boutsWon[t]?(t?' b':' a'):'');p.appendChild(d);}});
+}
+function say(html){$('say').innerHTML=html;}
+const sfx=t=>t?'B':'A';
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ================= PAUSE / KEYS ================= */
+function pause(){
+ if(!G||G.phase==='over') return;
+ G.paused=true; G.pauseAt=performance.now(); clearTimeout(nextTO);
+ $('pauseOv').classList.add('on'); $('resumeBtn').focus();
+}
+function resume(){
+ if(!G||!G.paused) return;
+ G.paused=false; G.pausedFor=(G.pausedFor||0)+(performance.now()-G.pauseAt);
+ $('pauseOv').classList.remove('on'); SFX.tap();
+ if(G.resumeAsk){G.resumeAsk=false;ask();}
+ else if(G.phase==='reveal'){clearTimeout(nextTO);nextTO=setTimeout(nextQuestion,1500);}
+}
+$('pauseBtn').addEventListener('click',()=>{SFX.tap();pause();});
+$('resumeBtn').addEventListener('click',resume);
+$('quitBtn').addEventListener('click',()=>{clearTimeout(nextTO);clearTimeout(introTO);cancelAnimationFrame(timerRAF);G=null;$('pauseOv').classList.remove('on');show('setup');});
+$('muteBtn').addEventListener('click',()=>{setMute(!muted);SFX.tap();});
+$('nextBoutBtn').addEventListener('click',()=>{SFX.tap();newBout();});
+$('rematchBtn').addEventListener('click',()=>{SFX.tap();startGame();});
+$('newBtn').addEventListener('click',()=>{SFX.tap();G=null;show('setup');});
+document.addEventListener('keydown',e=>{
+ if(!G||!$('game').classList.contains('on')) return;
+ if(e.key==='Escape'||e.key===' '&&e.target===document.body){ e.preventDefault(); G.paused?resume():pause(); return; }
+ const a=['1','2','3','4'].indexOf(e.key), b=['7','8','9','0'].indexOf(e.key);
+ if(a>=0) answer(0,a); else if(b>=0) answer(1,b);
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&G&&G.phase==='ask'&&!G.paused)pause();});
+
+loadCfg(); buildSetup(); syncSetup(); setMute(muted);
+</script>
+</body>
+</html>
