@@ -1,0 +1,772 @@
+<!-- CONCEPT: DRAWING & VISUAL (bid-down line-budget drawing) - "Line Limit": teams see only a clue's category and difficulty, then take turns bidding DOWN how few straight chalk lines their artist needs ("I can draw that in 4 lines!") until everyone else passes; the lowest bidder's artist peeks at the secret clue and must draw it with exactly that many ruler-straight lines (a drag is always one straight line, never a squiggle) while their team shouts guesses against a 60-second clock - fewer lines bid means more points plus a bonus for every line left unused, a miss lets rival teams steal, twist cards (Compass circles only, Ruler & Compass, Ghost Chalk lines that fade, Short Clock, Double Chalk) shake up rounds, 200 clues in 8 categories remembered across games, a souvenir gallery of every drawing, awards | Players: 3-12 in 2-4 teams | ~15-25 min [style: Chalkboard / sound: Marimba] -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Line Limit</title>
+<style>
+:root{
+  --bg:#1f3a2e; --panel:#2a4a3b; --panel2:#24423a; --text:#f4f1e8; --muted:#c8d5c9;
+  --btn:#ffd166; --btnText:#1b1030; --ink:#1b1030; --sel:#122219;
+  --chalk:#f4f1e8; --line:2px dashed #c8d5c9;
+  --t0:#ffb3c7; --t1:#a8d8ff; --t2:#ffc38a; --t3:#d6c2ff;
+  --gap:clamp(8px,2vw,14px);
+  --font:"Patrick Hand","Comic Sans MS","Chalkboard SE","Comic Neue",cursive;
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none;
+  background:var(--bg);color:var(--text);font-family:var(--font);font-size:clamp(16px,3.6vw,20px)}
+button{font-family:inherit;font-size:inherit;cursor:pointer;min-height:48px;min-width:44px;border-radius:6px;
+  border:2px dashed var(--ink);background:var(--btn);color:var(--btnText);padding:8px 16px;font-weight:700;letter-spacing:.3px}
+button:disabled{cursor:not-allowed;background:#3a4f45;color:#e6ebe6;border-color:#c8d5c9}
+button:active:not(:disabled){transform:translateY(1px) rotate(-.5deg)}
+button:focus-visible,input:focus-visible{outline:3px solid #ffd166;outline-offset:2px}
+.ghost{background:var(--panel);color:var(--text);border:var(--line)}
+.ghost[aria-pressed="true"],.choice[aria-pressed="true"]{background:var(--sel);color:#ffffff;border:2px solid #ffd166}
+.choice{background:var(--panel);color:var(--text);border:var(--line)}
+input[type=text]{font-family:inherit;font-size:inherit;background:var(--panel2);color:var(--text);border:var(--line);
+  border-radius:6px;padding:8px 10px;min-height:46px;width:100%;user-select:text;-webkit-user-select:text}
+#app{height:100%;display:flex;flex-direction:column}
+.topbar{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:var(--line);flex:0 0 auto}
+.brand{font-size:clamp(22px,5vw,30px);font-weight:700;color:#ffd166;margin:0;flex:1;white-space:nowrap;
+  text-decoration:underline wavy #f4f1e8;text-decoration-thickness:2px;text-underline-offset:6px}
+.topbar button{min-height:44px;padding:4px 10px;font-size:clamp(14px,3.4vw,18px)}
+.scores{display:flex;gap:6px;padding:6px 10px;flex:0 0 auto;flex-wrap:wrap}
+.chip{flex:1 1 0;min-width:70px;border-radius:6px;padding:4px 8px;color:var(--ink);font-weight:700;display:flex;
+  justify-content:space-between;gap:6px;border:2px dashed var(--ink);font-size:clamp(14px,3.4vw,19px)}
+.chip .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.turn{outline:3px solid #ffd166;outline-offset:1px}
+.screen{flex:1 1 auto;min-height:0;overflow-y:auto;padding:var(--gap);display:flex;flex-direction:column;gap:var(--gap)}
+.screen[hidden],[hidden]{display:none !important}
+.card{background:var(--panel);border:var(--line);border-radius:6px;padding:clamp(10px,3vw,18px)}
+.card h2,.card h3{margin:0 0 6px;color:#ffd166;font-weight:700}
+.card h2{font-size:clamp(22px,5.4vw,32px)}
+.card h3{font-size:clamp(18px,4.4vw,24px)}
+.muted{color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>button{flex:1 1 auto}
+.big{font-size:clamp(24px,6vw,40px)}
+.hero h1{font-size:clamp(44px,13vw,86px);margin:0;color:#ffd166;line-height:1;
+  text-decoration:underline wavy #f4f1e8;text-decoration-thickness:3px;text-underline-offset:10px}
+.hero p{margin:12px 0 0}
+.meta{color:var(--muted);font-size:clamp(15px,3.6vw,19px)}
+.teamrow{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:center;margin-top:8px}
+.dot{width:26px;height:26px;border-radius:50%;border:2px dashed var(--ink)}
+.primary{font-size:clamp(20px,5vw,28px);min-height:60px}
+.catcard{text-align:center}
+.catcard .cat{font-size:clamp(30px,8vw,54px);color:var(--text);font-weight:700;line-height:1.1}
+.stars{font-size:clamp(22px,5vw,32px);color:#ffd166;letter-spacing:4px}
+.twist{border:2px dashed #ffd166;border-radius:6px;padding:10px;background:var(--panel2)}
+.twist b{color:#ffd166}
+.bidbox{text-align:center}
+.bidnum{font-size:clamp(56px,16vw,110px);font-weight:700;line-height:1;color:#ffd166}
+.stepper{display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0}
+.stepper button{min-width:64px;min-height:64px;font-size:34px;padding:0}
+.stepper output{font-size:clamp(46px,13vw,80px);font-weight:700;min-width:2ch;text-align:center}
+.log{font-size:clamp(15px,3.6vw,18px);color:var(--muted);min-height:1.4em}
+.clueword{font-size:clamp(34px,10vw,70px);font-weight:700;text-align:center;color:var(--text);padding:12px 0;min-height:1.5em}
+.hud{display:flex;gap:8px;align-items:stretch;flex:0 0 auto}
+.hud .box{flex:1;background:var(--panel);border:var(--line);border-radius:6px;padding:4px 8px;text-align:center;min-width:0}
+.hud .lbl{font-size:clamp(13px,3.2vw,16px);color:var(--muted);display:block}
+.hud .val{font-size:clamp(24px,6.5vw,40px);font-weight:700;line-height:1.1}
+.hud .who{font-size:clamp(15px,3.6vw,20px);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.low{color:#ffd166}
+#stage{flex:1 1 auto;min-height:160px;position:relative;border:2px dashed #c8d5c9;border-radius:6px;background:#173126;overflow:hidden}
+#board{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;cursor:crosshair}
+.drawscreen{padding-bottom:max(var(--gap),env(safe-area-inset-bottom))}
+.actions{display:flex;gap:8px;flex:0 0 auto}
+.actions button{flex:1 1 0;padding:6px 8px}
+.tools{display:flex;gap:8px;flex:0 0 auto}
+.tools button{flex:1}
+.thumb{width:100%;max-width:520px;aspect-ratio:4/3;object-fit:contain;background:#173126;border:2px dashed #c8d5c9;border-radius:6px;display:block;margin:0 auto}
+.verdict{font-size:clamp(28px,7vw,46px);font-weight:700;text-align:center;color:#ffd166;margin:0}
+.answer{text-align:center;font-size:clamp(22px,5.4vw,34px)}
+.pts{list-style:none;padding:0;margin:6px 0 0}
+.pts li{padding:3px 0;border-bottom:1px dashed #4f6d5f}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;grid-auto-rows:max-content}
+.gallery figure{margin:0;background:var(--panel2);border:var(--line);border-radius:6px;padding:6px}
+.gallery img{width:100%;aspect-ratio:4/3;object-fit:contain;background:#173126;border-radius:4px;display:block}
+.gallery figcaption{font-size:clamp(14px,3.4vw,17px);margin-top:4px}
+.awards li{margin:4px 0}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.steals{display:flex;flex-direction:column;gap:8px}
+.steals button{color:var(--ink)}
+@media (min-width:760px){
+  .screen{max-width:980px;width:100%;margin:0 auto}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <p class="brand">Line Limit</p>
+    <button id="muteBtn" class="ghost" aria-pressed="false">Sound on</button>
+    <button id="menuBtn" class="ghost">New game</button>
+  </header>
+  <div id="scores" class="scores" aria-label="Scoreboard"></div>
+
+  <!-- SETUP -->
+  <section id="sSetup" class="screen" aria-labelledby="hTitle">
+    <div class="card hero">
+      <h1 id="hTitle">Line Limit</h1>
+      <p>Bid down how few <b>straight chalk lines</b> your artist needs to draw a secret clue. Win the bid, draw it in that many lines, and your team must guess it before the clock runs out.</p>
+      <p class="meta">3–12 players in 2–4 teams · ~15–25 min · one shared screen, host taps the buttons</p>
+    </div>
+    <div class="card">
+      <h3>How a round works</h3>
+      <p class="muted" style="margin:0">1. Everyone sees the category. 2. Teams take turns bidding lower ("we can do it in 5!") or passing. 3. The lowest bidder's artist peeks, then draws: every drag is one straight line. No letters, numbers, talking or pointing. 4. Team guesses out loud. Miss it and the other teams can steal.</p>
+    </div>
+    <div class="card">
+      <h3 id="lblTeams">Teams</h3>
+      <div class="row" role="group" aria-labelledby="lblTeams">
+        <button class="choice" data-teams="2">2 teams</button>
+        <button class="choice" data-teams="3">3 teams</button>
+        <button class="choice" data-teams="4">4 teams</button>
+      </div>
+      <div id="teamNames"></div>
+    </div>
+    <div class="card">
+      <h3 id="lblRounds">Rounds</h3>
+      <div class="row" role="group" aria-labelledby="lblRounds" id="roundBtns"></div>
+      <p class="meta" style="margin:6px 0 0">The last round is always Double Chalk.</p>
+    </div>
+    <button id="startBtn" class="primary">Start the game</button>
+  </section>
+
+  <!-- BID -->
+  <section id="sBid" class="screen" hidden>
+    <div class="card catcard">
+      <div class="meta" id="roundLbl">Round 1 of 8</div>
+      <div class="cat" id="catName">Animals</div>
+      <div class="stars" id="catStars" aria-label="Difficulty">★★☆</div>
+      <div id="twistBox" class="twist" hidden></div>
+    </div>
+    <div class="card bidbox">
+      <div class="meta" id="bidStatus">No bids yet</div>
+      <h2 id="bidTurn">Team turn</h2>
+      <div class="stepper">
+        <button id="bidMinus" aria-label="One line fewer">−</button>
+        <output id="bidChoice" aria-live="polite">8</output>
+        <button id="bidPlus" aria-label="One line more">+</button>
+      </div>
+      <div class="row">
+        <button id="bidPlace">Bid 8 lines</button>
+        <button id="bidPass" class="ghost">Pass</button>
+      </div>
+      <p class="log" id="bidLog" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- PEEK -->
+  <section id="sPeek" class="screen" hidden>
+    <div class="card" style="text-align:center">
+      <h2 id="peekTitle">Artist only!</h2>
+      <p id="peekSub" class="muted">Everyone else look away.</p>
+      <div id="peekWord" class="clueword" aria-live="polite"></div>
+      <button id="peekBtn" class="ghost" aria-pressed="false">Show the clue</button>
+    </div>
+    <div class="card">
+      <p style="margin:0" id="peekRules"></p>
+    </div>
+    <button id="goDraw" class="primary">Start the clock</button>
+  </section>
+
+  <!-- DRAW -->
+  <section id="sDraw" class="screen drawscreen" hidden>
+    <div class="hud">
+      <div class="box"><span class="lbl">Drawing</span><span class="who" id="hudWho">Team</span></div>
+      <div class="box"><span class="lbl">Lines left</span><span class="val" id="hudLines" aria-live="polite">5</span></div>
+      <div class="box"><span class="lbl">Time</span><span class="val" id="hudTime">60</span></div>
+    </div>
+    <div class="tools" id="toolRow" hidden>
+      <button id="toolLine" class="ghost" aria-pressed="true">Ruler line</button>
+      <button id="toolCircle" class="ghost" aria-pressed="false">Compass circle</button>
+    </div>
+    <div id="stage"><canvas id="board" role="img" aria-label="Chalk drawing board: drag to draw one straight line"></canvas></div>
+    <div class="actions">
+      <button id="undoBtn" class="ghost">Rub out last</button>
+      <button id="gotBtn">They got it!</button>
+      <button id="giveBtn" class="ghost">Give up</button>
+    </div>
+  </section>
+
+  <!-- STEAL -->
+  <section id="sSteal" class="screen" hidden>
+    <p class="verdict" id="stealTitle">Time's up!</p>
+    <img id="stealImg" class="thumb" alt="The artist's drawing">
+    <div class="card">
+      <h3>Steal!</h3>
+      <p class="muted" style="margin:0 0 8px">The other teams have 10 seconds to shout one guess each. The artist says who was first and right.</p>
+      <p class="big" id="stealClock" style="margin:0 0 8px;text-align:center">10</p>
+      <div class="steals" id="stealBtns"></div>
+    </div>
+  </section>
+
+  <!-- RESULT -->
+  <section id="sResult" class="screen" hidden>
+    <p class="verdict" id="resTitle">Got it!</p>
+    <img id="resImg" class="thumb" alt="The drawing from this round">
+    <div class="card">
+      <div class="answer">It was: <b id="resAnswer">cat</b></div>
+      <ul class="pts" id="resPts"></ul>
+    </div>
+    <button id="nextBtn" class="primary">Next round</button>
+  </section>
+
+  <!-- FINAL -->
+  <section id="sFinal" class="screen" hidden>
+    <div class="card" style="text-align:center">
+      <h2 id="finTitle">Winner!</h2>
+      <p class="big" id="finSub" style="margin:0"></p>
+    </div>
+    <div class="card">
+      <h3>Awards</h3>
+      <ul class="awards" id="awards"></ul>
+    </div>
+    <div class="card">
+      <h3>The chalkboard gallery</h3>
+      <div class="gallery" id="gallery"></div>
+    </div>
+    <div class="row">
+      <button id="againBtn" class="primary">Play again</button>
+      <button id="setupBtn" class="ghost primary">Change teams</button>
+    </div>
+  </section>
+</div>
+<script>
+'use strict';
+// ---------- CLUES: category -> [easy, medium, hard] ----------
+const CLUES = {
+  'Animals': [
+    ['cat','fish','snake','snail','bird','spider','giraffe','rabbit'],
+    ['elephant','crab','octopus','turtle','penguin','owl','butterfly','kangaroo','bat'],
+    ['jellyfish','peacock','flamingo','camel','seahorse','porcupine','squirrel','swan']],
+  'Food': [
+    ['pizza slice','ice cream cone','apple','banana','carrot','cupcake','hot dog','egg'],
+    ['sandwich','popcorn','pineapple','birthday cake','cherries','taco','lollipop','watermelon','cheese'],
+    ['spaghetti','pretzel','sushi','stack of pancakes','corn on the cob','cookie jar','milkshake']],
+  'Around the House': [
+    ['chair','table','door','bed','lamp','cup','key','clock'],
+    ['ladder','umbrella','toothbrush','scissors','bathtub','staircase','window','light bulb','teapot'],
+    ['vacuum cleaner','washing machine','rocking chair','bookshelf','fork','toaster','coat hanger']],
+  'Places & Buildings': [
+    ['house','castle','tent','bridge','pyramid','fence'],
+    ['lighthouse','igloo','skyscraper','barn','school','windmill','tree house','playground','garage'],
+    ['Eiffel Tower','stadium','airport','swimming pool','zoo','circus tent','haunted house','maze']],
+  'Getting Around': [
+    ['car','boat','rocket','train','bicycle','kite'],
+    ['airplane','sailboat','helicopter','bus','truck','hot air balloon','submarine','skateboard'],
+    ['tractor','ambulance','roller coaster','canoe','escalator','fire engine','motorcycle','traffic light']],
+  'Sports & Games': [
+    ['football','tennis racket','dice','bowling pin','basketball hoop','balloon'],
+    ['goal net','chess board','trophy','skis','golf club','dartboard','boxing glove','medal','bow and arrow'],
+    ['hopscotch','tug of war','jump rope','seesaw','swing set','surfing','ping pong','high jump']],
+  'Nature & Weather': [
+    ['sun','moon','star','tree','flower','mountain','cloud'],
+    ['rainbow','lightning bolt','snowflake','waterfall','cactus','volcano','palm tree','wave','mushroom'],
+    ['tornado','snowman','campfire','leaf','beehive','spider web','puddle','sunset']],
+  'Fantasy & Fun': [
+    ['crown','ghost','robot','heart','sword','magic wand'],
+    ['dragon','wizard hat','treasure chest','mermaid','unicorn','pirate ship','alien','superhero cape','dinosaur'],
+    ['genie lamp','time machine','fairy','monster under the bed','magic carpet','knight','spaceship']]
+};
+const CATS = Object.keys(CLUES);
+const TEAM_COLORS = ['#ffb3c7','#a8d8ff','#ffc38a','#d6c2ff'];
+const TEAM_DEFAULTS = ['Pink Chalk','Blue Chalk','Orange Chalk','Purple Chalk'];
+const TWISTS = [
+  {id:'compass', name:'Compass Only', text:'Every drag draws a CIRCLE (start = centre, drag out = size). No straight lines this round.'},
+  {id:'ruler', name:'Ruler & Compass', text:'Switch between straight lines and circles. Each one still costs a line.'},
+  {id:'ghost', name:'Ghost Chalk', text:'Lines slowly fade away a few seconds after you draw them. Draw fast!'},
+  {id:'short', name:'Short Clock', text:'Only 35 seconds to draw and guess.'},
+  {id:'double', name:'Double Chalk', text:'Every point this round is doubled - steals too.'}
+];
+const START_BID = 12, DRAW_TIME = 60, SHORT_TIME = 35, STEAL_TIME = 10, STEAL_PTS = 3;
+const LS = k => 'cowork-linelimit-' + k;
+
+// ---------- STATE ----------
+let S = null;
+let setup = loadJSON('setup', {teams:2, names:TEAM_DEFAULTS.slice(), rounds:8});
+function loadJSON(k, d){ try{ const v = JSON.parse(localStorage.getItem(LS(k))); return v ?? d; }catch(e){ return d; } }
+function saveJSON(k, v){ try{ localStorage.setItem(LS(k), JSON.stringify(v)); }catch(e){} }
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rnd = n => Math.floor(Math.random()*n);
+
+// ---------- SOUND (Marimba kit: FM, carrier sine + modulator at 4x) ----------
+let AC = null, master = null, muted = loadJSON('muted', false);
+function ac(){
+  if(!AC){
+    const C = window.AudioContext || window.webkitAudioContext; if(!C) return null;
+    AC = new C();
+    const comp = AC.createDynamicsCompressor();
+    comp.threshold.value = -16; comp.ratio.value = 4;
+    master = AC.createGain(); master.gain.value = muted ? 0 : 0.7;
+    master.connect(comp); comp.connect(AC.destination);
+  }
+  if(AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function mar(freq, when=0, dur=0.4, vol=0.4, idx=3){
+  const a = ac(); if(!a) return;
+  const t = a.currentTime + 0.01 + when;
+  const car = a.createOscillator(), mod = a.createOscillator(), mg = a.createGain(), g = a.createGain();
+  car.type = 'sine'; mod.type = 'sine';
+  car.frequency.value = freq; mod.frequency.value = freq*4;
+  mg.gain.setValueAtTime(freq*idx, t);
+  mg.gain.exponentialRampToValueAtTime(Math.max(1, freq*0.02), t + 0.09);
+  mod.connect(mg); mg.connect(car.frequency);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  car.connect(g); g.connect(master);
+  car.start(t); mod.start(t); car.stop(t + dur + 0.05); mod.stop(t + dur + 0.05);
+}
+const SFX = {
+  tap(){ mar(988, 0, 0.14, 0.18, 1.5); },
+  motif(){ [392,523,659,784].forEach((f,i)=>mar(f, i*0.13, 0.45, 0.35)); },
+  bid(n){ mar(300 + n*60, 0, 0.3, 0.35); mar(600 + n*120 > 1200 ? 1200 : 600 + n*120, 0.06, 0.2, 0.15, 2); },
+  pass(){ mar(330, 0, 0.3, 0.3, 1.2); mar(262, 0.12, 0.35, 0.25, 1.2); },
+  line(left){ mar(Math.min(1200, 260 + left*70), 0, 0.28, 0.32, 2.5); },
+  empty(){ mar(220, 0, 0.5, 0.35, 5); },
+  tick(){ mar(1150, 0, 0.07, 0.12, 0.8); },
+  win(){ [523,659,784,1046].forEach((f,i)=>mar(f, i*0.11, i===3?0.8:0.4, 0.38)); },
+  fail(){ mar(392, 0, 0.35, 0.35, 1); mar(294, 0.2, 0.4, 0.33, 1); mar(220, 0.45, 0.7, 0.3, 1); },
+  steal(){ [659,523,784].forEach((f,i)=>mar(f, i*0.08, 0.3, 0.33, 4)); }
+};
+function setMuted(m){
+  muted = m; saveJSON('muted', m);
+  if(master) master.gain.value = m ? 0 : 0.7;
+  const b = $('muteBtn'); b.textContent = m ? 'Sound off' : 'Sound on'; b.setAttribute('aria-pressed', String(m));
+}
+
+// ---------- SCREENS ----------
+const SCREENS = ['sSetup','sBid','sPeek','sDraw','sSteal','sResult','sFinal'];
+function show(id){
+  SCREENS.forEach(s => $(s).hidden = (s !== id));
+  $('scores').hidden = (id === 'sSetup');
+  $(id).scrollTop = 0;
+  if(id === 'sDraw') requestAnimationFrame(sizeBoard);
+}
+function renderScores(turnIdx=-1){
+  if(!S){ $('scores').innerHTML = ''; return; }
+  $('scores').innerHTML = S.teams.map((t,i) =>
+    `<div class="chip${i===turnIdx?' turn':''}" style="background:${t.color}"><span class="nm">${esc(t.name)}</span><span>${t.score}</span></div>`).join('');
+}
+
+// ---------- SETUP ----------
+function renderSetup(){
+  document.querySelectorAll('[data-teams]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.teams === setup.teams)));
+  let h = '';
+  for(let i=0;i<setup.teams;i++){
+    h += `<div class="teamrow"><span class="dot" style="background:${TEAM_COLORS[i]}" aria-hidden="true"></span>
+      <input type="text" id="tn${i}" maxlength="18" aria-label="Team ${i+1} name" value="${esc(setup.names[i] || TEAM_DEFAULTS[i])}"></div>`;
+  }
+  $('teamNames').innerHTML = h;
+  for(let i=0;i<setup.teams;i++) $('tn'+i).addEventListener('input', e => { setup.names[i] = e.target.value; saveJSON('setup', setup); });
+  const opts = [setup.teams*2, setup.teams*3, setup.teams*4];
+  if(!opts.includes(setup.rounds)) setup.rounds = opts[1];
+  $('roundBtns').innerHTML = opts.map(n => `<button class="choice" data-rounds="${n}" aria-pressed="${n===setup.rounds}">${n} rounds</button>`).join('');
+  document.querySelectorAll('[data-rounds]').forEach(b => b.addEventListener('click', () => { SFX.tap(); setup.rounds = +b.dataset.rounds; saveJSON('setup', setup); renderSetup(); }));
+}
+document.querySelectorAll('[data-teams]').forEach(b => b.addEventListener('click', () => {
+  SFX.tap(); setup.teams = +b.dataset.teams; setup.rounds = setup.teams*3; saveJSON('setup', setup); renderSetup();
+}));
+
+function newGame(){
+  const teams = [];
+  for(let i=0;i<setup.teams;i++){
+    const nm = (setup.names[i] || '').trim() || TEAM_DEFAULTS[i];
+    teams.push({name:nm, color:TEAM_COLORS[i], score:0, steals:0, wins:0, bids:[], bestWin:null});
+  }
+  S = {teams, rounds:setup.rounds, round:0, gallery:[], lastTwist:null};
+  SFX.motif();
+  startRound();
+}
+
+// ---------- CLUE PICKING (remembered across games) ----------
+function pickClue(){
+  const used = new Set(loadJSON('used', []));
+  const cat = CATS[rnd(CATS.length)];
+  const lvl = rnd(3);
+  let pool = CLUES[cat][lvl].filter(w => !used.has(cat+'|'+w));
+  if(!pool.length){ // that shelf is used up: forget it and start again
+    CLUES[cat][lvl].forEach(w => used.delete(cat+'|'+w));
+    pool = CLUES[cat][lvl].slice();
+  }
+  const word = pool[rnd(pool.length)];
+  used.add(cat+'|'+word); saveJSON('used', [...used]);
+  return {cat, lvl, word};
+}
+
+// ---------- ROUND / BIDDING ----------
+function startRound(){
+  S.round++;
+  const c = pickClue();
+  let twist = null;
+  if(S.round === S.rounds) twist = TWISTS.find(t => t.id === 'double');
+  else if(S.round > 1 && Math.random() < 0.35){
+    const opts = TWISTS.filter(t => t.id !== 'double' && t.id !== S.lastTwist);
+    twist = opts[rnd(opts.length)];
+  }
+  S.lastTwist = twist ? twist.id : null;
+  const n = S.teams.length;
+  S.cur = {clue:c, twist, opener:(S.round-1) % n, turn:(S.round-1) % n, bid:START_BID+1, holder:-1, out:new Set(), choice:8, log:''};
+  $('roundLbl').textContent = `Round ${S.round} of ${S.rounds}`;
+  $('catName').textContent = c.cat;
+  $('catStars').textContent = '★'.repeat(c.lvl+1) + '☆'.repeat(2-c.lvl);
+  $('catStars').setAttribute('aria-label', ['Easy','Medium','Hard'][c.lvl] + ' difficulty');
+  const tb = $('twistBox');
+  if(twist){ tb.hidden = false; tb.innerHTML = `<b>Twist: ${esc(twist.name)}</b><br>${esc(twist.text)}`; }
+  else tb.hidden = true;
+  renderBid();
+  show('sBid');
+}
+function renderBid(){
+  const B = S.cur, t = S.teams[B.turn];
+  const max = B.holder < 0 ? START_BID : B.bid - 1;
+  B.choice = Math.max(1, Math.min(B.choice, max));
+  $('bidTurn').textContent = `${t.name}: your call`;
+  $('bidTurn').style.color = t.color;
+  $('bidStatus').textContent = B.holder < 0 ? `Open the bidding - ${START_BID} lines or fewer`
+    : `Lowest bid: ${S.teams[B.holder].name} - ${B.bid} line${B.bid>1?'s':''}`;
+  $('bidChoice').textContent = B.choice;
+  $('bidPlace').textContent = `Bid ${B.choice} line${B.choice>1?'s':''}`;
+  $('bidMinus').disabled = B.choice <= 1;
+  $('bidPlus').disabled = B.choice >= max;
+  $('bidPass').disabled = B.holder < 0;
+  $('bidPass').textContent = B.holder < 0 ? 'Pass (first bid must be made)' : 'Pass - let them draw it';
+  $('bidLog').textContent = B.log;
+  renderScores(B.turn);
+}
+function nextBidder(){
+  const B = S.cur, n = S.teams.length;
+  for(let k=1;k<=n;k++){
+    const i = (B.turn + k) % n;
+    if(i !== B.holder && !B.out.has(i)){ B.turn = i; return true; }
+  }
+  return false; // nobody left to challenge the holder
+}
+$('bidMinus').addEventListener('click', () => { SFX.tap(); S.cur.choice--; renderBid(); });
+$('bidPlus').addEventListener('click', () => { SFX.tap(); S.cur.choice++; renderBid(); });
+$('bidPlace').addEventListener('click', () => {
+  const B = S.cur, t = S.teams[B.turn];
+  B.bid = B.choice; B.holder = B.turn;
+  t.bids.push(B.bid);
+  B.log = `${t.name} say: "We can draw that in ${B.bid}!"`;
+  SFX.bid(B.bid);
+  if(B.bid <= 1 || !nextBidder()){ toPeek(); return; }
+  B.choice = B.bid - 1;
+  renderBid();
+});
+$('bidPass').addEventListener('click', () => {
+  const B = S.cur;
+  if(B.holder < 0) return;
+  B.out.add(B.turn);
+  B.log = `${S.teams[B.turn].name} pass.`;
+  SFX.pass();
+  if(!nextBidder()){ toPeek(); return; }
+  renderBid();
+});
+
+// ---------- PEEK ----------
+function toPeek(){
+  const B = S.cur, t = S.teams[B.holder];
+  B.lines = B.bid;
+  $('peekTitle').textContent = `${t.name} artist only!`;
+  $('peekTitle').style.color = t.color;
+  $('peekSub').textContent = `You won the bid at ${B.bid} line${B.bid>1?'s':''}. Everyone else look away while you peek.`;
+  $('peekWord').textContent = '';
+  $('peekBtn').textContent = 'Show the clue';
+  $('peekBtn').setAttribute('aria-pressed','false');
+  const tw = B.twist;
+  let r = `<b>Your tools:</b> ${tw && tw.id==='compass' ? 'circles only' : tw && tw.id==='ruler' ? 'straight lines and circles' : 'straight lines only'} - every drag is one, and it costs one of your ${B.bid}. `;
+  r += `No letters, numbers, talking or pointing. Your team shouts guesses while you draw; you have ${tw && tw.id==='short' ? SHORT_TIME : DRAW_TIME} seconds.`;
+  if(tw) r += ` <b>Twist: ${esc(tw.name)}.</b>`;
+  $('peekRules').innerHTML = r;
+  renderScores(B.holder);
+  show('sPeek');
+}
+$('peekBtn').addEventListener('click', () => {
+  SFX.tap();
+  const on = $('peekBtn').getAttribute('aria-pressed') !== 'true';
+  $('peekBtn').setAttribute('aria-pressed', String(on));
+  $('peekBtn').textContent = on ? 'Hide the clue' : 'Show the clue';
+  $('peekWord').textContent = on ? S.cur.clue.word : '';
+});
+$('goDraw').addEventListener('click', () => { $('peekWord').textContent = ''; startDraw(); });
+
+// ---------- DRAW ----------
+const board = $('board'), ctx = board.getContext('2d');
+let D = null; // drawing state
+function startDraw(){
+  const B = S.cur, tw = B.twist;
+  D = {shapes:[], left:B.bid, used:0, tool: tw && tw.id==='compass' ? 'circle' : 'line',
+       time: tw && tw.id==='short' ? SHORT_TIME : DRAW_TIME, end:0, drag:null, ghost: !!(tw && tw.id==='ghost'),
+       running:true, lastTick:-1};
+  D.end = performance.now() + D.time*1000;
+  $('hudWho').textContent = S.teams[B.holder].name;
+  $('hudWho').style.color = S.teams[B.holder].color;
+  $('toolRow').hidden = !(tw && tw.id==='ruler');
+  setTool(tw && tw.id==='compass' ? 'circle' : 'line');
+  updateHud();
+  show('sDraw');
+  SFX.motif();
+  requestAnimationFrame(loop);
+}
+function setTool(t){
+  if(!D) return;
+  D.tool = t;
+  $('toolLine').setAttribute('aria-pressed', String(t==='line'));
+  $('toolCircle').setAttribute('aria-pressed', String(t==='circle'));
+}
+$('toolLine').addEventListener('click', () => { SFX.tap(); setTool('line'); });
+$('toolCircle').addEventListener('click', () => { SFX.tap(); setTool('circle'); });
+function updateHud(){
+  $('hudLines').textContent = D.left;
+  $('hudLines').className = 'val' + (D.left === 0 ? ' low' : '');
+  $('undoBtn').disabled = !D.shapes.length;
+  const kind = D.tool === 'circle' ? 'circle' : 'straight line';
+  board.setAttribute('aria-label', `Chalk drawing board: drag to draw one ${kind}. ${D.left} left.`);
+}
+function sizeBoard(){
+  const st = $('stage'); if(!st || $('sDraw').hidden) return;
+  const r = st.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(1, Math.round(r.width*dpr)), h = Math.max(1, Math.round(r.height*dpr));
+  if(board.width !== w || board.height !== h){ board.width = w; board.height = h; }
+  paint();
+}
+new ResizeObserver(() => sizeBoard()).observe($('stage'));
+window.addEventListener('resize', sizeBoard);
+
+function pt(e){
+  const r = board.getBoundingClientRect();
+  return {x:(e.clientX - r.left)/r.width, y:(e.clientY - r.top)/r.height, w:r.width, h:r.height};
+}
+board.addEventListener('pointerdown', e => {
+  if(!D || !D.running || D.left <= 0) { if(D && D.running && D.left <= 0) SFX.empty(); return; }
+  e.preventDefault();
+  try{ board.setPointerCapture(e.pointerId); }catch(_){}
+  const p = pt(e);
+  D.drag = {x1:p.x, y1:p.y, x2:p.x, y2:p.y, id:e.pointerId};
+  paint();
+});
+board.addEventListener('pointermove', e => {
+  if(!D || !D.drag || e.pointerId !== D.drag.id) return;
+  const p = pt(e); D.drag.x2 = p.x; D.drag.y2 = p.y; paint();
+});
+function finishDrag(e, cancel){
+  if(!D || !D.drag || e.pointerId !== D.drag.id) return;
+  const p = pt(e), d = D.drag; D.drag = null;
+  if(!cancel){ d.x2 = p.x; d.y2 = p.y; }
+  const len = Math.hypot((d.x2-d.x1)*p.w, (d.y2-d.y1)*p.h);
+  if(!cancel && len >= 10 && D.running && D.left > 0){
+    D.shapes.push({type:D.tool, x1:d.x1, y1:d.y1, x2:d.x2, y2:d.y2, t:performance.now()});
+    D.left--; D.used++;
+    SFX.line(D.left);
+    updateHud();
+  }
+  paint();
+}
+board.addEventListener('pointerup', e => finishDrag(e, false));
+board.addEventListener('pointercancel', e => finishDrag(e, true));
+$('undoBtn').addEventListener('click', () => {
+  if(!D || !D.shapes.length) return;
+  D.shapes.pop(); SFX.pass(); updateHud(); paint(); // rubbing out never gives the line back
+});
+
+function chalkStroke(c, s, W, H, alpha){
+  const lw = Math.max(3, Math.min(W,H)*0.014);
+  c.save();
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.strokeStyle = `rgba(244,241,232,${alpha})`;
+  c.lineWidth = lw;
+  c.beginPath();
+  if(s.type === 'circle'){
+    const cx = s.x1*W, cy = s.y1*H, rr = Math.hypot((s.x2-s.x1)*W, (s.y2-s.y1)*H);
+    c.arc(cx, cy, Math.max(1, rr), 0, Math.PI*2);
+  } else { c.moveTo(s.x1*W, s.y1*H); c.lineTo(s.x2*W, s.y2*H); }
+  c.stroke();
+  // dusty edge
+  c.strokeStyle = `rgba(244,241,232,${alpha*0.25})`;
+  c.lineWidth = lw*1.8;
+  c.stroke();
+  c.restore();
+}
+function drawShapes(c, W, H, shapes, now, ghost){
+  c.fillStyle = '#173126'; c.fillRect(0,0,W,H);
+  for(const s of shapes){
+    let a = 1;
+    if(ghost && now){ const age = (now - s.t)/1000; a = age < 4 ? 1 : Math.max(0.12, 1 - (age-4)/3); }
+    chalkStroke(c, s, W, H, a);
+  }
+}
+function paint(){
+  if(!D) return;
+  const W = board.width, H = board.height;
+  drawShapes(ctx, W, H, D.shapes, performance.now(), D.ghost);
+  if(D.drag){
+    const d = D.drag;
+    ctx.save(); ctx.setLineDash([12,10]); ctx.strokeStyle = '#ffd166'; ctx.lineWidth = Math.max(2, Math.min(W,H)*0.008);
+    ctx.beginPath();
+    if(D.tool === 'circle'){
+      ctx.arc(d.x1*W, d.y1*H, Math.max(1, Math.hypot((d.x2-d.x1)*W,(d.y2-d.y1)*H)), 0, Math.PI*2);
+    } else { ctx.moveTo(d.x1*W, d.y1*H); ctx.lineTo(d.x2*W, d.y2*H); }
+    ctx.stroke(); ctx.restore();
+  }
+  if(D.running && D.left === 0 && !D.drag){
+    const fs = Math.max(14, Math.min(W,H)*0.05);
+    ctx.save(); ctx.fillStyle = '#ffd166'; ctx.font = `700 ${fs}px "Patrick Hand","Comic Sans MS",cursive`;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('Out of chalk - keep guessing!', W - fs*0.5, H - fs*0.4);
+    ctx.restore();
+  }
+}
+function loop(){
+  if(!D || !D.running) return;
+  requestAnimationFrame(loop);
+  try{
+    const now = performance.now();
+    const remain = Math.max(0, (D.end - now)/1000);
+    const secs = Math.ceil(remain);
+    $('hudTime').textContent = secs;
+    $('hudTime').className = 'val' + (secs <= 10 ? ' low' : '');
+    if(secs <= 5 && secs > 0 && secs !== D.lastTick){ D.lastTick = secs; SFX.tick(); }
+    if(D.ghost) paint();
+    if(remain <= 0){ endDraw(false); }
+  }catch(err){ console.error(err); }
+}
+function snapshot(){
+  const off = document.createElement('canvas'); off.width = 480; off.height = 360;
+  const c = off.getContext('2d');
+  // fit the board's aspect into 4:3 without stretching
+  const bw = board.width || 4, bh = board.height || 3, sc = Math.min(480/bw, 360/bh);
+  const w = bw*sc, h = bh*sc;
+  c.fillStyle = '#173126'; c.fillRect(0,0,480,360);
+  c.save(); c.translate((480-w)/2, (360-h)/2);
+  drawShapes(c, w, h, D.shapes, 0, false);
+  c.restore();
+  return off.toDataURL('image/png');
+}
+$('gotBtn').addEventListener('click', () => { if(D && D.running) endDraw(true); });
+$('giveBtn').addEventListener('click', () => { if(D && D.running) endDraw(false); });
+
+function endDraw(success){
+  D.running = false; D.drag = null;
+  const B = S.cur;
+  B.img = snapshot();
+  B.used = D.used;
+  if(success){ score(true, B.holder); return; }
+  SFX.fail();
+  // steal
+  $('stealTitle').textContent = D.end <= performance.now() ? "Time's up!" : 'They gave up!';
+  $('stealImg').src = B.img;
+  const n = S.teams.length;
+  let h = '';
+  for(let i=0;i<n;i++) if(i !== B.holder) h += `<button data-steal="${i}" style="background:${S.teams[i].color}">${esc(S.teams[i].name)} stole it!</button>`;
+  h += `<button data-steal="-1" class="ghost">Nobody got it</button>`;
+  $('stealBtns').innerHTML = h;
+  $('stealBtns').querySelectorAll('[data-steal]').forEach(b => b.addEventListener('click', () => {
+    clearInterval(S.stealTimer);
+    const i = +b.dataset.steal;
+    if(i >= 0) score(false, i); else score(false, -1);
+  }));
+  let t = STEAL_TIME; $('stealClock').textContent = t;
+  clearInterval(S.stealTimer);
+  S.stealTimer = setInterval(() => {
+    t--; $('stealClock').textContent = Math.max(0,t);
+    if(t <= 3 && t > 0) SFX.tick();
+    if(t <= 0){ clearInterval(S.stealTimer); $('stealClock').textContent = "Time! Who got it?"; }
+  }, 1000);
+  renderScores(-1);
+  show('sSteal');
+}
+
+// ---------- SCORING ----------
+function score(success, team){
+  const B = S.cur, mult = B.twist && B.twist.id === 'double' ? 2 : 1;
+  const lines = [];
+  let title, pts = 0;
+  if(success){
+    const base = 14 - B.bid, bonus = B.bid - B.used;
+    pts = (base + bonus) * mult;
+    const t = S.teams[team];
+    t.score += pts; t.wins++;
+    if(t.bestWin === null || B.used < t.bestWin) t.bestWin = B.used;
+    title = `${t.name} got it!`;
+    lines.push(`Winning bid of ${B.bid}: <b>${base}</b> points (14 minus the bid)`);
+    lines.push(`Lines left unused: ${bonus} → <b>+${bonus}</b>`);
+    if(mult > 1) lines.push(`Double Chalk: <b>×2</b>`);
+    lines.push(`<b>${esc(t.name)} +${pts}</b>`);
+    SFX.win();
+  } else if(team >= 0){
+    pts = STEAL_PTS * mult;
+    const t = S.teams[team];
+    t.score += pts; t.steals++;
+    title = `Stolen by ${t.name}!`;
+    lines.push(`${esc(S.teams[B.holder].name)} couldn't land it in ${B.bid} line${B.bid>1?'s':''}.`);
+    lines.push(`<b>${esc(t.name)} +${pts}</b> for the steal${mult>1?' (doubled)':''}`);
+    SFX.steal();
+  } else {
+    title = 'Nobody got it!';
+    lines.push(`${esc(S.teams[B.holder].name)} bid ${B.bid} and the chalk wasn't enough. No points this round.`);
+  }
+  S.gallery.push({img:B.img, word:B.clue.word, team:S.teams[B.holder].name, color:S.teams[B.holder].color, bid:B.bid, used:B.used, ok:success, steal: !success && team >= 0});
+  $('resTitle').textContent = title;
+  $('resImg').src = B.img;
+  $('resAnswer').textContent = B.clue.word;
+  $('resPts').innerHTML = lines.map(l => `<li>${l}</li>`).join('');
+  $('nextBtn').textContent = S.round >= S.rounds ? 'See final results' : 'Next round';
+  renderScores(-1);
+  show('sResult');
+}
+$('nextBtn').addEventListener('click', () => { SFX.tap(); if(S.round >= S.rounds) finish(); else startRound(); });
+
+// ---------- FINAL ----------
+function finish(){
+  const best = S.teams.reduce((m,t) => Math.max(m, t.score), -1);
+  const winners = S.teams.filter(t => t.score === best);
+  $('finTitle').textContent = winners.length > 1 ? "It's a tie!" : `${winners[0].name} win!`;
+  $('finTitle').style.color = winners.length > 1 ? '#ffd166' : winners[0].color;
+  $('finSub').textContent = winners.length > 1 ? `${winners.map(t=>t.name).join(' & ')} share the chalk with ${best} points` : `${best} points`;
+  const aw = [];
+  const ok = S.gallery.filter(g => g.ok);
+  if(ok.length){
+    const m = ok.reduce((a,g) => g.used < a.used ? g : a);
+    aw.push(`<b>Minimalist:</b> ${esc(m.team)} drew "${esc(m.word)}" in just ${m.used} line${m.used===1?'':'s'}`);
+  }
+  const thief = S.teams.reduce((a,t) => t.steals > a.steals ? t : a, {steals:0});
+  if(thief.steals) aw.push(`<b>Chalk Thieves:</b> ${esc(thief.name)} with ${thief.steals} steal${thief.steals>1?'s':''}`);
+  const bold = S.teams.filter(t => t.bids.length).map(t => ({t, low:Math.min(...t.bids)})).sort((a,b) => a.low - b.low)[0];
+  if(bold) aw.push(`<b>Boldest Bid:</b> ${esc(bold.t.name)} went all the way down to ${bold.low}`);
+  const miss = S.gallery.filter(g => !g.ok);
+  if(miss.length) aw.push(`<b>Masterpiece Nobody Got:</b> "${esc(miss[miss.length-1].word)}" by ${esc(miss[miss.length-1].team)}`);
+  if(!aw.length) aw.push('Everyone tried their best!');
+  $('awards').innerHTML = aw.map(a => `<li>${a}</li>`).join('');
+  $('gallery').innerHTML = S.gallery.map(g => `<figure><img src="${g.img}" alt="Drawing of ${esc(g.word)}"><figcaption><b>${esc(g.word)}</b><br>${esc(g.team)} · ${g.used}/${g.bid} lines · ${g.ok ? 'got it' : g.steal ? 'stolen' : 'missed'}</figcaption></figure>`).join('');
+  renderScores(-1);
+  SFX.motif();
+  show('sFinal');
+}
+$('againBtn').addEventListener('click', () => { SFX.tap(); newGame(); });
+$('setupBtn').addEventListener('click', () => { SFX.tap(); goSetup(); });
+
+function goSetup(){
+  if(S && S.stealTimer) clearInterval(S.stealTimer);
+  if(D) D.running = false;
+  S = null; D = null;
+  renderScores(); renderSetup(); show('sSetup');
+}
+$('startBtn').addEventListener('click', () => newGame());
+$('menuBtn').addEventListener('click', () => {
+  SFX.tap();
+  if(S && $('sFinal').hidden && !confirm('Leave this game and go back to setup?')) return;
+  goSetup();
+});
+$('muteBtn').addEventListener('click', () => { setMuted(!muted); if(!muted) SFX.tap(); });
+
+setMuted(muted);
+renderSetup();
+show('sSetup');
+</script>
+</body>
+</html>
