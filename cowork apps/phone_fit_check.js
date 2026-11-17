@@ -56,13 +56,21 @@ function unreachable({ offsetTop, bottom }) {
   const scrollsInside = el => { for (let a = el.parentElement; a && a !== document.documentElement; a = a.parentElement) {
     const o = getComputedStyle(a).overflowY; if ((o === "auto" || o === "scroll") && a.scrollHeight > a.clientHeight + 2) return true; }
     return false; };
+  // ...or it's in a CLOSED panel: a fixed sheet or toast slid down by a transform until it sits wholly
+  // below the screen (17 Nov 2026: four false alarms - closed bottom sheets and a hidden Undo toast).
+  // Only a transform counts: a fixed footer pushed off by a 100vh offset is the real bug and still fails.
+  const parked = el => { for (let a = el; a && a !== document.documentElement; a = a.parentElement) {
+    const s = getComputedStyle(a); if (s.position !== "fixed") continue;
+    let dy = 0; try { dy = s.transform === "none" ? 0 : new DOMMatrix(s.transform).m42; } catch (e) {}
+    return dy > 0 && a.getBoundingClientRect().top + offsetTop >= bottom - 1; }
+    return false; };
   const out = [];
   for (const el of document.querySelectorAll("button, canvas, input, select, textarea, a[href], [role=button]")) {
     const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
     if (!r.width || !r.height || cs.visibility === "hidden" || cs.display === "none" || +cs.opacity === 0) continue;
     if (r.top + offsetTop >= bottom + 400) continue;            // parked far off-screen on purpose (slide-in panels)
     const over = Math.round(r.bottom + offsetTop - bottom);
-    if (over > 4 && !scrollsInside(el)) {
+    if (over > 4 && !scrollsInside(el) && !parked(el)) {
       const label = (el.innerText || el.getAttribute("aria-label") || el.id || el.tagName).replace(/\s+/g, " ").trim().slice(0, 24);
       out.push(`${el.tagName.toLowerCase()} "${label}" ${over}px below the screen`);
     }
