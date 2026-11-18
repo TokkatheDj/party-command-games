@@ -54,6 +54,11 @@ if (require.main === module) (async () => {
   const args = process.argv.slice(2);
   const ai = args.indexOf("--against");
   const against = ai >= 0 ? args.splice(ai, 2)[1] : null;
+  // 18 Nov: a wrapped paste ran the URL as its own command, and the check said "ok" without comparing
+  if (ai >= 0 && !/^https?:\/\//.test(against || "")) {
+    console.error("--against needs the live page's address right after it, on the same line, e.g.\n  --against https://kids-math-play.netlify.app/");
+    process.exit(2);
+  }
   const file = args[0];
   if (!file) { console.error("usage: node page_intact.js <index.html> [--against <live url>]"); process.exit(2); }
   const html = fs.readFileSync(file, "utf8");
