@@ -167,3 +167,6 @@ Build the full app in one pass. Do not produce skeleton code or placeholders.
 - To run Playwright tests: `.\Run-Tests.ps1` from the apps folder
 - Test a single category: `.\Run-Tests.ps1 -Category kids`
 - Test reports open at `test_reports\index.html`
+- QA screenshots go in `test_screens\` (gitignored), never the top level or an app folder:
+  `page.screenshot({ path: 'test_screens/<app>-375.png' })`. On 18 Nov 2026, 160 loose PNGs had
+  piled up at the top level, and loose files there have blocked the Surface's `git pull`.
