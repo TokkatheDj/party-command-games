@@ -16,6 +16,8 @@
  */
 const { chromium } = require("playwright");
 const path = require("path");
+const fs = require("fs");
+const { intactProblems } = require("./page_intact");   // 18 Nov 2026: a cut-off page fails here too
 
 const PAGES = process.argv.slice(2).length ? process.argv.slice(2) : [
   "https://tokkathedj.github.io/party-command-games/cowork%20apps/Educational%20Apps/educational_apps/2026-06-26-guided-math-worksheets.html",
@@ -28,8 +30,14 @@ function toUrl(p) {
 }
 
 async function checkPage(browser, url) {
+  // the page's own text first: is it whole? (28 Oct: a cut-off copy crashed on load)
+  const html = url.startsWith("file:")
+    ? fs.readFileSync(decodeURIComponent(url.replace(/^file:\/\/\//, "")), "utf8")
+    : await (await fetch(url + (url.includes("?") ? "&" : "?") + "v=" + Date.now())).text();
+  const cutOff = intactProblems(html);
+  if (cutOff.length) return { url, ok: false, errors: cutOff.map(p => "page not whole: " + p) };
   const page = await browser.newPage();
-  const errors = [];
+  const errors = [...cutOff.map(p => "page not whole: " + p)];
   page.on("pageerror", e => errors.push(e.message));
   await page.goto(url + (url.includes("?") ? "&" : "?") + "v=" + Date.now(), { waitUntil: "load", timeout: 60000 });
   await page.evaluate(() => { try { localStorage.clear(); } catch (e) {} });
@@ -72,7 +80,7 @@ async function checkPage(browser, url) {
 }
 
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: ["--mute-audio"] });   // never play through the speakers
   const pages = [];
   for (const p of PAGES) {
     const url = toUrl(p);
