@@ -100,6 +100,30 @@ def phone_fit(root):
     return bad
 
 
+NETLIFY_APPS = r"G:\My Drive\Netlify Apps"
+
+
+def netlify_sites():
+    """Every hand-deployed kids' site folder on Drive is whole and not older than its live site
+    (predeploy_check.js, 18 Nov 2026: Carnival Games and Splashy Bubbles had Drive copies four months
+    behind live, so a redeploy would have rolled them back). Needs Google Drive and the logged-in
+    netlify CLI; skips with a log line if Drive isn't there."""
+    if not os.path.isdir(NETLIFY_APPS):
+        log("deploy folders: skipped - %s isn't there (Google Drive not running?)" % NETLIFY_APPS)
+        return []
+    r = subprocess.run([NODE, os.path.join(HERE, "predeploy_check.js"), "--all", NETLIFY_APPS, "--json"], cwd=HERE,
+                       capture_output=True, text=True, encoding="utf-8", timeout=1800, creationflags=NO_WINDOW)
+    try:
+        sites = json.loads(r.stdout[r.stdout.index("{"):])["sites"]
+    except ValueError:
+        log("deploy folder check failed (exit %s): %s" % (r.returncode, (r.stderr or r.stdout)[-300:].strip()))
+        return [{"name": "Deploy folders check", "ok": False, "problems": ["the check itself failed"]}]
+    bad = [{"name": "Deploy folder %s: %s" % (s["name"], s["status"]), "ok": False, "problems": s["problems"]}
+           for s in sites if s["status"] in ("ROLLBACK", "NOT WHOLE", "UNKNOWN")]
+    log("deploy folders: %d sites, %s" % (len(sites), "%d need a look" % len(bad) if bad else "all safe to deploy"))
+    return bad
+
+
 def main():
     root = os.environ.get("ARCADE_ROOT") or os.path.dirname(HERE)      # a throwaway copy, for tests
     args = [NODE, os.path.join(HERE, "arcade_play_check.js"), root] + sys.argv[1:2]
@@ -114,7 +138,7 @@ def main():
         json.dump(result, f, indent=1, ensure_ascii=False)
     bad = [t for t in result["tiles"] if not t["ok"]]
     if not sys.argv[1:2]:
-        bad += blanks_check() + subjects_check() + worksheet_a11y()
+        bad += blanks_check() + subjects_check() + worksheet_a11y() + netlify_sites()
         bad += phone_fit(root)
     log("played %d tiles, %d need a look%s" % (len(result["tiles"]), len(bad),
         (": " + ", ".join(t["name"] for t in bad)) if bad else ""))
