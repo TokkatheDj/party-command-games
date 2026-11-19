@@ -1391,19 +1391,32 @@ function addUlt(n){const was=G.ult>=ULT_COST;G.ult=Math.min(ULT_COST,G.ult+n);if
 /* ---------- game controller: standard layout. A0 B1 X2 Y3 LB4 RB5 LT6 RT7 Back8 Start9 Up12 Down13 Left14 Right15 ---------- */
 const pad={on:false,mx:0,my:0,shield:false,fire:false,aim:false,aimA:0,cur:{x:0,y:0},mode:'bar'};
 let padActive=false,padFocus=null,padRoot=undefined,padLock=false,padRep=0,padLastDir=null,padLastRect=null,padIdx=-1,padPrev=[],padGot=null;
+/* 19 Nov 2026: follow button POSITION, like an Xbox, on every controller. Browsers number buttons by their
+   LABEL, so on a Nintendo-style pad (Switch Pro, Joy-Con, many 8BitDo) the bottom button, printed "B", came
+   in as B. For such a pad, hand the game a view with A<->B and X<->Y swapped: bottom = confirm, right = back.
+   Same rule and the same per-site setting (localStorage amigoPadLayout = nintendo|xbox) as the arcades' pad.js. */
+function padByPos(q){
+  if(!q)return q;
+  let o=null;try{o=localStorage.getItem('amigoPadLayout');}catch(e){}
+  const nin=o==='nintendo'||(o!=='xbox'&&/nintendo|pro controller|switch|joy-?con|057e/i.test(q.id||''));
+  if(!nin)return q;
+  const b=q.buttons.slice();b[0]=q.buttons[1];b[1]=q.buttons[0];b[2]=q.buttons[3];b[3]=q.buttons[2];
+  return {id:q.id,index:q.index,connected:q.connected,mapping:q.mapping,timestamp:q.timestamp,axes:q.axes,buttons:b,
+    vibrationActuator:q.vibrationActuator,hapticActuators:q.hapticActuators};
+}
 function padRead(){
   if(!navigator.getGamepads)return null;
   let list=[];try{list=[...navigator.getGamepads()].filter(q=>q&&q.connected&&q.buttons&&q.buttons.length);}catch(e){return null;}
   if(!list.length)return null;
   const live=list.find(q=>q.buttons.some(b=>b.pressed)); /* Windows can list a phantom controller first, so the one being used wins */
   if(live&&!list.some(q=>q.index===padIdx))padIdx=live.index;   // player 1 keeps the first controller used; another one is player 2
-  return list.find(q=>q.index===padIdx)||list[0];
+  return padByPos(list.find(q=>q.index===padIdx)||list[0]);
 }
 let pad2Prev=[];
 function pad2Read(){   // any controller that isn't player 1's
   if(!navigator.getGamepads||padIdx<0)return null;
   let list=[];try{list=[...navigator.getGamepads()].filter(q=>q&&q.connected&&q.buttons&&q.buttons.length&&q.index!==padIdx);}catch(e){return null;}
-  return list.find(q=>q.buttons.some(b=>b.pressed)||(q.axes||[]).some(a=>Math.abs(a)>0.5))||list[0]||null;
+  return padByPos(list.find(q=>q.buttons.some(b=>b.pressed)||(q.axes||[]).some(a=>Math.abs(a)>0.5))||list[0]||null);
 }
 function pad2Tick(){
   const g=pad2Read();if(!g){pad2Prev=[];return;}

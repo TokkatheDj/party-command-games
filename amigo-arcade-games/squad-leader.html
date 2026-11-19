@@ -170,13 +170,26 @@ function vib(p){padRumble(p);try{if(touchMode&&navigator.vibrate)navigator.vibra
 /* ---------- game controller, standard layout: A0 B1 X2 Y3 LB4 RB5 LT6 RT7 Back8 Start9 Up12 Down13 Left14 Right15 ---------- */
 const pad={on:false,mx:0,my:0,shield:false,rear:false};
 let padActive=false,padFocusI=0,padScreen='',padLock=false,padRep=0,padLastDir=null,padIdx=-1,padPrev=[],padGot=null;
+/* 19 Nov 2026: follow button POSITION, like an Xbox, on every controller. Browsers number buttons by their
+   LABEL, so on a Nintendo-style pad (Switch Pro, Joy-Con, many 8BitDo) the bottom button, printed "B", came
+   in as B. For such a pad, hand the game a view with A<->B and X<->Y swapped: bottom = confirm, right = back.
+   Same rule and the same per-site setting (localStorage amigoPadLayout = nintendo|xbox) as the arcades' pad.js. */
+function padByPos(q){
+  if(!q)return q;
+  let o=null;try{o=localStorage.getItem('amigoPadLayout');}catch(e){}
+  const nin=o==='nintendo'||(o!=='xbox'&&/nintendo|pro controller|switch|joy-?con|057e/i.test(q.id||''));
+  if(!nin)return q;
+  const b=q.buttons.slice();b[0]=q.buttons[1];b[1]=q.buttons[0];b[2]=q.buttons[3];b[3]=q.buttons[2];
+  return {id:q.id,index:q.index,connected:q.connected,mapping:q.mapping,timestamp:q.timestamp,axes:q.axes,buttons:b,
+    vibrationActuator:q.vibrationActuator,hapticActuators:q.hapticActuators};
+}
 function padRead(){
   if(!navigator.getGamepads)return null;
   let list=[];try{list=[...navigator.getGamepads()].filter(q=>q&&q.connected&&q.buttons&&q.buttons.length);}catch(e){return null;}
   if(!list.length)return null;
   const live=list.find(q=>q.buttons.some(b=>b.pressed)); /* Windows can list a phantom controller first, so the one being used wins */
   if(live)padIdx=live.index;
-  return list.find(q=>q.index===padIdx)||list[0];
+  return padByPos(list.find(q=>q.index===padIdx)||list[0]);
 }
 function padDead(x,y){const m=Math.hypot(x,y);if(m<0.22)return [0,0];const k=Math.min(1,(m-0.22)/0.78)/m;return [x*k,y*k];}
 function padRumble(p){
