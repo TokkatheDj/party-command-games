@@ -130,9 +130,11 @@ async function drift(out) {
   const master = sha(fs.readFileSync(MASTER, "utf8"));
   out.drift.push({ copy: "master (cowork apps/pad.js)", sha: master, ok: true });
   for (const [name, url] of Object.entries(COPIES)) {
-    let s = "unreachable";
-    try { const r = await fetch(url + "?v=" + Date.now()); if (r.ok) s = sha(await r.text()); } catch (e) {}
-    out.drift.push({ copy: name, sha: s, ok: s === master });
+    let s = "unreachable", body = "";
+    try { const r = await fetch(url + "?v=" + Date.now()); if (r.ok) { body = await r.text(); s = sha(body); } } catch (e) {}
+    // the Amigo Arcade serves a forwarder (19 Nov 2026) that loads the shared Games Arcade copy
+    const fwd = name === "Amigo Arcade" && s !== "unreachable" && /party-command-games\/cowork%20apps\/pad\.js/.test(body);
+    out.drift.push({ copy: name + (fwd ? " (forwarder to the shared copy)" : ""), sha: s, ok: s === master || fwd });
   }
 }
 
