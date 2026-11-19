@@ -26,6 +26,7 @@ from urllib.parse import unquote
 
 from applock import data_lock
 import mp_relay
+import pad_inject   # game controllers in every app (18 Nov 2026)
 # its own name: do_GET imports parse_qs locally further down, which makes a bare
 # parse_qs a not-yet-assigned local everywhere in that method
 from urllib.parse import parse_qs as mp_parse_qs
@@ -4143,6 +4144,20 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Cache-Control", "public, max-age=86400")
             self.end_headers()
             self.wfile.write(data)
+        elif path == "/pad.js":
+            # Game controllers (pad.js, 18 Nov 2026). .js is not public here (the source tree
+            # is), so this one file gets its own route; see pad_inject.py.
+            try:
+                data = (APPS_DIR / "pad.js").read_bytes()
+            except OSError:
+                self.send_error(404, "Not Found")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(data)
         elif path in ("/icon-192.png", "/icon-512.png"):
             size = 192 if "192" in path else 512
             data = get_icon(size)
@@ -4165,8 +4180,28 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             # Apps change constantly, so never serve one from cache without
             # asking. Last-Modified is still sent, so an unchanged app costs a
             # 304 and no body -- cheap on a LAN, and always correct.
+            if path.lower().endswith(".html") and self._send_app_page():
+                return
             self._no_cache = path.lower().endswith(".html")
             super().do_GET()
+
+    def _send_app_page(self):
+        # Every app page goes out with pad.js added (game controllers, 18 Nov 2026); the file on
+        # disk is untouched. Anything that isn't a plain file goes back to the normal handler.
+        try:
+            f = Path(self.translate_path(self.path))
+            if not f.is_file():
+                return False
+            data = pad_inject.inject(f.read_bytes())
+        except OSError:
+            return False
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(data)
+        return True
 
     @staticmethod
     def _is_public_static(path):
