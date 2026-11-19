@@ -55,7 +55,9 @@ async function gamesArcade(ctx, out) {
   check("A opens the focused game", await pg.evaluate(id => document.getElementById("player").classList.contains("open") && location.hash.includes(id), card));
   const before = await pg.evaluate(() => document.activeElement.dataset.id || document.activeElement.tagName);
   await press(pg, 15);
-  check("menu stays still while a game is open", before === await pg.evaluate(() => document.activeElement.dataset.id || document.activeElement.tagName));
+  const after = await pg.evaluate(() => document.activeElement.dataset.id || document.activeElement.tagName);
+  // the D-pad may move a highlight INSIDE the open game (its own menu, 19 Nov); the arcade's cards must not move
+  check("menu stays still while a game is open", after === before || after === "IFRAME", before + " -> " + after);
   await press(pg, 8); await pg.waitForTimeout(600);
   check("View goes back to All Games", await pg.evaluate(() => !document.getElementById("player").classList.contains("open")));
 

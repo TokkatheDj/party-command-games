@@ -44,7 +44,8 @@
   function keyEvent(type, key) {
     const [code, keyCode] = KEYS[key];
     if (MODE === "relay") { const f = stage(); if (f) f.contentWindow.postMessage({ amigoPad: "key", type, key }, "*"); return; }
-    fireKey(document, type, key, code, keyCode);
+    const ev = fireKey(document, type, key, code, keyCode);
+    if (type === "keydown" && key.startsWith("Arrow") && ev && !ev.defaultPrevented) navFocus(document, key);
   }
 
   function pointerAt(type, x, y) {
@@ -147,16 +148,14 @@
   // pad, swap A<->B and X<->Y. "Auto" goes by the pad's name; the Controller Practice page can set it by
   // hand for a site (localStorage "amigoPadLayout" = "nintendo" | "xbox").
   const NINTENDO = /nintendo|pro controller|switch|joy-?con|057e/i;
-  // Apple devices (iPad, iPhone, and Safari on a Mac) already report buttons by POSITION through Apple's
-  // controller support: there the bottom button IS A, so swapping would flip it back (Lance's iPad, 19 Nov).
-  const APPLE = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
-    || (/Macintosh/.test(navigator.userAgent) && /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent));
+  // NOT an Apple exception: on Lance's iPad (19 Nov, Chrome and Safari) the bottom button also arrives as B
+  // by LABEL, like Windows. An earlier guess that iPads report by position was wrong.
   function nintendoLayout(p) {
     let o = null;
     try { o = localStorage.getItem("amigoPadLayout"); } catch (e) {}
     if (o === "nintendo") return true;
     if (o === "xbox") return false;
-    return !APPLE && NINTENDO.test((p && p.id) || "");
+    return NINTENDO.test((p && p.id) || "");
   }
   const POS = [1, 0, 3, 2];
   let swap = false;
@@ -250,6 +249,52 @@
     }
     const target = doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : doc;
     target.dispatchEvent(ev);
+    return ev;
+  }
+  // D-pad in menus (19 Nov 2026: Candy Math's and Brick Dash's menus ignored the D-pad). When the game didn't
+  // use an arrow key and the middle of the screen isn't a game canvas (so a menu or title screen is showing),
+  // move a highlighted selection to the nearest button that way; A then presses it. Self-contained, because
+  // the receiver inside a student game's locked frame runs the same function.
+  function navFocus(doc, dir) {
+    var W = doc.defaultView, hit = doc.elementFromPoint(W.innerWidth / 2, W.innerHeight / 2);
+    if (hit && hit.tagName === "CANVAS") return;
+    if (!doc.getElementById("amigo-pad-focus-style")) {
+      var st = doc.createElement("style"); st.id = "amigo-pad-focus-style";
+      st.textContent = ".amigo-pad-focus{outline:4px solid #ffcc33 !important;outline-offset:3px !important;box-shadow:0 0 0 8px rgba(20,26,51,.55) !important}";
+      (doc.head || doc.documentElement).appendChild(st);
+    }
+    var all = [].slice.call(doc.querySelectorAll("button,a[href],[role=button],input[type=button],input[type=submit],select")).filter(function (e) {
+      var r = e.getBoundingClientRect(), cs = W.getComputedStyle(e);
+      return r.width > 4 && r.height > 4 && !e.disabled && cs.visibility !== "hidden" && cs.display !== "none" && r.bottom > 0 && r.top < W.innerHeight && r.right > 0 && r.left < W.innerWidth
+        && doc.elementFromPoint(Math.min(W.innerWidth - 1, Math.max(0, r.left + r.width / 2)), Math.min(W.innerHeight - 1, Math.max(0, r.top + r.height / 2))) !== null;
+    });
+    if (!all.length) return;
+    var now = all.indexOf(doc.activeElement) >= 0 ? doc.activeElement : null, best = null;
+    if (!now) {
+      // first press: a Start / Play button if there is one, else the button nearest the middle of the screen
+      var lbl = function (e) { return (e.innerText || e.value || e.getAttribute("aria-label") || "").trim(); };
+      best = all.filter(function (e) { return /^\W*(start|play|begin|go\b|let'?s|new game|ready)/i.test(lbl(e)); })[0] || all.slice().sort(function (x, y) {
+        var rx = x.getBoundingClientRect(), ry = y.getBoundingClientRect(), cx = W.innerWidth / 2, cy = W.innerHeight / 2;
+        return Math.hypot(rx.left + rx.width / 2 - cx, rx.top + rx.height / 2 - cy) - Math.hypot(ry.left + ry.width / 2 - cx, ry.top + ry.height / 2 - cy);
+      })[0];
+    }
+    else {
+      var a = now.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2, bestD = Infinity;
+      all.forEach(function (e) {
+        if (e === now) return;
+        var b = e.getBoundingClientRect(), dx = b.left + b.width / 2 - ax, dy = b.top + b.height / 2 - ay;
+        var along = { ArrowRight: dx, ArrowLeft: -dx, ArrowDown: dy, ArrowUp: -dy }[dir];
+        var across = dir === "ArrowLeft" || dir === "ArrowRight" ? Math.abs(dy) : Math.abs(dx);
+        if (along <= 2) return;
+        var d = along + across * 2;
+        if (d < bestD) { bestD = d; best = e; }
+      });
+    }
+    if (!best) best = now;   // nowhere further that way: keep (and show) the current one
+    if (!best) return;
+    var old = doc.querySelector(".amigo-pad-focus"); if (old) old.classList.remove("amigo-pad-focus");
+    best.classList.add("amigo-pad-focus");
+    try { best.focus({ preventScroll: true }); } catch (e) { best.focus(); }
   }
   function firePointer(doc, type, x, y) {
     const el = doc.elementFromPoint(x, y); if (!el) return;
@@ -269,7 +314,7 @@
   const receiver = `<script>(function(){
   if (window.__amigoPadIn) return; window.__amigoPadIn = 1;
   var C = ${JSON.stringify(KEYS)};
-  var fireKey = ${fireKey.toString()}, firePointer = ${firePointer.toString()};
+  var fireKey = ${fireKey.toString()}, firePointer = ${firePointer.toString()}, navFocus = ${navFocus.toString()};
   var real = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : null, told = false;
   if (real) try { navigator.getGamepads = function () { var l = real();
     for (var i = 0; i < l.length; i++) if (l[i] && l[i].connected && !told) { told = true; parent.postMessage({ amigoPad: "own" }, "*"); }
@@ -277,7 +322,13 @@
   addEventListener("message", function (e) {
     if (e.source !== parent || !e.data || !e.data.amigoPad) return;
     var d = e.data;
-    if (d.amigoPad === "key" && C[d.key]) fireKey(document, d.type === "keyup" ? "keyup" : "keydown", d.key, C[d.key][0], C[d.key][1]);
+    if (d.amigoPad === "key" && C[d.key]) {
+      var ev = fireKey(document, d.type === "keyup" ? "keyup" : "keydown", d.key, C[d.key][0], C[d.key][1]);
+      if (d.type === "keydown" && ev && !ev.defaultPrevented) {
+        if (/^Arrow/.test(d.key)) navFocus(document, d.key);
+        else if ((d.key === " " || d.key === "Enter") && document.activeElement && /^(BUTTON|A|SUMMARY)$/.test(document.activeElement.tagName)) document.activeElement.click();
+      }
+    }
     else if (d.amigoPad === "ptr" && /^pointer(down|move|up)$/.test(d.type)) firePointer(document, d.type, +d.x, +d.y);
   });
 })();<\/script>`;
