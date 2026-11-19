@@ -11,7 +11,12 @@
  *     controllers itself, which is fine);
  *   - Amigo Arcade: front page, the built-in games, and one student game through play.html's
  *     locked frame;
- *   - drift: every copy of pad.js matches the master (cowork apps/pad.js).
+ *   - drift: every copy of pad.js matches the master (cowork apps/pad.js);
+ *   - Lance's own setup (added 19 Nov 2026, after the buttons flipped three times in one day): an
+ *     iPad in Chrome with a "Pro Controller Extended Gamepad", which reports its bottom button as
+ *     B (raw 1). The bottom button must still be A (confirm) everywhere, the D-pad must move a
+ *     highlight through game menus, Candy Math must fill the Games Arcade frame, and Squad Leader
+ *     and Frontier must fire the laser with A.
  *
  *   node controller_check.js            prints JSON, exit 1 if anything needs a look
  * Run weekly by arcade_weekly.py. Muted browser; no clicks outside the simulated controller.
@@ -128,6 +133,86 @@ async function amigoArcade(ctx, out) {
   await pg.close();
 }
 
+// ---- Lance's iPad + Nintendo-layout controller (19 Nov 2026) ----
+const IPAD_UA = "Mozilla/5.0 (iPad; CPU OS 27_2_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/156.0.8078.54 Mobile/15E148 Safari/604.1";
+const PRO_ID = "Pro Controller Extended Gamepad";
+const BOTTOM = 1;   // on this controller the bottom button arrives as raw button 1 (it is printed B)
+const FAKE_PRO = id => {
+  Object.defineProperty(navigator, "maxTouchPoints", { get: () => 5 });
+  window.__pad = { buttons: new Array(17).fill(0), axes: [0, 0, 0, 0] };
+  navigator.getGamepads = () => [{ index: 0, id, connected: true, mapping: "standard", timestamp: performance.now(),
+    buttons: __pad.buttons.map(v => ({ pressed: v > 0.5, touched: v > 0, value: v })), axes: __pad.axes.slice() }];
+  try { speechSynthesis.speak = () => {}; } catch (e) {}
+  try { HTMLMediaElement.prototype.play = function () { return Promise.resolve(); }; } catch (e) {}
+  // the iPad fault Candy Math tripped over: inside a frame, visualViewport can report 0
+  if (window.self !== window.top && window.visualViewport) try { Object.defineProperty(visualViewport, "height", { get: () => 0 }); } catch (e) {}
+};
+const highlight = f => f.evaluate(() => { const h = document.querySelector(".amigo-pad-focus"); return h ? (h.innerText || h.getAttribute("aria-label") || h.tagName).trim().slice(0, 24) : ""; });
+
+async function ipadPro(browser, out) {
+  const check = (name, ok, detail) => out.checks.push({ site: "iPad + Pro Controller", name, ok, detail: detail || "" });
+  const ctx = await browser.newContext({ viewport: { width: 820, height: 1180 }, userAgent: IPAD_UA, hasTouch: true });
+  await ctx.addInitScript(FAKE_PRO, PRO_ID);
+  try {
+    // 1. Oops 3D: the bottom button is A and presses START
+    let pg = await ctx.newPage();
+    await pg.goto(AMIGO + "/games/oops-c.html?v=" + Date.now(), { waitUntil: "load", timeout: 60000 }); await pg.waitForTimeout(3500);
+    await pg.evaluate(LOG); await press(pg, BOTTOM); await pg.waitForTimeout(600);
+    const oops = await pg.evaluate(() => __log.join(" "));
+    check("Oops 3D: bottom button = A presses START", /click:BUTTON/.test(oops), oops.slice(0, 80));
+    await pg.close();
+
+    // 2. Candy Math (Amigo Arcade): the D-pad moves a highlight through the title menu
+    pg = await ctx.newPage();
+    await pg.goto(AMIGO + "/games/amigos-candy-math.html?v=" + Date.now(), { waitUntil: "load", timeout: 60000 }); await pg.waitForTimeout(5000);
+    await press(pg, 13); const h1 = await highlight(pg);
+    await press(pg, 13); const h2 = await highlight(pg);
+    check("Candy Math: the D-pad moves the menu highlight", !!h1 && !!h2 && h1 !== h2, (h1 + " -> " + h2).replace(/\s+/g, " "));
+    await pg.close();
+
+    // 3. a student game in play.html's locked frame: D-pad highlights, the bottom button presses it
+    pg = await ctx.newPage();
+    await pg.goto(AMIGO + "/play.html?g=brick-dash-fd47&v=" + Date.now(), { waitUntil: "load", timeout: 60000 }); await pg.waitForTimeout(5000);
+    const fr = pg.frames().find(f => f !== pg.mainFrame());
+    if (!fr) check("Brick Dash (locked frame): D-pad + A work the menu", false, "no game frame");
+    else {
+      await press(pg, 13); const hb = await highlight(fr);
+      await fr.evaluate(() => { window.__clk = 0; addEventListener("click", () => __clk++, true); });
+      await press(pg, BOTTOM);
+      const clk = await fr.evaluate(() => window.__clk);
+      check("Brick Dash (locked frame): D-pad + A work the menu", !!hb && clk >= 1, "highlight " + (hb || "none").replace(/\s+/g, " ") + " | clicks " + clk);
+    }
+    await pg.close();
+
+    // 4. Candy Math inside the Games Arcade frame keeps a full-size board (iPad visualViewport fault)
+    pg = await ctx.newPage();
+    await pg.goto(GAMES.replace("index.html", "cowork%20apps/all-games-hub.html") + "?v=" + Date.now() + "#play/kids-amigoscandym", { waitUntil: "load", timeout: 60000 });
+    await pg.waitForTimeout(7000);
+    const board = await pg.evaluate(() => { try { const d = document.getElementById("player-frame").contentDocument;
+      const c = d.querySelector("#wrap canvas"); if (!c) return -2; const r = c.getBoundingClientRect(); return Math.min(r.width, r.height); } catch (e) { return -1; } });
+    check("Candy Math fills the Games Arcade frame", board >= 200, "board side " + Math.round(board) + "px");
+    await pg.close();
+  } finally { await ctx.close(); }
+
+  // 5. Squad Leader + Frontier read the controller themselves: run their live padByPos as this
+  //    iPad + controller, and check the laser is on A
+  for (const [name, url] of [["Squad Leader", "https://tokkathedj.github.io/party-command-games/amigo-arcade-games/squad-leader.html"],
+                             ["Squad Leader Frontier", "https://tokkathedj.github.io/party-command-games/amigo-arcade-games/squad-leader-frontier.html"]]) {
+    let src = "";
+    try { const r = await fetch(url + "?v=" + Date.now()); if (r.ok) src = await r.text(); } catch (e) {}
+    const m = src.match(/function padByPos\(q\)\{[\s\S]*?\n\}/);
+    let mapped = "padByPos not found";
+    if (m) try {
+      const vm = require("vm"), sb = { navigator: { userAgent: IPAD_UA, maxTouchPoints: 5 }, localStorage: { getItem: () => null } };
+      vm.runInNewContext(m[0] + ";this.f=padByPos;", sb);
+      const raw = [0, 1, 2, 3].map(i => ({ pressed: i === BOTTOM, value: i === BOTTOM ? 1 : 0 }));
+      mapped = sb.f({ id: PRO_ID, buttons: raw.concat(new Array(13).fill({ pressed: false, value: 0 })), axes: [] }).buttons[0].pressed ? "bottom -> A" : "bottom -> not A";
+    } catch (e) { mapped = "error: " + e.message; }
+    const laserOnA = /edge\(0\)\)fireLaser\(\)/.test(src);
+    check(name + ": bottom button is A and A fires the laser", mapped === "bottom -> A" && laserOnA, mapped + " | laser on A: " + laserOnA);
+  }
+}
+
 async function drift(out) {
   const master = sha(fs.readFileSync(MASTER, "utf8"));
   out.drift.push({ copy: "master (cowork apps/pad.js)", sha: master, ok: true });
@@ -147,6 +232,7 @@ async function drift(out) {
   await ctx.addInitScript(FAKE);
   try { await gamesArcade(ctx, out); } catch (e) { out.checks.push({ site: "Games Arcade", name: "the check itself", ok: false, detail: String(e.message).slice(0, 200) }); }
   try { await amigoArcade(ctx, out); } catch (e) { out.checks.push({ site: "Amigo Arcade", name: "the check itself", ok: false, detail: String(e.message).slice(0, 200) }); }
+  try { await ipadPro(browser, out); } catch (e) { out.checks.push({ site: "iPad + Pro Controller", name: "the check itself", ok: false, detail: String(e.message).slice(0, 200) }); }
   await browser.close();
   await drift(out);
   out.ok = out.checks.every(c => c.ok) && out.tiles.every(t => t.ok) && out.drift.every(d => d.ok);
