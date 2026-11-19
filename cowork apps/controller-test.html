@@ -43,6 +43,11 @@ p { margin: 0; }
 .status.on .dot { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 25%, transparent); }
 .padname { font: 13px var(--mono); color: var(--dim); margin-top: 4px; overflow-wrap: anywhere; }
 
+.layout { margin: 12px 0 0; padding: 8px 12px 10px; border: 1px solid var(--line); border-radius: 10px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.layout legend { font-weight: 700; padding: 0 4px; }
+.layout label { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; cursor: pointer; }
+.layout input { width: 20px; height: 20px; accent-color: var(--ink); }
+.layout p { flex-basis: 100%; font-size: 14px; }
 /* the controller drawing */
 .pad { margin-top: 12px; display: grid; gap: 12px; }
 .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
@@ -134,6 +139,13 @@ button.act:focus-visible, a.act:focus-visible, .mark:focus-visible, textarea:foc
       <h2 id="live-h">1. Is the controller connected?</h2>
       <div class="status" id="status" role="status"><span class="dot"></span><span id="statusText">No controller yet: press any button on it</span></div>
       <div class="padname" id="padname"></div>
+      <fieldset class="layout">
+        <legend>Button layout</legend>
+        <label><input type="radio" name="lay" value="auto" id="layAuto"> Auto</label>
+        <label><input type="radio" name="lay" value="xbox" id="layXbox"> Bottom button says A (Xbox, PlayStation)</label>
+        <label><input type="radio" name="lay" value="nintendo" id="layNin"> Bottom button says B (Nintendo, many 8BitDo)</label>
+        <p class="sub" id="layNote" role="status"></p>
+      </fieldset>
       <!-- drawn as an Xbox controller: left stick high and D-pad low on the left; face buttons high and
            right stick low on the right; A south, B east, X west, Y north, in Xbox colours -->
       <div class="pad" aria-hidden="true">
@@ -285,7 +297,8 @@ window.__realGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(na
   let padId = "";
   function results() {
     const lines = ["Controller practice results, " + new Date().toLocaleString(),
-      "Device: " + navigator.userAgent, "Controller: " + (padId || "not seen on this page"), ""];
+      "Device: " + navigator.userAgent, "Controller: " + (padId || "not seen on this page"),
+      "Button layout: " + (document.querySelector('input[name="lay"]:checked') || {}).value + " - " + $("layNote").textContent, ""];
     for (const pl of PLACES) {
       lines.push(pl.title + ":");
       for (const it of pl.items) {
@@ -319,6 +332,14 @@ window.__realGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(na
   target.addEventListener("click", e => { if (!e.isTrusted) { taps++; $("taps").textContent = taps; target.classList.add("hit"); note("pointer tap on the test box"); } });
   addEventListener("pointerdown", e => { if (!e.isTrusted) note("pointer down (A held)"); }, true);
 
+  /* ---------- button layout setting (saved for this site; pad.js on this site reads it) ---------- */
+  let lay = "auto";
+  try { lay = localStorage.getItem("amigoPadLayout") || "auto"; } catch (e) {}
+  ({ auto: $("layAuto"), xbox: $("layXbox"), nintendo: $("layNin") }[lay] || $("layAuto")).checked = true;
+  for (const r of document.querySelectorAll('input[name="lay"]')) r.addEventListener("change", () => {
+    try { if (r.value === "auto") localStorage.removeItem("amigoPadLayout"); else localStorage.setItem("amigoPadLayout", r.value); } catch (e) {}
+  });
+
   /* ---------- the live drawing ---------- */
   const BTNS = [0, 1, 2, 3, 4, 5, 8, 9, 12, 13, 14, 15, 16];
   function draw() {
@@ -329,7 +350,12 @@ window.__realGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(na
     $("statusText").textContent = p ? "Controller connected" : "No controller yet: press any button on it";
     if (p && p.id !== padId) { padId = p.id; $("padname").textContent = p.id + (p.mapping === "standard" ? "" : " (non-standard layout: buttons may be mixed up)"); }
     if (!p) return;
-    for (const i of BTNS) { const el = $("b" + i); if (el) el.classList.toggle("on", !!(p.buttons[i] && p.buttons[i].pressed)); }
+    // the same layout rule the games use (pad.js): on a Nintendo-style pad the bottom button counts as A
+    const sw = !!(window.AmigoPad && AmigoPad.nintendoLayout && AmigoPad.nintendoLayout(p));
+    const note = sw ? "Bottom button works as A (confirm) and the right button as B (back), like an Xbox."
+                    : "Buttons work as labelled: bottom A (confirm), right B (back).";
+    if ($("layNote").textContent !== note) $("layNote").textContent = note;
+    for (const i of BTNS) { const j = sw && i < 4 ? [1, 0, 3, 2][i] : i; const el = $("b" + i); if (el) el.classList.toggle("on", !!(p.buttons[j] && p.buttons[j].pressed)); }
     for (const i of [6, 7]) { const v = p.buttons[i] ? p.buttons[i].value : 0; $("t" + i).style.width = Math.round(v * 100) + "%"; }
     const st = (id, x, y) => { const s = $(id), r = (s.clientWidth - 26) / 2; s.querySelector("i").style.transform = `translate(${(x || 0) * r}px, ${(y || 0) * r}px)`; s.classList.toggle("on", Math.hypot(x || 0, y || 0) > 0.2); };
     st("sL", p.axes[0], p.axes[1]); st("sR", p.axes[2], p.axes[3]);

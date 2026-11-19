@@ -141,7 +141,22 @@
     if (live) padIdx = live.index;
     return list.find(p => p.index === padIdx) || list[0];
   }
-  const btn = (p, i) => !!(p.buttons[i] && (p.buttons[i].pressed || p.buttons[i].value > 0.5));
+  // Button LAYOUT (19 Nov 2026): the browser numbers buttons by their LABEL, so on a Nintendo-style
+  // pad (Switch Pro, Joy-Con, many 8BitDo) the bottom button, printed "B", arrives as B. Games should
+  // follow POSITION, like an Xbox: bottom = confirm (A), right = back (B), left = X, top = Y. For such a
+  // pad, swap A<->B and X<->Y. "Auto" goes by the pad's name; the Controller Practice page can set it by
+  // hand for a site (localStorage "amigoPadLayout" = "nintendo" | "xbox").
+  const NINTENDO = /nintendo|pro controller|switch|joy-?con|057e/i;
+  function nintendoLayout(p) {
+    let o = null;
+    try { o = localStorage.getItem("amigoPadLayout"); } catch (e) {}
+    if (o === "nintendo") return true;
+    if (o === "xbox") return false;
+    return NINTENDO.test((p && p.id) || "");
+  }
+  const POS = [1, 0, 3, 2];
+  let swap = false;
+  const btn = (p, i) => { const j = swap && i < 4 ? POS[i] : i; return !!(p.buttons[j] && (p.buttons[j].pressed || p.buttons[j].value > 0.5)); };
 
   function edge(name, down, onDown, onUp) {
     if (down && !was[name]) onDown && onDown();
@@ -153,6 +168,7 @@
     requestAnimationFrame(frame);
     const p = readPad();
     if (!p) return;
+    swap = nintendoLayout(p);
     hint();
     if (gameHasOwnPad || frameHasOwnPad) return;          // the game drives itself
     const ax = p.axes[0] || 0, ay = p.axes[1] || 0, rx = p.axes[2] || 0, ry = p.axes[3] || 0;
@@ -272,6 +288,7 @@
   const api = window.AmigoPad = {
     receiver,
     newGame() { frameHasOwnPad = false; held = false; },   // play.html calls this on Restart
+    nintendoLayout,                                        // the practice page draws buttons by the same rule
     paused: null,                                          // menu pages: () => true while a game is open
     onBack: null,                                          // ...and what View / Select does then
   };
