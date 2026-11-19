@@ -147,12 +147,16 @@
   // pad, swap A<->B and X<->Y. "Auto" goes by the pad's name; the Controller Practice page can set it by
   // hand for a site (localStorage "amigoPadLayout" = "nintendo" | "xbox").
   const NINTENDO = /nintendo|pro controller|switch|joy-?con|057e/i;
+  // Apple devices (iPad, iPhone, and Safari on a Mac) already report buttons by POSITION through Apple's
+  // controller support: there the bottom button IS A, so swapping would flip it back (Lance's iPad, 19 Nov).
+  const APPLE = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+    || (/Macintosh/.test(navigator.userAgent) && /Safari\//.test(navigator.userAgent) && !/Chrome|Chromium|Edg|Firefox/.test(navigator.userAgent));
   function nintendoLayout(p) {
     let o = null;
     try { o = localStorage.getItem("amigoPadLayout"); } catch (e) {}
     if (o === "nintendo") return true;
     if (o === "xbox") return false;
-    return NINTENDO.test((p && p.id) || "");
+    return !APPLE && NINTENDO.test((p && p.id) || "");
   }
   const POS = [1, 0, 3, 2];
   let swap = false;
