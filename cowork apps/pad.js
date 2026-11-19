@@ -236,8 +236,8 @@
   // A title screen with only a START button and nothing focused (Click Click): A or Start presses it
   // Most wanted first (19 Nov 2026: Line Limit's A pressed the small "New game" in its header
   // instead of the big "Start the game"): a Start / Play button beats Spin / Roll / Deal
-  const START = [/^\W*(start|play|begin|let'?s (go|play|start)|tap to (start|play)|1 player|one player|single player|solo)/i,
-                 /^\W*(go\b|ready|spin|roll|deal|new word|let'?s)/i];   // never "New game": it would restart a game in progress
+  const START = [/^\W*(start(?!\s*(over|again))|play(?!\s*again)|begin|let'?s (go|play|start)|tap to (start|play)|1 player|one player|single player|solo)/i,
+                 /^\W*(go\b|ready|spin|roll|deal|new word|let'?s)/i];   // never "New game" / "Start over" / "Play again": they would restart a game in progress (Line Limit, ABC Barnyard)
   function pressStart() {
     if (MODE === "relay") return false;            // inside the locked frame the game decides
     const a = document.activeElement;
@@ -286,7 +286,7 @@
     if (!now) {
       // first press: a Start / Play button if there is one, else the button nearest the middle of the screen
       var lbl = function (e) { return (e.innerText || e.value || e.getAttribute("aria-label") || "").trim(); };
-      best = all.filter(function (e) { return /^\W*(start|play|begin|go\b|let'?s|ready|1 player|one player|single player|solo|spin|roll|deal|new word)/i.test(lbl(e)); })[0] || all.slice().sort(function (x, y) {
+      best = all.filter(function (e) { return /^\W*(start(?!\s*(over|again))|play(?!\s*again)|begin|go\b|let'?s|ready|1 player|one player|single player|solo|spin|roll|deal|new word)/i.test(lbl(e)); })[0] || all.slice().sort(function (x, y) {
         var rx = x.getBoundingClientRect(), ry = y.getBoundingClientRect(), cx = W.innerWidth / 2, cy = W.innerHeight / 2;
         return Math.hypot(rx.left + rx.width / 2 - cx, rx.top + rx.height / 2 - cy) - Math.hypot(ry.left + ry.width / 2 - cx, ry.top + ry.height / 2 - cy);
       })[0];
