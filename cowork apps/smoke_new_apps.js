@@ -15,6 +15,8 @@
  *   4. flags "null" / "undefined" / "NaN" left showing as text;
  *   5. on two phones with their browser bars showing, flags a button or play area left
  *      below the screen where nothing scrolls to it (phone_fit_check.js).
+ *   6. opens it where the browser refuses saved data, and flags a page that stops there
+ *      (storage_block_check.js).
  *
  *   node smoke_new_apps.js kids_apps/2026-10-11-foo.html party_apps/bar.html
  * Prints one JSON object: { checked_at, apps: [{ app, title, ok, problems: [...], a11y: [...] }] }
@@ -51,6 +53,11 @@ const IGNORE = /SpeechSynthesisErrorEvent|Speech synthesis error|ERR_REQUEST_RAN
 // browser bar while every check here passed - a test browser has no bars. phone_fit_check.js
 // imitates them; an app that leaves a button or its play area off the screen fails "does it play".
 const fit = require("./phone_fit_check");
+// Saved data blocked (19 Nov 2026): a browser can refuse localStorage outright, and a game that reads a
+// setting at start-up with nothing to catch that stops dead. 14 live Arcade games and three new ones did
+// (Human Remote, Rule Pile, Common Ground), all found by hand. storage_block_check.js opens the page where
+// the browser really refuses it; an app that throws there fails "does it play".
+const blocked = require("./storage_block_check");
 // AXE_CORE overrides the path on a machine without the canopy-hr checkout (the Surface).
 // axe-core is a dev dependency of cowork apps since 29 Oct; the canopy-hr path is the desktop's old copy
 const AXE = process.env.AXE_CORE || [path.join(__dirname, "node_modules/axe-core/axe.min.js"),
@@ -189,6 +196,7 @@ async function checkOne(browser, rel, vp) {
     }
     const url = `http://127.0.0.1:${PORT}/${rel.split("/").map(encodeURIComponent).join("/")}`;
     problems.push(...(await fit.fitProblems(browser, url)).map(w => "doesn't fit a phone screen - " + w));
+    problems.push(...(await blocked.storageProblems(browser, path.join(ROOT, rel))));
     out.apps.push({ app: rel, title, ok: problems.length === 0, problems, a11y: await a11yScan(browser, rel) });
   }
   await browser.close(); server.close();
