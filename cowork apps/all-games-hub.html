@@ -254,6 +254,7 @@
     <div id="player-loading"><div class="spinner"></div><div>Loading…</div></div>
   </div>
 
+<script src="pad.js" data-mode="menu"></script>
 <script>
 /* ─────────────────────────────────────────────
    GAME REGISTRY
@@ -603,6 +604,7 @@ function openGame(g) {
     frame.onload = () => {
       playerLoading.classList.remove('show');
       if (g.type === 'party') deepLinkParty(g.screen);
+      addPadToGame();
     };
     frame.src = src;
   });
@@ -635,6 +637,26 @@ function closeGame() {
   frame.src = 'about:blank';   // stop audio / free the game
   playerTitle.textContent = '';
   document.body.style.overflow = '';
+}
+
+/* ── GAME CONTROLLERS (pad.js, 18 Nov 2026) ──
+   The menu: the D-pad / stick moves between game cards, A opens one. Each game, as it loads,
+   gets pad.js too (same site, so the frame can be reached): the stick and buttons become the
+   keys and clicks it already understands. A game that reads controllers itself keeps them and
+   pad.js stands aside. While a game is open the menu stays still; View / Select comes back here. */
+function addPadToGame() {
+  try {
+    const d = frame.contentDocument, w = frame.contentWindow;
+    if (!d || !d.body || (w && w.AmigoPad) || d.querySelector('script[data-amigo-pad]')) return;
+    const s = d.createElement('script');
+    s.src = new URL(GAMES_BASE + 'pad.js', location.href).href;
+    s.dataset.mode = 'game'; s.dataset.amigoPad = '1';
+    d.body.appendChild(s);
+  } catch (e) { /* a game on another site: it keeps whatever controls it has */ }
+}
+if (window.AmigoPad) {
+  AmigoPad.paused = () => player.classList.contains('open');
+  AmigoPad.onBack = () => document.getElementById('back-btn').click();
 }
 
 document.getElementById('back-btn').addEventListener('click', () => {
