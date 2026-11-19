@@ -120,5 +120,8 @@ async function checkFolder(folder) {
   }
   if (asJson) console.log(JSON.stringify({ checked_at: new Date().toISOString(), sites: results }, null, 1));
   else if (bad) console.log("\nNOT SAFE TO DEPLOY the folders marked ROLLBACK or NOT WHOLE.");
-  process.exit(bad ? 1 : 0);
+  // Not process.exit(): on Windows, Node 24 aborts with "Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)"
+  // when exit() lands while fetch's sockets are still closing, and SHIP IT read that crash as a failed check
+  // (19 Nov 2026, right after a correct NEW CHANGES). Setting the code lets Node end by itself.
+  process.exitCode = bad ? 1 : 0;
 })();
