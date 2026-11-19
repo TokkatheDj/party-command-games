@@ -260,7 +260,8 @@
     for (const [k, v] of [["keyCode", keyCode], ["which", keyCode], ["charCode", 0]]) {
       try { Object.defineProperty(ev, k, { get: () => v }); } catch (e) {}
     }
-    const target = doc.activeElement && doc.activeElement !== doc.body ? doc.activeElement : doc;
+    // like a real keyboard: from the focused element, else <body> (never document: Blocky Obby calls e.target.closest)
+    const target = doc.activeElement || doc.body || doc;
     target.dispatchEvent(ev);
     return ev;
   }
