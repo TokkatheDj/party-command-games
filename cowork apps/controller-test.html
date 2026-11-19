@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Controller Practice</title>
+<style>
+/* Layout idea: a test bench. Left, the live controller; right, what the arcades turn it into;
+   below, a checklist of real games to try, with a Works / Problem mark on each. */
+:root {
+  --bg: #eef1f6;
+  --panel: #ffffff;
+  --ink: #141a2e;
+  --dim: #5a6480;
+  --line: #d4dae6;
+  --hot: #ffcc33;
+  --ok: #1f8a4c;
+  --bad: #c43b3b;
+  --display: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, Consolas, "SF Mono", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #10141f; --panel: #181e2d; --ink: #e9edf6; --dim: #9aa5bf; --line: #2b3348; --hot: #ffcc33; --ok: #4cc27f; --bad: #ef6b6b; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #10141f; --panel: #181e2d; --ink: #e9edf6; --dim: #9aa5bf; --line: #2b3348; --hot: #ffcc33; --ok: #4cc27f; --bad: #ef6b6b; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); }
+.wrap { max-width: 1060px; margin: 0 auto; padding: 20px 16px 48px; display: grid; gap: 18px; }
+h1 { font: 800 clamp(26px, 5vw, 38px)/1.1 var(--display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font: 700 20px/1.2 var(--display); margin: 0 0 10px; }
+p { margin: 0; }
+.sub { color: var(--dim); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.top { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; }
+@media (max-width: 820px) { .top { grid-template-columns: 1fr; } }
+
+/* status */
+.status { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.dot { width: 14px; height: 14px; border-radius: 50%; background: var(--bad); flex: none; }
+.status.on .dot { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 25%, transparent); }
+.padname { font: 13px var(--mono); color: var(--dim); margin-top: 4px; overflow-wrap: anywhere; }
+
+/* the controller drawing */
+.pad { margin-top: 12px; display: grid; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: center; }
+.b { min-width: 52px; height: 44px; padding: 0 10px; border-radius: 10px; border: 2px solid var(--line); display: grid; place-items: center; font: 700 14px var(--display); color: var(--dim); background: var(--bg); transition: background .05s, color .05s; }
+.b.round { border-radius: 50%; width: 52px; min-width: 52px; height: 52px; }
+.b.on { background: var(--hot); color: #141a2e; border-color: var(--hot); }
+.trig { width: 90px; height: 14px; border-radius: 7px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.trig i { display: block; height: 100%; width: 0; background: var(--hot); }
+.sticks { display: flex; gap: 24px; justify-content: center; }
+.stick { width: 110px; height: 110px; border-radius: 50%; border: 2px solid var(--line); position: relative; background: var(--bg); }
+.stick::before { content: ""; position: absolute; inset: 50% 0 auto; height: 1px; background: var(--line); }
+.stick::after { content: ""; position: absolute; inset: 0 auto 0 50%; width: 1px; background: var(--line); }
+.stick i { position: absolute; width: 26px; height: 26px; border-radius: 50%; background: var(--ink); left: 42px; top: 42px; transition: transform .03s; }
+.stick.on i { background: var(--hot); }
+.stick span { position: absolute; bottom: -22px; left: 0; right: 0; text-align: center; font-size: 12px; color: var(--dim); }
+.rumble { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* buttons on the page */
+button.act, a.act { font: 600 15px var(--body); min-height: 44px; padding: 8px 14px; border-radius: 10px; border: 2px solid var(--ink); background: var(--panel); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+button.act:focus-visible, a.act:focus-visible, .mark:focus-visible, textarea:focus-visible { outline: 4px solid var(--hot); outline-offset: 2px; }
+
+/* bridge */
+.map { width: 100%; border-collapse: collapse; font-size: 14px; }
+.map td { padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.map td:first-child { font-weight: 700; white-space: nowrap; }
+.log { margin-top: 10px; font: 13px/1.5 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; height: 132px; overflow: auto; }
+.log b { color: var(--ok); }
+.target { margin-top: 10px; height: 92px; border: 2px dashed var(--line); border-radius: 10px; display: grid; place-items: center; text-align: center; color: var(--dim); font-size: 14px; user-select: none; padding: 6px; }
+.target.hit { border-color: var(--ok); color: var(--ok); }
+
+/* checklist */
+.place { display: grid; gap: 8px; }
+.place + .place { margin-top: 16px; }
+.place h3 { margin: 0; font: 700 17px var(--display); display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.place h3 small { font: 13px var(--body); color: var(--dim); }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.item .name { font-weight: 700; }
+.item .try { color: var(--dim); font-size: 14px; }
+.item .ctl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.item textarea { grid-column: 1 / -1; width: 100%; min-height: 44px; font: 14px var(--body); padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); display: none; }
+.item.bad textarea { display: block; }
+.mark { font: 700 14px var(--body); min-height: 44px; min-width: 44px; padding: 6px 12px; border-radius: 999px; border: 2px solid var(--line); background: var(--panel); color: var(--dim); cursor: pointer; }
+.item.good .mark.yes { background: var(--ok); border-color: var(--ok); color: #fff; }
+.item.bad .mark.no { background: var(--bad); border-color: var(--bad); color: #fff; }
+.item.off { opacity: .55; }
+@media (max-width: 560px) { .item { grid-template-columns: 1fr; } .item .ctl { justify-content: flex-start; } }
+.foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+#copied { color: var(--ok); font-weight: 700; }
+#copybox { width: 100%; min-height: 140px; font: 13px var(--mono); display: none; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:grid;gap:6px">
+    <h1>Controller Practice</h1>
+    <p class="sub">Check the controller works here first, then try each game below and mark it. On an iPad, pair the controller in Settings &gt; Bluetooth, then press any button on it: Safari only shows a controller after a button press.</p>
+  </header>
+
+  <div class="top">
+    <section class="panel" aria-labelledby="live-h">
+      <h2 id="live-h">1. Is the controller connected?</h2>
+      <div class="status" id="status" role="status"><span class="dot"></span><span id="statusText">No controller yet: press any button on it</span></div>
+      <div class="padname" id="padname"></div>
+      <div class="pad" aria-hidden="true">
+        <div class="row">
+          <div class="b" id="b4">LB</div><div class="trig"><i id="t6"></i></div>
+          <div class="b" id="b8">View</div><div class="b" id="b16">Home</div><div class="b" id="b9">Menu</div>
+          <div class="trig"><i id="t7"></i></div><div class="b" id="b5">RB</div>
+        </div>
+        <div class="row">
+          <div class="row" style="gap:4px;flex-direction:column">
+            <div class="b" id="b12">▲</div>
+            <div class="row" style="gap:4px"><div class="b" id="b14">◀</div><div class="b" id="b15">▶</div></div>
+            <div class="b" id="b13">▼</div>
+          </div>
+          <div class="sticks">
+            <div class="stick" id="sL"><i></i><span>left stick</span></div>
+            <div class="stick" id="sR"><i></i><span>right stick</span></div>
+          </div>
+          <div class="row" style="gap:4px;flex-direction:column">
+            <div class="b round" id="b3">Y</div>
+            <div class="row" style="gap:4px"><div class="b round" id="b2">X</div><div class="b round" id="b1">B</div></div>
+            <div class="b round" id="b0">A</div>
+          </div>
+        </div>
+      </div>
+      <div class="rumble">
+        <button type="button" class="act" id="rumbleBtn">Shake the controller (rumble test)</button>
+        <span class="sub" id="rumbleOut"></span>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="bridge-h">
+      <h2 id="bridge-h">2. What the games receive</h2>
+      <table class="map">
+        <tr><td>Stick or D-pad</td><td>Arrow keys</td></tr>
+        <tr><td>A</td><td>Space, or presses the button that's focused or a Start / Play button</td></tr>
+        <tr><td>Start (Menu)</td><td>Enter</td></tr>
+        <tr><td>B</td><td>Escape</td></tr>
+        <tr><td>Right stick</td><td>Moves a yellow pointer; A taps under it, hold A to drag</td></tr>
+        <tr><td>View</td><td>Back to All Games (Games Arcade)</td></tr>
+      </table>
+      <div class="log" id="log" aria-live="polite"><span class="sub">Press buttons: the keys the games get show up here.</span></div>
+      <div class="target" id="target">Pointer test: move the right stick until the yellow ring is over this box, then press A.<br>Taps: <b id="taps">0</b></div>
+    </section>
+  </div>
+
+  <section class="panel" aria-labelledby="list-h">
+    <h2 id="list-h">3. Try the games</h2>
+    <p class="sub" style="margin-bottom:14px">Each link opens in this tab; come back with the browser's Back. Mark each one, and for a Problem write what went wrong (which button, what happened). Marks are kept in this browser.</p>
+    <div id="list"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="send-h">
+    <h2 id="send-h">4. Send me the results</h2>
+    <div class="foot">
+      <button type="button" class="act" id="copyBtn">Copy results</button>
+      <button type="button" class="act" id="clearBtn">Clear all marks</button>
+      <span id="copied" role="status"></span>
+    </div>
+    <p class="sub" style="margin-top:8px">Paste the copied text into Claude. If copying is blocked, the text appears below to select by hand.</p>
+    <textarea id="copybox" aria-label="Results text" readonly></textarea>
+  </section>
+</div>
+
+<script>
+// read the controller with the browser's own function, captured BEFORE pad.js loads: pad.js
+// stands aside for a page that reads controllers itself, and this page wants it running
+window.__realGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : null;
+</script>
+<script src="pad.js" data-mode="game"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const realGet = window.__realGetGamepads;
+
+  /* ---------- where am I? (links differ between GitHub Pages and the AppVerse at home) ---------- */
+  const onPages = /cowork(%20| )apps/.test(location.pathname);
+  const hub = onPages ? "../index.html" : "all-games-hub.html";
+  const AMIGO = "https://amigo-arcade.vercel.app";
+
+  const PLACES = [
+    { title: "Games Arcade", note: onPages ? "public, works on the iPad" : "the AppVerse copy at home", items: [
+      { id: "ga-menu", name: "The menu itself", href: hub, tryIt: "D-pad between game cards, A opens one, View (⧉) comes back." },
+      { id: "ga-candy", name: "Amigo's Candy Math", href: hub + "#play/kids-amigoscandym", tryIt: "Right stick moves the pointer; hold A and move to link candies." },
+      { id: "ga-bunny", name: "Bunny Carrot Maze", href: hub + "#play/kids-bunny", tryIt: "D-pad or left stick moves the bunny." },
+      { id: "ga-tilly", name: "Tilly's Whirly Gears", href: hub + "#play/kids-tillyswhirly", tryIt: "Pointer + hold A to drag gears onto pegs (levels 6 and 12 were fixed today)." },
+      { id: "ga-story", name: "Story Blocks", href: hub + "#play/kids-storyblocks", tryIt: "A starts it; pointer + A picks blocks." },
+      { id: "ga-ring", name: "Ring Toss", href: hub + "#play/carnival-ringtoss", tryIt: "Aim and throw with the pointer and A." },
+      { id: "ga-boo", name: "Boo Tag", href: hub + "#play/kids-bootag", tryIt: "Stick moves, A says BOO." },
+      { id: "ga-wyr", name: "Would You Rather (party)", href: hub + "#play/party-wyr", tryIt: "A presses Start and the answer buttons." },
+    ]},
+    { title: "Amigo Arcade", note: "public", items: [
+      { id: "aa-menu", name: "The front page", href: AMIGO + "/", tryIt: "D-pad between game cards, A opens one." },
+      { id: "aa-oops", name: "Oops 3D", href: AMIGO + "/games/oops-c.html", tryIt: "A presses Start, stick steers, A shoots." },
+      { id: "aa-click", name: "Click Click", href: AMIGO + "/games/click-click.html", tryIt: "A starts, then A clicks the cookie; pointer + A buys upgrades." },
+      { id: "aa-candy", name: "Amigo's Candy Math", href: AMIGO + "/games/amigos-candy-math.html", tryIt: "Pointer + hold A to link candies." },
+      { id: "aa-student", name: "A student game (Brick Dash)", href: AMIGO + "/play.html?g=brick-dash-fd47", tryIt: "Arrows and Space reach a game locked in its own frame." },
+      { id: "aa-squad", name: "Squad Leader", href: AMIGO + "/games/squad-leader.html", tryIt: "Uses its own controller support (menus, rumble): nothing should act twice." },
+    ]},
+    { title: "AppVerse at home", note: onPages ? "only on the home network: open this page from the AppVerse to try these" : "every app gets the controller", home: true, items: [
+      { id: "av-fish", name: "Big Fish Little Fish", href: "kids_apps/2026-09-21-big-fish-little-fish.html", tryIt: "Opened straight from the AppVerse: stick and A." },
+      { id: "av-carnival", name: "Carnival Games", href: "kids_apps/2026-06-26-carnival-games.html", tryIt: "Stick and A in a Phaser game." },
+      { id: "av-harp", name: "Pedal Harp Academy", href: "music_game_apps/2026-10-26-instrument-simulation-pedal-harp-academy.html", tryIt: "Fixed today: it makes sound again. Pointer + A plucks strings." },
+    ]},
+  ];
+
+  /* ---------- the checklist ---------- */
+  const KEY = "controller-practice-v1";
+  let marks = {};
+  try { marks = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) { marks = {}; }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(marks)); } catch (e) {} };
+
+  const list = $("list");
+  for (const pl of PLACES) {
+    const sec = document.createElement("div");
+    sec.className = "place";
+    sec.innerHTML = `<h3>${pl.title} <small>${pl.note}</small></h3>`;
+    for (const it of pl.items) {
+      const off = pl.home && onPages;
+      const m = marks[it.id] || {};
+      const el = document.createElement("div");
+      el.className = "item" + (m.s === "good" ? " good" : m.s === "bad" ? " bad" : "") + (off ? " off" : "");
+      el.innerHTML = `<div><div class="name"></div><div class="try"></div></div>
+        <div class="ctl">${off ? "" : `<a class="act" href="${it.href}">Open</a>`}
+          <button type="button" class="mark yes" aria-pressed="${m.s === "good"}">Works</button>
+          <button type="button" class="mark no" aria-pressed="${m.s === "bad"}">Problem</button></div>
+        <textarea aria-label="What went wrong with ${it.name}" placeholder="Which button, what happened?"></textarea>`;
+      el.querySelector(".name").textContent = it.name;
+      el.querySelector(".try").textContent = it.tryIt;
+      const ta = el.querySelector("textarea");
+      ta.value = m.note || "";
+      const set = s => {
+        marks[it.id] = { s, note: ta.value, name: it.name, place: pl.title };
+        el.classList.toggle("good", s === "good"); el.classList.toggle("bad", s === "bad");
+        el.querySelector(".yes").setAttribute("aria-pressed", s === "good");
+        el.querySelector(".no").setAttribute("aria-pressed", s === "bad");
+        save();
+        if (s === "bad") ta.focus();
+      };
+      el.querySelector(".yes").addEventListener("click", () => set(marks[it.id]?.s === "good" ? "" : "good"));
+      el.querySelector(".no").addEventListener("click", () => set(marks[it.id]?.s === "bad" ? "" : "bad"));
+      ta.addEventListener("input", () => { marks[it.id] = { ...(marks[it.id] || { name: it.name, place: pl.title }), note: ta.value }; save(); });
+      sec.appendChild(el);
+    }
+    list.appendChild(sec);
+  }
+
+  /* ---------- results ---------- */
+  let padId = "";
+  function results() {
+    const lines = ["Controller practice results, " + new Date().toLocaleString(),
+      "Device: " + navigator.userAgent, "Controller: " + (padId || "not seen on this page"), ""];
+    for (const pl of PLACES) {
+      lines.push(pl.title + ":");
+      for (const it of pl.items) {
+        const m = marks[it.id] || {};
+        const s = m.s === "good" ? "WORKS" : m.s === "bad" ? "PROBLEM" : "not tried";
+        lines.push(`- ${it.name}: ${s}` + (m.note ? ` - ${m.note}` : ""));
+      }
+      lines.push("");
+    }
+    return lines.join("\n");
+  }
+  $("copyBtn").addEventListener("click", async () => {
+    const text = results();
+    try { await navigator.clipboard.writeText(text); $("copied").textContent = "Copied. Paste it into Claude."; }
+    catch (e) { const b = $("copybox"); b.style.display = "block"; b.value = text; b.focus(); b.select(); $("copied").textContent = "Copying was blocked: select the text below."; }
+  });
+  $("clearBtn").addEventListener("click", () => { marks = {}; save(); location.reload(); });
+
+  /* ---------- what pad.js sends (the same bridge every game gets) ---------- */
+  const log = $("log");
+  let lines = [];
+  function note(t) {
+    lines.unshift(t); lines = lines.slice(0, 12);
+    log.innerHTML = lines.map((l, i) => i === 0 ? "<b>" + l + "</b>" : l).join("<br>");
+  }
+  const NAMES = { " ": "Space", ArrowUp: "Arrow Up", ArrowDown: "Arrow Down", ArrowLeft: "Arrow Left", ArrowRight: "Arrow Right", Enter: "Enter", Escape: "Escape" };
+  addEventListener("keydown", e => { if (!e.isTrusted && NAMES[e.key]) note("key down: " + NAMES[e.key]); }, true);
+  addEventListener("keyup", e => { if (!e.isTrusted && NAMES[e.key]) note("key up: " + NAMES[e.key]); }, true);
+  let taps = 0;
+  const target = $("target");
+  target.addEventListener("click", e => { if (!e.isTrusted) { taps++; $("taps").textContent = taps; target.classList.add("hit"); note("pointer tap on the test box"); } });
+  addEventListener("pointerdown", e => { if (!e.isTrusted) note("pointer down (A held)"); }, true);
+
+  /* ---------- the live drawing ---------- */
+  const BTNS = [0, 1, 2, 3, 4, 5, 8, 9, 12, 13, 14, 15, 16];
+  function draw() {
+    requestAnimationFrame(draw);
+    let p = null;
+    if (realGet) { try { const l = [...realGet()].filter(g => g && g.connected); p = l.find(g => g.buttons.some(b => b.pressed)) || l[0] || null; } catch (e) {} }
+    $("status").classList.toggle("on", !!p);
+    $("statusText").textContent = p ? "Controller connected" : "No controller yet: press any button on it";
+    if (p && p.id !== padId) { padId = p.id; $("padname").textContent = p.id + (p.mapping === "standard" ? "" : " (non-standard layout: buttons may be mixed up)"); }
+    if (!p) return;
+    for (const i of BTNS) { const el = $("b" + i); if (el) el.classList.toggle("on", !!(p.buttons[i] && p.buttons[i].pressed)); }
+    for (const i of [6, 7]) { const v = p.buttons[i] ? p.buttons[i].value : 0; $("t" + i).style.width = Math.round(v * 100) + "%"; }
+    const st = (id, x, y) => { const s = $(id); s.querySelector("i").style.transform = `translate(${(x || 0) * 42}px, ${(y || 0) * 42}px)`; s.classList.toggle("on", Math.hypot(x || 0, y || 0) > 0.2); };
+    st("sL", p.axes[0], p.axes[1]); st("sR", p.axes[2], p.axes[3]);
+  }
+  requestAnimationFrame(draw);
+
+  $("rumbleBtn").addEventListener("click", () => {
+    let p = null;
+    try { p = [...realGet()].find(g => g && g.connected); } catch (e) {}
+    const a = p && p.vibrationActuator;
+    if (!p) { $("rumbleOut").textContent = "Connect the controller first."; return; }
+    if (!a || !a.playEffect) { $("rumbleOut").textContent = "This browser can't make this controller rumble (normal on iPad)."; return; }
+    a.playEffect("dual-rumble", { duration: 400, strongMagnitude: 0.8, weakMagnitude: 0.6 }).then(() => { $("rumbleOut").textContent = "Did it shake?"; }).catch(() => { $("rumbleOut").textContent = "Rumble was refused."; });
+  });
+})();
+</script>
+</body>
+</html>
