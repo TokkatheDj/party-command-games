@@ -17,10 +17,11 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;touch-action:manipulati
   font-family:var(--font);color:var(--ink);background:linear-gradient(160deg,var(--bg1),var(--bg2));}
 #app{display:flex;flex-direction:column;height:100%;max-width:820px;margin:0 auto;}
 header{display:flex;align-items:center;gap:6px;padding:6px 8px;flex:0 0 auto;}
-h1{flex:1;margin:0;font-size:clamp(17px,5vw,28px);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-@media (max-width:460px){ h1 .long{display:none;} }
+h1{flex:1;min-width:0;margin:0;font-size:clamp(17px,5vw,28px);line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+@media (max-width:460px){ h1 .long{display:none;} header{gap:4px;padding:4px 6px;} h1{white-space:normal;font-size:17px;line-height:1.2;text-align:center;} }
+@media (max-width:340px){ h1{font-size:14px;} }
 h1 .g{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent;}
-.hbtn{width:46px;height:46px;border-radius:14px;border:3px solid #fff;background:#fff6;font-size:22px;cursor:pointer;flex:0 0 auto;
+.hbtn{width:60px;height:60px;border-radius:16px;border:3px solid #fff;background:#fff6;font-size:26px;cursor:pointer;flex:0 0 auto;
   box-shadow:0 3px 0 #0002;display:flex;align-items:center;justify-content:center;padding:0;}
 .hbtn:active{transform:translateY(2px);box-shadow:none;}
 #msg{flex:0 0 auto;height:48px;margin:0 8px;padding:0 12px;border-radius:16px;background:var(--panel);display:flex;align-items:center;justify-content:center;
@@ -257,7 +258,10 @@ function placeOnPeg(pi, s){
 }
 function removeGear(g){
   G.gears = G.gears.filter(x => x !== g);
-  if (g.peg != null && G.pegs[g.peg]) G.pegs[g.peg].gear = null;
+  if (g.peg != null && G.pegs[g.peg]){
+    G.pegs[g.peg].gear = null;
+    if (G.hintPeg === g.peg){ G.hintPeg = -1; G.hintT = 0; }   // the hinted gear is gone: drop the hint
+  }
   rebuild();
 }
 
@@ -661,13 +665,17 @@ function afterPlace(g){
 function maybeAutoHint(){ if (G.mode === 'level' && G.misses >= 3){ G.misses = 0; setTimeout(showHint, 900); } }
 
 // ---------- main loop ----------
-let last = performance.now(), T = 0, tickA = 0;
+let last = performance.now(), T = 0, tickA = 0, frameErrLogged = false;
 function frame(now){
+  requestAnimationFrame(frame);           // schedule first: one bad frame must never freeze the game
   const dt = Math.min(0.05, (now - last) / 1000); last = now; T += dt;
-  if (G.mode !== 'menu') step(dt);
-  render(dt);
-  drawConfetti(dt);
-  requestAnimationFrame(frame);
+  try {
+    if (G.mode !== 'menu') step(dt);
+    render(dt);
+    drawConfetti(dt);
+  } catch (e){
+    if (!frameErrLogged){ frameErrLogged = true; console.warn('Whirly Gears frame error (kept running):', e); }
+  }
 }
 function step(dt){
   if (!G.jam){
@@ -714,7 +722,7 @@ function render(dt){
     const p = G.pegs[G.hintPeg], glow = 0.5 + 0.5*Math.sin(T*6);
     if (!G.hintOff && p.s) drawGear(ctx, px(p.x), py(p.y), U[p.s].r, U[p.s].n, 0, U[p.s].c, U[p.s].d, 0.25 + 0.25*glow);
     ctx.save(); ctx.strokeStyle = '#fab005'; ctx.lineWidth = SC*0.12; ctx.globalAlpha = 0.5 + 0.5*glow;
-    ctx.beginPath(); ctx.arc(px(p.x), py(p.y), ((p.gear ? p.gear.r : U[p.s].r) + 0.35)*SC, 0, TAU); ctx.stroke(); ctx.restore();
+    ctx.beginPath(); ctx.arc(px(p.x), py(p.y), ((p.gear ? p.gear.r : (p.s ? U[p.s].r : 1)) + 0.35)*SC, 0, TAU); ctx.stroke(); ctx.restore();
   }
   for (const g of G.gears){
     if (g.kind === 'driver') drawDriver(g, T);
