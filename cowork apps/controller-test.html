@@ -119,6 +119,7 @@ button.act:focus-visible, a.act:focus-visible, .mark:focus-visible, textarea:foc
 .mark { font: 700 14px var(--body); min-height: 44px; min-width: 44px; padding: 6px 12px; border-radius: 999px; border: 2px solid var(--line); background: var(--panel); color: var(--dim); cursor: pointer; }
 .item.good .mark.yes { background: var(--ok); border-color: var(--ok); color: #fff; }
 .item.bad .mark.no { background: var(--bad); border-color: var(--bad); color: #fff; }
+.item.blank .mark.blk { background: var(--ink); border-color: var(--ink); color: var(--panel); }
 .item.off { opacity: .55; }
 @media (max-width: 560px) { .item { grid-template-columns: 1fr; } .item .ctl { justify-content: flex-start; } }
 .foot { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -194,7 +195,7 @@ button.act:focus-visible, a.act:focus-visible, .mark:focus-visible, textarea:foc
 
   <section class="panel" aria-labelledby="list-h">
     <h2 id="list-h">3. Try the games</h2>
-    <p class="sub" style="margin-bottom:14px">Each link opens in this tab; come back with the browser's Back. Mark each one, and for a Problem write what went wrong (which button, what happened). Marks are kept in this browser.</p>
+    <p class="sub" style="margin-bottom:14px">Open starts the game in a new tab, and this page stays open behind it: switch back to this tab to mark it. If a game shows a blank screen, press Blank screen. For any other Problem, write which button and what happened. Marks are kept in this browser.</p>
     <div id="list"></div>
   </section>
 
@@ -267,10 +268,11 @@ window.__realGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(na
       const off = pl.home && onPages;
       const m = marks[it.id] || {};
       const el = document.createElement("div");
-      el.className = "item" + (m.s === "good" ? " good" : m.s === "bad" ? " bad" : "") + (off ? " off" : "");
+      el.className = "item" + (m.s === "good" ? " good" : m.s === "bad" ? " bad" : m.s === "blank" ? " blank" : "") + (off ? " off" : "");
       el.innerHTML = `<div><div class="name"></div><div class="try"></div></div>
-        <div class="ctl">${off ? "" : `<a class="act" href="${it.href}">Open</a>`}
+        <div class="ctl">${off ? "" : `<a class="act" href="${it.href}" target="_blank" rel="noopener">Open</a>`}
           <button type="button" class="mark yes" aria-pressed="${m.s === "good"}">Works</button>
+          <button type="button" class="mark blk" aria-pressed="${m.s === "blank"}">Blank screen</button>
           <button type="button" class="mark no" aria-pressed="${m.s === "bad"}">Problem</button></div>
         <textarea aria-label="What went wrong with ${it.name}" placeholder="Which button, what happened?"></textarea>`;
       el.querySelector(".name").textContent = it.name;
@@ -279,7 +281,8 @@ window.__realGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(na
       ta.value = m.note || "";
       const set = s => {
         marks[it.id] = { s, note: ta.value, name: it.name, place: pl.title };
-        el.classList.toggle("good", s === "good"); el.classList.toggle("bad", s === "bad");
+        el.classList.toggle("good", s === "good"); el.classList.toggle("bad", s === "bad"); el.classList.toggle("blank", s === "blank");
+        el.querySelector(".blk").setAttribute("aria-pressed", s === "blank");
         el.querySelector(".yes").setAttribute("aria-pressed", s === "good");
         el.querySelector(".no").setAttribute("aria-pressed", s === "bad");
         save();
@@ -287,6 +290,7 @@ window.__realGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(na
       };
       el.querySelector(".yes").addEventListener("click", () => set(marks[it.id]?.s === "good" ? "" : "good"));
       el.querySelector(".no").addEventListener("click", () => set(marks[it.id]?.s === "bad" ? "" : "bad"));
+      el.querySelector(".blk").addEventListener("click", () => set(marks[it.id]?.s === "blank" ? "" : "blank"));
       ta.addEventListener("input", () => { marks[it.id] = { ...(marks[it.id] || { name: it.name, place: pl.title }), note: ta.value }; save(); });
       sec.appendChild(el);
     }
@@ -303,7 +307,7 @@ window.__realGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(na
       lines.push(pl.title + ":");
       for (const it of pl.items) {
         const m = marks[it.id] || {};
-        const s = m.s === "good" ? "WORKS" : m.s === "bad" ? "PROBLEM" : "not tried";
+        const s = m.s === "good" ? "WORKS" : m.s === "bad" ? "PROBLEM" : m.s === "blank" ? "BLANK SCREEN" : "not tried";
         lines.push(`- ${it.name}: ${s}` + (m.note ? ` - ${m.note}` : ""));
       }
       lines.push("");
