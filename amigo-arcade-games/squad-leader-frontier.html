@@ -1423,7 +1423,7 @@ function pad2Read(){   // any controller that isn't player 1's
 function pad2Tick(){
   const g=pad2Read();if(!g){pad2Prev=[];return;}
   const prev=pad2Prev,cur=g.buttons.map(b=>!!b&&(b.pressed||b.value>0.3)),edge=i=>cur[i]&&!prev[i];pad2Prev=cur;
-  if(state==='play'&&!ui&&copilot&&edge(2))p2Missiles();
+  if(state==='play'&&!ui&&copilot&&edge(0))p2Missiles();
   if(state==='play'&&!ui&&!coop&&player&&(edge(0)||edge(9))){setCoop(true);SFX.power();pop(player.x,player.y-60,'P2 JOINED!','#b6ff3a',2);}
 }
 function padDead(x,y){const m=Math.hypot(x,y);if(m<0.22)return [0,0];const k=Math.min(1,(m-0.22)/0.78)/m;return [x*k,y*k];}
@@ -1488,10 +1488,10 @@ function padTick(dt){
   }
   const flying=state==='play'&&!ui;
   if(flying){
-    pad.mx=L[0];pad.my=L[1];pad.shield=B(0)||B(6);
+    pad.mx=L[0];pad.my=L[1];pad.shield=B(2)||B(6);
     const rm=Math.hypot(Rs[0],Rs[1]);pad.aim=rm>0.3;if(pad.aim)pad.aimA=Math.atan2(Rs[1],Rs[0]);
     pad.fire=B(7)||pad.aim;
-    if(edge(2))fireLaser();
+    if(edge(0))fireLaser();   // 19 Nov 2026 (Lance): laser on A (bottom), shield on X
     else if(edge(3))openBuild();
     else if(edge(1))sayObjective();
     else if(edge(4))viewTap();
@@ -1832,7 +1832,7 @@ function openPause(){
   hush();
   openPanel('<h2>Paused</h2><p class="muted">Your game saves by itself.'+(G.diff!=='cadet'?' Threat level: <b>'+threat()+'</b>. It climbs as you level up, and jumps with every boss you beat.':'')+'</p><div class="row" style="margin-top:10px"><button class="big primary" data-do="close">Resume</button><button class="big alt" data-do="help">How to Play</button><button class="big alt" data-do="aimtoggle">🎯 Auto-Aim: '+(G.autoAim?'ON':'OFF')+'</button><button class="big alt" data-do="copilot">👥 Co-pilot: '+(coop?'ON':'OFF')+'</button>'+(NET.ok?'<button class="big alt" data-do="net">📡 Second device: '+(NET.room?(NET.peer?'P2 JOINED':'WAITING'):'OFF')+'</button>':'')+'<button class="big alt" data-do="talk">🔊 Amigo talks: '+(G.talk?'ON':'OFF')+'</button><button class="big alt" data-do="music" aria-pressed="'+musicOn+'">🎵 Music: '+(musicOn?'ON':'OFF')+'</button><button class="big alt" data-do="sfx" aria-pressed="'+sfxOn+'">🔔 Sound effects: '+(sfxOn?'ON':'OFF')+'</button><button class="big alt" data-do="calm" aria-pressed="'+!calm+'">💫 Shake and flashes: '+(calm?'OFF':'ON')+'</button>'+(canFull()?'<button class="big alt" data-do="full">⛶ Full Screen: '+(document.fullscreenElement?'ON':'OFF')+'</button>':'')+'<button class="big alt" data-do="title">Save and quit</button><button class="big alt" data-do="askquit">Quit without saving</button></div>');
 }
-function helpHtml(){const K=keyHints(),k=s=>K?' ('+s+')':'';return '<h2>How to Play</h2>'+(padActive?'<p><b>🎮 Controller</b>: left stick flies. A or LT is the shield, RT fires, the right stick aims and fires, X is the laser. Y builds, B says your goal, Back opens the map, Start pauses, LB zooms the view, RB drops a Beacon. D-pad up is your squad, right is quests, down zooms the mini map. In menus, move with the stick or D-pad, A chooses and B goes back. Building: the stick moves a crosshair, A places, the D-pad goes back to the buttons.</p>':'')+'<p><b>Fly anywhere.</b> '+(K?'Touch: drag to fly. Keyboard: WASD to fly, mouse to aim, Space or click to fire.':'Drag to fly.')+'</p>'+
+function helpHtml(){const K=keyHints(),k=s=>K?' ('+s+')':'';return '<h2>How to Play</h2>'+(padActive?'<p><b>🎮 Controller</b>: left stick flies. X or LT is the shield, RT fires, the right stick aims and fires, A is the laser. Y builds, B says your goal, Back opens the map, Start pauses, LB zooms the view, RB drops a Beacon. D-pad up is your squad, right is quests, down zooms the mini map. In menus, move with the stick or D-pad, A chooses and B goes back. Building: the stick moves a crosshair, A places, the D-pad goes back to the buttons.</p>':'')+'<p><b>Fly anywhere.</b> '+(K?'Touch: drag to fly. Keyboard: WASD to fly, mouse to aim, Space or click to fire.':'Drag to fly.')+'</p>'+
  '<p><b>🪞 Mirror Shield</b> ('+(K?'SHIELD, Shift, or right-click':'SHIELD')+'): press it just before a shot hits and the shot flies back, harder. Hold it to block, but that drains energy.</p>'+
  '<p><b>⚡ Laser</b> ('+(K?'LASER or E':'LASER')+'): charges as you fight.</p>'+
  '<p><b>🔧 Build</b>'+k('B')+': pick a building and tap inside a glowing ring. Tap a building to upgrade, move or delete it. Moving is free; deleting gives back half of what you spent. The game waits while you build. A Beacon can go anywhere and makes a new ring.</p>'+
@@ -1841,7 +1841,7 @@ function helpHtml(){const K=keyHints(),k=s=>K?' ('+s+')':'';return '<h2>How to P
  '<p><b>🎯 Auto-Aim</b>: when it is ON your ship aims and fires by itself. When it is OFF you aim and fire (phone: you shoot where you fly, hold FIRE). Choose it next to your rank, or change it any time in Pause.</p>'+
  '<p><b>👥 Co-pilot</b>: a second player flies the green P2 ship. Turn it on at the start screen or in Pause. On a tablet, player one drags on the left half of the screen and player two on the right half'+(K?'. On a keyboard, WASD flies you and the arrow keys fly P2':'')+(padActive?'. With two game controllers, the second one flies P2: press A on it to join':'')+'. P2 aims and fires by itself, grabs loot it touches, and comes back '+COOP_DOWN+' seconds after it goes down.</p>'+
     '<p><b>🚑 P2 is the squad\'s medic.</b> Only the green ship can do this. When a wingmate goes down, a blinking green SOS marks the spot: fly P2 onto it and the wingmate is back at once. Fly P2 right up beside a hurt friend and a green beam repairs them. P2\'s reflects count for the team too. The green card shows P2\'s hearts and what P2 has done: 💥 hits, 🪞 reflects, 🚑 rescues, 🔧 repairs.</p>'+
- '<p><b>🛡️🚀 P2 has its own shield and missiles.</b> Hold P2\'s 🛡️ to block shots, or raise it just as a shot arrives to bounce it back. P2\'s 🚀 fills as P2 fights; when it says READY, tap it for a missile barrage. On a tablet the two green buttons sit on the right edge, and the SHIELD and LASER buttons for player one move to the left side, so each player has a side'+(K?'; on a keyboard, / is the shield and . fires the missiles':'')+(padActive?'; on a second controller, A is the shield and X fires the missiles':'')+'.</p>'+
+ '<p><b>🛡️🚀 P2 has its own shield and missiles.</b> Hold P2\'s 🛡️ to block shots, or raise it just as a shot arrives to bounce it back. P2\'s 🚀 fills as P2 fights; when it says READY, tap it for a missile barrage. On a tablet the two green buttons sit on the right edge, and the SHIELD and LASER buttons for player one move to the left side, so each player has a side'+(K?'; on a keyboard, / is the shield and . fires the missiles':'')+(padActive?'; on a second controller, A is the shield and A fires the missiles':'')+'.</p>'+
  (NET.ok?'<p><b>📡 Two devices</b>: at home, player two can fly P2 from their own phone or tablet. Player one taps ⏸️ then 📡 Second device; player two opens this game and taps 🎮 Join as P2. Both need the home Wi-Fi. Player two sees the game on their own screen, following the green ship, and can fly off exploring: an arrow at the edge of each screen points to the other player. Sounds from the green ship play on the second device too.</p>':'')+
  '<p><b>🔊 Stuck?</b> Tap the goal under your meters and the arrow shows where to go. With Amigo Talks on, he says what to do too. The 🔊 buttons in 📜 always read aloud.</p>'+'<p><b>💫 Too loud or too busy?</b> Tap ⏸️: music, sound effects and Amigo talking each have their own switch, and <b>Shake and flashes</b> turns off the screen shake and fast blinking. It starts OFF if your device is set to reduce motion.</p>'+
  '<p><b>📡 Beacons in Rogue</b>: every boss you beat earns one. Tap the 📡 button to claim land right where you are.</p>'+
