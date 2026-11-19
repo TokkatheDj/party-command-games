@@ -192,9 +192,24 @@ async function ipadPro(browser, out) {
       const c = d.querySelector("#wrap canvas"); if (!c) return -2; const r = c.getBoundingClientRect(); return Math.min(r.width, r.height); } catch (e) { return -1; } });
     check("Candy Math fills the Games Arcade frame", board >= 200, "board side " + Math.round(board) + "px");
     await pg.close();
+
+    // 5. A on a menu with no Start button (Boo Tag: "1 Player") and on a canvas-only game (the
+    //    Carnival Midway: A brings up the pointer, the next A taps) - both did nothing before 19 Nov
+    pg = await ctx.newPage(); pg.on("dialog", d => d.dismiss().catch(() => {}));
+    const HUB = GAMES.replace("index.html", "cowork%20apps/all-games-hub.html") + "?v=" + Date.now();
+    for (const [id, name, want] of [["kids-bootag", "Boo Tag: A starts 1 Player", /click:.*1 Player/], ["carnival", "Carnival Midway: A brings up the pointer and taps", /pointerdown:CANVAS/]]) {
+      await pg.goto(HUB + "#play/" + id, { waitUntil: "load", timeout: 60000 }); await pg.waitForTimeout(5000);
+      const gf = pg.frames().find(f => f.parentFrame() === pg.mainFrame());
+      if (!gf) { check(name, false, "no game frame"); continue; }
+      await gf.evaluate(() => { window.__log = []; for (const t of ["pointerdown", "click"]) addEventListener(t, e => __log.push(t + ":" + ((e.target.innerText || e.target.tagName) + "").trim().slice(0, 16)), true); });
+      await press(pg, BOTTOM); await pg.waitForTimeout(500); await press(pg, BOTTOM); await pg.waitForTimeout(500);
+      const got = await gf.evaluate(() => __log.join(" ")).catch(() => "frame changed");
+      check(name, want.test(got) || (id === "kids-bootag" && got === "frame changed"), got.replace(/\s+/g, " ").slice(0, 80));
+    }
+    await pg.close();
   } finally { await ctx.close(); }
 
-  // 5. Squad Leader + Frontier read the controller themselves: run their live padByPos as this
+  // 6. Squad Leader + Frontier read the controller themselves: run their live padByPos as this
   //    iPad + controller, and check the laser is on A
   for (const [name, url] of [["Squad Leader", "https://tokkathedj.github.io/party-command-games/amigo-arcade-games/squad-leader.html"],
                              ["Squad Leader Frontier", "https://tokkathedj.github.io/party-command-games/amigo-arcade-games/squad-leader-frontier.html"]]) {

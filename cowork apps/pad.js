@@ -43,9 +43,13 @@
 
   function keyEvent(type, key) {
     const [code, keyCode] = KEYS[key];
-    if (MODE === "relay") { const f = stage(); if (f) f.contentWindow.postMessage({ amigoPad: "key", type, key }, "*"); return; }
+    if (MODE === "relay") { const f = stage(); if (f) f.contentWindow.postMessage({ amigoPad: "key", type, key }, "*"); return null; }
     const ev = fireKey(document, type, key, code, keyCode);
     if (type === "keydown" && key.startsWith("Arrow") && ev && !ev.defaultPrevented) navFocus(document, key);
+    // A the game ignored on a menu (19 Nov 2026: Boo Tag's "1 Player / 2 Players" menu): highlight
+    // the likeliest button so A visibly does something; the next A presses it
+    if (type === "keydown" && key === " " && ev && !ev.defaultPrevented) navFocus(document, "first");
+    return ev;
   }
 
   function pointerAt(type, x, y) {
@@ -214,7 +218,11 @@
       const a = document.activeElement;
       if (MODE !== "relay" && a && /^(BUTTON|A|SUMMARY)$/.test(a.tagName)) { a.click(); return; }
       if (pressStart()) { was.Aclick = true; return; }
-      keyEvent("keydown", " ");
+      const ev = keyEvent("keydown", " ");
+      if (ev && !ev.defaultPrevented && !document.querySelector(".amigo-pad-focus")) {
+        const hit = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+        if (hit && hit.tagName === "CANVAS") { cx = innerWidth / 2; cy = innerHeight / 2; showCursor(true); }
+      }
     }, () => {
       if (held) { held = false; showCursor(true); pointerAt("pointerup", cx, cy); return; }
       if (was.Aclick) { was.Aclick = false; return; }
@@ -226,16 +234,21 @@
   }
 
   // A title screen with only a START button and nothing focused (Click Click): A or Start presses it
-  const START = /^\W*(start|play|begin|go\b|let'?s|new game|tap to (start|play)|ready)/i;
+  // Most wanted first (19 Nov 2026: Line Limit's A pressed the small "New game" in its header
+  // instead of the big "Start the game"): a Start / Play button beats Spin / Roll / Deal
+  const START = [/^\W*(start|play|begin|let'?s (go|play|start)|tap to (start|play)|1 player|one player|single player|solo)/i,
+                 /^\W*(go\b|ready|spin|roll|deal|new word|let'?s)/i];   // never "New game": it would restart a game in progress
   function pressStart() {
     if (MODE === "relay") return false;            // inside the locked frame the game decides
     const a = document.activeElement;
     if (a && a !== document.body && a !== document.documentElement) return false;
-    const b = [...document.querySelectorAll("button,[role=button],input[type=button],input[type=submit]")].find(e => {
+    const shown = [...document.querySelectorAll("button,[role=button],input[type=button],input[type=submit]")].filter(e => {
       const r = e.getBoundingClientRect(), cs = getComputedStyle(e);
-      return r.width && r.height && cs.visibility !== "hidden" && !e.disabled &&
-        r.bottom > 0 && r.top < innerHeight && START.test((e.innerText || e.value || e.getAttribute("aria-label") || "").trim());
+      return r.width && r.height && cs.visibility !== "hidden" && !e.disabled && r.bottom > 0 && r.top < innerHeight;
     });
+    const label = e => (e.innerText || e.value || e.getAttribute("aria-label") || "").trim();
+    let b = null;
+    for (const re of START) { b = shown.find(e => re.test(label(e))); if (b) break; }
     if (!b) return false;
     b.click();
     return true;
@@ -273,7 +286,7 @@
     if (!now) {
       // first press: a Start / Play button if there is one, else the button nearest the middle of the screen
       var lbl = function (e) { return (e.innerText || e.value || e.getAttribute("aria-label") || "").trim(); };
-      best = all.filter(function (e) { return /^\W*(start|play|begin|go\b|let'?s|new game|ready)/i.test(lbl(e)); })[0] || all.slice().sort(function (x, y) {
+      best = all.filter(function (e) { return /^\W*(start|play|begin|go\b|let'?s|ready|1 player|one player|single player|solo|spin|roll|deal|new word)/i.test(lbl(e)); })[0] || all.slice().sort(function (x, y) {
         var rx = x.getBoundingClientRect(), ry = y.getBoundingClientRect(), cx = W.innerWidth / 2, cy = W.innerHeight / 2;
         return Math.hypot(rx.left + rx.width / 2 - cx, rx.top + rx.height / 2 - cy) - Math.hypot(ry.left + ry.width / 2 - cx, ry.top + ry.height / 2 - cy);
       })[0];
@@ -327,6 +340,7 @@
       if (d.type === "keydown" && ev && !ev.defaultPrevented) {
         if (/^Arrow/.test(d.key)) navFocus(document, d.key);
         else if ((d.key === " " || d.key === "Enter") && document.activeElement && /^(BUTTON|A|SUMMARY)$/.test(document.activeElement.tagName)) document.activeElement.click();
+        else if (d.key === " ") navFocus(document, "first");
       }
     }
     else if (d.amigoPad === "ptr" && /^pointer(down|move|up)$/.test(d.type)) firePointer(document, d.type, +d.x, +d.y);
