@@ -124,6 +124,28 @@ def netlify_sites():
     return bad
 
 
+def controllers():
+    """Game controllers still work on the live Games Arcade (every tile) and Amigo Arcade, and every
+    copy of pad.js matches cowork apps/pad.js (controller_check.js, 19 Nov 2026). Returns what failed,
+    shaped like broken tiles."""
+    r = subprocess.run([NODE, os.path.join(HERE, "controller_check.js")], cwd=HERE, capture_output=True,
+                       text=True, encoding="utf-8", timeout=3600, creationflags=NO_WINDOW)
+    try:
+        res = json.loads(r.stdout[r.stdout.index("{"):])
+    except ValueError:
+        log("controller check failed (exit %s): %s" % (r.returncode, (r.stderr or r.stdout)[-300:].strip()))
+        return [{"name": "Controller check", "ok": False, "problems": ["the check itself failed"]}]
+    bad = [{"name": "Controller: %s - %s" % (c["site"], c["name"]), "ok": False, "problems": [c["detail"]] if c["detail"] else []}
+           for c in res["checks"] if not c["ok"]]
+    bad += [{"name": "Controller: Games Arcade tile " + t["id"], "ok": False, "problems": [t["problem"]]}
+            for t in res["tiles"] if not t["ok"]]
+    bad += [{"name": "Controller: pad.js copy on the " + d["copy"] + " differs from cowork apps/pad.js", "ok": False,
+             "problems": ["sha " + d["sha"]]} for d in res["drift"] if not d["ok"]]
+    log("controllers: %d checks, %d tiles, %d pad.js copies, %s" % (len(res["checks"]), len(res["tiles"]), len(res["drift"]),
+        "%d need a look" % len(bad) if bad else "all working"))
+    return bad
+
+
 def main():
     root = os.environ.get("ARCADE_ROOT") or os.path.dirname(HERE)      # a throwaway copy, for tests
     args = [NODE, os.path.join(HERE, "arcade_play_check.js"), root] + sys.argv[1:2]
@@ -138,7 +160,7 @@ def main():
         json.dump(result, f, indent=1, ensure_ascii=False)
     bad = [t for t in result["tiles"] if not t["ok"]]
     if not sys.argv[1:2]:
-        bad += blanks_check() + subjects_check() + worksheet_a11y() + netlify_sites()
+        bad += blanks_check() + subjects_check() + worksheet_a11y() + netlify_sites() + controllers()
         bad += phone_fit(root)
     log("played %d tiles, %d need a look%s" % (len(result["tiles"]), len(bad),
         (": " + ", ".join(t["name"] for t in bad)) if bad else ""))

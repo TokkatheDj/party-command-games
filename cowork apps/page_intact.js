@@ -71,6 +71,6 @@ if (require.main === module) (async () => {
       const p = sizeProblem(bytes, live, "the live page"); if (p) problems.push(p);
     } catch (e) { problems.push("couldn't fetch the live page to compare sizes: " + e.message); }
   }
-  if (problems.length) { console.log("NOT SAFE TO DEPLOY - " + file + "\n  - " + problems.join("\n  - ")); process.exit(1); }
+  if (problems.length) { console.log("NOT SAFE TO DEPLOY - " + file + "\n  - " + problems.join("\n  - ")); process.exitCode = 1; return; }   // not exit(): see 4a16d18
   console.log(`ok - ${file} is whole (${bytes.toLocaleString()} bytes${against ? ", not smaller than live" : ""})`);
 })();
