@@ -138,6 +138,7 @@ if (-not $NoRegistry) {
 
 W "=== START '$Name'  (timeout ${TimeoutMin}m, max-turns $MaxTurns) ==="
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
+$runStart = Get-Date   # pages created after this and left unfinished are set aside (RunOutcome.ps1)
 
 $job = Start-Job -ScriptBlock {
     param($claude, $prompt, $allow, $root, $maxturns)
@@ -172,16 +173,28 @@ if (Wait-Job $job -Timeout ($TimeoutMin * 60)) {
     # The job "completing" says nothing about whether the routine produced anything.
     # Both of these exited 0 for weeks while writing no app at all, so Task Scheduler
     # reported LastTaskResult 0 and the failures stayed invisible.
+    # What counts as "produced nothing" lives in RunOutcome.ps1 (19 Nov 2026: an API error and a
+    # "5-hour limit" both logged a clean Completed and left an empty page shell).
     $degraded = $null
-    if ($fullOut -match '(?i)Reached max turns')        { $degraded = 'max-turns' }
-    # Any usage cap: "session", "weekly", ... On 12 Oct "You've hit your weekly limit"
-    # slipped past a session-only match AND past the empty-output floor (a plugin's
-    # SessionEnd hook error padded it to 231 chars), so every run "succeeded".
-    elseif ($fullOut -match "(?i)hit your (\w+ )?limit") { $degraded = if ($Matches[1]) { "$($Matches[1].Trim())-limit" } else { 'usage-limit' } }
-    elseif ($fullOut.Trim().Length -lt 200)              { $degraded = 'empty-output' }
+    try {
+        . (Join-Path $SchedHome "RunOutcome.ps1")
+        $degraded = Get-RunOutcome $fullOut
+        $exp = Get-SignInExpiry $fullOut
+        if ($exp) { W "WARN: this machine's Claude sign-in ends between $($exp.From) and $($exp.To) -- renew it (claude auth login, or claude setup-token) or every routine stops" }
+    } catch {
+        W "WARN: RunOutcome.ps1 failed ($($_.Exception.Message)) -- using the basic checks"
+        if ($fullOut -match '(?i)Reached max turns')            { $degraded = 'max-turns' }
+        elseif ($fullOut -match "(?i)hit your ([\w-]+ )?limit") { $degraded = 'usage-limit' }
+        elseif ($fullOut.Trim().Length -lt 200)                 { $degraded = 'empty-output' }
+    }
 
     if ($degraded) {
         W "WARN: '$Name' finished DEGRADED ($degraded) -- may not have produced an app"
+        # A max-turns run usually did write its app; the others can leave a page with no code in it.
+        if ($degraded -ne 'max-turns') {
+            try { $null = Rename-UnfinishedApps -Root $Root -Since $runStart -Say ${function:W} }
+            catch { W "WARN: could not look for unfinished pages ($($_.Exception.Message))" }
+        }
         W "=== DONE '$Name'  state=$($job.State)  degraded=$degraded  elapsed=$([int]$sw.Elapsed.TotalSeconds)s ==="
         Remove-Job $job -Force
         exit 3

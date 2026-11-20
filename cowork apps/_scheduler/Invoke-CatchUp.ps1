@@ -100,7 +100,9 @@ foreach ($m in $items) {
                     if ($lines[$j] -match "^\d{4}-\d{2}-\d{2} .*=== START") { $end = $j; break }
                 }
                 $block = ($lines[$i..($end - 1)]) -join "`n"
-                $barren = ($block -match "session limit") -or ($block -match "degraded=empty-output")
+                # 19 Nov 2026: also a run stopped by any usage limit ("5-hour", "weekly") or an API error.
+                # Not signed-out: a rerun cannot help until someone signs this machine in again.
+                $barren = ($block -match "session limit") -or ($block -match "degraded=(empty-output|api-error|[\w-]*limit)")
                 if (-not $barren) { $ran = $true; break }
             }
         }
