@@ -1,0 +1,385 @@
+<!-- CONCEPT: PHYSICAL & CHARADES (remote-controlled charades) - "Human Remote": a team's Controller peeks at a secret action ("walk a very stubborn dog") and may NOT speak or gesture - they can only tap buttons on a phone remote dealt from 40 robot commands (Step forward, Left arm up, Stir, Wiggle, Slow motion...), which flash huge on screen and are spoken in a robot voice; their teammate the Robot obeys every command exactly and the rest of the team shouts guesses. Every tap drains 1 battery and a correct guess scores the battery left, so fewer commands = more points; a dead battery or the 60s clock lets rival teams steal. Twist turns (Low Battery, Glitchy Remote, Double Power, Short Circuit, Sticky Buttons), 96 secret actions remembered across games, awards | Players: 4-12 in 2-4 teams | ~15-25 min [style: Retro Terminal / sound: Toy Piano] -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Human Remote</title>
+<style>
+:root{
+  --bg:#0a0f0a; --panel:#111a11; --panel2:#182418; --text:#9dff9d; --muted:#7fcf7f;
+  --btn:#ffb000; --btnText:#0a0f0a; --line:#3d6b3d; --bright:#d8ffd8;
+  --t0:#ffb000; --t1:#5ff2ff; --t2:#ff9ad8; --t3:#c9ff5f;
+  --font:"IBM Plex Mono", Consolas, "Courier New", monospace;
+  --gap:clamp(8px,2vw,14px);
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:var(--font);touch-action:manipulation;user-select:none;-webkit-user-select:none}
+#app{height:100%;overflow-y:auto;overflow-x:hidden}
+.scan{position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0 1px,transparent 1px 3px)}
+.wrap{max-width:880px;margin:0 auto;padding:var(--gap);display:flex;flex-direction:column;gap:var(--gap);min-height:100%}
+h1{margin:0;font-size:clamp(28px,8vw,56px);letter-spacing:2px;color:var(--bright);text-transform:uppercase}
+h2{margin:0;font-size:clamp(20px,5vw,32px);color:var(--bright)}
+p{margin:0;line-height:1.45}
+.muted{color:var(--muted)}
+.cursor{display:inline-block;width:.6em;height:1em;background:var(--text);vertical-align:-2px;margin-left:4px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{background:transparent}}
+@media (prefers-reduced-motion:reduce){.cursor{animation:none}}
+.panel{background:var(--panel);border:1px solid var(--line);padding:clamp(10px,3vw,18px)}
+.row{display:flex;gap:var(--gap);flex-wrap:wrap;align-items:center}
+button{font-family:var(--font);font-size:clamp(15px,3.8vw,20px);min-height:48px;cursor:pointer;border-radius:0;
+  border:1px solid var(--btn);background:var(--btn);color:var(--btnText);padding:8px 14px;font-weight:700}
+button.ghost{background:var(--panel2);color:var(--text);border-color:var(--line)}
+button.ghost[aria-pressed="true"]{background:#0f3a0f;color:#ffffff;border-color:var(--text)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--bright);outline-offset:2px}
+button:disabled{background:var(--panel2);color:var(--muted);border-color:var(--line);cursor:default}
+.big{font-size:clamp(20px,5.5vw,30px);min-height:64px;width:100%}
+input[type=text]{font-family:var(--font);font-size:18px;background:var(--bg);color:var(--text);border:1px solid var(--line);
+  padding:8px;min-height:48px;width:100%;border-radius:0}
+.teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--gap)}
+.tag{font-weight:700}
+.t0{color:var(--t0)} .t1{color:var(--t1)} .t2{color:var(--t2)} .t3{color:var(--t3)}
+ol.rules{margin:0;padding-left:1.4em;line-height:1.5}
+.secret{font-size:clamp(26px,7vw,48px);color:var(--bright);text-align:center;padding:24px 8px;border:1px dashed var(--text);line-height:1.2}
+.screen{background:#000;border:1px solid var(--text);min-height:clamp(96px,22vh,170px);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:8px}
+.cmd{font-size:clamp(28px,8.5vw,60px);color:var(--bright);font-weight:700;line-height:1.1}
+.cmdmod{font-size:clamp(16px,4.5vw,26px);color:var(--btn)}
+.hud{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;text-align:center;font-size:clamp(14px,3.6vw,18px)}
+.hud b{display:block;font-size:clamp(20px,5.5vw,30px);color:var(--bright)}
+.bar{height:14px;border:1px solid var(--line);background:var(--bg)}
+.bar>i{display:block;height:100%;background:var(--text)}
+.remote{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(30%,150px),1fr));gap:6px}
+.remote button{min-height:56px;font-size:clamp(13px,3.4vw,17px);padding:4px;line-height:1.15;background:var(--panel2);color:var(--text);border-color:var(--line)}
+.remote button.free{border-color:var(--btn);color:var(--btn)}
+.board{width:100%;border-collapse:collapse;font-size:clamp(16px,4vw,22px)}
+.board td{padding:8px;border-bottom:1px solid var(--line)}
+.board td:last-child{text-align:right;color:var(--bright);font-weight:700}
+.twist{border:1px solid var(--btn);padding:10px;color:var(--btn)}
+.twist b{color:var(--bright)}
+.steal{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.foot{margin-top:auto;font-size:14px}
+</style>
+</head>
+<body>
+<div class="scan" aria-hidden="true"></div>
+<main id="app"></main>
+<script>
+// ---------- CONTENT ----------
+const ACTIONS=[
+"Walk a very stubborn dog","Brush a giant's teeth","Bake a pizza","Change a baby's nappy","Wash an elephant","Fly a kite",
+"Build a snowman","Paint a wall","Ride a horse","Climb a ladder","Row a boat","Milk a cow","Play the drums","Mow the lawn",
+"Make a sandwich","Wrap a present","Catch a butterfly","Open a stuck jar","Put on a wetsuit","Blow up a balloon",
+"Fish and catch a big one","Juggle three balls","Hammer a nail","Iron a shirt","Do the laundry","Water the garden",
+"Carry a sleeping cat","Push a broken-down car","Walk on a tightrope","Dig for treasure","Put out a fire","Skip with a rope",
+"Throw a bowling ball","Swat a fly","Take a selfie","Sneak past a sleeping bear","Lift a heavy suitcase","Ski down a hill",
+"Shoot a basketball","Hit a golf ball","Serve at tennis","Surf a giant wave","Ice skate","Play the violin","Conduct an orchestra",
+"Pick apples from a tree","Plant a seed","Rock a baby to sleep","Brush a horse","Shave a beard","Put on lipstick",
+"Hang up washing","Vacuum the carpet","Scrub a dirty pan","Flip pancakes","Chop firewood","Pump up a bike tyre",
+"Ride a bike","Drive a race car","Steer a ship in a storm","Land an aeroplane","Ring a big church bell","Stir a witch's cauldron",
+"Wake up a grumpy dragon","Tickle a tiger","Feed a baby bird","Hatch from an egg","Swim through jelly","Escape quicksand",
+"Squeeze into tiny jeans","Untangle headphones","Peel a banana","Eat spaghetti","Lick an ice cream in the sun","Blow out birthday candles",
+"Knit a scarf","Pour a cup of tea","Shake a fizzy drink","Open an umbrella in the wind","Walk on hot sand","Tiptoe past a baby",
+"Pull a tooth","Lasso a bull","Sweep the floor","Throw a paper aeroplane","Pop bubble wrap","Bounce on a trampoline",
+"Do a magic trick","Take a dog to the vet","Carry a tray of drinks","Paddle a canoe","Shovel snow","Arm-wrestle a gorilla",
+"Make a snow angel","Play hopscotch","Brush long hair","Dance at a wedding","Get stuck in a lift","Defuse a bomb"
+];
+const COMMANDS=[
+["Step forward","🦶"],["Step back","🦶"],["Turn left","↺"],["Turn right","↻"],["Spin around","🌀"],["Crouch down","⬇"],
+["Jump","⬆"],["Tiptoe","🩰"],["Sit down","🪑"],["Lie down","🛌"],["Left arm up","💪"],["Right arm up","💪"],
+["Both arms out","✋"],["Wave","👋"],["Reach forward","🫴"],["Clap","👏"],["Point","👉"],["Hug yourself","🤗"],
+["Grab","✊"],["Pull","🪢"],["Push","🫸"],["Shake","🫨"],["Wiggle","🐛"],["Stir","🥄"],["Scrub","🧽"],["Throw","🤾"],
+["Lift something heavy","🏋"],["Tap tap tap","☝"],["Pat","🫳"],["Twist","🔧"],["Smile big","😁"],["Look scared","😱"],
+["Sniff","👃"],["Look surprised","😮"],["Yawn","🥱"],["Cry","😢"],["Nod","👍"],["Shake head","🙅"],["Balance on one leg","🦩"],["March","🥁"]
+];
+const MODS=["in slow motion","like a cat","very tiny","very HUGE","like a wobbly jelly","super fast","like a grandparent","like a ballerina"];
+const FREE=[["Freeze","🧊"],["Again","🔁"]];
+const TWISTS=[
+ {id:"low",name:"Low Battery",text:"The remote starts with only 6 battery."},
+ {id:"glitch",name:"Glitchy Remote",text:"Every command comes out with a random style (in slow motion, like a cat...)."},
+ {id:"double",name:"Double Power",text:"A correct guess scores double points."},
+ {id:"short",name:"Short Circuit",text:"Only 40 seconds on the clock."},
+ {id:"sticky",name:"Sticky Buttons",text:"Only 8 commands on the remote."}
+];
+const TEAM_DEFAULT=["Toasters","Robo-Cats","Mega Bots","Wind-Ups"];
+const safeLS={getItem(k){try{return window.localStorage.getItem(k)}catch(e){return null}},setItem(k,v){try{window.localStorage.setItem(k,v)}catch(e){}}}; /* saved data may be blocked (private mode, tablet settings): play on without it */
+const LS="cowork-humanremote-";
+
+// ---------- SOUND (Toy Piano) ----------
+let ac=null,master=null,soundOn=true,voiceOn=('speechSynthesis' in window);
+function audio(){
+  if(!ac){
+    const C=window.AudioContext||window.webkitAudioContext; if(!C)return null;
+    ac=new C(); const comp=ac.createDynamicsCompressor(); comp.threshold.value=-18; comp.ratio.value=4;
+    master=ac.createGain(); master.gain.value=soundOn?0.7:0; master.connect(comp); comp.connect(ac.destination);
+  }
+  if(ac.state==="suspended")ac.resume();
+  return ac;
+}
+function toy(freq,when=0,dur=0.5,vol=0.3){
+  const a=audio(); if(!a)return; const t=a.currentTime+when;
+  const g=a.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur); g.connect(master);
+  [0,-9,7].forEach((det,i)=>{ // two detuned triangles + slightly sour third voice for toy charm
+    const o=a.createOscillator(); o.type="triangle"; o.frequency.value=freq; o.detune.value=det+(i===2?14:0);
+    const og=a.createGain(); og.gain.value=i===2?0.25:0.5; o.connect(og); og.connect(g); o.start(t); o.stop(t+dur+0.05);
+  });
+  const tine=a.createOscillator(), tg=a.createGain(); tine.type="sine"; tine.frequency.value=freq*4.07;
+  tg.gain.setValueAtTime(0.0001,t); tg.gain.exponentialRampToValueAtTime(vol*0.5,t+0.005);
+  tg.gain.exponentialRampToValueAtTime(0.0001,t+0.09); tine.connect(tg); tg.connect(master); tine.start(t); tine.stop(t+0.12);
+}
+const N={C4:261.6,D4:293.7,E4:329.6,G4:392,A4:440,C5:523.3,D5:587.3,E5:659.3,G5:784,A5:880,C6:1046.5,F3:174.6,Bb3:233.1};
+const SFX={
+  motif(){[N.C5,N.G4,N.E5,N.C6].forEach((f,i)=>toy(f,i*0.14,0.6,0.28))},
+  tap(){toy(N.A5,0,0.14,0.18);toy(N.E5,0.04,0.12,0.12)},
+  win(){[N.C5,N.E5,N.G5,N.C6,N.G5,N.C6].forEach((f,i)=>toy(f,i*0.09,0.5,0.25))},
+  fail(){toy(N.Bb3,0,0.6,0.3);toy(N.F3*1.01,0.28,0.9,0.3)},
+  tick(){toy(N.C6,0,0.08,0.1)},
+  steal(){[N.G4,N.D5,N.G5].forEach((f,i)=>toy(f,i*0.07,0.3,0.22))}
+};
+function setSound(on){soundOn=on; if(master)master.gain.value=on?0.7:0; safeLS.setItem(LS+"sound",on?"1":"0")}
+function speak(txt){
+  if(!voiceOn||!('speechSynthesis' in window))return;
+  try{speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(txt); u.pitch=0.2; u.rate=0.95; speechSynthesis.speak(u);}catch(e){}
+}
+
+// ---------- STATE ----------
+let G=null, T=null, timerId=null;
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+function used(){try{return JSON.parse(safeLS.getItem(LS+"used")||"[]")}catch(e){return[]}}
+function markUsed(a){let u=used(); if(!u.includes(a))u.push(a); if(u.length>ACTIONS.length-12)u=u.slice(-20); safeLS.setItem(LS+"used",JSON.stringify(u))}
+function drawAction(exclude=[]){
+  const u=used(); let pool=ACTIONS.filter(a=>!u.includes(a)&&!exclude.includes(a)&&!G.played.includes(a));
+  if(!pool.length)pool=ACTIONS.filter(a=>!exclude.includes(a));
+  return pool[Math.random()*pool.length|0];
+}
+let setup={teams:2,names:TEAM_DEFAULT.slice(),rounds:3};
+try{const s=JSON.parse(safeLS.getItem(LS+"setup")||"null"); if(s&&s.names)setup=s;}catch(e){}
+soundOn=safeLS.getItem(LS+"sound")!=="0";
+if(safeLS.getItem(LS+"voice")==="0")voiceOn=false;
+
+// ---------- SCREENS ----------
+function render(html){clearInterval(timerId); $("#app").innerHTML=`<div class="wrap">${html}</div>`; $("#app").scrollTop=0}
+function toggles(){
+  const hasVoice='speechSynthesis' in window;
+  return `<div class="row">
+   <button class="ghost" id="snd" aria-pressed="${soundOn}">Sound: ${soundOn?"ON":"OFF"}</button>
+   ${hasVoice?`<button class="ghost" id="vox" aria-pressed="${voiceOn}">Robot voice: ${voiceOn?"ON":"OFF"}</button>`:""}
+  </div>`;
+}
+function bindToggles(rerender){
+  const s=$("#snd"); if(s)s.onclick=()=>{setSound(!soundOn); rerender()};
+  const v=$("#vox"); if(v)v.onclick=()=>{voiceOn=!voiceOn; safeLS.setItem(LS+"voice",voiceOn?"1":"0"); rerender()};
+}
+
+function showSetup(){
+  const teamInputs=[...Array(setup.teams)].map((_,i)=>`<label class="tag t${i}">Team ${i+1}
+     <input type="text" id="tn${i}" maxlength="16" value="${esc(setup.names[i]||TEAM_DEFAULT[i])}"></label>`).join("");
+  render(`
+  <header><h1>Human Remote<span class="cursor" aria-hidden="true"></span></h1>
+  <p class="muted">&gt; Remote-control charades. The Controller can't speak - only tap commands - while the Robot obeys and the team guesses the secret action.</p>
+  <p class="muted">&gt; 4-12 players in 2-4 teams &middot; ~15-25 min</p></header>
+  <section class="panel" aria-labelledby="hw"><h2 id="hw">How to play</h2>
+   <ol class="rules">
+    <li>Each turn a team picks a <b>Controller</b> (holds the phone) and a <b>Robot</b>.</li>
+    <li>The Controller secretly reads an action, then may <b>only tap commands</b> - no talking, no pointing.</li>
+    <li>Each command flashes on screen and is spoken aloud. The Robot does exactly that. The team shouts guesses.</li>
+    <li>Every tap costs 1 battery. A correct guess scores the battery left (at least 2). Fail and the other teams can steal for 2.</li>
+   </ol></section>
+  <section class="panel"><h2>Teams</h2>
+   <div class="row" role="group" aria-label="Number of teams">${[2,3,4].map(n=>`<button class="ghost" data-teams="${n}" aria-pressed="${setup.teams===n}">${n} teams</button>`).join("")}</div>
+   <div class="teams" style="margin-top:10px">${teamInputs}</div></section>
+  <section class="panel"><h2>Rounds</h2>
+   <div class="row" role="group" aria-label="Rounds">${[2,3,4,5].map(n=>`<button class="ghost" data-rounds="${n}" aria-pressed="${setup.rounds===n}">${n} rounds</button>`).join("")}</div>
+   <p class="muted" style="margin-top:8px">Every team plays once per round. Twist turns start in round 2.</p></section>
+  ${toggles()}
+  <button class="big" id="go">&gt; POWER ON</button>
+  <p class="muted foot">Secret actions you've played are remembered, so the next game deals fresh ones.</p>`);
+  const saveNames=()=>{for(let i=0;i<setup.teams;i++){const el=$("#tn"+i); if(el)setup.names[i]=el.value.trim()||TEAM_DEFAULT[i]}};
+  document.querySelectorAll("[data-teams]").forEach(b=>b.onclick=()=>{saveNames(); setup.teams=+b.dataset.teams; showSetup()});
+  document.querySelectorAll("[data-rounds]").forEach(b=>b.onclick=()=>{saveNames(); setup.rounds=+b.dataset.rounds; showSetup()});
+  bindToggles(()=>{saveNames(); showSetup()});
+  $("#go").onclick=()=>{saveNames(); safeLS.setItem(LS+"setup",JSON.stringify(setup)); audio(); SFX.motif(); newGame()};
+}
+
+function newGame(){
+  G={teams:setup.names.slice(0,setup.teams).map((n,i)=>({name:n,score:0,wins:0,cmds:0,fast:null,steals:0,idx:i})),
+     rounds:setup.rounds,round:1,turn:0,played:[],log:[]};
+  turnIntro();
+}
+const team=i=>G.teams[i];
+const tName=t=>`<span class="tag t${t.idx}">${esc(t.name)}</span>`;
+
+function scoreboard(){
+  const rows=G.teams.slice().sort((a,b)=>b.score-a.score).map(t=>`<tr><td>${tName(t)}</td><td>${t.score}</td></tr>`).join("");
+  return `<table class="board" aria-label="Scoreboard"><tbody>${rows}</tbody></table>`;
+}
+
+function turnIntro(){
+  const t=team(G.turn);
+  const twist=(G.round>1&&Math.random()<0.45)?TWISTS[Math.random()*TWISTS.length|0]:null;
+  T={team:t,twist,action:drawAction(),skipped:false,battery:twist&&twist.id==="low"?6:10,
+     time:twist&&twist.id==="short"?40:60,cmds:0,last:null,start:0};
+  T.maxBattery=T.battery;
+  render(`
+   <p class="muted">&gt; ROUND ${G.round} of ${G.rounds}</p>
+   <h1>${tName(t)}</h1>
+   <section class="panel"><p style="font-size:clamp(17px,4.4vw,22px)">Pick a <b>Controller</b> to hold the phone and a <b>Robot</b> to stand where the team can see them.</p>
+   <p class="muted" style="margin-top:6px">Robot and teammates: look away while the Controller peeks.</p></section>
+   ${twist?`<div class="twist" role="note">TWIST: <b>${twist.name}</b> - ${twist.text}</div>`:""}
+   <button class="big" id="peek">Controller: peek at the secret</button>
+   <section class="panel" aria-label="Scores">${scoreboard()}</section>`);
+  $("#peek").onclick=()=>{SFX.tap(); peek()};
+}
+
+function peek(){
+  render(`
+   <p class="muted">&gt; TOP SECRET - Controller only</p>
+   <div class="secret" id="sec">${esc(T.action)}</div>
+   <p class="muted">Remember: no talking, no pointing, no mouthing. Only the remote.</p>
+   <button class="big" id="start">Hide it &amp; start the clock</button>
+   ${T.skipped?"":`<button class="ghost" id="swap">Too hard? Swap it (once)</button>`}`);
+  $("#start").onclick=play;
+  const s=$("#swap"); if(s)s.onclick=()=>{T.skipped=true; T.action=drawAction([T.action]); SFX.tap(); peek()};
+}
+
+function dealRemote(){
+  const n=T.twist&&T.twist.id==="sticky"?8:12;
+  return shuffle(COMMANDS).slice(0,n);
+}
+
+function play(){
+  T.remote=dealRemote(); T.start=performance.now(); T.left=T.time;
+  G.played.push(T.action);
+  const btns=T.remote.map((c,i)=>`<button data-c="${i}"><span aria-hidden="true">${c[1]}</span> ${esc(c[0])}</button>`).join("")
+    +FREE.map((c,i)=>`<button class="free" data-f="${i}"><span aria-hidden="true">${c[1]}</span> ${c[0]} (free)</button>`).join("");
+  render(`
+   <div class="screen" aria-live="polite" id="scr"><div class="cmd" id="cmd">READY</div><div class="cmdmod" id="mod">Robot: watch this screen</div></div>
+   <div class="hud">
+     <div>TIME<b id="tm">${T.time}</b></div>
+     <div>BATTERY<b id="bt">${T.battery}</b></div>
+     <div>WORTH<b id="wt">${worth()}</b></div>
+   </div>
+   <div class="bar" aria-hidden="true"><i id="bb" style="width:100%"></i></div>
+   <div class="remote" aria-label="Remote control commands">${btns}</div>
+   <div class="row" style="flex-wrap:nowrap">
+     <button class="big" id="got" style="flex:2">GOT IT!</button>
+     <button class="ghost" id="quit" style="flex:1;min-height:64px">Give up</button>
+   </div>
+   <p class="muted">${tName(T.team)} is playing${T.twist?` &middot; TWIST: ${T.twist.name}`:""}</p>`);
+  document.querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>command(T.remote[+b.dataset.c][0],false));
+  document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{
+    if(+b.dataset.f===0)command("FREEZE",true); else if(T.last)command(T.last,true,true);
+  });
+  $("#got").onclick=()=>endTurn(true);
+  $("#quit").onclick=()=>endTurn(false);
+  timerId=setInterval(tick,250);
+}
+function worth(){const w=Math.max(2,T.battery); return T.twist&&T.twist.id==="double"?w*2:w}
+function command(text,free,again){
+  if(!free){
+    if(T.battery<=0)return;
+    T.battery--; T.cmds++;
+    if(T.twist&&T.twist.id==="glitch")text=text+"|"+MODS[Math.random()*MODS.length|0];
+    T.last=text;
+  }
+  const [main,mod]=text.split("|");
+  $("#cmd").textContent=main.toUpperCase(); $("#mod").textContent=mod?mod:(again?"(again)":"");
+  SFX.tap(); speak(main+(mod?" "+mod:""));
+  $("#bt").textContent=T.battery; $("#wt").textContent=worth();
+  $("#bb").style.width=(100*T.battery/T.maxBattery)+"%";
+  if(T.battery<=0){
+    document.querySelectorAll("[data-c]").forEach(b=>b.disabled=true);
+    $("#mod").textContent="BATTERY EMPTY - keep guessing!";
+  }
+}
+function tick(){
+  const left=Math.max(0,Math.ceil(T.time-(performance.now()-T.start)/1000));
+  if(left!==T.left){T.left=left; const el=$("#tm"); if(el)el.textContent=left; if(left<=10&&left>0)SFX.tick();}
+  if(left<=0)endTurn(false);
+}
+
+function endTurn(ok){
+  clearInterval(timerId); try{speechSynthesis.cancel()}catch(e){}
+  markUsed(T.action);
+  const secs=Math.round((performance.now()-T.start)/1000);
+  const t=T.team;
+  if(ok){
+    const pts=worth(); t.score+=pts; t.wins++; t.cmds+=T.cmds;
+    if(t.fast===null||secs<t.fast)t.fast=secs;
+    G.log.push({team:t.idx,action:T.action,pts,cmds:T.cmds,secs,ok:true});
+    SFX.win();
+    render(`
+     <h1>CORRECT!</h1>
+     <div class="secret">${esc(T.action)}</div>
+     <p style="font-size:clamp(18px,4.6vw,24px)">${tName(t)} score <b style="color:var(--bright)">+${pts}</b> using ${T.cmds} command${T.cmds===1?"":"s"} in ${secs}s.</p>
+     <button class="big" id="next">Next</button>
+     <section class="panel">${scoreboard()}</section>`);
+    $("#next").onclick=advance;
+  } else {
+    SFX.fail();
+    const rivals=G.teams.filter(x=>x!==t);
+    render(`
+     <h1>POWER DOWN</h1>
+     <p style="font-size:clamp(18px,4.6vw,22px)">STEAL! Other teams: one guess each, out loud. Controller - did anyone get it?</p>
+     <div class="steal">${rivals.map(r=>`<button data-s="${r.idx}">${esc(r.name)} got it (+2)</button>`).join("")}
+       <button class="ghost" id="none">Nobody got it</button></div>
+     <p class="muted">The secret is revealed after the steal.</p>`);
+    const finish=(stealer)=>{
+      if(stealer){stealer.score+=2; stealer.steals++; SFX.steal();}
+      G.log.push({team:t.idx,action:T.action,pts:0,cmds:T.cmds,secs,ok:false,stealer:stealer?stealer.idx:null});
+      render(`
+       <h2>The secret was</h2>
+       <div class="secret">${esc(T.action)}</div>
+       <p style="font-size:clamp(17px,4.4vw,22px)">${stealer?`${tName(stealer)} steal 2 points!`:"Nobody scores this time."}</p>
+       <button class="big" id="next">Next</button>
+       <section class="panel">${scoreboard()}</section>`);
+      $("#next").onclick=advance;
+    };
+    document.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>finish(team(+b.dataset.s)));
+    $("#none").onclick=()=>finish(null);
+  }
+}
+
+function advance(){
+  G.turn++;
+  if(G.turn>=G.teams.length){G.turn=0; G.round++;}
+  if(G.round>G.rounds)return finale();
+  turnIntro();
+}
+
+function finale(){
+  const sorted=G.teams.slice().sort((a,b)=>b.score-a.score);
+  const top=sorted[0].score, winners=sorted.filter(t=>t.score===top);
+  const awards=[];
+  const eff=G.log.filter(l=>l.ok).sort((a,b)=>a.cmds-b.cmds)[0];
+  if(eff)awards.push(["Power Saver",`${esc(team(eff.team).name)} - "${esc(eff.action)}" in just ${eff.cmds} command${eff.cmds===1?"":"s"}`]);
+  const fast=G.log.filter(l=>l.ok).sort((a,b)=>a.secs-b.secs)[0];
+  if(fast)awards.push(["Quick Circuits",`${esc(team(fast.team).name)} - guessed in ${fast.secs}s`]);
+  const thief=G.teams.slice().sort((a,b)=>b.steals-a.steals)[0];
+  if(thief&&thief.steals)awards.push(["Signal Jammer",`${esc(thief.name)} - ${thief.steals} steal${thief.steals===1?"":"s"}`]);
+  const hard=G.log.filter(l=>!l.ok&&l.stealer===null).map(l=>l.action);
+  if(hard.length)awards.push(["Unsolved Mystery",`"${esc(hard[0])}"`]);
+  SFX.motif(); setTimeout(()=>SFX.win(),700);
+  render(`
+   <p class="muted">&gt; GAME OVER</p>
+   <h1>${winners.length>1?"It's a tie!":`${esc(winners[0].name)} win!`}</h1>
+   <p style="font-size:clamp(18px,4.6vw,24px)">${winners.map(tName).join(" &amp; ")} with ${top} points.</p>
+   <section class="panel">${scoreboard()}</section>
+   ${awards.length?`<section class="panel"><h2>Awards</h2>${awards.map(a=>`<p style="margin-top:8px"><b style="color:var(--btn)">${a[0]}</b><br>${a[1]}</p>`).join("")}</section>`:""}
+   <section class="panel"><h2>Every action</h2>${G.log.map(l=>`<p style="margin-top:6px">${tName(team(l.team))}: ${esc(l.action)} - ${l.ok?`+${l.pts}`:(l.stealer!=null?`stolen by ${esc(team(l.stealer).name)}`:"unsolved")}</p>`).join("")}</section>
+   <button class="big" id="again">Play again (same teams)</button>
+   <button class="ghost" id="setup">New game setup</button>`);
+  $("#again").onclick=()=>{SFX.motif(); newGame()};
+  $("#setup").onclick=showSetup;
+}
+
+showSetup();
+</script>
+</body>
+</html>

@@ -1,0 +1,589 @@
+<!-- CONCEPT: HIDE & SEEK / SEARCH (follow the footprints) - Whose Tracks?: forest friends have hidden behind bushes, logs and rocks in a snowy chalkboard meadow, and kids look at the footprint card (bunny hops, bird forks, duck webs, fox toes, deer hearts, bear paws, mouse tail-drag), find the matching trail among 2-4 winding trails that cross each other, tap prints to light the trail step by step, and tap the hiding spot where it ends; a wrong spot just has that friend peek out and wave "those were MY prints!" while their trail glows. Five walks grow from two straight trails to four criss-crossing trails half-covered by fresh snow, with a Sniff hint, read-aloud clues, saved stars per walk and a Track Book of every print learned. No timer, no losing. Ages 4-10. [style: Chalkboard / sound: Music Box] -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Whose Tracks? Snowy Trail Detectives</title>
+<style>
+:root{
+  --bg:#1f3a2e; --panel:#2a4a3b; --text:#f4f1e8; --muted:#c8d5c9;
+  --btn:#ffd166; --btn-text:#1b1030; --chalk:#f4f1e8; --lit:#ffd166; --peek:#9fd3ff;
+  --gap:clamp(6px,2vw,12px);
+  --font:"Patrick Hand","Chalkboard SE","Marker Felt","Comic Sans MS","Comic Neue",cursive;
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:var(--font);touch-action:manipulation;user-select:none;-webkit-user-select:none;}
+button{font-family:inherit;cursor:pointer;touch-action:manipulation;}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;}
+.screen[hidden]{display:none;}
+.scroll{overflow-y:auto;overflow-x:clip;padding:var(--gap) var(--gap) 24px;}
+h1{font-size:clamp(34px,10vw,64px);margin:12px 0 0;text-align:center;font-weight:700;line-height:1.05;}
+h1 .u, h2 .u{background-image:linear-gradient(var(--btn),var(--btn));background-repeat:no-repeat;background-size:100% 4px;background-position:0 95%;padding-bottom:6px;}
+h2{font-size:clamp(26px,7vw,40px);margin:8px 0;text-align:center;font-weight:700;}
+.tag{text-align:center;color:var(--muted);font-size:clamp(17px,4.6vw,24px);margin:8px auto 0;max-width:34em;line-height:1.3;}
+.big{display:block;margin:14px auto 0;min-width:min(280px,82vw);min-height:64px;padding:10px 22px;font-size:clamp(22px,6vw,30px);
+  background:var(--btn);color:var(--btn-text);border:2px dashed var(--btn-text);border-radius:14px 10px 16px 12px;font-weight:700;}
+.ghost{background:var(--panel);color:var(--text);border:2px dashed var(--chalk);}
+.big:active,.chip:active,.walk:active{transform:scale(.96);}
+.icon{min-width:48px;min-height:48px;font-size:22px;background:var(--panel);color:var(--text);border:2px dashed var(--muted);border-radius:12px;padding:4px 10px;}
+.title-art{display:block;margin:10px auto 0;width:min(320px,80vw);height:auto;}
+.walks{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,42vw),1fr));gap:12px;max-width:640px;margin:10px auto 0;grid-auto-rows:max-content;}
+.walk{min-height:120px;background:var(--panel);color:var(--text);border:2px dashed var(--chalk);border-radius:16px 12px 18px 10px;padding:10px 8px;text-align:center;font-size:clamp(17px,4.6vw,22px);line-height:1.2;}
+.walk .em{font-size:34px;display:block;}
+.walk .st{display:block;color:var(--btn);font-size:22px;margin-top:4px;letter-spacing:2px;}
+.walk .sub{display:block;color:var(--muted);font-size:clamp(14px,3.8vw,18px);}
+.topbar{display:flex;align-items:center;gap:8px;padding:6px var(--gap);flex:0 0 auto;}
+.topbar .grow{flex:1;text-align:center;font-size:clamp(20px,5.4vw,28px);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.clue{display:flex;align-items:center;gap:10px;margin:0 var(--gap);padding:6px 10px;background:var(--panel);border:2px dashed var(--chalk);border-radius:14px 10px 12px 16px;flex:0 0 auto;}
+.clue canvas{width:64px;height:64px;flex:0 0 64px;background:var(--bg);border-radius:10px;}
+.clue .ctext{flex:1;font-size:clamp(19px,5.2vw,26px);line-height:1.15;}
+.clue .ctext b{color:var(--btn);}
+.dots{display:flex;gap:6px;justify-content:center;font-size:20px;color:var(--muted);}
+#stageWrap{position:relative;flex:1 1 auto;min-height:0;margin:6px var(--gap) 0;border:2px dashed var(--muted);border-radius:16px;overflow:hidden;}
+#stage{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;}
+.spot{position:absolute;background:transparent;border:2px dashed transparent;border-radius:14px;color:transparent;font-size:1px;}
+.spot:focus-visible{border-color:var(--btn);outline:none;}
+.spot:disabled{cursor:default;}
+.bottombar{display:flex;align-items:center;gap:8px;padding:6px var(--gap) 8px;flex:0 0 auto;}
+#msg{flex:1;height:2.6em;overflow:hidden;font-size:clamp(17px,4.6vw,22px);line-height:1.25;display:flex;align-items:center;}
+#msg span{display:block;}
+.chip{min-height:52px;padding:6px 14px;font-size:clamp(18px,4.8vw,22px);background:var(--btn);color:var(--btn-text);border:2px dashed var(--btn-text);border-radius:12px;font-weight:700;white-space:nowrap;}
+.book{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(150px,42vw),1fr));gap:12px;max-width:700px;margin:10px auto 0;grid-auto-rows:max-content;}
+.card{background:var(--panel);border:2px dashed var(--chalk);border-radius:14px 10px 16px 12px;padding:8px;text-align:center;}
+.card canvas{width:100%;height:auto;aspect-ratio:1/1;max-width:140px;display:block;margin:0 auto;}
+.card .nm{font-size:clamp(19px,5vw,24px);font-weight:700;}
+.card .ct{color:var(--muted);font-size:clamp(15px,4vw,18px);}
+.card .tip{color:var(--text);font-size:clamp(14px,3.8vw,17px);line-height:1.2;margin-top:2px;}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(15,30,22,.82);z-index:5;padding:16px;}
+#overlay[hidden]{display:none;}
+.panel{background:var(--panel);border:2px dashed var(--chalk);border-radius:18px 12px 20px 14px;padding:16px;max-width:420px;width:100%;text-align:center;}
+.panel .stars{font-size:48px;color:var(--btn);letter-spacing:6px;}
+.panel p{font-size:clamp(18px,5vw,24px);margin:6px 0;}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+.row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px;}
+.row .big{margin:8px 0 0;min-width:0;flex:1 1 140px;}
+</style>
+</head>
+<body>
+<!-- TITLE -->
+<section class="screen" id="scrTitle">
+  <div class="scroll">
+    <div class="topbar" style="padding:0"><span class="grow"></span><button class="icon" id="muteT" aria-pressed="false" aria-label="Sound on">🔊</button></div>
+    <h1><span class="u">Whose Tracks?</span></h1>
+    <p class="tag">Friends are hiding in the snowy forest! Look at the footprints, follow the right trail, and tap the spot where it ends.</p>
+    <canvas class="title-art" id="titleArt" width="640" height="300" role="img" aria-label="Footprint trails in the snow leading to a bush"></canvas>
+    <button class="big" id="btnPlay">Let's Go! 👣</button>
+    <button class="big ghost" id="btnBook">📖 Track Book</button>
+  </div>
+</section>
+
+<!-- WALK MAP -->
+<section class="screen" id="scrMap" hidden>
+  <div class="topbar"><button class="icon" id="mapBack" aria-label="Back to start">⬅</button><span class="grow">Pick a Walk</span><button class="icon" id="muteM" aria-pressed="false" aria-label="Sound on">🔊</button></div>
+  <div class="scroll"><div class="walks" id="walks"></div></div>
+</section>
+
+<!-- PLAY -->
+<section class="screen" id="scrPlay" hidden>
+  <div class="topbar">
+    <button class="icon" id="playBack" aria-label="Back to walks">⬅</button>
+    <span class="grow" id="walkName">Walk</span>
+    <button class="icon" id="muteP" aria-pressed="false" aria-label="Sound on">🔊</button>
+  </div>
+  <div class="clue">
+    <canvas id="clueCv" width="128" height="128" role="img" aria-label="Footprint to find"></canvas>
+    <div class="ctext"><span id="clueText">Find <b>Bunny</b>!</span><div class="dots" id="dots" aria-label="Round 1 of 4"></div></div>
+    <button class="icon" id="sayBtn" aria-label="Read the clue">🗣️</button>
+  </div>
+  <div id="stageWrap">
+    <canvas id="stage" role="img" aria-label="Snowy meadow with footprint trails leading to hiding spots"></canvas>
+    <div id="spots"></div>
+  </div>
+  <div class="bottombar">
+    <div id="msg" aria-live="polite"><span>Tap a footprint to light up its trail.</span></div>
+    <button class="chip" id="hintBtn">👃 Sniff</button>
+  </div>
+  <div id="overlay" hidden><div class="panel" id="overPanel"></div></div>
+</section>
+
+<!-- TRACK BOOK -->
+<section class="screen" id="scrBook" hidden>
+  <div class="topbar"><button class="icon" id="bookBack" aria-label="Back to start">⬅</button><span class="grow">Track Book</span><span style="width:48px"></span></div>
+  <div class="scroll">
+    <p class="tag">Every friend leaves their own footprints. Find a friend to fill in their page!</p>
+    <div class="book" id="book"></div>
+    <button class="big ghost" id="bookReset" style="margin-top:20px">Start over (clear stars)</button>
+  </div>
+</section>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const KEY = 'cowork-whosetracks-';
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- saved progress ---------- */
+let save = { stars:{}, book:{}, muted:false };
+try { const s = JSON.parse(localStorage.getItem(KEY+'save')); if (s && typeof s==='object') save = Object.assign(save, s); } catch(e){}
+const persist = () => { try { localStorage.setItem(KEY+'save', JSON.stringify(save)); } catch(e){} };
+
+/* ---------- Music Box sound kit ---------- */
+let AC=null, master=null, wet=null;
+function audio(){
+  if (AC) { if (AC.state==='suspended') AC.resume(); return AC; }
+  const C = window.AudioContext || window.webkitAudioContext; if (!C) return null;
+  AC = new C();
+  const comp = AC.createDynamicsCompressor();
+  comp.threshold.value=-18; comp.ratio.value=4; comp.connect(AC.destination);
+  master = AC.createGain(); master.gain.value = save.muted?0:0.8; master.connect(comp);
+  // generated noise impulse, normalised to unit energy so the reverb never clips
+  const len = Math.floor(AC.sampleRate*1.6), ir = AC.createBuffer(2,len,AC.sampleRate);
+  for (let c=0;c<2;c++){ const d=ir.getChannelData(c); let e=0;
+    for (let i=0;i<len;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3); e+=d[i]*d[i]; }
+    const k=1/Math.sqrt(e); for (let i=0;i<len;i++) d[i]*=k; }
+  const conv = AC.createConvolver(); conv.normalize=false; conv.buffer=ir;
+  wet = AC.createGain(); wet.gain.value=0.35; wet.connect(conv); conv.connect(master);
+  return AC;
+}
+// one music-box tine: sine + 3rd harmonic + short bright 2-3 kHz partial, long decay
+function tine(f, when=0, vel=0.2, dur=1.2){
+  const a=audio(); if(!a) return; const t=a.currentTime+when;
+  const g=a.createGain(); g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(vel,t+0.008); g.gain.exponentialRampToValueAtTime(0.0005,t+dur);
+  g.connect(master); g.connect(wet);
+  const o1=a.createOscillator(); o1.type='sine'; o1.frequency.value=f; o1.connect(g);
+  const g3=a.createGain(); g3.gain.value=0.22; g3.connect(g);
+  const o3=a.createOscillator(); o3.type='sine'; o3.frequency.value=f*3; o3.connect(g3);
+  const gb=a.createGain(); gb.gain.setValueAtTime(0.0001,t);
+  gb.gain.linearRampToValueAtTime(vel*0.35,t+0.005); gb.gain.exponentialRampToValueAtTime(0.0003,t+0.14); gb.connect(master);
+  const ob=a.createOscillator(); ob.type='sine'; ob.frequency.value=2200+((f*7)%800); ob.connect(gb);
+  [o1,o3,ob].forEach(o=>{o.start(t); o.stop(t+dur+0.05);});
+}
+// muffled "hmm-mm" for a wrong spot: low, lowpassed triangle, no bright partial
+function hum(f, when=0, dur=0.45){
+  const a=audio(); if(!a) return; const t=a.currentTime+when;
+  const lp=a.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=700;
+  const g=a.createGain(); g.gain.setValueAtTime(0.0001,t);
+  g.gain.linearRampToValueAtTime(0.22,t+0.02); g.gain.exponentialRampToValueAtTime(0.0005,t+dur);
+  const o=a.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(f,t); o.frequency.exponentialRampToValueAtTime(f*0.94,t+dur);
+  o.connect(lp); lp.connect(g); g.connect(master); g.connect(wet); o.start(t); o.stop(t+dur+0.05);
+}
+// soft snow "poof" when a hiding spot is opened
+function poof(when=0){
+  const a=audio(); if(!a) return; const t=a.currentTime+when;
+  const n=a.createBuffer(1,Math.floor(a.sampleRate*0.25),a.sampleRate), d=n.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  const s=a.createBufferSource(); s.buffer=n;
+  const bp=a.createBiquadFilter(); bp.type='bandpass'; bp.frequency.setValueAtTime(2400,t); bp.frequency.exponentialRampToValueAtTime(700,t+0.2); bp.Q.value=0.8;
+  const g=a.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.25,t+0.012); g.gain.exponentialRampToValueAtTime(0.0005,t+0.22);
+  s.connect(bp); bp.connect(g); g.connect(master); s.start(t); s.stop(t+0.26);
+}
+const PENTA=[523.25,587.33,659.25,783.99,880,1046.5,1174.66,1318.5,1568,1760];
+const SFX = {
+  motif(){ [659.25,783.99,1174.66,1046.5].forEach((f,i)=>tine(f,i*0.18,0.2,1.4)); },
+  step(i){ tine(PENTA[Math.min(PENTA.length-1,i)],0,0.09,0.6); },
+  tap(){ tine(1568,0,0.1,0.5); },
+  found(){ [1046.5,1318.5,1568,2093].forEach((f,i)=>tine(f,i*0.1,0.2,1.3)); tine(523.25,0.4,0.14,1.6); },
+  wrong(){ hum(330,0); hum(262,0.22,0.55); },
+  win(){ [659.25,783.99,1174.66,1046.5,1318.5,1568,2093].forEach((f,i)=>tine(f,i*0.14,0.18,1.6)); },
+  poof
+};
+function speak(text){
+  if (save.muted || !('speechSynthesis' in window)) return;
+  try { speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.rate=0.95; u.pitch=1.15; speechSynthesis.speak(u); } catch(e){}
+}
+
+/* ---------- animals and their footprints ---------- */
+// spacing: distance between print groups, in print-size units
+const ANIMALS = {
+  bunny:{name:'Bunny', em:'🐰', sp:1.9, tip:'Two big feet in front, two little dots behind - hop, hop!'},
+  bird: {name:'Bird',  em:'🐦', sp:1.3, tip:'Two little forks side by side - birds hop with both feet.'},
+  duck: {name:'Duck',  em:'🦆', sp:1.0, tip:'Webbed triangle feet that waddle left, right, left.'},
+  fox:  {name:'Fox',   em:'🦊', sp:1.15,tip:'A small pad and four toes, all in one neat line.'},
+  deer: {name:'Deer',  em:'🦌', sp:1.2, tip:'Two pointy halves that look like an upside-down heart.'},
+  bear: {name:'Bear',  em:'🐻', sp:1.45,tip:'A BIG wide paw with five round toes.'},
+  mouse:{name:'Mouse', em:'🐭', sp:0.9, tip:'Tiny dots with a wiggly tail line dragging between them.'}
+};
+const ANIMAL_KEYS = Object.keys(ANIMALS);
+
+function ell(c,x,y,rx,ry,rot=0){ c.beginPath(); c.ellipse(x,y,rx,ry,rot,0,Math.PI*2); c.fill(); }
+// draw one print group at the origin, facing "up" (-y), size s
+function drawPrint(c, kind, s, side){
+  switch(kind){
+    case 'bunny':
+      ell(c,-0.3*s,-0.45*s,0.17*s,0.42*s,-0.12); ell(c,0.3*s,-0.45*s,0.17*s,0.42*s,0.12);
+      ell(c,0,0.25*s,0.13*s,0.15*s); ell(c,0.05*s,0.6*s,0.13*s,0.15*s); break;
+    case 'bird': {
+      c.lineWidth=Math.max(2,0.09*s); c.lineCap='round';
+      for (const dx of [-0.28,0.28]){ const x=dx*s, y=0.25*s; c.beginPath();
+        c.moveTo(x,y); c.lineTo(x,y-0.6*s); c.moveTo(x,y); c.lineTo(x-0.28*s,y-0.48*s);
+        c.moveTo(x,y); c.lineTo(x+0.28*s,y-0.48*s); c.moveTo(x,y); c.lineTo(x,y+0.28*s); c.stroke(); }
+      break; }
+    case 'duck': {
+      const x=side*0.22*s; c.beginPath(); c.moveTo(x,0.35*s); c.lineTo(x-0.42*s,-0.35*s);
+      c.quadraticCurveTo(x-0.2*s,-0.22*s,x,-0.45*s); c.quadraticCurveTo(x+0.2*s,-0.22*s,x+0.42*s,-0.35*s); c.closePath(); c.fill();
+      break; }
+    case 'fox': {
+      const x=side*0.07*s; ell(c,x,0.12*s,0.2*s,0.17*s);
+      ell(c,x-0.2*s,-0.2*s,0.07*s,0.1*s); ell(c,x+0.2*s,-0.2*s,0.07*s,0.1*s);
+      ell(c,x-0.07*s,-0.36*s,0.07*s,0.1*s); ell(c,x+0.07*s,-0.36*s,0.07*s,0.1*s); break; }
+    case 'deer': {
+      const x=side*0.16*s;
+      for (const k of [-1,1]){ c.beginPath(); c.moveTo(x+k*0.04*s,-0.45*s);
+        c.quadraticCurveTo(x+k*0.32*s,0.0,x+k*0.2*s,0.38*s); c.quadraticCurveTo(x+k*0.08*s,0.42*s,x+k*0.04*s,0.3*s); c.closePath(); c.fill(); }
+      break; }
+    case 'bear': {
+      const x=side*0.3*s; c.beginPath();
+      if (c.roundRect) c.roundRect(x-0.33*s,-0.12*s,0.66*s,0.55*s,0.2*s); else c.rect(x-0.33*s,-0.12*s,0.66*s,0.55*s);
+      c.fill();
+      [-0.32,-0.16,0,0.16,0.32].forEach((dx,i)=>ell(c,x+dx*s,-0.3*s+(i===0||i===4?0.06*s:0),0.075*s,0.09*s)); break; }
+    case 'mouse':
+      for (const dx of [-0.2,0.2]){ ell(c,dx*s,0,0.06*s,0.06*s); ell(c,dx*s-0.07*s,-0.12*s,0.04*s,0.04*s);
+        ell(c,dx*s+0.07*s,-0.12*s,0.04*s,0.04*s); ell(c,dx*s,-0.16*s,0.04*s,0.04*s); }
+      break;
+  }
+}
+// a little vertical strip of a few prints, for cards and the clue
+function drawSample(cv, kind, color){
+  const c=cv.getContext('2d'), W=cv.width, H=cv.height; c.clearRect(0,0,W,H);
+  const s=W*(kind==='bear'?0.27:0.3); c.fillStyle=color; c.strokeStyle=color;
+  const n= kind==='bunny'?2:3; const gap=H/(n+0.2);
+  if (kind==='mouse'){ c.lineWidth=Math.max(1.5,W*0.012); c.beginPath(); for(let y=H;y>=0;y-=2) c.lineTo(W/2+Math.sin(y*0.06)*W*0.05,y); c.stroke(); }
+  for (let i=0;i<n;i++){ c.save(); c.translate(W/2, H-gap*(i+0.6)); drawPrint(c,kind,s,i%2?1:-1); c.restore(); }
+}
+
+/* ---------- walks ---------- */
+const WALKS = [
+  {name:'Sunny Morning', em:'☀️', n:2, cross:false, snow:false, pool:['bunny','bird','deer','bear','duck']},
+  {name:'Pine Path',     em:'🌲', n:3, cross:false, snow:false, pool:['bunny','bird','duck','fox','deer','bear']},
+  {name:'Criss-Cross',   em:'❄️', n:3, cross:true,  snow:false, pool:ANIMAL_KEYS},
+  {name:'Busy Forest',   em:'🦉', n:4, cross:true,  snow:false, pool:ANIMAL_KEYS},
+  {name:'Snowy Evening', em:'🌙', n:4, cross:true,  snow:true,  pool:ANIMAL_KEYS}
+];
+const ROUNDS = 4;
+const SPOT_KINDS = ['bush','log','rock','stump','drift','pine'];
+const SPOT_NAMES = {bush:'bush',log:'log',rock:'rock',stump:'tree stump',drift:'snow pile',pine:'little pine tree'};
+
+// trail geometry uses a seeded generator so a resize rebuilds the very same trails
+let R = Math.random;
+function seeded(seed){ let a=seed>>>0; return ()=>{ a=(a+0x6D2B79F5)>>>0; let t=a; t=Math.imul(t^(t>>>15),t|1); t^=t+Math.imul(t^(t>>>7),t|61); return ((t^(t>>>14))>>>0)/4294967296; }; }
+const rnd = (a,b)=>a+R()*(b-a);
+const shuffle = a => { for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+
+/* ---------- trail geometry ---------- */
+function bez(p0,p1,p2,p3,t){ const u=1-t; return u*u*u*p0+3*u*u*t*p1+3*u*t*t*p2+t*t*t*p3; }
+// builds trails for the current stage size; trails[i] = {animal, end, prints:[{x,y,a,side,hidden,lit}], path:[...]}
+function buildTrails(W,H,walk,animals,spotOrder){
+  const n=animals.length, S=printSize(W,H,n);
+  const spotY=spotTop(H)+spotH(H)*0.85, endY=spotY+S*0.4;
+  const trails=[];
+  for (let i=0;i<n;i++){
+    const sx=W*(i+1)/(n+1), ex=W*(spotOrder[i]+1)/(n+1);
+    const y1=H*rnd(0.55,0.7), y2=H*rnd(0.38,0.5), wig=W*0.022*(walk.cross?1:0.7), ph=rnd(0,6), fq=rnd(1.5,2.5);
+    const pts=[]; const N=240;
+    for (let k=0;k<=N;k++){ const t=k/N;
+      const x=bez(sx,sx,ex,ex,t)+Math.sin(t*Math.PI*fq+ph)*wig*Math.sin(t*Math.PI);
+      const y=bez(H+S,y1,y2,endY,t); pts.push({x,y}); }
+    const kind=animals[i], sp=ANIMALS[kind].sp*S, prints=[];
+    let acc=sp*rnd(0.3,0.9), side=1;
+    for (let k=1;k<pts.length;k++){
+      const dx=pts[k].x-pts[k-1].x, dy=pts[k].y-pts[k-1].y, d=Math.hypot(dx,dy); acc-=d;
+      if (acc<=0){ acc+=sp; if (pts[k].y>H-S*0.3) continue;
+        prints.push({x:pts[k].x,y:pts[k].y,a:Math.atan2(dy,dx)+Math.PI/2,side,hidden:false,lit:0}); side=-side; }
+    }
+    trails.push({animal:kind, end:spotOrder[i], prints, path:pts, S});
+  }
+  if (walk.snow) coverWithSnow(trails);
+  return trails;
+}
+function printSize(W,H,n){ return Math.max(20, Math.min(34, W/(n*3.6+1.5), H/18)); }
+function spotTop(H){ return Math.max(8, H*0.03); }
+function spotH(H){ return Math.max(62, Math.min(96, H*0.17)); }
+// fresh snow covers short runs of prints - never the first/last prints, never near another trail
+function coverWithSnow(trails){
+  for (const tr of trails){
+    const P=tr.prints, L=P.length; if (L<8) continue;
+    const near=P.map(p=>trails.some(o=>o!==tr && o.prints.some(q=>Math.hypot(q.x-p.x,q.y-p.y)<tr.S*1.6)));
+    // candidate starts for a 2-print gap that stays clear of crossings and the trail's ends
+    const cand=[]; for (let i=3;i<=L-5;i++) if (!near[i-1]&&!near[i]&&!near[i+1]&&!near[i+2]) cand.push(i);
+    let runs=0, lastEnd=-9;
+    for (const i of cand.sort(()=>R()-0.5)){
+      if (runs>=2) break;
+      if (Math.abs(i-lastEnd)<4) continue;
+      P[i].hidden=P[i+1].hidden=true; runs++; lastEnd=i;
+    }
+  }
+}
+
+/* ---------- game state ---------- */
+const G = { walk:0, round:0, mistakes:0, found:[], R:null, trails:[], W:0, H:0, busy:false, token:0, flakes:[] };
+const cv=$('stage'), cx=cv.getContext('2d'), wrap=$('stageWrap'), spotsEl=$('spots');
+
+function newRound(){
+  const walk=WALKS[G.walk], n=walk.n;
+  const prev=G.R && G.R.target;
+  const animals=shuffle(walk.pool.slice()).slice(0,n);
+  let target=animals[Math.floor(Math.random()*n)];
+  if (target===prev) target=animals.find(a=>a!==prev)||target;
+  let order=[...Array(n).keys()];
+  if (walk.cross){ let tries=0; do { shuffle(order); tries++; } while (order.every((v,i)=>v===i) && tries<20); }
+  G.R = { animals, target, order, spots:shuffle(SPOT_KINDS.slice()).slice(0,n),
+          opened:Array(n).fill(null), seed:(Math.random()*1e9)|0, done:false };
+  G.busy=false; G.token++;
+  layout(true);
+  updateClue();
+  setMsg(G.round===0 ? 'Tap a footprint to light up its trail.' : 'Whose tracks are these? Follow them!');
+  speak(`Find ${ANIMALS[target].name}'s tracks!`);
+}
+
+function layout(rebuild){
+  const r=wrap.getBoundingClientRect(), W=Math.max(200,Math.round(r.width)), H=Math.max(200,Math.round(r.height));
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  if (W!==G.W || H!==G.H || rebuild){
+    G.W=W; G.H=H; cv.width=W*dpr; cv.height=H*dpr; cx.setTransform(dpr,0,0,dpr,0,0);
+    if (!G.R) return;
+    R=seeded(G.R.seed);
+    try { G.trails=buildTrails(W,H,WALKS[G.walk],G.R.animals,G.R.order); } finally { R=Math.random; }
+    // keep what has already been revealed
+    G.R.opened.forEach((o,j)=>{ if(!o) return; const tr=G.trails.find(t=>t.end===j); tr.prints.forEach(p=>p.lit=o.ok?1:2); });
+    G.flakes = WALKS[G.walk].snow && !reduceMotion ? Array.from({length:40},()=>({x:Math.random()*W,y:Math.random()*H,r:rnd(1,2.6),v:rnd(12,30)})) : [];
+    buildSpots();
+  }
+}
+function spotRect(j){
+  const n=G.R.animals.length, h=spotH(G.H), w=Math.min(G.W/(n+0.4), h*1.6);
+  const cxp=G.W*(j+1)/(n+1); return {x:cxp-w/2, y:spotTop(G.H), w, h, cx:cxp};
+}
+function buildSpots(){
+  spotsEl.innerHTML='';
+  G.R.spots.forEach((kind,j)=>{
+    const r=spotRect(j), b=document.createElement('button');
+    b.className='spot'; b.style.left=r.x+'px'; b.style.top=r.y+'px'; b.style.width=r.w+'px'; b.style.height=r.h+'px';
+    b.setAttribute('aria-label',`Hiding spot ${j+1}: the ${SPOT_NAMES[kind]}`);
+    b.disabled=!!G.R.opened[j] || G.busy;
+    b.addEventListener('click',()=>openSpot(j));
+    spotsEl.appendChild(b);
+  });
+}
+function setSpotsDisabled(all){ [...spotsEl.children].forEach((b,j)=>b.disabled= all || !!G.R.opened[j]); }
+
+/* ---------- lighting trails ---------- */
+function light(tr, from, count, val=1, stepMs=75){
+  const tok=G.token; let k=0;
+  for (let i=from;i<Math.min(tr.prints.length,from+count);i++){
+    const idx=i, kk=k++;
+    setTimeout(()=>{ if (tok!==G.token) return; if (tr.prints[idx].lit!==2) tr.prints[idx].lit=val; if (stepMs>40 && kk%2===0) SFX.step(kk/2+1); }, kk*stepMs);
+  }
+}
+function nearestPrint(x,y){
+  let best=null, bd=Infinity;
+  for (const tr of G.trails) tr.prints.forEach((p,i)=>{ const d=Math.hypot(p.x-x,p.y-y); if(d<bd){bd=d; best={tr,i};} });
+  const lim=Math.max(30,(G.trails[0]?.S||24)*1.3);
+  return bd<=lim ? best : null;
+}
+cv.addEventListener('pointerdown',e=>{
+  if (!G.R || G.busy) return; audio();
+  const r=cv.getBoundingClientRect(), x=(e.clientX-r.left)*(G.W/r.width), y=(e.clientY-r.top)*(G.H/r.height);
+  // taps on a hiding spot that land on the canvas still open it
+  for (let j=0;j<G.R.animals.length;j++){ const s=spotRect(j); if (x>=s.x&&x<=s.x+s.w&&y>=s.y&&y<=s.y+s.h){ openSpot(j); return; } }
+  const hit=nearestPrint(x,y);
+  if (!hit){ setMsg('Tap right on a footprint to follow it!'); return; }
+  SFX.tap(); light(hit.tr, Math.max(0,hit.i-1), 7);
+  const left=hit.tr.prints.length-1-hit.i;
+  setMsg(left<8 ? `This trail goes to the ${SPOT_NAMES[G.R.spots[hit.tr.end]]}. Is it the right one?` : 'Keep tapping along the glowing prints!');
+});
+$('hintBtn').addEventListener('click',()=>{
+  if (!G.R || G.busy) return; audio();
+  const tr=G.trails.find(t=>t.animal===G.R.target);
+  let last=-1; tr.prints.forEach((p,i)=>{ if(p.lit===1) last=i; });
+  // first sniff lights the start; each later sniff walks on from the furthest glowing print
+  let from=0; if (last>=0){ let i=0; while(i<tr.prints.length && tr.prints[i].lit===1) i++; from=i>=tr.prints.length?tr.prints.length:i; }
+  if (from>=tr.prints.length){ setMsg(`Sniff! The trail ends at the ${SPOT_NAMES[G.R.spots[tr.end]]}. Tap it!`); SFX.tap(); return; }
+  light(tr, from, 6);
+  setMsg(`Sniff, sniff! These are ${ANIMALS[G.R.target].name}'s prints.`);
+});
+
+function openSpot(j){
+  if (!G.R || G.busy || G.R.opened[j]) return; audio();
+  const tr=G.trails.find(t=>t.end===j), ok=tr.animal===G.R.target, A=ANIMALS[tr.animal];
+  G.R.opened[j]={ok, at:performance.now(), animal:tr.animal};
+  SFX.poof();
+  if (ok){
+    G.busy=true; setSpotsDisabled(true);
+    tr.prints.forEach(p=>{ if(p.lit!==2) p.lit=1; });
+    setTimeout(()=>SFX.found(),120);
+    save.book[tr.animal]=(save.book[tr.animal]||0)+1; persist();
+    G.found.push(tr.animal);
+    setMsg(`You found ${A.name}! ${A.em} Great tracking!`); speak(`You found ${A.name}!`);
+    const tok=G.token;
+    setTimeout(()=>{ if(tok!==G.token) return; G.round++; updateDots(); if (G.round>=ROUNDS) finishWalk(); else newRound(); },2000);
+  } else {
+    G.mistakes++;
+    tr.prints.forEach(p=>p.lit=2);
+    setSpotsDisabled(false);
+    setTimeout(()=>SFX.wrong(),100);
+    setMsg(`${A.em} "Hi! Those blue prints are MINE." Look for ${ANIMALS[G.R.target].name}'s!`);
+    speak(`Hi, I'm ${A.name}! Those were my prints. Keep looking for ${ANIMALS[G.R.target].name}.`);
+  }
+}
+
+/* ---------- drawing ---------- */
+function chalkLine(c,pts,w){ c.lineWidth=w; c.lineJoin='round'; c.lineCap='round'; c.beginPath(); pts.forEach((p,i)=>i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.stroke(); }
+function drawSpot(c,kind,r){
+  const {x,y,w,h}=r, mx=x+w/2, by=y+h*0.92;
+  c.fillStyle='#2a4a3b'; c.strokeStyle='#f4f1e8'; c.lineWidth=3;
+  c.beginPath();
+  if (kind==='bush'){ for(let k=0;k<4;k++){ c.moveTo(x+w*(0.22+k*0.19)+h*0.24,by-h*0.3); c.arc(x+w*(0.22+k*0.19),by-h*0.3-(k%2)*h*0.12,h*0.24,0,Math.PI*2); } c.fill(); c.stroke();
+    c.fillStyle='#2a4a3b'; c.fillRect(x+w*0.1,by-h*0.32,w*0.8,h*0.3); c.beginPath(); c.moveTo(x+w*0.06,by); c.lineTo(x+w*0.94,by); c.stroke(); }
+  else if (kind==='log'){ c.ellipse(mx,by-h*0.25,w*0.42,h*0.22,0,0,Math.PI*2); c.fill(); c.stroke();
+    c.beginPath(); c.ellipse(x+w*0.12,by-h*0.25,h*0.12,h*0.2,0,0,Math.PI*2); c.stroke();
+    c.beginPath(); c.ellipse(x+w*0.12,by-h*0.25,h*0.05,h*0.09,0,0,Math.PI*2); c.stroke(); }
+  else if (kind==='rock'){ c.moveTo(x+w*0.08,by); c.quadraticCurveTo(x+w*0.1,by-h*0.6,x+w*0.45,by-h*0.66); c.quadraticCurveTo(x+w*0.92,by-h*0.62,x+w*0.92,by); c.closePath(); c.fill(); c.stroke();
+    chalkLine(c,[[x+w*0.3,by-h*0.4],[x+w*0.42,by-h*0.3]],2); }
+  else if (kind==='stump'){ c.rect(mx-w*0.3,by-h*0.55,w*0.6,h*0.55); c.fill(); c.stroke(); c.beginPath(); c.ellipse(mx,by-h*0.55,w*0.3,h*0.1,0,0,Math.PI*2); c.fill(); c.stroke();
+    c.beginPath(); c.ellipse(mx,by-h*0.55,w*0.14,h*0.045,0,0,Math.PI*2); c.stroke(); }
+  else if (kind==='drift'){ c.moveTo(x+w*0.02,by); c.bezierCurveTo(x+w*0.15,by-h*0.8,x+w*0.5,by-h*0.75,x+w*0.6,by-h*0.45); c.bezierCurveTo(x+w*0.75,by-h*0.6,x+w*0.95,by-h*0.4,x+w*0.98,by); c.closePath(); c.fill(); c.stroke(); }
+  else if (kind==='pine'){ c.moveTo(mx,y+h*0.02); c.lineTo(mx+w*0.38,by-h*0.12); c.lineTo(mx-w*0.38,by-h*0.12); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.rect(mx-w*0.06,by-h*0.12,w*0.12,h*0.12); c.fill(); c.stroke(); }
+}
+function draw(now){
+  const c=cx, W=G.W, H=G.H; if(!W) return;
+  c.clearRect(0,0,W,H); c.fillStyle='#1f3a2e'; c.fillRect(0,0,W,H);
+  // soft chalk snow drifts
+  c.strokeStyle='#3d5e4e'; c.lineWidth=2;
+  for (let k=0;k<5;k++){ const yy=H*(0.3+k*0.15); chalkLine(c,[[0,yy],[W*0.25,yy-10],[W*0.5,yy+6],[W*0.75,yy-8],[W,yy+4]],2); }
+  if (!G.R) return;
+  // footprints
+  for (const tr of G.trails){
+    const S=tr.S, P=tr.prints;
+    if (tr.animal==='mouse'){ // tail drag between prints
+      for (let i=0;i<P.length-1;i++){ const a=P[i], b=P[i+1]; if (a.hidden&&!a.lit || b.hidden&&!b.lit) continue;
+        c.strokeStyle=a.lit===2?'#9fd3ff':a.lit?'#ffd166':'#f4f1e8';
+        chalkLine(c,[[a.x,a.y],[(a.x+b.x)/2+Math.cos(a.a)*S*0.18,(a.y+b.y)/2+Math.sin(a.a)*S*0.18],[b.x,b.y]],Math.max(1.5,S*0.06)); }
+    }
+    for (const p of P){
+      if (p.hidden && !p.lit){ // fresh snow puff covers this print
+        c.fillStyle='#3d5e4e'; c.beginPath(); c.arc(p.x-S*0.2,p.y,S*0.3,0,Math.PI*2); c.arc(p.x+S*0.2,p.y+S*0.05,S*0.26,0,Math.PI*2); c.fill(); continue; }
+      const col=p.lit===2?'#9fd3ff':p.lit?'#ffd166':'#f4f1e8';
+      c.save(); c.translate(p.x,p.y); c.rotate(p.a); c.fillStyle=col; c.strokeStyle=col;
+      if (p.lit){ c.shadowColor=col; c.shadowBlur=8; }
+      drawPrint(c,tr.animal, tr.animal==='bear'?S*1.15:S, p.side); c.restore();
+    }
+  }
+  // hiding spots and peeking friends
+  G.R.spots.forEach((kind,j)=>{
+    const r=spotRect(j), o=G.R.opened[j];
+    if (o){ const t=Math.min(1,(now-o.at)/450), lift=(1-Math.pow(1-t,3))*r.h*0.42 + (t<1?0:Math.sin(now/300+j)*2);
+      c.globalAlpha=1; c.fillStyle='#000';
+      c.font=`${Math.round(r.h*0.55)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+      c.textAlign='center'; c.textBaseline='middle'; c.fillText(ANIMALS[o.animal].em, r.cx, r.y+r.h*0.62-lift); }
+    drawSpot(c,kind,r);
+    if (o){ c.font=`${Math.round(r.h*0.24)}px sans-serif`; c.fillStyle='#000'; c.fillText(o.ok?'⭐':'👋', r.x+r.w*0.88, r.y+r.h*0.2); }
+    if (o && o.ok){ const t=(now-o.at)/1000; if (t<1.6){ c.fillStyle='#ffd166';
+      for (let k=0;k<8;k++){ const ang=k*Math.PI/4+t, rad=r.h*(0.3+t*0.5); c.beginPath(); c.arc(r.cx+Math.cos(ang)*rad, r.y+r.h*0.4+Math.sin(ang)*rad*0.6, 3,0,Math.PI*2); c.fill(); } } }
+  });
+  // gentle evening snowfall
+  if (G.flakes.length){ c.fillStyle='#f4f1e8'; for (const f of G.flakes){ c.beginPath(); c.arc(f.x,f.y,f.r,0,Math.PI*2); c.fill(); } }
+}
+let lastT=performance.now();
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.min(0.05,Math.max(0,(now-lastT)/1000)); lastT=now;
+  if ($('scrPlay').hidden) return;
+  for (const f of G.flakes){ f.y+=f.v*dt; f.x+=Math.sin(now/900+f.r)*0.2; if(f.y>G.H){f.y=-4; f.x=Math.random()*G.W;} }
+  try { draw(now); } catch(e){ console.error(e); }
+}
+requestAnimationFrame(loop);
+new ResizeObserver(()=>{ if(!$('scrPlay').hidden) layout(false); }).observe(wrap);
+
+/* ---------- UI ---------- */
+function setMsg(t){ $('msg').innerHTML=''; const s=document.createElement('span'); s.textContent=t; $('msg').appendChild(s); }
+function updateClue(){
+  const A=ANIMALS[G.R.target];
+  $('clueText').innerHTML=''; $('clueText').append('Find ');
+  const b=document.createElement('b'); b.textContent=`${A.em} ${A.name}`; $('clueText').append(b, `'s tracks!`);
+  drawSample($('clueCv'),G.R.target,'#f4f1e8'); $('clueCv').setAttribute('aria-label',`${A.name}'s footprint: ${A.tip}`);
+  updateDots();
+}
+function updateDots(){
+  const d=$('dots'); d.textContent='';
+  for(let i=0;i<ROUNDS;i++){ const s=document.createElement('span'); s.textContent=i<G.round?'🐾':'○'; s.setAttribute('aria-hidden','true'); d.appendChild(s); }
+  d.setAttribute('aria-label',`Friend ${Math.min(G.round+1,ROUNDS)} of ${ROUNDS}`);
+}
+function show(id){ ['scrTitle','scrMap','scrPlay','scrBook'].forEach(s=>$(s).hidden = s!==id); if (id!=='scrPlay') { G.token++; $('overlay').hidden=true; } }
+function starText(n){ return '★'.repeat(n)+'☆'.repeat(3-n); }
+function renderMap(){
+  const el=$('walks'); el.innerHTML='';
+  WALKS.forEach((w,i)=>{
+    const st=save.stars[i]||0, b=document.createElement('button'); b.className='walk';
+    b.innerHTML=`<span class="em" aria-hidden="true">${w.em}</span>Walk ${i+1}: ${w.name}<span class="sub">${w.n} trails${w.cross?', criss-cross':''}${w.snow?', fresh snow':''}</span><span class="st" aria-hidden="true">${starText(st)}</span><span class="sr">${st} of 3 stars</span>`;
+    b.addEventListener('click',()=>startWalk(i)); el.appendChild(b);
+  });
+}
+function startWalk(i){
+  audio(); G.walk=i; G.round=0; G.mistakes=0; G.found=[]; G.R=null;
+  $('walkName').textContent=`Walk ${i+1}: ${WALKS[i].name}`;
+  $('overlay').hidden=true; show('scrPlay'); SFX.motif();
+  requestAnimationFrame(()=>newRound());
+}
+function finishWalk(){
+  const stars = G.mistakes===0?3 : G.mistakes<=3?2 : 1;
+  save.stars[G.walk]=Math.max(save.stars[G.walk]||0,stars); persist();
+  SFX.win(); speak('You found everyone! Super tracking!');
+  const p=$('overPanel'); p.innerHTML='';
+  const h=document.createElement('h2'); h.innerHTML='<span class="u">Everyone found!</span>';
+  const s=document.createElement('div'); s.className='stars'; s.textContent=starText(stars); s.setAttribute('aria-label',`${stars} of 3 stars`); s.setAttribute('role','img');
+  const f=document.createElement('p'); f.textContent=G.found.map(a=>ANIMALS[a].em).join(' ');
+  const m=document.createElement('p'); m.textContent= stars===3?'Every guess was right - a true tracker!': 'Great tracking! Every friend is found.';
+  const row=document.createElement('div'); row.className='row';
+  const mk=(t,fn,ghost)=>{ const b=document.createElement('button'); b.className='big'+(ghost?' ghost':''); b.textContent=t; b.addEventListener('click',fn); row.appendChild(b); return b; };
+  if (G.walk<WALKS.length-1) mk('Next Walk ➜',()=>startWalk(G.walk+1));
+  mk('Walk Again',()=>startWalk(G.walk),G.walk<WALKS.length-1);
+  mk('All Walks',()=>{ renderMap(); show('scrMap'); },true);
+  p.append(h,s,f,m,row); $('overlay').hidden=false; row.querySelector('button').focus();
+}
+function renderBook(){
+  const el=$('book'); el.innerHTML='';
+  ANIMAL_KEYS.forEach(k=>{
+    const A=ANIMALS[k], n=save.book[k]||0, card=document.createElement('div'); card.className='card';
+    const c=document.createElement('canvas'); c.width=200; c.height=200; c.setAttribute('role','img'); c.setAttribute('aria-label',`${A.name} footprints`);
+    drawSample(c,k,n?'#f4f1e8':'#c8d5c9');
+    const nm=document.createElement('div'); nm.className='nm'; nm.textContent=n?`${A.em} ${A.name}`:'❓ Who is it?';
+    const ct=document.createElement('div'); ct.className='ct'; ct.textContent=n?`Found ${n} time${n>1?'s':''}`:'Not found yet';
+    const tip=document.createElement('div'); tip.className='tip'; tip.textContent=n?A.tip:'Find this friend on a walk!';
+    card.append(c,nm,ct,tip); el.appendChild(card);
+  });
+}
+function syncMute(){ ['muteT','muteM','muteP'].forEach(id=>{ const b=$(id); b.textContent=save.muted?'🔇':'🔊'; b.setAttribute('aria-pressed',String(save.muted)); b.setAttribute('aria-label','Mute sound'); });
+  if (master) master.gain.value=save.muted?0:0.8; if (save.muted && 'speechSynthesis' in window) speechSynthesis.cancel(); }
+['muteT','muteM','muteP'].forEach(id=>$(id).addEventListener('click',()=>{ save.muted=!save.muted; persist(); audio(); syncMute(); if(!save.muted) SFX.tap(); }));
+$('btnPlay').addEventListener('click',()=>{ audio(); SFX.motif(); renderMap(); show('scrMap'); });
+$('btnBook').addEventListener('click',()=>{ audio(); SFX.tap(); renderBook(); show('scrBook'); });
+$('mapBack').addEventListener('click',()=>show('scrTitle'));
+$('bookBack').addEventListener('click',()=>show('scrTitle'));
+$('playBack').addEventListener('click',()=>{ renderMap(); show('scrMap'); });
+$('sayBtn').addEventListener('click',()=>{ if(!G.R) return; const A=ANIMALS[G.R.target]; speak(`Find ${A.name}'s tracks! ${A.tip}`); setMsg(A.tip); });
+$('bookReset').addEventListener('click',e=>{
+  const b=e.currentTarget;
+  if (b.dataset.armed!=='1'){ b.dataset.armed='1'; b.textContent='Tap again to clear everything'; setTimeout(()=>{ b.dataset.armed=''; b.textContent='Start over (clear stars)'; },4000); return; }
+  save.stars={}; save.book={}; persist(); b.dataset.armed=''; b.textContent='Start over (clear stars)'; renderBook();
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !$('scrPlay').hidden){ renderMap(); show('scrMap'); } });
+
+/* ---------- title art ---------- */
+(function titleArt(){
+  const c=$('titleArt').getContext('2d'), W=640, H=300;
+  c.fillStyle='#1f3a2e'; c.fillRect(0,0,W,H); c.fillStyle='#f4f1e8';
+  const pt=t=>[60+t*420, 260-Math.sin(t*Math.PI)*60-t*120];
+  for (let i=0;i<7;i++){ const t=i/6, [x,y]=pt(t), [x2,y2]=pt(t+0.01);
+    c.save(); c.translate(x,y); c.rotate(Math.atan2(y2-y,x2-x)+Math.PI/2); drawPrint(c,'bunny',34,1); c.restore(); }
+  drawSpot(c,'bush',{x:470,y:40,w:150,h:110});
+  c.font='60px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillStyle='#000';
+  c.fillText('👀',545,82);
+})();
+syncMute();
+</script>
+</body>
+</html>
