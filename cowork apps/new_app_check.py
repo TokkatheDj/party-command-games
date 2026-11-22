@@ -150,7 +150,34 @@ def play(apps):
                     "flashes a large area %d times a second (seizure limit is 3)" % m["maxPerSec"])
     except (subprocess.SubprocessError, ValueError, KeyError, OSError) as e:
         log("flash check skipped: %s" % type(e).__name__)
+    name_problems(out)
     return out
+
+
+def name_problems(out):
+    """22 Nov 2026: fail an app that contains a family name (add_to_arcade.py's list and rule). GitHub Pages
+    serves this whole repo, so an app is public the moment it's committed - Arcade or not - and the Arcade
+    guard alone came too late (Stowaway carried a name in a comment for 3+ weeks). Only the COUNT is written:
+    these results go to logs, reviews and the house status page. No list on this machine: log it, fail nothing."""
+    try:
+        from add_to_arcade import private_names_in
+    except Exception as e:                      # never break the nightly run over this
+        log("family-names check skipped: %s" % type(e).__name__)
+        return
+    for a in out.get("apps", []):
+        try:
+            text = open(os.path.join(HERE, a["app"]), encoding="utf-8", errors="replace").read()
+        except (OSError, KeyError):
+            continue
+        found = private_names_in(text)
+        if found is None:
+            log("family-names check: no list on this machine - not checked")
+            return
+        if found:
+            a["ok"] = False
+            a.setdefault("problems", []).append(
+                "has %d family name(s) in it - take them out before it's committed (GitHub Pages makes it public)"
+                % len(found))
 
 
 def note_reviews(known):

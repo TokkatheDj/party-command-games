@@ -69,5 +69,44 @@ class PrivateNames(unittest.TestCase):
         self.assertNotIn("Magnet\n", r.stdout + r.stderr)      # names are never echoed, only the count
 
 
+class NightlyCheck(unittest.TestCase):
+    """new_app_check.name_problems: the nightly check fails an app with a listed name (count only)."""
+    def setUp(self):
+        import new_app_check
+        self.N = new_app_check
+        self.tmp = tempfile.mkdtemp()
+        self.list = os.path.join(self.tmp, "private-names.txt")
+        with open(self.list, "w", encoding="utf-8") as f:
+            f.write("Zorblat\n")
+        self.bad = os.path.join(self.tmp, "bad.html")
+        self.good = os.path.join(self.tmp, "good.html")
+        open(self.bad, "w", encoding="utf-8").write("<p>Made for Zorblat</p>")
+        open(self.good, "w", encoding="utf-8").write("<p>Made for everyone</p>")
+        self.logged = []
+        self.p1 = mock.patch.object(self.N, "log", self.logged.append)
+        self.p1.start()
+
+    def tearDown(self):
+        self.p1.stop()
+
+    def run_check(self, places):
+        out = {"apps": [{"app": self.bad, "ok": True, "problems": []}, {"app": self.good, "ok": True, "problems": []}]}
+        with mock.patch.object(A, "PRIVATE_NAMES_PLACES", places):
+            self.N.name_problems(out)
+        return out["apps"]
+
+    def test_app_with_a_listed_name_fails_count_only(self):
+        bad, good = self.run_check(["", self.list])
+        self.assertFalse(bad["ok"])
+        self.assertIn("1 family name(s)", bad["problems"][0])
+        self.assertNotIn("Zorblat", " ".join(bad["problems"]))
+        self.assertTrue(good["ok"]); self.assertEqual(good["problems"], [])
+
+    def test_no_list_fails_nothing_and_says_so(self):
+        bad, good = self.run_check(["", os.path.join(self.tmp, "nope.txt")])
+        self.assertTrue(bad["ok"] and good["ok"])
+        self.assertTrue(any("not checked" in m for m in self.logged))
+
+
 if __name__ == "__main__":
     unittest.main()
