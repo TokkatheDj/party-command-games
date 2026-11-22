@@ -65,13 +65,27 @@ def emoji_for(rel, name):
 # Family names that must never reach the public Arcade, one per line. The list lives OUTSIDE
 # this public repo - a copy in here would publish the very names it protects. 27 Oct 2026: a
 # game's title-screen credit put a child's name on a public page.
-PRIVATE_NAMES = r"C:\Users\Lance\Amigo\private-names.txt"
+# Looked for in this order (22 Nov 2026): $AMIGO_PRIVATE_NAMES, then this user's own Amigo folder
+# (C:\Users\Lance\Amigo on the desktop, C:\Users\tokka\Amigo on the Surface), then the desktop's path.
+# It used to be the desktop's path only, so on the Surface - where the factory runs and most Arcade
+# adds happen - the check never ran; it only printed a note.
+PRIVATE_NAMES_PLACES = [os.environ.get("AMIGO_PRIVATE_NAMES") or "",
+                        os.path.join(os.path.expanduser("~"), "Amigo", "private-names.txt"),
+                        r"C:\Users\Lance\Amigo\private-names.txt"]
+
+
+def private_names_file():
+    """The first family-names list that exists on this machine, or None."""
+    return next((p for p in PRIVATE_NAMES_PLACES if p and os.path.isfile(p)), None)
 
 
 def private_names_in(text, path=None):
     """The listed names that appear in text as whole words; None if there is no list here."""
+    path = path or private_names_file()
+    if not path:
+        return None
     try:
-        names = [l.strip() for l in open(path or PRIVATE_NAMES, encoding="utf-8")
+        names = [l.strip() for l in open(path, encoding="utf-8")
                  if l.strip() and not l.lstrip().startswith("#")]
     except OSError:
         return None
@@ -152,7 +166,8 @@ def main():
             sys.exit("%s: no such file" % rel)
         found = private_names_in(open(full, encoding="utf-8", errors="replace").read() + " " + (a.name or ""))
         if found is None:
-            print("note: no family-names list at %s - not checked for names" % PRIVATE_NAMES)
+            print("note: no family-names list - not checked for names (looked in: %s)"
+                  % ", ".join(p for p in PRIVATE_NAMES_PLACES if p))
         elif found:   # the count only: this output lands in logs
             sys.exit("%s: has %d family name(s) in it - they stay off the public Arcade; take them out first"
                      % (rel, len(found)))
