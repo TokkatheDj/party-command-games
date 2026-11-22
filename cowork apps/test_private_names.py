@@ -36,6 +36,11 @@ class PrivateNames(unittest.TestCase):
             self.assertIsNone(A.private_names_file())
             self.assertIsNone(A.private_names_in("Zorblat"))
 
+    def test_list_with_only_comments_counts_as_no_list(self):
+        with open(self.list, "w", encoding="utf-8") as f:
+            f.write("# one family name per line\n\n")
+        self.assertIsNone(A.private_names_in("anything", self.list))
+
     def test_this_users_amigo_folder_is_found(self):
         # the Surface case: ~\\Amigo\\private-names.txt, with the desktop path absent
         home = os.path.join(self.tmp, "home")

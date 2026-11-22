@@ -89,6 +89,8 @@ def private_names_in(text, path=None):
                  if l.strip() and not l.lstrip().startswith("#")]
     except OSError:
         return None
+    if not names:       # a list with no names checks nothing: say "not checked", don't pass quietly
+        return None
     return sorted(n for n in set(names) if re.search(r"\b%s\b" % re.escape(n), text, re.I))
 
 
