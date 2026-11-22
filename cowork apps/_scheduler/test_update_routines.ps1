@@ -124,13 +124,22 @@ try {
             "$r | $($said -join ' ; ')"
         }
     }
-    $got = $jobs | Wait-Job -Timeout 120 | Receive-Job
+    # Wait, THEN receive (22 Nov 2026). In Windows PowerShell 5.1 each git call inside a background job
+    # takes ~17 s (not in real runs: their logs show the pull done 3-9 s after the task fires, and 0.4 s
+    # outside jobs), so four queued pulls took 70-90 s here and overran the old 120 s wait. And
+    # `Wait-Job -Timeout | Receive-Job` passes NOTHING on when it times out, so the check failed with an
+    # empty detail, every time, in 5.1 only. 300 s, and a timeout now says so.
+    $t9 = Get-Date
+    $null = $jobs | Wait-Job -Timeout 300
+    $secs = [int]((Get-Date) - $t9).TotalSeconds
+    $states = ($jobs | ForEach-Object { $_.State }) -join ","
+    $got = @($jobs | Receive-Job -ErrorAction SilentlyContinue)
     $jobs | Remove-Job -Force
     $kinds = $got | ForEach-Object { ($_ -split ' \| ')[0] }
     Check "four routines waking at once -> one pulls, three find it current, none fail" (
         ($kinds | Where-Object { $_ -eq "updated" }).Count -eq 1 -and
         ($kinds | Where-Object { $_ -eq "current" }).Count -eq 3 -and
-        (Get-Content "$surf\Routines\Kids.txt") -eq "v6") ($got -join "`n")
+        (Get-Content "$surf\Routines\Kids.txt") -eq "v6") ("jobs [$states] after ${secs}s: " + ($got -join "`n"))
 } finally {
     Set-Location $env:TEMP
     Remove-Item -Recurse -Force -LiteralPath $tmp -ErrorAction SilentlyContinue
