@@ -333,21 +333,101 @@ def main():
     return 1 if failed else 0
 
 
+def ready_for_arcade(known):
+    """(ok, unplaced): waiting public apps that passed (no accessibility notes), split by whether their
+    folder has an Arcade section. Only apps add_to_arcade.py --waiting will really add go in ok: one whose
+    folder has no section made the whole step stop on "which section?" (16 Oct, an Action Games app)."""
+    from add_to_arcade import section_for
+    passed = sorted((k, v) for k, v in known.items() if v.get("ok") and not v.get("a11y"))
+    ok = [(k, v) for k, v in passed if section_for(k)]
+    unplaced = [v["title"][:40] for k, v in passed if not section_for(k)]
+    return ok, unplaced
+
+
+ARCADE_MAIL_STATE = os.path.join(REPORTS, "arcade-email-sent.txt")   # gitignored, like all of test_reports
+
+
+def not_on_arcade(ok, index=None):
+    """Drop apps the Arcade catalog already lists. The 'waiting' flags come from the last nightly run, and on
+    22 Nov a hand run off a day-old list emailed 10 apps that had been published that morning."""
+    try:
+        cat = open(index or os.path.join(REPO, "index.html"), encoding="utf-8").read()
+    except OSError:
+        return ok
+    return [(k, v) for k, v in ok if "src: '%s'" % k not in cat and "src: '%s'" % k.replace(" ", "%20") not in cat]
+
+
+def email_arcade_ready(known, state=ARCADE_MAIL_STATE, send=None, today=None, index=None):
+    """22 Nov 2026: the SHIP IT list lives only on the desktop, so on the Surface - where the factory makes
+    the apps - queue_arcade_step never had anywhere to put "put these on the Arcade". Passed apps sat
+    untracked until someone noticed (10 of them on 22 Nov). Instead: ONE email a day to owner_email
+    (AppVerse's email_config.json) naming the apps and the one step to publish them. Titles only - an app
+    with a family name already failed name_problems(), so it is never listed. Never raises.
+    send(msg) is for tests; returns "none" | "already" | "sent" | "not-sent"."""
+    try:
+        ok, unplaced = ready_for_arcade(known)
+        ok = not_on_arcade(ok, index)
+        if not ok:
+            return "none"
+        today = today or time.strftime("%Y-%m-%d")
+        try:
+            if open(state, encoding="utf-8").read().startswith(today):
+                return "already"
+        except OSError:
+            pass
+        from email.message import EmailMessage
+        cfg = None
+        if send is None:
+            from serve_apps import load_email_config
+            cfg = load_email_config()
+            if not cfg or not cfg.get("owner_email"):
+                log("Arcade-ready email not sent: no email_config.json / owner_email")
+                return "not-sent"
+        msg = EmailMessage()
+        msg["Subject"] = "Cowork factory: %d new game%s ready for the Games Arcade" % (len(ok), "" if len(ok) == 1 else "s")
+        msg["From"] = "%s <%s>" % ((cfg or {}).get("from_name", "AppVerse"), (cfg or {}).get("smtp_user", "factory@localhost"))
+        msg["To"] = (cfg or {}).get("owner_email", "lance@localhost")
+        lines = ["The nightly check on the Surface played these and found nothing wrong. They're on GitHub's",
+                 "doorstep but not on the Arcade yet:", ""]
+        lines += ["  - %s   (%s)" % (v["title"][:60], k) for k, v in ok]
+        lines += ["", "Play them first. To publish all of them, either ask Claude on the Surface:",
+                  "  \"put the waiting games on the Arcade\"",
+                  "or, in the cowork apps folder on the Surface, run:",
+                  "  python add_to_arcade.py --waiting --dry     (shows what would change)",
+                  "  python add_to_arcade.py --waiting           (commits, adds the tiles, pushes - PUBLIC)"]
+        if unplaced:
+            lines += ["", "Also passed, but their folder has no Arcade section (ask Claude to place them): " + ", ".join(unplaced)]
+        lines += ["", "At most one of these a day. Sent by cowork apps/new_app_check.py (email_arcade_ready)."]
+        msg.set_content("\n".join(lines) + "\n")
+        if send is not None:
+            send(msg)
+        else:
+            import smtplib
+            with smtplib.SMTP(cfg["smtp_host"], cfg.get("smtp_port", 587), timeout=15) as smtp:
+                smtp.starttls()
+                smtp.login(cfg["smtp_user"], cfg["smtp_app_password"])
+                smtp.send_message(msg)
+        with open(state, "w", encoding="utf-8") as f:
+            f.write("%s %d apps\n" % (today, len(ok)))
+        log("Arcade-ready email sent: %d app(s)" % len(ok))
+        return "sent"
+    except Exception as e:                     # never break the nightly run over this
+        log("Arcade-ready email failed: %s" % type(e).__name__)
+        return "not-sent"
+
+
 def queue_arcade_step(known):
     """Keep ONE waiting SHIP IT step, "put these on the Arcade", for the apps that passed -
     a phone tap once you've played them (add_to_arcade.py does the work). Updated each
-    night; removed when nothing that passed is waiting. No ship-queue.txt, no step."""
+    night; removed when nothing that passed is waiting. No ship-queue.txt (the Surface, where the
+    SHIP IT list doesn't live): email Lance instead - see email_arcade_ready."""
     try:
         qpath = open(SHIP_QUEUE, encoding="utf-8").read().strip()
         q = json.load(open(qpath, encoding="utf-8"))
     except (OSError, ValueError):
+        email_arcade_ready(known)
         return
-    from add_to_arcade import section_for
-    passed = sorted((k, v) for k, v in known.items() if v.get("ok") and not v.get("a11y"))
-    # Only apps add_to_arcade.py --waiting will really add: one whose folder has no Arcade
-    # section made the whole step stop on "which section?" (16 Oct, an Action Games app).
-    ok = [(k, v) for k, v in passed if section_for(k)]
-    unplaced = [v["title"][:40] for k, v in passed if not section_for(k)]
+    ok, unplaced = ready_for_arcade(known)
     # Replace only this script's own waiting step. Matching on the "arcade-add-" id alone
     # threw away a step queued by hand (27 Oct: arcade-add-amigos-candy-math vanished at 21:30).
     steps = [st for st in q.get("steps", []) if not (st.get("from") == "new_app_check.py" and st.get("status") == "waiting")]
