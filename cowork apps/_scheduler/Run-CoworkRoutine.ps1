@@ -96,7 +96,13 @@ if (-not $AnyTime) {
 # this run reads (29 Oct 2026). Never blocks the run: see Update-Routines.ps1.
 if (-not $NoPull) {
     . (Join-Path $SchedHome "Update-Routines.ps1")
-    $null = Update-Routines -Repo (Split-Path -Parent (Split-Path -Parent $SchedHome)) -Say ${function:W}
+    . (Join-Path $SchedHome "PullAlert.ps1")
+    # A refused pull used to leave only a WARN line nobody read (20-21 Nov: ~36 runs on stale prompts).
+    # Remember that line and let PullAlert email Lance, at most once a day (22 Nov 2026).
+    $script:PullWarn = ""
+    $pullSay = { param($m) W $m; if ($m -like "WARN: routines NOT updated*") { $script:PullWarn = $m } }
+    $pull = Update-Routines -Repo (Split-Path -Parent (Split-Path -Parent $SchedHome)) -Say $pullSay
+    $null = Invoke-PullAlert -Result $pull -Warn $script:PullWarn -Say ${function:W}
 }
 
 if (-not (Test-Path -LiteralPath $PromptFile)) {
