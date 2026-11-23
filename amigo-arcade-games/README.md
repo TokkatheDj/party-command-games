@@ -9,3 +9,10 @@ The Arcade's games/<name>.html is a small loader that fetches the file from here
 - squad-leader-frontier.html - Squad Leader: Frontier, by Massey M. (from the desktop AppVerse,
   Shooting Games/2026-11-02-squad-leader-frontier-rpg.html, updated 6 Nov 2026: two-player co-pilot; P2 from a second device works only
   inside AppVerse at home, through its relay, so here the button stays hidden)
+- adobe-test/ - four test games made with Adobe Stock art and Adobe Fonts (23 Nov 2026), not on the
+  Arcade home page yet. The Arcade's test/<name>.html loaders fetch them from here.
+  - reef-rescue.html - Basic (Amigo Build rules): catch game; Adobe Stock 478346529 vectorized to SVG
+  - comet-courier.html - Advanced (Amigo Build rules): gravity flying; Adobe Stock 541053342, background removed
+  - marble-maze-3d.html - 3D (three.js from jsDelivr): Adobe Stock 320483183 board texture, Adobe font Yerk
+  - star-catcher-vr.html - VR (A-Frame from jsDelivr): Adobe Stock 919344524 360 sky, Adobe font Strelka
+  - img/ - the two Stock images, as WebP. The Adobe font kit only allows amigo-arcade.vercel.app.

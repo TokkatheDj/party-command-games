@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Star Catcher VR</title>
+<!-- Star Catcher VR: stars drift toward you in space; point and pull the trigger (or click/tap) to catch them.
+     Works in a VR headset browser (Meta Quest: press "VR"), on computers (drag to look, click to catch)
+     and on phones (move the phone or drag to look, tap to catch).
+     Space sky: Adobe Stock #919344524 "360 degree 4K VR space background with Planet Earth in Space,
+     equirectangular projection, environment map.", licensed 23 Nov 2026.
+     Title font: Strelka Ultra by Dave Rowland (Dave Rowland Type), Adobe Fonts kit pur5moc.
+     A-Frame 1.6.0 (MIT), loaded from jsDelivr. No buzzers: missed stars just fade away. -->
+<link rel="stylesheet" href="https://use.typekit.net/pur5moc.css">
+<script src="https://cdn.jsdelivr.net/npm/aframe@1.6.0/dist/aframe-v1.6.0.min.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #fff; font-family: system-ui, "Segoe UI", sans-serif; }
+  .title { font-family: "strelka", "Arial Black", sans-serif; font-weight: 800; letter-spacing: .02em; }
+  .screen { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 22px; text-align: center; background: radial-gradient(circle, #1b2150e6, #02030ae6); }
+  .screen h1 { margin: 0; font-size: clamp(38px, 10vw, 84px); line-height: 1; color: #ffe066; text-shadow: 0 0 24px #ffb70388; }
+  .screen p { margin: 0; max-width: 500px; line-height: 1.45; font-size: clamp(15px, 4vw, 19px); }
+  .big { font-family: "strelka", "Arial Black", sans-serif; font-weight: 800; font-size: 24px; padding: 14px 42px; border: 0;
+    border-radius: 40px; color: #1b1b3a; background: linear-gradient(90deg, #ffe066, #ffb703); box-shadow: 0 0 28px #ffb70399; cursor: pointer; }
+  #bar { position: fixed; top: 10px; left: 12px; z-index: 5; font-weight: 700; font-size: 18px; text-shadow: 0 0 6px #000; pointer-events: none; }
+  #mute { position: fixed; top: 8px; right: 12px; z-index: 5; font-size: 18px; color: #fff; background: #ffffff22; border: 2px solid #fff; border-radius: 10px; padding: 2px 10px; cursor: pointer; }
+  .hide { display: none !important; }
+</style>
+</head>
+<body>
+<div class="screen" id="start">
+  <h1 class="title">STAR<br>CATCHER VR</h1>
+  <p>Stars drift toward you from deep space. Catch as many as you can in 60 seconds. Gold stars are worth 5!</p>
+  <p>Headset: press <b>VR</b>, then point and pull the trigger. Computer: drag to look, click to catch. Phone: move your phone or drag to look, tap to catch.</p>
+  <button class="big" id="go">Start</button>
+</div>
+<div class="screen hide" id="end"><h1 class="title" id="endTitle">TIME!</h1><p id="endText"></p><button class="big" id="again">Play again</button></div>
+<div id="bar">★ <span id="hudScore">0</span> &nbsp; ⏱ <span id="hudTime">60</span></div>
+<button id="mute" aria-label="Sound on or off">🔊</button>
+
+<script>
+// A-Frame components must be registered before the scene below is read.
+// ===== Text on a flat panel, drawn with the Adobe font (Strelka) =====
+AFRAME.registerComponent("label", {
+  schema: { text: { default: "" }, w: { default: 1 }, h: { default: 0.3 }, size: { default: 120 }, color: { default: "#fff" }, bg: { default: "" } },
+  init() {
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = 1024; this.canvas.height = Math.round(1024 * this.data.h / this.data.w);
+    this.tex = new THREE.CanvasTexture(this.canvas); this.tex.colorSpace = THREE.SRGBColorSpace;
+    this.el.setObject3D("mesh", new THREE.Mesh(new THREE.PlaneGeometry(this.data.w, this.data.h),
+      new THREE.MeshBasicMaterial({ map: this.tex, transparent: true })));
+    if (document.fonts) document.fonts.ready.then(() => this.draw());
+  },
+  update() { if (this.canvas) this.draw(); },
+  draw() {
+    const c = this.canvas, x = c.getContext("2d"), d = this.data, lines = d.text.split("|");
+    x.clearRect(0, 0, c.width, c.height);
+    if (d.bg) { x.fillStyle = d.bg; x.beginPath(); x.roundRect(6, 6, c.width - 12, c.height - 12, c.height * 0.45); x.fill(); }
+    x.fillStyle = d.color; x.textAlign = "center"; x.textBaseline = "middle";
+    const size = Math.min(d.size, c.height / lines.length * 0.8);
+    x.font = `800 ${size}px strelka, "Arial Black", sans-serif`;
+    lines.forEach((ln, i) => x.fillText(ln, c.width / 2, c.height / 2 + (i - (lines.length - 1) / 2) * size * 1.15, c.width - 30));
+    this.tex.needsUpdate = true;
+  }
+});
+
+// game loop, run by A-Frame every frame
+AFRAME.registerComponent("star-game", {
+  tick(time, dms) {
+    if (!window.gameReady) return;            // the game code below hasn't loaded yet
+    const dt = Math.min(0.05, dms / 1000);
+    if (state !== "play") return;
+    timeLeft -= dt; if (timeLeft <= 0) { timeLeft = 0; hud(); return endRound(); }
+    spawnT -= dt; if (spawnT <= 0) { spawnStar(); spawnT = SPAWN_EVERY * (0.6 + Math.random() * 0.8); }
+    document.getElementById("cam").object3D.getWorldPosition(camPos);
+    for (let i = stars.length - 1; i >= 0; i--) {
+      const s = stars[i], o = s.el.object3D;
+      if (!o) continue;
+      s.age += dt; o.rotation.y += s.spin * dt; o.rotation.x += s.spin * 0.5 * dt;
+      if (s.caught) { // quick sparkle-and-grow, then gone
+        s.popT -= dt; o.scale.setScalar(1 + (0.25 - s.popT) * 6);
+        if (s.popT <= 0) { s.el.remove(); stars.splice(i, 1); }
+        continue;
+      }
+      const toMe = camPos.clone().sub(o.position);
+      if (toMe.length() > 2.2) o.position.addScaledVector(toMe.normalize(), dt * 0.9);   // drift toward you
+      if (s.age > STAR_LIFE - 1) o.scale.setScalar(Math.max(0.01, STAR_LIFE - s.age));     // fade out at the end
+      if (s.age > STAR_LIFE) { s.el.remove(); stars.splice(i, 1); streak = 0; }
+    }
+    if (Math.floor(timeLeft) !== Math.floor(timeLeft + dt)) hud();
+  }
+});
+</script>
+<a-scene star-game renderer="colorManagement: true" vr-mode-ui="enabled: true" loading-screen="dotsColor: #ffe066; backgroundColor: #02030a">
+  <a-assets><img id="space" src="img/space-360.webp" crossorigin="anonymous"></a-assets>
+  <!-- The Adobe Stock 360 photo wraps all the way around you. Turned so Planet Earth starts in front. -->
+  <a-sky src="#space" rotation="0 -90 0"></a-sky>
+  <a-entity light="type: ambient; intensity: 0.7"></a-entity>
+  <a-entity light="type: directional; intensity: 1.2" position="-1 2 1"></a-entity>
+
+  <a-entity id="rig">
+    <a-camera id="cam" wasd-controls-enabled="false" cursor="rayOrigin: mouse" raycaster="objects: .clickable; far: 40"></a-camera>
+    <a-entity laser-controls="hand: right" raycaster="objects: .clickable; far: 40; lineColor: #ffe066"></a-entity>
+    <a-entity laser-controls="hand: left" raycaster="objects: .clickable; far: 40; lineColor: #8fd3ff"></a-entity>
+  </a-entity>
+
+  <!-- in-world scoreboard and start / play-again button (for people already in the headset) -->
+  <a-entity id="board" position="0 2.7 -4" label="text: STAR CATCHER VR; w: 3.2; h: 0.6; size: 150; color: #ffe066"></a-entity>
+  <a-entity id="startBtn" class="clickable" position="0 1.7 -3" label="text: START; w: 1.2; h: 0.4; size: 170; color: #1b1b3a; bg: #ffd84d"></a-entity>
+</a-scene>
+
+<script>
+// ===== Settings =====
+const ROUND_SECONDS = 60;
+const SPAWN_EVERY = 0.9;     // seconds between new stars
+const STAR_LIFE = 7;         // seconds before a star fades away
+const GOLD_CHANCE = 0.15;    // 15% of stars are gold (5 points)
+
+// ===== Sound: soft chimes only =====
+let ac = null, muted = false;
+function tone(f, dur, vol, delay = 0, type = "sine") {
+  if (!ac || muted) return;
+  const t0 = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.value = f;
+  g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const SCALE = [523, 587, 659, 784, 880, 1047, 1175, 1319]; // each catch in a row climbs the scale
+let streak = 0;
+const sfx = {
+  catch: gold => { const f = SCALE[streak % SCALE.length]; tone(f, 0.25, 0.09, 0, "triangle"); if (gold) tone(f * 1.5, 0.35, 0.07, 0.07, "triangle"); },
+  start: () => [392, 523, 659].forEach((f, i) => tone(f, 0.25, 0.08, i * 0.1, "triangle")),
+  end: () => [659, 523, 392, 523].forEach((f, i) => tone(f, 0.3, 0.07, i * 0.15, "triangle"))
+};
+function audioOn() { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { ac = null; } }
+
+// ===== Game =====
+const scene = document.querySelector("a-scene"), $ = id => document.getElementById(id);
+let state = "ready", score = 0, timeLeft = ROUND_SECONDS, spawnT = 0;
+const stars = [];
+const camPos = new THREE.Vector3();
+
+function setBoard(text) { $("board").setAttribute("label", "text", text); }
+function hud() { $("hudScore").textContent = score; $("hudTime").textContent = Math.ceil(timeLeft); setBoard(`★ ${score}   ⏱ ${Math.ceil(timeLeft)}`); }
+
+function startRound() {
+  audioOn(); sfx.start();
+  stars.splice(0).forEach(s => s.el.remove());
+  state = "play"; score = 0; streak = 0; timeLeft = ROUND_SECONDS; spawnT = 0.3;
+  $("start").classList.add("hide"); $("end").classList.add("hide");
+  $("startBtn").setAttribute("visible", false); $("startBtn").classList.remove("clickable");
+  hud();
+}
+function endRound() {
+  state = "over"; sfx.end();
+  stars.splice(0).forEach(s => s.el.remove());
+  setBoard(`TIME!|You caught ${score} points of stars`);
+  $("startBtn").setAttribute("label", "text", "PLAY AGAIN"); $("startBtn").setAttribute("visible", true); $("startBtn").classList.add("clickable");
+  $("endText").textContent = `You caught ${score} points of stars. Can you beat it?`;
+  if (!scene.is("vr-mode")) $("end").classList.remove("hide");
+}
+
+function spawnStar() {
+  const gold = Math.random() < GOLD_CHANCE;
+  // in a headset stars come from all around (up to ~120° each side); on flat screens they stay nearer the front
+  const spread = scene.is("vr-mode") ? 2.1 : innerWidth < innerHeight ? 0.45 : 0.9;
+  const yaw = (Math.random() * 2 - 1) * spread;
+  const pitch = -0.15 + Math.random() * 0.75, dist = 8 + Math.random() * 3;
+  const el = document.createElement("a-entity");
+  el.setAttribute("geometry", `primitive: octahedron; radius: ${gold ? 0.42 : 0.32}`);
+  el.setAttribute("material", `color: ${gold ? "#ffd84d" : "#9fe7ff"}; emissive: ${gold ? "#ff9f1c" : "#3aa0ff"}; emissiveIntensity: 0.9; metalness: 0.3; roughness: 0.25`);
+  el.classList.add("clickable");
+  el.object3D.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, 1.6 + Math.sin(pitch) * dist, -Math.cos(yaw) * Math.cos(pitch) * dist);
+  const s = { el, gold, age: 0, spin: 1 + Math.random() * 2, caught: false };
+  el.addEventListener("click", () => catchStar(s));
+  scene.appendChild(el); stars.push(s);
+}
+function catchStar(s) {
+  if (state !== "play" || s.caught) return;
+  s.caught = true; s.popT = 0.25; s.el.classList.remove("clickable");
+  score += s.gold ? 5 : 1; sfx.catch(s.gold); streak++; hud();
+}
+
+$("go").onclick = startRound; $("again").onclick = startRound;
+$("startBtn").addEventListener("click", () => { if (state !== "play") startRound(); });
+$("mute").onclick = e => { muted = !muted; e.target.textContent = muted ? "🔇" : "🔊"; };
+window.gameReady = true;
+scene.addEventListener("enter-vr", () => { audioOn(); $("start").classList.add("hide"); $("end").classList.add("hide"); });
+
+
+</script>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Comet Courier</title>
+<!-- Comet Courier: a gravity flying game made with the Amigo App Builder's Advanced rules.
+     Rocket art: Adobe Stock #541053342 "Small cartoon red and white rocket.", licensed 23 Nov 2026,
+     background removed with Adobe's Remove Background, and stored inside this file as a small picture. -->
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #070b1f; color: #eef1ff;
+    font-family: "Segoe UI", system-ui, sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; top: 8px; left: 10px; right: 10px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    font-weight: 700; font-size: clamp(14px, 3.6vw, 18px); pointer-events: none; text-shadow: 0 0 8px #4c6fff; }
+  #fuelbar { width: clamp(80px, 22vw, 160px); height: 12px; border: 2px solid #9fb0ff; border-radius: 8px; overflow: hidden; }
+  #fuel { height: 100%; width: 100%; background: linear-gradient(90deg, #ffb703, #ffe066); }
+  #hud button { pointer-events: auto; margin-left: auto; font: inherit; font-size: 15px; color: #eef1ff; background: rgba(120,140,255,.2);
+    border: 2px solid #9fb0ff; border-radius: 10px; padding: 3px 10px; cursor: pointer; }
+  .pad { position: fixed; bottom: 14px; width: 74px; height: 74px; border-radius: 50%; border: 3px solid #9fb0ff;
+    background: rgba(120,140,255,.18); color: #fff; font-size: 30px; display: grid; place-items: center; cursor: pointer; }
+  .pad.on { background: rgba(255,200,80,.45); border-color: #ffe066; }
+  #tl { left: 14px; } #tr { left: 100px; } #th { right: 14px; width: 96px; height: 96px; font-size: 22px; font-weight: 700; }
+  .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    padding: 20px; text-align: center; background: rgba(7, 11, 31, .82); }
+  .screen h1 { margin: 0; font-size: clamp(36px, 10vw, 68px); background: linear-gradient(90deg, #ffe066, #ff8fab, #8fd3ff);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .screen p { margin: 0; max-width: 460px; line-height: 1.45; font-size: clamp(15px, 4vw, 18px); }
+  .screen kbd { background: #1d2550; border: 1px solid #5b6bd6; border-radius: 5px; padding: 0 6px; }
+  .big { font: inherit; font-weight: 800; font-size: 24px; padding: 14px 40px; border-radius: 40px; border: 0; cursor: pointer;
+    color: #1b1b3a; background: linear-gradient(90deg, #ffe066, #ff8fab); box-shadow: 0 0 24px #ff8fab88; }
+  .hide { display: none !important; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud">
+  <span id="level">Level 1</span><span id="lives"></span><span id="score">Score 0</span>
+  <span>Fuel</span><div id="fuelbar"><div id="fuel"></div></div>
+  <button id="restart">↺ Level</button><button id="mute" aria-label="Sound on or off">🔊</button>
+</div>
+<button class="pad" id="tl" aria-label="Turn left">⟲</button>
+<button class="pad" id="tr" aria-label="Turn right">⟳</button>
+<button class="pad" id="th" aria-label="Thrust">BOOST</button>
+
+<div class="screen" id="start">
+  <h1>Comet Courier</h1>
+  <p>Fly your rocket to the glowing delivery ring. Planets pull you in with gravity, so use it to swing around them. Grab stars for points and fuel.</p>
+  <p>Turn with <kbd>←</kbd> <kbd>→</kbd>, boost with <kbd>↑</kbd> or <kbd>Space</kbd>, or use the buttons. Restart a level with <kbd>R</kbd>.</p>
+  <button class="big" id="go">Launch</button>
+</div>
+<div class="screen hide" id="msg"><h1 id="msgTitle"></h1><p id="msgText"></p><button class="big" id="msgBtn"></button></div>
+
+<script>
+/* =========================================================
+   1. SETTINGS — try changing these numbers!
+   ========================================================= */
+const CONFIG = {
+  turnSpeed: 3.2,     // how fast the rocket turns (radians per second)
+  thrust: 0.9,        // how hard the boost pushes
+  gravity: 0.045,     // how strongly planets pull (bigger = harder)
+  maxSpeed: 0.9,      // speed limit
+  fuelUse: 0.16,      // fuel used per second of boosting (1 = a full tank)
+  starFuel: 0.25,     // fuel a star gives back
+  lives: 3,
+  rocketSize: 0.075   // rocket picture size, as a share of the screen
+};
+
+/* =========================================================
+   2. LEVELS — x and y go from 0 (left/top) to 1 (right/bottom).
+   r is a planet's size, m is its mass (how hard it pulls).
+   Add your own level by copying one and changing the numbers.
+   ========================================================= */
+const LEVELS = [
+  { name: "First Delivery", start: [0.12, 0.8], goal: [0.85, 0.22],
+    planets: [{ x: 0.5, y: 0.5, r: 0.07, m: 1, color: "#6fd3ff" }],
+    stars: [[0.3, 0.6], [0.5, 0.25], [0.7, 0.4]] },
+  { name: "Twin Moons", start: [0.1, 0.5], goal: [0.9, 0.5],
+    planets: [{ x: 0.4, y: 0.3, r: 0.06, m: 0.9, color: "#ff9fb8" }, { x: 0.6, y: 0.7, r: 0.06, m: 0.9, color: "#b69cff" }],
+    stars: [[0.5, 0.5], [0.4, 0.62], [0.6, 0.38]] },
+  { name: "Around the Giant", start: [0.15, 0.5], goal: [0.85, 0.5],
+    planets: [{ x: 0.5, y: 0.5, r: 0.13, m: 2.2, color: "#ffb347" }],
+    stars: [[0.5, 0.18], [0.5, 0.82], [0.75, 0.3]] },
+  { name: "Ring Road", start: [0.1, 0.15], goal: [0.15, 0.85],
+    planets: [{ x: 0.35, y: 0.5, r: 0.08, m: 1.4, color: "#7be0a6" }, { x: 0.7, y: 0.3, r: 0.06, m: 1, color: "#6fd3ff" },
+              { x: 0.7, y: 0.75, r: 0.05, m: 0.8, color: "#ff9fb8" }],
+    stars: [[0.55, 0.15], [0.88, 0.5], [0.5, 0.85]] },
+  { name: "Asteroid Alley", start: [0.08, 0.85], goal: [0.92, 0.12],
+    planets: [{ x: 0.28, y: 0.55, r: 0.05, m: 0.7, color: "#c9b8a6" }, { x: 0.45, y: 0.3, r: 0.05, m: 0.7, color: "#c9b8a6" },
+              { x: 0.55, y: 0.7, r: 0.06, m: 0.9, color: "#b69cff" }, { x: 0.75, y: 0.45, r: 0.05, m: 0.7, color: "#c9b8a6" }],
+    stars: [[0.38, 0.75], [0.62, 0.45], [0.8, 0.22]] }
+];
+
+/* =========================================================
+   3. ART — the Adobe rocket picture (nose points up-right in the picture)
+   ========================================================= */
+const rocketImg = new Image();
+rocketImg.src = "data:image/webp;base64,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";
+const ROCKET_TILT = Math.PI / 4; // turns the picture so its nose matches the flying direction
+
+/* =========================================================
+   4. GAME STATE
+   ========================================================= */
+const cvs = document.getElementById("game"), ctx = cvs.getContext("2d");
+let W, H, S;                 // screen width, height, and the "unit" size (smaller side)
+let level = 0, lives = CONFIG.lives, score = 0, state = "start";
+let ship, planets, goal, stars, fuel, trail = [], boom = 0, t = 0;
+const sky = Array.from({ length: 160 }, () => ({ x: Math.random(), y: Math.random(), s: Math.random() * 1.6 + 0.3, tw: Math.random() * 6 }));
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = innerWidth; H = innerHeight; S = Math.min(W, H);
+  cvs.width = W * dpr; cvs.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener("resize", () => { resize(); if (state !== "start") loadLevel(level, true); });
+resize();
+
+// Level positions are 0..1 across the screen; physics uses "units" where 1 = the smaller screen side.
+const ux = x => x * W / S, uy = y => y * H / S;
+
+function loadLevel(n, keepShip = false) {
+  const L = LEVELS[n];
+  planets = L.planets.map(p => ({ ...p, x: ux(p.x), y: uy(p.y) }));
+  goal = { x: ux(L.goal[0]), y: uy(L.goal[1]), r: 0.07 };
+  if (!keepShip) {
+    stars = L.stars.map(s => ({ x: ux(s[0]), y: uy(s[1]), got: false }));
+    ship = { x: ux(L.start[0]), y: uy(L.start[1]), vx: 0, vy: 0, a: -Math.PI / 2 };
+    fuel = 1; trail = [];
+  }
+  updateHud();
+}
+
+/* =========================================================
+   5. SOUND — soft Web Audio sounds, no buzzers
+   ========================================================= */
+let ac = null, muted = false, hum = null;
+function tone(f1, f2, dur, vol, delay = 0, type = "sine") {
+  if (!ac || muted) return;
+  const t0 = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+  o.type = type; o.frequency.setValueAtTime(f1, t0); o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const sfx = {
+  star:    () => { tone(988, 988, 0.12, 0.08, 0, "triangle"); tone(1480, 1480, 0.2, 0.07, 0.08, "triangle"); },
+  deliver: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.22, 0.08, i * 0.1, "triangle")),
+  crash:   () => tone(300, 220, 0.3, 0.06),                     // soft, short mistake tone
+  win:     () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, f, 0.3, 0.08, i * 0.12, "triangle"))
+};
+function setHum(on) { // gentle engine hum while boosting
+  if (!ac) return;
+  if (!hum) {
+    const o = ac.createOscillator(), f = ac.createBiquadFilter(), g = ac.createGain();
+    o.type = "triangle"; o.frequency.value = 70; f.type = "lowpass"; f.frequency.value = 300; g.gain.value = 0;
+    o.connect(f); f.connect(g); g.connect(ac.destination); o.start(); hum = g;
+  }
+  hum.gain.setTargetAtTime(on && !muted ? 0.05 : 0, ac.currentTime, 0.05);
+}
+
+/* =========================================================
+   6. CONTROLS — keyboard and on-screen buttons
+   ========================================================= */
+const keys = { left: false, right: false, thrust: false };
+const KEYMAP = { ArrowLeft: "left", a: "left", ArrowRight: "right", d: "right", ArrowUp: "thrust", w: "thrust", " ": "thrust" };
+addEventListener("keydown", e => {
+  if (KEYMAP[e.key]) { keys[KEYMAP[e.key]] = true; e.preventDefault(); }
+  if ((e.key === "r" || e.key === "R") && state === "play") loadLevel(level);
+});
+addEventListener("keyup", e => { if (KEYMAP[e.key]) keys[KEYMAP[e.key]] = false; });
+for (const [id, k] of [["tl", "left"], ["tr", "right"], ["th", "thrust"]]) {
+  const b = document.getElementById(id);
+  const on = e => { e.preventDefault(); keys[k] = true; b.classList.add("on"); };
+  const off = () => { keys[k] = false; b.classList.remove("on"); };
+  b.addEventListener("pointerdown", on); b.addEventListener("pointerup", off);
+  b.addEventListener("pointerleave", off); b.addEventListener("pointercancel", off);
+}
+document.getElementById("restart").onclick = () => { if (state === "play") loadLevel(level); };
+document.getElementById("mute").onclick = e => { muted = !muted; e.target.textContent = muted ? "🔇" : "🔊"; setHum(false); };
+document.getElementById("go").onclick = () => {
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (err) { ac = null; }
+  level = 0; lives = CONFIG.lives; score = 0; loadLevel(0); state = "play";
+  document.getElementById("start").classList.add("hide");
+};
+
+function showMsg(title, text, btn, next) {
+  state = "msg"; setHum(false);
+  document.getElementById("msgTitle").textContent = title;
+  document.getElementById("msgText").textContent = text;
+  const b = document.getElementById("msgBtn"); b.textContent = btn;
+  b.onclick = () => { document.getElementById("msg").classList.add("hide"); next(); };
+  document.getElementById("msg").classList.remove("hide");
+}
+
+function updateHud() {
+  document.getElementById("level").textContent = `Level ${level + 1}: ${LEVELS[level].name}`;
+  document.getElementById("lives").textContent = "🚀".repeat(Math.max(0, lives));
+  document.getElementById("score").textContent = "Score " + score;
+  document.getElementById("fuel").style.width = Math.round(fuel * 100) + "%";
+}
+
+/* =========================================================
+   7. PHYSICS — runs every frame
+   ========================================================= */
+function update(dt) {
+  if (keys.left) ship.a -= CONFIG.turnSpeed * dt;
+  if (keys.right) ship.a += CONFIG.turnSpeed * dt;
+  const boosting = keys.thrust && fuel > 0;
+  setHum(boosting);
+  if (boosting) {
+    ship.vx += Math.cos(ship.a) * CONFIG.thrust * dt;
+    ship.vy += Math.sin(ship.a) * CONFIG.thrust * dt;
+    fuel = Math.max(0, fuel - CONFIG.fuelUse * dt);
+  }
+  // gravity: each planet pulls the ship toward its center (pull gets weaker with distance squared)
+  for (const p of planets) {
+    const dx = p.x - ship.x, dy = p.y - ship.y, d2 = Math.max(dx * dx + dy * dy, 0.004), d = Math.sqrt(d2);
+    const pull = CONFIG.gravity * p.m / d2;
+    ship.vx += dx / d * pull * dt; ship.vy += dy / d * pull * dt;
+    if (d < p.r + 0.022) return crash();
+  }
+  // speed limit, then move
+  const sp = Math.hypot(ship.vx, ship.vy);
+  if (sp > CONFIG.maxSpeed) { ship.vx *= CONFIG.maxSpeed / sp; ship.vy *= CONFIG.maxSpeed / sp; }
+  ship.x += ship.vx * dt; ship.y += ship.vy * dt;
+  // soft bounce off the screen edges
+  const maxX = W / S, maxY = H / S;
+  if (ship.x < 0.02 || ship.x > maxX - 0.02) { ship.vx *= -0.6; ship.x = Math.min(Math.max(ship.x, 0.02), maxX - 0.02); }
+  if (ship.y < 0.02 || ship.y > maxY - 0.02) { ship.vy *= -0.6; ship.y = Math.min(Math.max(ship.y, 0.02), maxY - 0.02); }
+  // stars
+  for (const s of stars) if (!s.got && Math.hypot(s.x - ship.x, s.y - ship.y) < 0.05) {
+    s.got = true; score += 10; fuel = Math.min(1, fuel + CONFIG.starFuel); sfx.star();
+  }
+  // delivered?
+  if (Math.hypot(goal.x - ship.x, goal.y - ship.y) < goal.r) return deliver();
+  trail.push({ x: ship.x, y: ship.y }); if (trail.length > 60) trail.shift();
+  updateHud();
+}
+
+function crash() {
+  sfx.crash(); lives--; boom = 0.6; updateHud();
+  if (lives <= 0) return showMsg("Out of rockets", `You scored ${score}. Every courier crashes on the way to greatness.`, "Try again",
+    () => { level = 0; lives = CONFIG.lives; score = 0; loadLevel(0); state = "play"; });
+  loadLevel(level); // same level, fresh tank
+}
+
+function deliver() {
+  const bonus = Math.round(fuel * 50);
+  score += 50 + bonus; sfx.deliver(); updateHud();
+  if (level === LEVELS.length - 1) {
+    sfx.win();
+    return showMsg("All delivered!", `Every package made it. Final score: ${score}.`, "Play again",
+      () => { level = 0; lives = CONFIG.lives; score = 0; loadLevel(0); state = "play"; });
+  }
+  showMsg("Delivered!", `+50 for the delivery and +${bonus} for fuel left. Next: ${LEVELS[level + 1].name}.`, "Next level",
+    () => { level++; loadLevel(level); state = "play"; });
+}
+
+/* =========================================================
+   8. DRAWING
+   ========================================================= */
+function glow(x, y, r, color) { // a soft glowing circle
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, color); g.addColorStop(1, "transparent");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+}
+
+function draw() {
+  ctx.fillStyle = "#070b1f"; ctx.fillRect(0, 0, W, H);
+  glow(W * 0.8, H * 0.2, S * 0.6, "rgba(120,80,255,.18)"); glow(W * 0.15, H * 0.85, S * 0.5, "rgba(255,90,160,.12)");
+  for (const s of sky) { ctx.fillStyle = `rgba(255,255,255,${0.4 + 0.4 * Math.sin(t * 2 + s.tw)})`; ctx.fillRect(s.x * W, s.y * H, s.s, s.s); }
+  if (state === "start") return;
+
+  // goal ring pulses
+  const gx = goal.x * S, gy = goal.y * S, gr = goal.r * S;
+  glow(gx, gy, gr * 2, "rgba(120,255,200,.35)");
+  ctx.strokeStyle = "#8affd0"; ctx.lineWidth = 4; ctx.setLineDash([10, 8]); ctx.lineDashOffset = -t * 30;
+  ctx.beginPath(); ctx.arc(gx, gy, gr * (1 + 0.06 * Math.sin(t * 4)), 0, 7); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "#8affd0"; ctx.font = `bold ${Math.round(S * 0.028)}px system-ui`; ctx.textAlign = "center"; ctx.fillText("DELIVER", gx, gy + 5);
+
+  // planets with a glow and a shaded side
+  for (const p of planets) {
+    const x = p.x * S, y = p.y * S, r = p.r * S;
+    glow(x, y, r * 2.2, p.color + "40");
+    const g = ctx.createRadialGradient(x - r * 0.4, y - r * 0.4, r * 0.1, x, y, r);
+    g.addColorStop(0, "#ffffff"); g.addColorStop(0.25, p.color); g.addColorStop(1, "#1a1440");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+  }
+  // stars to collect
+  for (const s of stars) if (!s.got) {
+    const x = s.x * S, y = s.y * S; glow(x, y, S * 0.04, "rgba(255,230,120,.6)");
+    ctx.font = `${Math.round(S * 0.04)}px serif`; ctx.fillText("⭐", x, y + S * 0.014);
+  }
+  // the ship's dotted trail, then the ship
+  ctx.fillStyle = "rgba(255,200,120,.5)";
+  trail.forEach((p, i) => { if (i % 3 === 0) ctx.fillRect(p.x * S - 1, p.y * S - 1, 2, 2); });
+  const x = ship.x * S, y = ship.y * S, size = S * CONFIG.rocketSize;
+  if (keys.thrust && fuel > 0) glow(x - Math.cos(ship.a) * size * 0.55, y - Math.sin(ship.a) * size * 0.55, size * 0.6, "rgba(255,170,60,.8)");
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ship.a + ROCKET_TILT);
+  ctx.drawImage(rocketImg, -size / 2, -size / 2, size, size); ctx.restore();
+  if (boom > 0) { glow(x, y, S * 0.12 * (1 - boom), `rgba(255,180,90,${boom})`); }
+}
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now; t += dt; boom = Math.max(0, boom - dt);
+  if (state === "play") update(dt);
+  draw(); requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
