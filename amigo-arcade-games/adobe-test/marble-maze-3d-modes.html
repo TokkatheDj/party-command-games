@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Marble Maze 3D</title>
+<!-- Marble Maze 3D: tilt the board, roll the marble to the green ring. Four ways to play (23 Nov 2026):
+     Classic, Time Trial, Gem Hunt and Endless. Gem Hunt and Endless build a brand-new maze every round.
+     Board texture: Adobe Stock #320483183 (white gray marble), licensed 23 Nov 2026.
+     Title font: Yerk by Harbor Bickmore (That That Type), served by Adobe Fonts kit pur5moc.
+     3D: three.js r160 (MIT), loaded from jsDelivr. No buzzers: falling in a hole plays one soft tone. -->
+<link rel="stylesheet" href="https://use.typekit.net/pur5moc.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1c2133; color: #fff;
+    font-family: system-ui, "Segoe UI", sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+  canvas { display: block; }
+  .title { font-family: "yerk", "Arial Black", sans-serif; font-weight: 400; }
+  #hud { position: fixed; top: 10px; left: 12px; right: 12px; display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: center;
+    font-weight: 700; font-size: clamp(14px, 3.6vw, 19px); text-shadow: 0 2px 4px #000a; pointer-events: none; }
+  #hud .title { font-size: clamp(18px, 4.6vw, 26px); color: #ffd84d; }
+  .hudbtn { pointer-events: auto; font-size: 18px; background: #ffffff22; color: #fff; border: 2px solid #fff; border-radius: 10px; padding: 2px 10px; cursor: pointer; }
+  #hudBtns { margin-left: auto; display: flex; gap: 8px; }
+  #toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); background: #ffd84d; color: #1c2133; font-weight: 800;
+    font-size: clamp(16px, 4vw, 22px); padding: 8px 18px; border-radius: 30px; box-shadow: 0 4px 12px #0008; pointer-events: none; }
+  #stick { position: fixed; right: 18px; bottom: 18px; width: 120px; height: 120px; border-radius: 50%; border: 3px solid #ffffffaa;
+    background: #ffffff1a; touch-action: none; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #fff, #ff6b6b 45%, #a61e4d); box-shadow: 0 4px 10px #0008; }
+  .screen { position: fixed; inset: 0; overflow-y: auto; touch-action: pan-y; padding: 22px 16px; text-align: center;
+    background: radial-gradient(circle, #2b3352ee, #10131fee); display: flex; }
+  .inner { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 760px; width: 100%; }
+  .screen h1 { margin: 0; font-size: clamp(44px, 12vw, 88px); line-height: .95; color: #ffd84d; text-shadow: 0 6px 0 #c2410c; }
+  .screen p { margin: 0; max-width: 520px; font-size: clamp(15px, 4vw, 19px); line-height: 1.45; }
+  .screen p.small { font-size: 15px; color: #c9d0ee; }
+  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; width: 100%; }
+  .mode { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 14px 16px; border-radius: 16px; cursor: pointer;
+    background: #ffffff14; color: #fff; border: 3px solid #ffffff55; font: inherit; }
+  .mode b { font-family: "yerk", "Arial Black", sans-serif; font-weight: 400; font-size: 22px; color: #ffd84d; }
+  .mode span { font-size: 15px; line-height: 1.35; }
+  .mode i { font-style: normal; font-size: 14px; font-weight: 700; color: #8ce99a; }
+  .mode i:empty { display: none; }
+  .mode:hover, .mode:focus-visible { border-color: #ffd84d; background: #ffffff22; outline: none; }
+  .big { font-family: "yerk", "Arial Black", sans-serif; font-size: 24px; padding: 12px 36px; border-radius: 40px; border: 4px solid #fff;
+    color: #fff; background: #ff6b6b; box-shadow: 0 6px 0 #a61e4d; cursor: pointer; }
+  .big:active { transform: translateY(4px); box-shadow: 0 2px 0 #a61e4d; }
+  .big.alt { background: #4dabf7; box-shadow: 0 6px 0 #1864ab; }
+  .big:focus-visible, .hudbtn:focus-visible { outline: 4px solid #ffd84d; outline-offset: 3px; }
+  .btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  #tiltToggle { font-size: 17px; padding: 8px 16px; }
+  #tiltToggle.on { background: #2f9e44; }
+  .hide { display: none !important; }
+  body.menu #hud, body.menu #stick, body.menu #toast { visibility: hidden; } /* the menu covers the game */
+  @media (max-width: 560px) { .screen h1 { font-size: clamp(36px, 13vw, 60px); } .mode { padding: 10px 14px; } .mode b { font-size: 19px; } .inner { gap: 11px; } }
+</style>
+</head>
+<body class="menu">
+<div id="hud"><span class="title">Marble Maze 3D</span><span id="lvl">Level 1</span><span id="time">0.0s</span><span id="gems">💎 0</span><span id="info">🕳️ 0</span>
+  <span id="hudBtns"><button id="tilt" class="hudbtn hide" aria-label="Steer by tilting your tablet or phone">📱 Tilt</button>
+  <button id="mute" class="hudbtn" aria-label="Sound on or off">🔊</button>
+  <button id="menu" class="hudbtn" aria-label="Back to the game modes">☰</button></span></div>
+<div id="toast" class="hide"></div>
+<div id="stick" aria-label="Tilt stick"><div id="knob"></div></div>
+
+<div class="screen" id="start"><div class="inner">
+  <h1 class="title">Marble<br>Maze 3D</h1>
+  <p>Tilt the board to roll your marble to the glowing green ring. Pick a way to play:</p>
+  <div class="modes">
+    <button class="mode" data-mode="classic"><b>🔴 Classic</b><span>3 mazes. Grab the gems, steer around the holes, and reach the green ring.</span><i id="best-classic"></i></button>
+    <button class="mode" data-mode="trial"><b>⏱️ Time Trial</b><span>The same 3 mazes against the clock. Finish fast for gold, silver or bronze.</span><i id="best-trial"></i></button>
+    <button class="mode" data-mode="gems"><b>💎 Gem Hunt</b><span>A brand-new maze every round, with no holes. Collect every gem to open the ring.</span><i id="best-gems"></i></button>
+    <button class="mode" data-mode="endless"><b>♾️ Endless</b><span>New mazes that get bigger, with more holes each time. You have 3 marbles. How far can you go?</span><i id="best-endless"></i></button>
+  </div>
+  <button id="tiltToggle" class="hudbtn hide" aria-pressed="false">📱 Tilt the tablet to steer: Off</button>
+  <p class="small">Steer with the arrow keys or WASD, drag anywhere on the screen, or use the stick in the corner.<span id="tiltHint" class="hide"> To steer by tilting this device, turn tilt on, hold the device the way you like, then pick a mode.</span></p>
+</div></div>
+<div class="screen hide" id="msg"><div class="inner"><h1 class="title" id="msgTitle"></h1><p id="msgText"></p>
+  <div class="btns"><button class="big" id="msgBtn"></button><button class="big alt" id="msgModes">Modes</button></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js"></script>
+<script>
+// ===== Settings: change these to tweak the game =====
+const GRAVITY = 26;        // how fast the marble speeds up when the board tilts
+const MAX_TILT = 0.22;     // how far the board can tilt (radians)
+const FRICTION = 0.985;    // 1 = ice, smaller = sticky
+const BALL_R = 0.3;        // marble size (one maze square = 1)
+const START_MARBLES = 3;   // Endless: marbles at the start
+const GEMS_PER_MARBLE = 5; // Endless: collect this many gems to earn an extra marble
+const MAX_MARBLES = 5;
+// Time Trial: seconds for [gold, silver] on each Classic maze. Anything slower is bronze.
+// (A computer player that steers perfectly takes about 13, 13.5 and 9.5 seconds.)
+const TRIAL_TIMES = [[15, 24], [16, 25], [11, 17]];
+
+// ===== Classic mazes: # wall  . floor  S start  G goal  o hole  * gem =====
+const LEVELS = [
+  ["############","#S.....#...#","#.####.#.*.#","#.#..o.#...#","#.#.####.#.#","#...#*...#.#",
+   "###.#.####.#","#...#.o..#.#","#.###.##.#.#","#.*...#..o.#","#..o..#...G#","############"],
+  ["############","#S...#....*#","#.o..#.##..#","#....#..#o.#","##.###..#..#","#..#*o..##.#",
+   "#..#....o..#","#.o####.##.#","#.......#..#","#*.##o..#..#","#..##...o.G#","############"],
+  ["############","#S.o...o..*#","#.#.#.#.#..#","#...o...o..#","#.#.#.#.#.##","#o..*..o...#",
+   "#.#.#.#.#.##","#...o...o..#","##.#.#.#.#.#","#*..o...o..#","#.#...#...G#","############"]
+];
+
+// ===== Maze maker for Gem Hunt and Endless =====
+// Carves a random maze, knocks out some walls so there is more than one way through,
+// then adds gems and holes. A hole is only kept if the ring and every gem can still be reached.
+const DIRS = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+const rnd = k => Math.floor(Math.random() * k);
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function reach(g, from) { // steps from "from" to every square, going around walls and holes
+  const n = g.length, d = g.map(row => row.map(() => -1)), q = [from]; d[from[0]][from[1]] = 0;
+  for (let i = 0; i < q.length; i++) {
+    const [r, c] = q[i];
+    for (const [dr, dc] of DIRS) { const a = r + dr, b = c + dc;
+      if (a >= 0 && b >= 0 && a < n && b < n && g[a][b] !== "#" && g[a][b] !== "o" && d[a][b] < 0) { d[a][b] = d[r][c] + 1; q.push([a, b]); } }
+  }
+  return d;
+}
+function makeMaze(cells, holeCount, gemCount) {
+  const n = cells * 2 + 1, g = Array.from({ length: n }, () => Array(n).fill("#"));
+  const stack = [[0, 0]]; g[1][1] = ".";
+  while (stack.length) {
+    const [r, c] = stack[stack.length - 1];
+    const open = DIRS.filter(([dr, dc]) => { const a = r + dr, b = c + dc; return a >= 0 && b >= 0 && a < cells && b < cells && g[2 * a + 1][2 * b + 1] === "#"; });
+    if (!open.length) { stack.pop(); continue; }
+    const [dr, dc] = open[rnd(open.length)];
+    g[2 * r + 1 + dr][2 * c + 1 + dc] = "."; g[2 * (r + dr) + 1][2 * (c + dc) + 1] = "."; stack.push([r + dr, c + dc]);
+  }
+  const inner = []; // walls between two squares (not the posts at the corners)
+  for (let r = 1; r < n - 1; r++) for (let c = 1; c < n - 1; c++) if (g[r][c] === "#" && (r + c) % 2 === 1) inner.push([r, c]);
+  shuffle(inner).slice(0, Math.round(inner.length * 0.22)).forEach(([r, c]) => { g[r][c] = "."; });
+  const S = [1, 1], G = [n - 2, n - 2];
+  g[1][1] = "S"; g[n - 2][n - 2] = "G";
+  const dist = reach(g, S);
+  const spots = [];
+  for (let r = 1; r < n - 1; r++) for (let c = 1; c < n - 1; c++) if (g[r][c] === "." && dist[r][c] >= 3) spots.push([r, c]);
+  shuffle(spots);
+  const gemSpots = spots.filter(([r, c]) => r % 2 && c % 2).slice(0, gemCount); // gems sit in the middle of a square
+  gemSpots.forEach(([r, c]) => { g[r][c] = "*"; });
+  let placed = 0;
+  for (const [r, c] of spots) {
+    if (placed >= holeCount) break;
+    if (g[r][c] !== ".") continue;
+    g[r][c] = "o";
+    const d = reach(g, S);
+    if (d[G[0]][G[1]] < 0 || gemSpots.some(([a, b]) => d[a][b] < 0)) g[r][c] = "."; else placed++;
+  }
+  return g.map(row => row.join(""));
+}
+
+// ===== three.js scene =====
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#1c2133");
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+scene.add(new THREE.HemisphereLight("#ffffff", "#445", 1.1));
+const sun = new THREE.DirectionalLight("#fff4e0", 2.2);
+sun.position.set(-6, 14, 8); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9 });
+scene.add(sun);
+
+// the Adobe Stock marble photo becomes the board's texture
+const marbleTex = new THREE.TextureLoader().load("img/marble-1024.webp");
+marbleTex.colorSpace = THREE.SRGBColorSpace;
+const wallTex = marbleTex.clone(); wallTex.needsUpdate = true;
+const wallGeo = new THREE.BoxGeometry(1, 0.6, 1);
+const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, color: "#8a93b8", roughness: 0.4 });
+const holeGeo = new THREE.CircleGeometry(0.4, 32), holeMat = new THREE.MeshBasicMaterial({ color: "#05060a" });
+const gemGeo = new THREE.OctahedronGeometry(0.22);
+const gemMat = new THREE.MeshStandardMaterial({ color: "#4dd4ff", emissive: "#1a6aa0", roughness: 0.1, metalness: 0.3 });
+const goalMat = new THREE.MeshStandardMaterial({ color: "#5cff9d", emissive: "#20c060", emissiveIntensity: 1.2 });
+
+const board = new THREE.Group(); scene.add(board);
+let walls = [], holes = [], gems = [], goal, startPos, ball, ballMesh, goalMesh, curGrid;
+let N = 12, HALF = N / 2;
+const cell = (r, c) => ({ x: c - HALF + 0.5, z: r - HALF + 0.5 });
+
+function buildLevel(grid) {
+  curGrid = grid; N = grid.length; HALF = N / 2;
+  while (board.children.length) board.remove(board.children[0]);
+  walls = []; holes = []; gems = [];
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(N, 0.4, N),
+    new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.35, metalness: 0.05 }));
+  floor.position.y = -0.2; floor.receiveShadow = true; board.add(floor);
+  grid.forEach((row, r) => [...row].forEach((ch, c) => {
+    const p = cell(r, c);
+    if (ch === "#") {
+      const m = new THREE.Mesh(wallGeo, wallMat);
+      m.position.set(p.x, 0.3, p.z); m.castShadow = m.receiveShadow = true; board.add(m);
+      walls.push({ x0: p.x - 0.5, x1: p.x + 0.5, z0: p.z - 0.5, z1: p.z + 0.5 });
+    } else if (ch === "o") {
+      const m = new THREE.Mesh(holeGeo, holeMat);
+      m.rotation.x = -Math.PI / 2; m.position.set(p.x, 0.005, p.z); board.add(m); holes.push(p);
+    } else if (ch === "*") {
+      const m = new THREE.Mesh(gemGeo, gemMat);
+      m.position.set(p.x, 0.4, p.z); m.castShadow = true; board.add(m); gems.push({ ...p, mesh: m, got: false });
+    } else if (ch === "G") {
+      goal = p;
+      goalMesh = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.07, 12, 40), goalMat);
+      goalMesh.rotation.x = -Math.PI / 2; goalMesh.position.set(p.x, 0.08, p.z); board.add(goalMesh);
+    } else if (ch === "S") startPos = p;
+  }));
+  ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 40, 28),
+    new THREE.MeshPhysicalMaterial({ color: "#ff6b6b", roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05 }));
+  ballMesh.castShadow = true; board.add(ballMesh);
+  resetBall(); resize();
+}
+function resetBall() { ball = { x: startPos.x, z: startPos.z, vx: 0, vz: 0, y: BALL_R, falling: 0 }; }
+function setRing(open) { // Gem Hunt: the ring is grey and closed until every gem is collected
+  goalLocked = !open;
+  goalMat.color.set(open ? "#5cff9d" : "#7b839c"); goalMat.emissive.set(open ? "#20c060" : "#000000");
+}
+
+// ===== Sound: soft tones only =====
+let ac = null, muted = false;
+function tone(f1, f2, dur, vol, delay = 0) {
+  if (!ac || muted) return;
+  const t0 = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+  o.type = "sine"; o.frequency.setValueAtTime(f1, t0); o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const sfx = {
+  gem: () => { tone(1046, 1046, 0.12, 0.08); tone(1568, 1568, 0.2, 0.07, 0.08); },
+  hole: () => tone(440, 220, 0.45, 0.06),               // soft slide-down tone
+  bump: v => tone(160, 120, 0.06, Math.min(0.05, v * 0.01)),
+  open: () => [784, 988, 1175].forEach((f, i) => tone(f, f, 0.22, 0.07, i * 0.08)),
+  extra: () => [659, 880].forEach((f, i) => tone(f, f, 0.25, 0.07, i * 0.12)),
+  goal: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.25, 0.08, i * 0.1)),
+  over: () => [392, 330, 262].forEach((f, i) => tone(f, f, 0.35, 0.05, i * 0.2)) // gentle "that's it" notes
+};
+
+// ===== Controls: keys, drag anywhere, or the on-screen stick =====
+const keys = {}; let drag = null, tiltX = 0, tiltZ = 0;
+addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.startsWith("Arrow") && state === "play") e.preventDefault(); // on menus the arrows move between buttons
+  if (e.key === "Escape" && state !== "start") toMenu();
+});
+addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
+const stick = document.getElementById("stick"), knob = document.getElementById("knob");
+function startDrag(e, isStick) { drag = { x: e.clientX, y: e.clientY, dx: 0, dy: 0, isStick }; }
+renderer.domElement.addEventListener("pointerdown", e => startDrag(e, false));
+stick.addEventListener("pointerdown", e => { e.preventDefault(); const r = stick.getBoundingClientRect(); drag = { x: r.left + r.width / 2, y: r.top + r.height / 2, isStick: true }; moveDrag(e); });
+function moveDrag(e) { if (!drag) return; drag.dx = e.clientX - drag.x; drag.dy = e.clientY - drag.y; }
+addEventListener("pointermove", moveDrag);
+addEventListener("pointerup", () => { drag = null; knob.style.transform = ""; });
+document.getElementById("mute").onclick = e => { muted = !muted; e.currentTarget.textContent = muted ? "🔇" : "🔊"; };
+
+function readTilt() {
+  let tx = (keys["arrowright"] || keys["d"] ? 1 : 0) - (keys["arrowleft"] || keys["a"] ? 1 : 0);
+  let tz = (keys["arrowdown"] || keys["s"] ? 1 : 0) - (keys["arrowup"] || keys["w"] ? 1 : 0);
+  if (drag) {
+    const range = drag.isStick ? 50 : 90;
+    tx = Math.max(-1, Math.min(1, drag.dx / range)); tz = Math.max(-1, Math.min(1, drag.dy / range));
+    if (drag.isStick) knob.style.transform = `translate(${tx * 34}px, ${tz * 34}px)`;
+  }
+  if (!drag && !tx && !tz && tiltOn) { tx = devX; tz = devZ; } // device tilt when nothing else is steering
+  return { tx, tz };
+}
+
+// ===== Tilt the tablet or phone itself (motion sensor) =====
+// Whatever angle you hold the device at when tilt starts counts as "flat". Tap "Re-center" to reset it.
+const TILT_RANGE = 18;   // degrees of device tilt that give a full board tilt (smaller = more sensitive)
+const canTilt = "DeviceOrientationEvent" in window && matchMedia("(pointer: coarse)").matches;
+let tiltOn = false, tiltListening = false, tiltZero = null, devX = 0, devZ = 0;
+function screenAngle() { const a = (screen.orientation && screen.orientation.angle) ?? window.orientation ?? 0; return ((a % 360) + 360) % 360; }
+function onOrient(e) {
+  if (!tiltOn || e.beta == null || e.gamma == null) return;
+  // turn the sensor's numbers into "right" (x) and "toward me" (y) for the way the screen is turned
+  let x = e.gamma, y = e.beta;
+  const a = screenAngle();
+  if (a === 90) { x = e.beta; y = e.gamma; }
+  else if (a === 270) { x = -e.beta; y = -e.gamma; }
+  else if (a === 180) { x = -e.gamma; y = -e.beta; }
+  if (!tiltZero) tiltZero = { x, y };
+  devX = Math.max(-1, Math.min(1, (x - tiltZero.x) / TILT_RANGE));
+  devZ = Math.max(-1, Math.min(1, (y - tiltZero.y) / TILT_RANGE));
+}
+async function enableTilt() {
+  const btn = document.getElementById("tilt");
+  try { // iPads and iPhones ask permission first
+    if (typeof DeviceOrientationEvent.requestPermission === "function" && (await DeviceOrientationEvent.requestPermission()) !== "granted") throw 0;
+  } catch (e) { btn.textContent = "📱 Tilt not allowed"; showTiltToggle(false, true); return false; }
+  if (!tiltListening) { tiltListening = true; addEventListener("deviceorientation", onOrient); addEventListener("orientationchange", () => { tiltZero = null; }); }
+  tiltOn = true; tiltZero = null; devX = devZ = 0; btn.textContent = "📱 Re-center"; showTiltToggle(true);
+  return true;
+}
+function showTiltToggle(on, refused) {
+  const t = document.getElementById("tiltToggle");
+  t.classList.toggle("on", on); t.setAttribute("aria-pressed", on);
+  t.textContent = refused ? "📱 Tilt not allowed on this device" : "📱 Tilt the tablet to steer: " + (on ? "On" : "Off");
+}
+if (canTilt) ["tilt", "tiltToggle", "tiltHint"].forEach(id => document.getElementById(id).classList.remove("hide"));
+document.getElementById("tilt").onclick = enableTilt;
+document.getElementById("tiltToggle").onclick = () => {
+  if (tiltOn) { tiltOn = false; devX = devZ = 0; document.getElementById("tilt").textContent = "📱 Tilt"; showTiltToggle(false); }
+  else enableTilt();
+};
+
+// ===== Best scores, kept on this device =====
+const REC_KEY = "marbleMaze3d.records";
+let rec = {};
+try { rec = JSON.parse(localStorage.getItem(REC_KEY)) || {}; } catch (e) { rec = {}; }
+function saveRec() { try { localStorage.setItem(REC_KEY, JSON.stringify(rec)); } catch (e) {} }
+function showBests() {
+  $("best-classic").textContent = rec.classic ? `Best: all 3 in ${rec.classic.toFixed(1)}s` : "";
+  const m = rec.medals || [];
+  $("best-trial").textContent = m.length ? "Best medals: " + LEVELS.map((_, i) => m[i] || "▫️").join(" ") : "";
+  $("best-gems").textContent = rec.gems ? `Fastest maze: ${rec.gems.toFixed(1)}s` : "";
+  $("best-endless").textContent = rec.endless ? `Best: ${rec.endless} ${rec.endless === 1 ? "maze" : "mazes"} cleared` : "";
+}
+
+// ===== Game flow =====
+let mode = "classic", level = 0, state = "start", time = 0, totalTime = 0, gemCount = 0, falls = 0;
+let lives = START_MARBLES, gemsToMarble = 0, goalLocked = false, medals = [], toastTimer = 0;
+const $ = id => document.getElementById(id);
+const MEDAL = ["🥇", "🥈", "🥉"], MEDAL_NAME = ["Gold", "Silver", "Bronze"];
+
+function levelGrid(n) {
+  if (mode === "classic" || mode === "trial") return LEVELS[n];
+  if (mode === "gems") return makeMaze(n < 2 ? 5 : 6, 0, Math.min(5 + n, 9));
+  const cells = n < 3 ? 5 : n < 7 ? 6 : 7;                       // Endless: the maze grows...
+  return makeMaze(cells, Math.min(2 + Math.floor(n * 1.5), Math.floor(cells * cells / 2.5)), 3); // ...and gets more holes
+}
+function hud() {
+  const fixed = mode === "classic" || mode === "trial";
+  $("lvl").textContent = fixed ? `Level ${level + 1}/${LEVELS.length}` : `Maze ${level + 1}`;
+  $("time").textContent = time.toFixed(1) + "s";
+  const got = gems.filter(g => g.got).length;
+  $("gems").textContent = mode === "gems" ? `💎 ${got}/${gems.length}` : "💎 " + gemCount;
+  $("info").textContent = mode === "endless" ? "🔴 ×" + lives
+    : mode === "trial" ? `🥇 under ${TRIAL_TIMES[level][0]}s`
+    : mode === "gems" ? (goalLocked ? "🔒 Ring closed" : "🟢 Ring open!")
+    : "🕳️ " + falls;
+}
+function toast(text) {
+  const t = $("toast"); t.textContent = text; t.classList.remove("hide");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add("hide"), 1600);
+}
+function startMode(m) {
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { ac = null; }
+  mode = m; gemCount = 0; falls = 0; totalTime = 0; lives = START_MARBLES; gemsToMarble = 0; medals = [];
+  $("start").classList.add("hide"); document.body.classList.remove("menu"); startLevel(0);
+}
+function startLevel(n) { level = n; time = 0; buildLevel(levelGrid(n)); setRing(mode !== "gems"); state = "play"; hud(); }
+function showMsg(title, text, btn, next) {
+  state = "msg"; $("msgTitle").textContent = title; $("msgText").textContent = text; $("msgBtn").textContent = btn;
+  $("msgBtn").onclick = () => { $("msg").classList.add("hide"); next(); }; $("msg").classList.remove("hide");
+  $("msgBtn").focus();
+}
+function toMenu() {
+  state = "start"; $("msg").classList.add("hide"); $("toast").classList.add("hide");
+  showBests(); document.body.classList.add("menu"); $("start").classList.remove("hide"); document.querySelector(".mode").focus();
+}
+document.querySelectorAll(".mode").forEach(b => { b.onclick = () => startMode(b.dataset.mode); });
+$("msgModes").onclick = toMenu;
+$("menu").onclick = toMenu;
+
+function levelDone() {
+  sfx.goal(); totalTime += time;
+  const t = time.toFixed(1), last = level === LEVELS.length - 1;
+  if (mode === "classic") {
+    if (!last) return showMsg("Level clear!", `Done in ${t} seconds. Ready for level ${level + 2}?`, "Next level", () => startLevel(level + 1));
+    const best = !rec.classic || totalTime < rec.classic; if (best) { rec.classic = totalTime; saveRec(); }
+    return showMsg("You win!", `All ${LEVELS.length} mazes in ${totalTime.toFixed(1)} seconds, with ${gemCount} gems and ${falls} falls.${best ? " That's your best time!" : ""}`,
+      "Play again", () => startMode("classic"));
+  }
+  if (mode === "trial") {
+    const [gold, silver] = TRIAL_TIMES[level], m = time <= gold ? 0 : time <= silver ? 1 : 2;
+    medals.push(MEDAL[m]);
+    rec.medals = rec.medals || []; rec.bestTimes = rec.bestTimes || [];
+    const prevM = MEDAL.indexOf(rec.medals[level]); if (prevM < 0 || m < prevM) rec.medals[level] = MEDAL[m];
+    const newBest = !rec.bestTimes[level] || time < rec.bestTimes[level]; if (newBest) rec.bestTimes[level] = time; saveRec();
+    const goal = m === 0 ? "" : ` Gold is under ${gold}s.`;
+    const text = `${t} seconds.${newBest ? " New best!" : ` Your best is ${rec.bestTimes[level].toFixed(1)}s.`}${goal}`;
+    if (!last) return showMsg(`${MEDAL[m]} ${MEDAL_NAME[m]}!`, text + ` Ready for level ${level + 2}?`, "Next level", () => startLevel(level + 1));
+    return showMsg(`${MEDAL[m]} ${MEDAL_NAME[m]}!`, `${text} Your medals: ${medals.join(" ")}. Total time ${totalTime.toFixed(1)}s.`,
+      "Try again", () => startMode("trial"));
+  }
+  if (mode === "gems") {
+    const best = !rec.gems || time < rec.gems; if (best) { rec.gems = time; saveRec(); }
+    return showMsg("All gems found!", `Maze ${level + 1} done in ${t} seconds.${best ? " That's your fastest maze!" : ` Fastest: ${rec.gems.toFixed(1)}s.`}`,
+      "Next maze", () => startLevel(level + 1));
+  }
+  // Endless
+  const cleared = level + 1; if (!rec.endless || cleared > rec.endless) { rec.endless = cleared; saveRec(); }
+  showMsg(`Maze ${cleared} clear!`, `You have ${lives} ${lives === 1 ? "marble" : "marbles"} left. The next maze ${cleared === 3 || cleared === 7 ? "is bigger" : "has more holes"}.`,
+    "Next maze", () => startLevel(level + 1));
+}
+function outOfMarbles() {
+  sfx.over(); const cleared = level, best = rec.endless || 0;
+  showMsg("Out of marbles", `You cleared ${cleared} ${cleared === 1 ? "maze" : "mazes"} and found ${gemCount} gems.${cleared && cleared >= best ? " That's your best run!" : best ? ` Your best is ${best}.` : ""}`,
+    "Play again", () => startMode("endless"));
+}
+
+// ===== Physics: the marble rolls on a flat grid; walls are boxes =====
+function step(dt) {
+  const { tx, tz } = readTilt();
+  tiltX += (tx * MAX_TILT - tiltX) * Math.min(1, dt * 8);
+  tiltZ += (tz * MAX_TILT - tiltZ) * Math.min(1, dt * 8);
+  board.rotation.z = -tiltX; board.rotation.x = tiltZ;
+  if (state !== "play") return;
+  time += dt;
+
+  if (ball.falling > 0) { // dropping into a hole
+    ball.falling -= dt; ball.y -= dt * 3;
+    if (ball.falling <= 0) { if (mode === "endless" && lives <= 0) return outOfMarbles(); resetBall(); }
+    hud(); return;
+  }
+  ball.vx = (ball.vx + Math.sin(tiltX) * GRAVITY * dt) * FRICTION;
+  ball.vz = (ball.vz + Math.sin(tiltZ) * GRAVITY * dt) * FRICTION;
+  // move in small sub-steps so the marble never tunnels through a wall
+  const sub = 4;
+  for (let i = 0; i < sub; i++) {
+    ball.x += ball.vx * dt / sub; ball.z += ball.vz * dt / sub;
+    for (const w of walls) {
+      const nx = Math.max(w.x0, Math.min(ball.x, w.x1)), nz = Math.max(w.z0, Math.min(ball.z, w.z1));
+      const dx = ball.x - nx, dz = ball.z - nz, d = Math.hypot(dx, dz);
+      if (d < BALL_R && d > 0) {
+        const push = (BALL_R - d) / d; ball.x += dx * push; ball.z += dz * push;
+        const n = { x: dx / d, z: dz / d }, vn = ball.vx * n.x + ball.vz * n.z;
+        if (vn < 0) { ball.vx -= 1.5 * vn * n.x; ball.vz -= 1.5 * vn * n.z; if (vn < -1.5) sfx.bump(-vn); }
+      }
+    }
+  }
+  for (const h of holes) if (Math.hypot(ball.x - h.x, ball.z - h.z) < 0.3) {
+    ball.x = h.x; ball.z = h.z; ball.vx = ball.vz = 0; ball.falling = 0.6; falls++; sfx.hole();
+    if (mode === "endless") lives--;
+    hud(); return;
+  }
+  for (const g of gems) if (!g.got && Math.hypot(ball.x - g.x, ball.z - g.z) < 0.45) {
+    g.got = true; g.mesh.visible = false; gemCount++; sfx.gem();
+    if (mode === "gems" && gems.every(x => x.got)) { setRing(true); sfx.open(); toast("🟢 The ring is open!"); }
+    if (mode === "endless" && ++gemsToMarble >= GEMS_PER_MARBLE) {
+      gemsToMarble = 0; if (lives < MAX_MARBLES) { lives++; sfx.extra(); toast("🔴 Extra marble!"); }
+    }
+  }
+  if (!goalLocked && Math.hypot(ball.x - goal.x, ball.z - goal.z) < 0.35) return levelDone();
+  hud();
+}
+
+// ===== Render loop =====
+function resize() {
+  const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h;
+  const fit = (w < h ? 23 / (w / h) * 0.62 : 15.5) * N / 12;   // pull back on tall screens and for bigger mazes
+  camera.position.set(0, fit, fit * 0.55); camera.lookAt(0, 0, 0.6 * N / 12); camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+buildLevel(LEVELS[0]); showBests();
+let last = performance.now(), t = 0;
+renderer.setAnimationLoop(now => {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now; t += dt;
+  step(dt);
+  if (ballMesh) {
+    ballMesh.position.set(ball.x, ball.y, ball.z);
+    ballMesh.rotation.x += ball.vz * dt / BALL_R; ballMesh.rotation.z -= ball.vx * dt / BALL_R; // roll
+  }
+  for (const g of gems) g.mesh.rotation.y += dt * 2;
+  if (goalMesh) goalMesh.scale.setScalar(goalLocked ? 1 : 1 + Math.sin(t * 4) * 0.08);
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
