@@ -18,7 +18,11 @@
   #hud { position: fixed; top: 10px; left: 12px; right: 12px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
     font-weight: 700; font-size: clamp(14px, 3.6vw, 19px); text-shadow: 0 2px 4px #000a; pointer-events: none; }
   #hud .title { font-size: clamp(18px, 4.6vw, 26px); color: #ffd84d; }
-  #mute { margin-left: auto; pointer-events: auto; font-size: 18px; background: #ffffff22; color: #fff; border: 2px solid #fff; border-radius: 10px; padding: 2px 10px; cursor: pointer; }
+  .hudbtn { pointer-events: auto; font-size: 18px; background: #ffffff22; color: #fff; border: 2px solid #fff; border-radius: 10px; padding: 2px 10px; cursor: pointer; }
+  #tilt { margin-left: auto; }
+  #tilt.hide + #mute { margin-left: auto; }
+  .btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .big.alt { background: #4dabf7; box-shadow: 0 6px 0 #1864ab; }
   #stick { position: fixed; right: 18px; bottom: 18px; width: 120px; height: 120px; border-radius: 50%; border: 3px solid #ffffffaa;
     background: #ffffff1a; touch-action: none; }
   #knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%;
@@ -35,13 +39,14 @@
 </head>
 <body>
 <div id="hud"><span class="title">Marble Maze 3D</span><span id="lvl">Level 1</span><span id="time">0.0s</span><span id="gems">💎 0</span><span id="falls">🕳️ 0</span>
-  <button id="mute" aria-label="Sound on or off">🔊</button></div>
+  <button id="tilt" class="hudbtn hide" aria-label="Steer by tilting your tablet or phone">📱 Tilt</button>
+  <button id="mute" class="hudbtn" aria-label="Sound on or off">🔊</button></div>
 <div id="stick" aria-label="Tilt stick"><div id="knob"></div></div>
 <div class="screen" id="start">
   <h1 class="title">Marble<br>Maze 3D</h1>
   <p>Tilt the marble board to roll your marble to the glowing green ring. Grab the gems, and steer around the holes. If you fall in, you just start the level again.</p>
-  <p>Tilt with the arrow keys or WASD, drag anywhere on the screen, or use the stick in the corner.</p>
-  <button class="big" id="go">Play</button>
+  <p>Tilt with the arrow keys or WASD, drag anywhere on the screen, or use the stick in the corner.<span id="tiltHint" class="hide"> On a tablet or phone you can also tilt the device itself: hold it the way you like and press Play with tilt.</span></p>
+  <div class="btns"><button class="big" id="go">Play</button><button class="big alt hide" id="goTilt">Play with tilt</button></div>
 </div>
 <div class="screen hide" id="msg"><h1 class="title" id="msgTitle"></h1><p id="msgText"></p><button class="big" id="msgBtn"></button></div>
 
@@ -159,8 +164,39 @@ function readTilt() {
     tx = Math.max(-1, Math.min(1, drag.dx / range)); tz = Math.max(-1, Math.min(1, drag.dy / range));
     if (drag.isStick) knob.style.transform = `translate(${tx * 34}px, ${tz * 34}px)`;
   }
+  if (!drag && !tx && !tz && tiltOn) { tx = devX; tz = devZ; } // device tilt when nothing else is steering
   return { tx, tz };
 }
+
+// ===== Tilt the tablet or phone itself (motion sensor) =====
+// Whatever angle you hold the device at when tilt starts counts as "flat". Tap "Re-center" to reset it.
+const TILT_RANGE = 18;   // degrees of device tilt that give a full board tilt (smaller = more sensitive)
+const canTilt = "DeviceOrientationEvent" in window && matchMedia("(pointer: coarse)").matches;
+let tiltOn = false, tiltZero = null, devX = 0, devZ = 0;
+function screenAngle() { const a = (screen.orientation && screen.orientation.angle) ?? window.orientation ?? 0; return ((a % 360) + 360) % 360; }
+function onOrient(e) {
+  if (e.beta == null || e.gamma == null) return;
+  // turn the sensor's numbers into "right" (x) and "toward me" (y) for the way the screen is turned
+  let x = e.gamma, y = e.beta;
+  const a = screenAngle();
+  if (a === 90) { x = e.beta; y = e.gamma; }
+  else if (a === 270) { x = -e.beta; y = -e.gamma; }
+  else if (a === 180) { x = -e.gamma; y = -e.beta; }
+  if (!tiltZero) tiltZero = { x, y };
+  devX = Math.max(-1, Math.min(1, (x - tiltZero.x) / TILT_RANGE));
+  devZ = Math.max(-1, Math.min(1, (y - tiltZero.y) / TILT_RANGE));
+}
+async function enableTilt() {
+  const btn = document.getElementById("tilt");
+  try { // iPads and iPhones ask permission first
+    if (typeof DeviceOrientationEvent.requestPermission === "function" && (await DeviceOrientationEvent.requestPermission()) !== "granted") throw 0;
+  } catch (e) { btn.textContent = "📱 Tilt not allowed"; return false; }
+  if (!tiltOn) { addEventListener("deviceorientation", onOrient); addEventListener("orientationchange", () => { tiltZero = null; }); }
+  tiltOn = true; tiltZero = null; devX = devZ = 0; btn.textContent = "📱 Re-center";
+  return true;
+}
+if (canTilt) ["tilt", "goTilt", "tiltHint"].forEach(id => document.getElementById(id).classList.remove("hide"));
+document.getElementById("tilt").onclick = enableTilt;
 
 // ===== Game flow =====
 let level = 0, state = "start", time = 0, totalTime = 0, gemCount = 0, falls = 0;
@@ -174,6 +210,7 @@ function showMsg(title, text, btn, next) {
   state = "msg"; $("msgTitle").textContent = title; $("msgText").textContent = text; $("msgBtn").textContent = btn;
   $("msgBtn").onclick = () => { $("msg").classList.add("hide"); next(); }; $("msg").classList.remove("hide");
 }
+$("goTilt").onclick = async () => { await enableTilt(); $("go").onclick(); };
 $("go").onclick = () => {
   try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { ac = null; }
   $("start").classList.add("hide"); gemCount = 0; falls = 0; totalTime = 0; startLevel(0);
