@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Marble Maze 3D</title>
-<!-- Marble Maze 3D: tilt the board, roll the marble into the green cup. Six ways to play (23-24 Nov 2026):
+<!-- Marble Maze 3D: tilt the board, roll the marble into the green cup. Six ways to play (23-24 Nov 2026), plus 4 mini-games (Ghost Chase, Paint the Floor, Marble Snake, Crumble):
      Classic, Time Trial, Gem Hunt, Endless, Color Match and Challenges (8 challenges with a twist). Gem Hunt, Endless and Color Match build a brand-new maze every round.
      Board texture: Adobe Stock #320483183 (white gray marble), licensed 23 Nov 2026.
      Title font: Yerk by Harbor Bickmore (That That Type), served by Adobe Fonts kit pur5moc.
@@ -84,6 +84,13 @@
   <p>Every challenge has a twist. If you miss, your marble just goes back to the start, so try as many times as you like!</p>
   <div class="modes" id="chalList"></div>
   <button class="big alt" id="chalBack">Back</button>
+</div></div>
+<div class="screen hide" id="minis"><div class="inner">
+  <h1 class="title" style="font-size: clamp(36px, 10vw, 64px)" id="minisTitle">Mini-Games</h1>
+  <p>Four quick games on the same tilting board. Can you beat your best?</p>
+  <div class="modes" id="miniList"></div>
+  <button class="big alt" id="minisBack">Back</button>
+  <p class="small" id="minisHelp">Steer with a game controller 🎮, the arrow keys or WASD, by dragging anywhere on the screen, or with the stick in the corner.</p>
 </div></div>
 <div class="screen hide" id="msg"><div class="inner"><h1 class="title" id="msgTitle"></h1><p id="msgText"></p>
   <div class="btns"><button class="big" id="msgBtn"></button><button class="big alt" id="msgModes">Modes</button></div></div></div>
@@ -262,7 +269,7 @@ const bumperMat = new THREE.MeshStandardMaterial({ color: "#e64980", emissive: "
 const PORTAL_COLORS = { 1: "#22d3ee", 2: "#ff922b" };
 
 const board = new THREE.Group(); scene.add(board);
-let walls = [], holes = [], gems = [], bumpers = [], portals = [], spinners = [], goal, startPos, ball, ballMesh, goalMesh, curGrid;
+let floorMesh, walls = [], holes = [], gems = [], bumpers = [], portals = [], spinners = [], goal, startPos, ball, ballMesh, goalMesh, curGrid;
 let N = 12, HALF = N / 2;
 const cell = (r, c) => ({ x: c - HALF + 0.5, z: r - HALF + 0.5 });
 
@@ -270,7 +277,7 @@ function buildLevel(grid) {
   curGrid = grid; N = grid.length; HALF = N / 2;
   while (board.children.length) board.remove(board.children[0]);
   walls = []; holes = []; gems = []; bumpers = []; portals = []; spinners = []; effects.length = 0; marbles = []; goal = null; goalMesh = null;
-  const floor = new THREE.Mesh(new THREE.BoxGeometry(N, 0.4, N),
+  const floor = floorMesh = new THREE.Mesh(new THREE.BoxGeometry(N, 0.4, N),
     new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.35, metalness: 0.05 }));
   floor.position.y = -0.2; floor.receiveShadow = true; board.add(floor);
   grid.forEach((row, r) => [...row].forEach((ch, c) => {
@@ -306,7 +313,7 @@ function buildLevel(grid) {
   ballMesh.castShadow = true; board.add(ballMesh);
   if (mode === "color") { paintHoles(); placeMarbles(); }
   portals.forEach(a => { a.twin = portals.find(b => b !== a && b.id === a.id); });
-  resetBall(); resize();
+  resetBall(); if (mode === "mini") buildMini(); resize();
 }
 
 // ===== Color Match: colored holes, and a marble that changes color =====
@@ -532,7 +539,8 @@ function pollPad(dt) {
   for (const d of Object.keys(dirs)) press(d, dirs[d], () => { if (state !== "play") moveFocus(d); }, true);
   const focused = () => { const a = document.activeElement; return a && a.tagName === "BUTTON" && a.offsetParent ? a : firstButton(); };
   press("A", b(0), () => { if (state !== "play") { const a = focused(); if (a) a.click(); } });
-  press("B", b(1), () => { if (state === "msg") back(); else if (state === "start" && !$("chal").classList.contains("hide")) toMenu(); });
+  press("B", b(1), () => { if (state === "msg") back();
+    else if (state === "start" && (!$("chal").classList.contains("hide") || (!$("minis").classList.contains("hide") && !window.MINI_ONLY))) toMenu(); });
   press("Start", b(9) || b(8), () => { if (state === "msg") $("msgBtn").click(); else if (state === "play") back(); else { const a = focused(); if (a) a.click(); } });
 }
 function visibleButtons() { return [...document.querySelectorAll("button")].filter(x => x.offsetParent && !x.closest("#hud")); }
@@ -624,6 +632,7 @@ const $ = id => document.getElementById(id);
 const MEDAL = ["🥇", "🥈", "🥉"], MEDAL_NAME = ["Gold", "Silver", "Bronze"];
 
 function levelGrid(n) {
+  if (mode === "mini") return miniGrid(n);
   if (mode === "classic" || mode === "trial") return LEVELS[n];
   if (mode === "challenge") return CHALLENGES[n].grid;
   if (mode === "gems") return makeMaze(n < 2 ? 5 : 6, 0, Math.min(10 + 2 * n, 18)); // lots of gems
@@ -633,6 +642,7 @@ function levelGrid(n) {
   return makeMaze(cells, Math.min(2 + Math.floor(n * 1.5), Math.floor(cells * cells / 2.5)), 3); // ...and gets more holes
 }
 function hud() {
+  if (mode === "mini") return miniHud();
   if (mode === "challenge") { const c = ch();
     $("lvl").textContent = `${c.icon} ${c.name}`;
     $("time").textContent = c.timeLimit ? `⏳ ${Math.max(0, c.timeLimit - time).toFixed(1)}s` : time.toFixed(1) + "s";
@@ -671,17 +681,22 @@ function startLevel(n) {
   state = "play"; hud();
 }
 function showMsg(title, text, btn, next) {
-  $("msgModes").textContent = mode === "challenge" ? "Challenges" : "Modes";
+  $("msgModes").textContent = mode === "challenge" ? "Challenges" : mode === "mini" ? "Mini-Games" : "Modes";
   state = "msg"; $("msgTitle").textContent = title; $("msgText").textContent = text; $("msgBtn").textContent = btn;
   $("msgBtn").onclick = () => { $("msg").classList.add("hide"); next(); }; $("msg").classList.remove("hide");
   $("msgBtn").focus();
 }
 function toMenu() {
-  state = "start"; setDark(false); $("msg").classList.add("hide"); $("chal").classList.add("hide"); $("toast").classList.add("hide");
+  if (window.MINI_ONLY) return toMinis(); // the Mini-Games tile has no other menu
+  state = "start"; setDark(false); ["msg", "chal", "minis", "toast"].forEach(id => $(id).classList.add("hide"));
   showBests(); document.body.classList.add("menu"); $("start").classList.remove("hide"); document.querySelector(".mode").focus();
 }
 document.querySelectorAll(".mode").forEach(b => { b.onclick = () => b.dataset.mode === "challenge" ? toChallenges() : startMode(b.dataset.mode); });
-function back() { if (mode === "challenge" && state !== "start") toChallenges(); else toMenu(); }
+function back() {
+  if (mode === "challenge" && state !== "start") toChallenges();
+  else if (mode === "mini" && (state !== "start" || window.MINI_ONLY)) toMinis();
+  else toMenu();
+}
 $("msgModes").onclick = back;
 $("menu").onclick = back;
 
@@ -763,6 +778,388 @@ function outOfMarbles() {
     "Play again", () => startMode("endless"));
 }
 
+// ===== Mini-Games: four quick games on the same tilting board (24 Nov 2026) =====
+// The Arcade's "Marble Mini-Games" tile opens this same file with window.MINI_ONLY set, so it goes straight to this menu.
+const MINIS = [
+  { id: "pac", icon: "👻", name: "Ghost Chase", unit: ["point", "points"],
+    rule: "Roll over every dot while the ghost marbles chase you. Grab a big gold dot and the ghosts turn blue, so you can catch them for extra points! You have 3 marbles." },
+  { id: "paint", icon: "🎨", name: "Paint the Floor", unit: ["board", "boards"],
+    rule: "Roll over every square to paint it before the clock runs out. Every board is a new maze, and they keep getting bigger." },
+  { id: "snake", icon: "🐍", name: "Marble Snake", unit: ["apple", "apples"],
+    rule: "Your marble never stops rolling: tilt to steer it. Every apple makes your tail longer and you a little faster. Don't run into your own tail!" },
+  { id: "crumble", icon: "💥", name: "Crumble", unit: ["star", "stars"],
+    rule: "Every square you roll over cracks and falls away, then grows back a few seconds later. Keep moving, catch the stars, and don't fall through!" }
+];
+// Ghost Chase board: P = big gold dot, H = the ghosts' home, S = your start. Every other open square has a dot.
+const PAC_GRID = [
+  "############",
+  "#P...##...P#",
+  "#.##.##.##.#",
+  "#..........#",
+  "#.##.HH.##.#",
+  "#....HH....#",
+  "#.##.##.##.#",
+  "#..........#",
+  "#.#.####.#.#",
+  "#.#......#.#",
+  "#P..#S.#..P#",
+  "############"
+];
+const SNAKE_GRID = [
+  "############",
+  "#..........#",
+  "#..........#",
+  "#..#....#..#",
+  "#..#....#..#",
+  "#..........#",
+  "#.....S....#",
+  "#..........#",
+  "#..#....#..#",
+  "#..#....#..#",
+  "#..........#",
+  "############"
+];
+const CRUMBLE_GRID = ["############", ...Array.from({ length: 10 }, (_, r) => r === 5 ? "#....S.....#" : "#..........#"), "############"];
+const GHOST_COLORS = ["#fa5252", "#f783ac", "#22b8cf", "#ff922b"];
+const GHOST_SPEED = 2.2;     // Ghost Chase: squares per second in round 1 (a little faster each round)
+const PAINT_SECONDS = 1.1;   // Paint the Floor: seconds on the clock for each square of the board
+const CRUMBLE_REGROW = 8;    // Crumble: seconds before a fallen square grows back
+const SNAKE_SPEED = 2.4;     // Marble Snake: starting speed (a little faster with every apple)
+
+let miniId = null, mini = {}, dots = [], ghosts = [], miniTiles = [], tail = [], trail = [], apple = null, star = null;
+const tileKey = (r, c) => r * 100 + c;
+const openCell = (r, c) => !!(curGrid[r] && curGrid[r][c] && curGrid[r][c] !== "#");
+const ballCell = () => [Math.floor(ball.z + HALF), Math.floor(ball.x + HALF)];
+function gridDist(sources) { // steps from the nearest source square to every open square
+  const d = curGrid.map(row => [...row].map(() => -1)), q = sources.slice();
+  sources.forEach(([r, c]) => { d[r][c] = 0; });
+  for (let i = 0; i < q.length; i++) { const [r, c] = q[i];
+    for (const [dr, dc] of DIRS) { const a = r + dr, b = c + dc;
+      if (openCell(a, b) && d[a][b] < 0) { d[a][b] = d[r][c] + 1; q.push([a, b]); } } }
+  return d;
+}
+function miniGrid(n) {
+  if (miniId === "pac") return PAC_GRID;
+  if (miniId === "snake") return SNAKE_GRID;
+  if (miniId === "crumble") return CRUMBLE_GRID;
+  return makeMaze(n < 1 ? 4 : n < 3 ? 5 : 6, 0, 0, false, 0.35).map(row => row.replace("G", ".")); // Paint: a new maze each board
+}
+function miniWait(sec, fn) { mini.wait = sec; mini.then = fn; } // freeze for a moment, then carry on
+
+const dotGeo = new THREE.SphereGeometry(0.08, 10, 8), powerGeo = new THREE.SphereGeometry(0.17, 18, 12);
+const dotMat = new THREE.MeshStandardMaterial({ color: "#fff3bf", emissive: "#fab005", emissiveIntensity: 0.5 });
+const powerMat = new THREE.MeshStandardMaterial({ color: "#ffd43b", emissive: "#f59f00", emissiveIntensity: 1 });
+const eyeGeo = new THREE.SphereGeometry(0.085, 12, 8), pupilGeo = new THREE.SphereGeometry(0.045, 10, 6);
+const eyeMat = new THREE.MeshBasicMaterial({ color: "#ffffff" }), pupilMat = new THREE.MeshBasicMaterial({ color: "#1c2133" });
+const tileGeo = new THREE.PlaneGeometry(0.96, 0.96), blockGeo = new THREE.BoxGeometry(0.94, 0.4, 0.94);
+const segGeo = new THREE.SphereGeometry(0.25, 20, 14);
+const segMats = ["#51cf66", "#94d82d"].map(c => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.2, clearcoat: 1 }));
+const appleMat = new THREE.MeshStandardMaterial({ color: "#fa5252", emissive: "#801010", emissiveIntensity: 0.3, roughness: 0.3 });
+const leafMat = new THREE.MeshStandardMaterial({ color: "#40c057" }), stemGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.12, 6);
+const starShape = new THREE.Shape();
+for (let i = 0; i <= 10; i++) { const a = i / 10 * Math.PI * 2 + Math.PI / 2, r = i % 2 ? 0.11 : 0.26;
+  i ? starShape.lineTo(Math.cos(a) * r, Math.sin(a) * r) : starShape.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+const starGeo = new THREE.ExtrudeGeometry(starShape, { depth: 0.08, bevelEnabled: false }); starGeo.center();
+const starMat = new THREE.MeshStandardMaterial({ color: "#ffd43b", emissive: "#f08c00", emissiveIntensity: 0.8, metalness: 0.3, roughness: 0.3 });
+
+function buildMini() { // called by buildLevel once the walls and the marble are in place
+  dots = []; ghosts = []; miniTiles = []; tail = []; trail = []; apple = null; star = null;
+  mini.tileAt = {}; mini.wait = 0; mini.t = 0; mini.fright = 0; floorMesh.visible = true;
+  ballMesh.material.color.set({ pac: "#ffd43b", paint: "#f8f9fa", snake: "#2f9e44", crumble: "#ff6b6b" }[miniId]);
+  ({ pac: buildPac, paint: buildPaint, snake: buildSnake, crumble: buildCrumble })[miniId]();
+}
+
+// ----- Ghost Chase -----
+function buildPac() {
+  const home = [];
+  curGrid.forEach((row, r) => [...row].forEach((ch, c) => {
+    if (ch === "H") home.push([r, c]);
+    if (ch !== "." && ch !== "P") return;
+    const p = cell(r, c), power = ch === "P", m = new THREE.Mesh(power ? powerGeo : dotGeo, power ? powerMat : dotMat);
+    m.position.set(p.x, power ? 0.22 : 0.14, p.z); board.add(m); dots.push({ ...p, power, mesh: m, got: false });
+  }));
+  mini.home = home; mini.homeDist = gridDist(home);
+  const count = level >= 2 ? 4 : 3;
+  for (let i = 0; i < count; i++) {
+    const grp = new THREE.Group(), mat = new THREE.MeshPhysicalMaterial({ color: GHOST_COLORS[i], roughness: 0.25, clearcoat: 1 });
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 28, 20), mat); body.castShadow = true; grp.add(body);
+    for (const s of [-1, 1]) { // googly eyes, so you can see which way a ghost is going
+      const e = new THREE.Mesh(eyeGeo, eyeMat); e.position.set(s * 0.12, 0.08, 0.24); grp.add(e);
+      const p = new THREE.Mesh(pupilGeo, pupilMat); p.position.set(s * 0.12, 0.08, 0.31); grp.add(p);
+    }
+    board.add(grp); ghosts.push({ grp, body, mat, color: GHOST_COLORS[i], kind: i });
+  }
+  ghostsHome();
+}
+function ghostsHome() { // back into their home; they come out one by one
+  ghosts.forEach((g, i) => {
+    const [r, c] = mini.home[i % mini.home.length], p = cell(r, c);
+    Object.assign(g, { r, c, tr: r, tc: c, prog: 1, x: p.x, z: p.z, dir: [-1, 0], state: "wait", wait: Math.max(0.6, 1.2 + 2.4 * i - 0.3 * level) });
+  });
+}
+const ghostSpeed = g => g.state === "eaten" ? 6 : g.state === "fright" ? 1.5 : Math.min(3.4, GHOST_SPEED + 0.25 * level);
+function pickNext(g, pr, pc) { // at each square a ghost picks where to go next (never straight back, unless it must)
+  const opts = DIRS.filter(([dr, dc]) => openCell(g.r + dr, g.c + dc));
+  if (g.state === "eaten") return opts.reduce((a, b) => mini.homeDist[g.r + b[0]][g.c + b[1]] < mini.homeDist[g.r + a[0]][g.c + a[1]] ? b : a);
+  let ways = opts.filter(([dr, dc]) => dr !== -g.dir[0] || dc !== -g.dir[1]); if (!ways.length) ways = opts;
+  if (g.state === "fright" || Math.random() < [0.12, 0.15, 0.45, 0.3][g.kind]) return ways[rnd(ways.length)];
+  let tr = pr, tc = pc;
+  if (g.kind === 1) { if (Math.abs(ball.vx) > Math.abs(ball.vz)) tc += 3 * Math.sign(ball.vx); else tr += 3 * Math.sign(ball.vz); } // tries to get ahead of you
+  const far = ([dr, dc]) => (g.r + dr - tr) ** 2 + (g.c + dc - tc) ** 2;
+  return ways.reduce((a, b) => far(b) < far(a) ? b : a);
+}
+function pacStep(dt) {
+  for (const d of dots) if (!d.got && Math.hypot(ball.x - d.x, ball.z - d.z) < 0.4) {
+    d.got = true; d.mesh.visible = false;
+    if (d.power) {
+      mini.score += 50; mini.chain = 200; mini.fright = Math.max(4, 7 - level); sfx.open(); toast("😱 The ghosts are scared. Catch them!");
+      for (const g of ghosts) if (g.state === "chase") { // they turn around and run
+        g.state = "fright"; [g.r, g.tr] = [g.tr, g.r]; [g.c, g.tc] = [g.tc, g.c]; g.prog = 1 - g.prog; g.dir = [-g.dir[0], -g.dir[1]];
+      }
+    } else { mini.score += 10; tone(880, 1175, 0.06, 0.025); }
+  }
+  if (dots.every(d => d.got)) {
+    sfx.goal(); burst(ball.x, ball.z, true, "#ffd43b");
+    return miniWait(1, () => showMsg("Board clear!", `${mini.score} points so far. In the next round the ghosts are faster!`, "Next round",
+      () => { startLevel(level + 1); toast(`👻 Round ${level + 1}!`); }));
+  }
+  if (mini.fright > 0 && (mini.fright -= dt) <= 0) ghosts.forEach(g => { if (g.state === "fright") g.state = "chase"; });
+  const [pr, pc] = ballCell();
+  for (const g of ghosts) {
+    if (g.state === "wait") { g.wait -= dt; if (g.wait <= 0) g.state = "chase"; }
+    else {
+      g.prog += ghostSpeed(g) * dt;
+      while (g.prog >= 1) {
+        g.prog -= 1; g.r = g.tr; g.c = g.tc;
+        if (g.state === "eaten" && mini.homeDist[g.r][g.c] === 0) { g.state = "wait"; g.wait = 1.2; g.prog = 1; break; } // home again
+        g.dir = pickNext(g, pr, pc); g.tr = g.r + g.dir[0]; g.tc = g.c + g.dir[1];
+      }
+    }
+    const a = cell(g.r, g.c), b = cell(g.tr, g.tc), k = Math.min(1, g.prog);
+    g.x = a.x + (b.x - a.x) * k; g.z = a.z + (b.z - a.z) * k;
+    if (g.state !== "eaten" && Math.hypot(ball.x - g.x, ball.z - g.z) < 0.52) {
+      if (g.state !== "fright") return pacCaught();
+      mini.score += mini.chain; toast(`👻 Caught a ghost! +${mini.chain}`); mini.chain *= 2;
+      sfx.match(); burst(g.x, g.z, true, "#4dabf7"); g.state = "eaten"; // only its eyes are left, and they hurry home
+    }
+  }
+}
+function pacCaught() {
+  mini.lives--; sfx.hole(); burst(ball.x, ball.z, false); shake = 0.35; ballMesh.visible = false; ball.vx = ball.vz = 0;
+  if (mini.lives <= 0) return miniWait(1.2, () => miniOver("Caught!"));
+  toast(`👻 Caught! ${mini.lives} ${mini.lives === 1 ? "marble" : "marbles"} left`);
+  miniWait(1.4, () => { ballMesh.visible = true; resetBall(); mini.fright = 0; ghostsHome(); });
+}
+
+// ----- Paint the Floor -----
+function buildPaint() {
+  curGrid.forEach((row, r) => [...row].forEach((ch, c) => {
+    if (ch === "#") return;
+    const p = cell(r, c), m = new THREE.Mesh(tileGeo, new THREE.MeshStandardMaterial({ color: "#363c58", roughness: 0.7 }));
+    m.rotation.x = -Math.PI / 2; m.position.set(p.x, 0.004, p.z); m.receiveShadow = true; board.add(m);
+    const tl = { ...p, mesh: m, st: 0, t: 0, pop: 0 }; miniTiles.push(tl); mini.tileAt[tileKey(r, c)] = tl;
+  }));
+  mini.painted = 0;
+  mini.limit = Math.round(miniTiles.length * PAINT_SECONDS * Math.max(0.85, 1 - 0.04 * level) + 8);
+}
+function paintStep() {
+  const [r, c] = ballCell(), tl = mini.tileAt[tileKey(r, c)];
+  if (!tl || tl.st) return;
+  tl.st = 1; tl.pop = 1; mini.painted++;
+  const hue = ((r + c) / (2 * N) + level * 0.17) % 1;
+  tl.mesh.material.color.setHSL(hue, 0.85, 0.58); ballMesh.material.color.setHSL(hue, 0.85, 0.62); // the marble carries the paint
+  const f = 500 + 500 * mini.painted / miniTiles.length; tone(f, f * 1.1, 0.07, 0.025);
+  if (mini.painted === miniTiles.length) {
+    mini.score++; sfx.goal(); burst(ball.x, ball.z, true, "#ffd84d");
+    const spare = Math.max(0, mini.limit - time).toFixed(1);
+    miniWait(0.8, () => showMsg("Board painted!", `Every square painted, with ${spare} seconds to spare. Ready for board ${level + 2}?`, "Next board", () => startLevel(level + 1)));
+  }
+}
+
+// ----- Marble Snake -----
+function buildSnake() {
+  mini.heading = -Math.PI / 2; mini.len = 3;
+  for (let i = 0; i <= 40; i++) trail.push({ x: ball.x, z: ball.z + i * 0.05 }); // the tail starts out straight behind you
+  placeTail(); spawnApple();
+}
+function placeTail() { // each tail marble sits a fixed distance back along the path the head rolled
+  const SEG = 0.5;
+  while (tail.length < mini.len) { const m = new THREE.Mesh(segGeo, segMats[tail.length % 2]); m.castShadow = true; board.add(m); tail.push({ x: ball.x, z: ball.z, mesh: m }); }
+  let dist = 0, i = 0, prev = { x: ball.x, z: ball.z };
+  for (let s = 0; s < tail.length; s++) {
+    const want = (s + 1) * SEG;
+    while (i < trail.length && dist + Math.hypot(trail[i].x - prev.x, trail[i].z - prev.z) < want) { dist += Math.hypot(trail[i].x - prev.x, trail[i].z - prev.z); prev = trail[i]; i++; }
+    let x = prev.x, z = prev.z;
+    if (i < trail.length) { const seg = Math.hypot(trail[i].x - prev.x, trail[i].z - prev.z), k = seg ? (want - dist) / seg : 0; x += (trail[i].x - prev.x) * k; z += (trail[i].z - prev.z) * k; }
+    tail[s].x = x; tail[s].z = z; tail[s].mesh.position.set(x, 0.25, z);
+  }
+  if (i + 5 < trail.length) trail.length = i + 5;
+}
+function spawnApple() {
+  if (apple) board.remove(apple.mesh);
+  const spots = [];
+  curGrid.forEach((row, r) => [...row].forEach((ch, c) => {
+    if (ch === "#") return; const p = cell(r, c);
+    if (Math.hypot(p.x - ball.x, p.z - ball.z) > 2.5 && tail.every(s => Math.hypot(p.x - s.x, p.z - s.z) > 0.8)) spots.push(p);
+  }));
+  const p = spots.length ? spots[rnd(spots.length)] : cell(1, 1), grp = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 14), appleMat); body.castShadow = true; grp.add(body);
+  const stem = new THREE.Mesh(stemGeo, leafMat); stem.position.y = 0.22; grp.add(stem);
+  const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 6), leafMat); leaf.scale.set(1.2, 0.35, 0.6); leaf.position.set(0.07, 0.25, 0); grp.add(leaf);
+  grp.position.set(p.x, 0.2, p.z); board.add(grp); apple = { ...p, mesh: grp };
+}
+function snakeStep(dt, tx, tz) {
+  mini.t += dt;
+  if (Math.hypot(tx, tz) > 0.25) { // turn toward the way you are tilting (a smooth turn, not a jump)
+    let d = Math.atan2(tz, tx) - mini.heading; d = Math.atan2(Math.sin(d), Math.cos(d));
+    mini.heading += Math.max(-7 * dt, Math.min(7 * dt, d));
+  }
+  const sp = Math.min(4, SNAKE_SPEED + 0.08 * mini.score);
+  ball.vx = Math.cos(mini.heading) * sp; ball.vz = Math.sin(mini.heading) * sp;
+  let hit = null;
+  for (let i = 0; i < 4; i++) {
+    ball.x += ball.vx * dt / 4; ball.z += ball.vz * dt / 4;
+    for (const w of walls) {
+      const nx = Math.max(w.x0, Math.min(ball.x, w.x1)), nz = Math.max(w.z0, Math.min(ball.z, w.z1));
+      const dx = ball.x - nx, dz = ball.z - nz, d = Math.hypot(dx, dz);
+      if (d < BALL_R && d > 0) {
+        const push = (BALL_R - d) / d; ball.x += dx * push; ball.z += dz * push;
+        const n = { x: dx / d, z: dz / d }, vn = ball.vx * n.x + ball.vz * n.z;
+        if (vn < 0) { ball.vx -= vn * n.x; ball.vz -= vn * n.z; hit = n; }
+      }
+    }
+  }
+  if (hit) { // walls don't hurt: the marble slides along them (straight into one, it turns along it)
+    if (Math.hypot(ball.vx, ball.vz) < sp * 0.3) {
+      let s = tx * -hit.z + tz * hit.x; if (Math.abs(s) < 0.1) s = Math.random() - 0.5;
+      ball.vx = -hit.z * Math.sign(s) * sp; ball.vz = hit.x * Math.sign(s) * sp;
+    }
+    mini.heading = Math.atan2(ball.vz, ball.vx);
+  }
+  if (Math.hypot(ball.x - trail[0].x, ball.z - trail[0].z) >= 0.05) trail.unshift({ x: ball.x, z: ball.z });
+  placeTail();
+  if (mini.t > 1) for (let s = 2; s < tail.length; s++) if (Math.hypot(ball.x - tail[s].x, ball.z - tail[s].z) < 0.42) {
+    sfx.hole(); burst(ball.x, ball.z, false); shake = 0.3; ball.vx = ball.vz = 0;
+    return miniWait(1, () => miniOver("Ouch, your tail!"));
+  }
+  if (apple && Math.hypot(ball.x - apple.x, ball.z - apple.z) < 0.45) {
+    mini.score++; mini.len += 2; sfx.gem(); burst(apple.x, apple.z, true, "#fa5252"); spawnApple();
+    if (mini.score % 5 === 0) toast(`🐍 ${mini.score} apples!`);
+  }
+  hud();
+}
+
+// ----- Crumble -----
+function buildCrumble() {
+  floorMesh.visible = false; // the floor is made of loose squares instead
+  const pit = new THREE.Mesh(new THREE.PlaneGeometry(N, N), new THREE.MeshBasicMaterial({ color: "#0b0d16" }));
+  pit.rotation.x = -Math.PI / 2; pit.position.y = -3; board.add(pit);
+  curGrid.forEach((row, r) => [...row].forEach((ch, c) => {
+    if (ch === "#") return;
+    const p = cell(r, c), m = new THREE.Mesh(blockGeo, new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.35 }));
+    m.position.set(p.x, -0.2, p.z); m.receiveShadow = true; board.add(m);
+    const tl = { ...p, mesh: m, st: 0, t: 0, pop: 0 }; miniTiles.push(tl); mini.tileAt[tileKey(r, c)] = tl;
+  }));
+  spawnStar();
+}
+function spawnStar() {
+  if (star) board.remove(star.mesh);
+  let ok = miniTiles.filter(tl => tl.st === 0 && Math.hypot(tl.x - ball.x, tl.z - ball.z) > 3);
+  if (!ok.length) ok = miniTiles.filter(tl => tl.st === 0); if (!ok.length) ok = miniTiles;
+  const tl = ok[rnd(ok.length)], m = new THREE.Mesh(starGeo, starMat);
+  m.position.set(tl.x, 0.45, tl.z); m.castShadow = true; board.add(m); star = { x: tl.x, z: tl.z, tile: tl, mesh: m };
+}
+function crumbleStep(dt) {
+  mini.t += dt;
+  const crack = Math.max(0.55, 1.1 - mini.t / 150); // squares crack a little faster as time goes on
+  const [r, c] = ballCell(), here = mini.tileAt[tileKey(r, c)];
+  if (here && here.st === 0 && mini.t > 1.5) { here.st = 1; here.t = 0; }
+  for (const tl of miniTiles) {
+    if (tl.st === 1) {
+      tl.t += dt; const k = Math.min(1, tl.t / crack); tl.mesh.material.color.setRGB(1, 1 - 0.7 * k, 1 - 0.75 * k);
+      if (tl.t >= crack) { tl.st = 2; tl.t = 0; tone(220, 110, 0.18, 0.025); }
+    } else if (tl.st === 2) {
+      tl.t += dt;
+      if (tl.t >= CRUMBLE_REGROW) { tl.st = 0; tl.t = 0; tl.pop = 1; tl.mesh.visible = true; tl.mesh.position.set(tl.x, -0.2, tl.z); tl.mesh.material.color.set("#ffffff"); }
+    }
+  }
+  if (here && here.st === 2) { // nothing under the marble any more
+    sfx.hole(); dropInto({ x: here.x, z: here.z }, false); ball.sinkTo = -2.5; ball.falling = ball.fallDur = 0.8; return;
+  }
+  if (star.tile.st === 2) spawnStar();
+  if (Math.hypot(ball.x - star.x, ball.z - star.z) < 0.45) { mini.score++; sfx.gem(); burst(star.x, star.z, true, "#ffd43b"); spawnStar(); }
+}
+
+function miniAfter(dt) { if (miniId === "pac") pacStep(dt); else if (miniId === "paint") paintStep(); else if (miniId === "crumble") crumbleStep(dt); }
+function miniAnim(dt) { // things that move on their own, every frame
+  if (miniId === "pac") {
+    const pulse = 1 + Math.sin(t * 6) * 0.2;
+    for (const d of dots) if (d.power) d.mesh.scale.setScalar(pulse);
+    ghosts.forEach((g, i) => {
+      g.grp.position.set(g.x, 0.3 + (g.state === "wait" ? Math.abs(Math.sin(t * 5 + i)) * 0.12 : Math.sin(t * 8 + i) * 0.03), g.z);
+      g.grp.rotation.y = Math.atan2(g.dir[1], g.dir[0]);
+      g.body.visible = g.state !== "eaten";
+      g.mat.color.set(g.state !== "fright" ? g.color : mini.fright < 2 && Math.floor(mini.fright * 5) % 2 ? "#f1f3f5" : "#4263eb"); // blue, flashing when it is about to end
+    });
+  } else if (miniId === "paint") {
+    for (const tl of miniTiles) if (tl.pop > 0) { tl.pop = Math.max(0, tl.pop - dt * 4); tl.mesh.scale.setScalar(1 + 0.25 * Math.sin(tl.pop * Math.PI)); }
+  } else if (miniId === "crumble") {
+    for (const tl of miniTiles) {
+      if (tl.st === 1) tl.mesh.position.x = tl.x + (Math.random() - 0.5) * 0.05 * Math.min(1, tl.t / 0.4);       // wobble while it cracks
+      else if (tl.st === 2) { tl.mesh.position.x = tl.x; tl.mesh.position.y = -0.2 - 5 * tl.t * tl.t; tl.mesh.visible = tl.t < 1; } // falls away
+      else if (tl.pop > 0) { tl.pop = Math.max(0, tl.pop - dt * 3); tl.mesh.scale.setScalar(1 - 0.4 * tl.pop); }    // grows back
+    }
+  } else if (apple) { apple.mesh.rotation.y += dt * 2; apple.mesh.position.y = 0.2 + Math.abs(Math.sin(t * 3)) * 0.08; }
+  if (star) star.mesh.rotation.y += dt * 2.5;
+}
+function miniHud() {
+  const s = mini.score;
+  if (miniId === "pac") {
+    $("lvl").textContent = `👻 Round ${level + 1}`; $("time").textContent = `⭐ ${s}`;
+    $("gems").textContent = `• ${dots.filter(d => !d.got).length} dots left`; $("info").textContent = "🟡 ×" + Math.max(0, mini.lives);
+  } else if (miniId === "paint") {
+    $("lvl").textContent = `🎨 Board ${level + 1}`; $("time").textContent = `⏳ ${Math.max(0, mini.limit - time).toFixed(1)}s`;
+    $("gems").textContent = `🖌️ ${mini.painted}/${miniTiles.length} painted`; $("info").textContent = s ? `✅ ${s} done` : "";
+  } else {
+    const best = (rec.mini || {})[miniId];
+    $("lvl").textContent = miniId === "snake" ? "🐍 Marble Snake" : "💥 Crumble"; $("time").textContent = time.toFixed(1) + "s";
+    $("gems").textContent = (miniId === "snake" ? "🍎 " : "⭐ ") + s; $("info").textContent = best ? `Best ${best}` : "";
+  }
+}
+function miniOver(title) {
+  sfx.over();
+  const i = MINIS.findIndex(m => m.id === miniId), m = MINIS[i], s = mini.score;
+  rec.mini = rec.mini || {}; const prev = rec.mini[miniId] || 0, best = s > prev; if (best) { rec.mini[miniId] = s; saveRec(); }
+  const what = {
+    pac: `You scored ${s} points and reached round ${level + 1}.`,
+    paint: `You painted ${s} ${s === 1 ? "board" : "boards"}, plus ${mini.painted} of ${miniTiles.length} squares on the last one.`,
+    snake: `Your snake ate ${s} ${s === 1 ? "apple" : "apples"} and grew to ${mini.len + 1} marbles long.`,
+    crumble: `You caught ${s} ${s === 1 ? "star" : "stars"} and stayed up for ${time.toFixed(1)} seconds.`
+  }[miniId];
+  showMsg(title, what + (best && s ? " That's your best!" : prev ? ` Your best is ${prev} ${m.unit[prev === 1 ? 0 : 1]}.` : ""), "Play again", () => playMini(i));
+}
+const miniFell = () => miniOver("You fell through!");
+function playMini(i) { mode = "mini"; miniId = MINIS[i].id; mini = { score: 0, lives: 3, wait: 0 }; startLevel(0); }
+function startMini(i) {
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { ac = null; }
+  ["minis", "start", "chal"].forEach(id => $(id).classList.add("hide")); document.body.classList.remove("menu");
+  playMini(i); const m = MINIS[i];
+  showMsg(`${m.icon} ${m.name}`, m.rule, "Go!", () => { state = "play"; time = 0; });
+}
+function toMinis() { // the Mini-Games menu
+  state = "start"; mode = "mini"; setDark(false);
+  ["msg", "start", "chal", "toast"].forEach(id => $(id).classList.add("hide"));
+  document.body.classList.add("menu"); $("minis").classList.remove("hide");
+  const best = rec.mini || {}; $("miniList").innerHTML = "";
+  MINIS.forEach((m, i) => {
+    const b = document.createElement("button"), s = best[m.id]; b.className = "mode";
+    b.innerHTML = `<b>${m.icon} ${m.name}</b><span>${m.rule}</span><i>${s ? `Best: ${s} ${m.unit[s === 1 ? 0 : 1]}` : ""}</i>`;
+    b.onclick = () => startMini(i); $("miniList").appendChild(b);
+  });
+  $("miniList").firstChild.focus();
+}
+$("minisBack").onclick = () => toMenu();
+
 // ===== Physics: the marble rolls on a flat grid; walls are boxes =====
 function step(dt) {
   let { tx, tz } = readTilt();
@@ -775,6 +1172,11 @@ function step(dt) {
   if (state !== "play") return;
   if (!ball.toGoal) time += dt; // the clock stops the moment the marble reaches the cup
   if (mode === "color") return colorStep(dt);
+  if (mode === "mini") {
+    if (mini.wait > 0) { mini.wait -= dt; if (mini.wait <= 0) mini.then(); hud(); return; }
+    if (miniId === "paint" && time > mini.limit) return miniOver("⏳ Time's up!");
+    if (miniId === "snake") return snakeStep(dt, tx, tz);
+  }
   if (ch().timeLimit && ball.falling <= 0 && time > ch().timeLimit) return fail("⏳ Time's up!");
 
   if (ball.falling > 0) { // dropping into a hole (a good one keeps the marble; a bad one swallows it)
@@ -784,6 +1186,7 @@ function step(dt) {
     ball.y = BALL_R + (ball.sinkTo - BALL_R) * e; ball.shrink = ball.good ? 1 : 1 - 0.5 * e;
     if (ball.falling <= 0) {
       if (ball.toGoal) return levelDone(true);
+      if (mode === "mini") return miniFell();
       if (mode === "endless" && lives <= 0) return outOfMarbles();
       if (ball.into) { fillHole(ball.into); if (holes.every(h => h.filled)) return levelDone(); nextColor(); }
       if (mode === "challenge") { attempts++; resetAttempt(); } else resetBall();
@@ -849,6 +1252,7 @@ function step(dt) {
   if (goal && !goalLocked && Math.hypot(ball.x - goal.x, ball.z - goal.z) < 0.35) { // into the green cup
     dropInto(goal, true, "#5cff9d"); ball.toGoal = true; sfx.goal(); hud(); return;
   }
+  if (mode === "mini") miniAfter(dt);
   hud();
 }
 
@@ -860,12 +1264,19 @@ function resize() {
 }
 addEventListener("resize", resize);
 buildLevel(LEVELS[0]); showBests();
+if (window.MINI_ONLY) { // opened from the Marble Mini-Games tile: go straight to the mini-games
+  document.title = "Marble Mini-Games"; document.querySelector("#hud .title").textContent = "Marble Mini-Games";
+  $("minisTitle").innerHTML = "Marble<br>Mini-Games"; $("minisBack").classList.add("hide");
+  $("minisHelp").before($("tiltToggle")); // tablet tilt switch (touch screens only)
+  toMinis();
+}
 let last = performance.now(), t = 0;
 renderer.setAnimationLoop(now => {
   const dt = Math.min(0.033, (now - last) / 1000); last = now; t += dt;
   pollPad(dt);
   step(dt);
   updateEffects(dt);
+  if (mode === "mini") miniAnim(dt);
   if (shake > 0) { shake -= dt; board.position.set((Math.random() - 0.5) * shake * 0.5, 0, (Math.random() - 0.5) * shake * 0.5); } else board.position.set(0, 0, 0);
   for (const sp of spinners) sp.mesh.rotation.z += sp.speed * dt;
   for (const bp of bumpers) { bp.pop = Math.max(0, bp.pop - dt * 5); bp.mesh.scale.set(1 + bp.pop * 0.25, 1, 1 + bp.pop * 0.25); }
