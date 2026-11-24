@@ -47,6 +47,8 @@
   .big.alt { background: #4dabf7; box-shadow: 0 6px 0 #1864ab; }
   .big:focus-visible, .hudbtn:focus-visible { outline: 4px solid #ffd84d; outline-offset: 3px; }
   .btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  #tiltToggle { font-size: 17px; padding: 8px 16px; }
+  #tiltToggle.on { background: #2f9e44; }
   /* a game controller moves the focus between buttons: show where it is */
   .mode:focus { border-color: #ffd84d; background: #ffffff22; outline: none; }
   .big:focus { outline: 4px solid #ffd84d; outline-offset: 3px; }
@@ -57,7 +59,8 @@
 </head>
 <body class="menu">
 <div id="hud"><span class="title">Marble Maze 3D</span><span id="lvl">Level 1</span><span id="time">0.0s</span><span id="gems">💎 0</span><span id="info">❌ 0</span>
-  <span id="hudBtns"><button id="mute" class="hudbtn" aria-label="Sound on or off">🔊</button>
+  <span id="hudBtns"><button id="tilt" class="hudbtn hide" aria-label="Steer by tilting your tablet or phone">📱 Tilt</button>
+  <button id="mute" class="hudbtn" aria-label="Sound on or off">🔊</button>
   <button id="menu" class="hudbtn" aria-label="Back to the game modes">☰</button></span></div>
 <div id="toast" class="hide"></div>
 <div id="stick" aria-label="Tilt stick"><div id="knob"></div></div>
@@ -70,10 +73,11 @@
     <button class="mode" data-mode="trial"><b>⏱️ Time Trial</b><span>The same 6 mazes against the clock. Finish fast for gold, silver or bronze.</span><i id="best-trial"></i></button>
     <button class="mode" data-mode="gems"><b>💎 Gem Hunt</b><span>A brand-new maze every round, with no holes. Collect every gem to open the green cup.</span><i id="best-gems"></i></button>
     <button class="mode" data-mode="endless"><b>♾️ Endless</b><span>New mazes that get bigger, with more holes each time. You have 3 marbles. How far can you go?</span><i id="best-endless"></i></button>
-    <button class="mode" data-mode="color"><b>🎨 Color Match</b><span>Roll each marble into the hole of the same color. Fill every hole in 3 mazes, as fast as you can.</span><i id="best-color"></i></button>
+    <button class="mode" data-mode="color"><b>🎨 Color Match</b><span>All the marbles roll at once! Tilt to drop each one into the hole of its color. 3 boards, as fast as you can.</span><i id="best-color"></i></button>
     <button class="mode" data-mode="challenge"><b>🏆 Challenges</b><span>12 challenges with a twist: ice, lights out, wind, bumpers, portals, black holes and more. Miss one and your marble just goes back to the start.</span><i id="best-challenge"></i></button>
   </div>
-  <p class="small">Steer with a game controller 🎮, the arrow keys or WASD, by dragging anywhere on the screen, or with the stick in the corner.</p>
+  <button id="tiltToggle" class="hudbtn hide" aria-pressed="false">📱 Tilt the tablet to steer: Off</button>
+  <p class="small">Steer with a game controller 🎮, the arrow keys or WASD, by dragging anywhere on the screen, or with the stick in the corner.<span id="tiltHint" class="hide"> You can also switch on tablet tilt above.</span></p>
 </div></div>
 <div class="screen hide" id="chal"><div class="inner">
   <h1 class="title" style="font-size: clamp(36px, 10vw, 64px)">Challenges</h1>
@@ -96,7 +100,7 @@ const GEMS_PER_MARBLE = 5; // Endless: collect this many gems to earn an extra m
 const MAX_MARBLES = 5;
 // Time Trial: seconds for [gold, silver] on each Classic maze. Anything slower is bronze.
 // (Set from how long a computer player that steers perfectly takes, plus a little.)
-const TRIAL_TIMES = [[15, 24], [16, 25], [11, 17], [11, 18], [17, 27], [10, 16]];
+const TRIAL_TIMES = [[18, 29], [17, 27], [15, 24], [14, 23], [17, 27], [10, 16]];
 const WIND = 4;            // Windy Day: how hard the wind pushes
 const PULL = 5;            // Black Holes: how hard a hole pulls when the marble is close
 // Color Match: for each maze, [maze size, how many colors, holes of each color]
@@ -109,17 +113,17 @@ const COLORS = [
 // ===== Classic mazes: # wall  . floor  S start  G goal  o hole  * gem =====
 const LEVELS = [
   ["############","#S.....#...#","#.####.#.*.#","#.#..o.#...#","#.#.####.#.#","#...#*...#.#",
-   "###.#.####.#","#...#.o..#.#","#.###.##.#.#","#.*...#..o.#","#..o..#...G#","############"],
+    "###.#.####.#","#...#.oG.#.#","#.###.##.#.#","#.*...#..o.#","#..o..#....#","############"],
   ["############","#S...#....*#","#.o..#.##..#","#....#..#o.#","##.###..#..#","#..#*o..##.#",
-   "#..#....o..#","#.o####.##.#","#.......#..#","#*.##o..#..#","#..##...o.G#","############"],
-  ["############","#S.o...o..*#","#.#.#.#.#..#","#...o...o..#","#.#.#.#.#.##","#o..*..o...#",
-   "#.#.#.#.#.##","#...o...o..#","##.#.#.#.#.#","#*..o...o..#","#.#...#...G#","############"],
+    "#..#....o..#","#.o####.##.#","#.......#..#","#*.##o..#G.#","#..##...o..#","############"],
+  ["############","#S.o...o..*#","#.#.#.#.#..#","#...o...o..#","#.#.#.#.#.##","#o..*..oG..#",
+    "#.#.#.#.#.##","#...o...o..#","##.#.#.#.#.#","#*..o...o..#","#.#...#....#","############"],
   ["############","#S..#......#","#.o.#.####.#","#...#.#*.#.#","##.##.#..#.#","#.....#o.#.#",
-   "#.###.##.#.#","#.#*.....#.#","#.#####o##.#","#..o.......#","#.####.##oG#","############"],
+    "#.###.##.#.#","#.#*.....#.#","#.#####o##.#","#..oG......#","#.####.##o.#","############"],
   ["############","#S.........#","#.#######o.#","#.#.....#..#","#.#.###.#.##","#.#.#G#.#..#",
    "#.#.#.#.##.#","#o#...o....#","#.#######.##","#.....*o...#","####.......#","############"],
   ["############","#S.o....o..#","#....o.....#","#.o....o.o.#","######.#####","#*.o.....o*#",
-   "#..o..o.o..#","#.....o....#","#####.######","#.o...*..o.#","#...o.....G#","############"]
+    "#..o..o.o..#","#.....o....#","#####.######","#.o...*G.o.#","#...o......#","############"]
 ];
 
 // ===== Challenges: each one has a twist. Missing one just sends the marble back to the start. =====
@@ -129,40 +133,40 @@ const LEVELS = [
 const CHALLENGES = [
   { icon: "⏱️", name: "Beat the Clock", rule: "Reach the green ring in 25 seconds.", timeLimit: 25,
     grid: ["############","#S.....#...#","#.####.#.*.#","#.#..o.#...#","#.#.####.#.#","#...#*...#.#",
-    "###.#.####.#","#...#.o..#.#","#.###.##.#.#","#.*...#..o.#","#..o..#...G#","############"] },
+    "###.#.####.#","#...#.oG.#.#","#.###.##.#.#","#.*...#..o.#","#..o..#....#","############"] },
   { icon: "🪢", name: "Tightrope", rule: "Holes on both sides! Stay on the white path all the way to the ring.",
     grid: ["############","#S...oooooo#","#ooo.oooooo#","#ooo.....oo#","#ooooooo.oo#","#oo......oo#",
     "#oo.ooooooo#","#oo....oooo#","#ooooo.oooo#","#ooooo....o#","#oooooooo.G#","############"] },
-  { icon: "🧊", name: "Ice Rink", rule: "The board is slippery, so the marble keeps sliding. Steer gently!", friction: 0.997,
-    grid: ["############","#S.........#","#..........#","#..##..o...#","#..##......#","#......##..#",
-    "#..o...##..#","#..........#","#.##....o..#","#.##.......#","#.........G#","############"] },
+  { icon: "🧊", name: "Ice Rink", rule: "The board is pure ice: the marble keeps sliding and holes are everywhere. Tap the controls gently!", friction: 0.999,
+    grid: ["############","#S.........#","#..o....o..#","#....##....#","#.o..##..o.#","#..........#",
+    "#...o..o...#","#....G.....#","#.o..##..o.#","#....##....#","#..o....o..#","############"] },
   { icon: "🔄", name: "Backwards", rule: "Every control is flipped: left rolls right and up rolls down.", flip: true,
     grid: ["############","#S.........#","#########..#","#..........#","#..#########","#..........#",
-    "#########..#","#..........#","#..#########","#.....o....#","#.o......G.#","############"] },
-  { icon: "🫧", name: "No Bumping", rule: "Don't bump the walls. A hard bump sends you back to the start, so roll gently.", noBump: 1.2,
-    grid: ["############","#S...#.....#","#....#.....#","#..#.#..#..#","#..#....#..#","#..######..#",
-    "#..........#","#....##....#","#....##....#","#..........#","#.........G#","############"] },
+    "#########..#","#..........#","#..#########","#.....o.G..#","#.o........#","############"] },
+  { icon: "🫧", name: "No Bumping", rule: "Follow the narrow spiral to the middle without bumping the walls. A bump sends you back to the start, so slow down for every turn!", noBump: 1.3,
+    grid: ["############","#S.........#","##########.#","#........#.#","#.######.#.#","#.#..G.#.#.#",
+    "#.#.####.#.#","#.#......#.#","#.########.#","#..........#","############","############"] },
   { icon: "↔️", name: "Moving Holes", rule: "The holes slide back and forth. Wait for a gap, then go!", moving: true,
     grid: ["############","#S.........#","#..........#","#....o.....#","#..........#","#.......o..#",
-    "#..........#","#...o......#","#..........#","#......o...#","#.........G#","############"] },
+    "#..........#","#...o......#","#.......G..#","#......o...#","#..........#","############"] },
   { icon: "🔦", name: "Lights Out", rule: "It's dark! Only the space around your marble is lit. Watch for holes.", dark: true,
     grid: ["############","#S...#....*#","#.o..#.##..#","#....#..#o.#","##.###..#..#","#..#*o..##.#",
-    "#..#....o..#","#.o####.##.#","#.......#..#","#*.##o..#..#","#..##...o.G#","############"] },
+    "#..#....o..#","#.o####.##.#","#.......#..#","#*.##o..#G.#","#..##...o..#","############"] },
   { icon: "💎", name: "Gem Rush", rule: "Collect all 7 gems in 60 seconds. Then the ring opens.", timeLimit: 60, needGems: true,
     grid: ["############","#S...#....*#","#.##.#.##..#","#.*#...#*..#","#.##.###.###","#....*.....#",
-    "###.####.#.#","#*..#..#.#*#","#.###.##.#.#","#.....#....#","#.#*#...#.G#","############"] },
+    "###.####.#.#","#*..#..#.#*#","#.###G##.#.#","#.....#....#","#.#*#...#..#","############"] },
   { icon: "🌬️", name: "Windy Day", rule: "A gust of wind keeps pushing your marble, and it changes direction. Watch the arrow at the top and lean against it!", wind: true,
     grid: ["############","#S.........#","#.....o....#","#..o.......#","#.......o..#","#....##....#",
-    "#.o..##..o.#","#..........#","#.....o....#","#..o.....o.#","#.........G#","############"] },
+    "#.o..##..o.#","#..........#","#.....o.G..#","#..o.....o.#","#..........#","############"] },
   { icon: "🟣", name: "Bumpers", rule: "Pinball bumpers bounce your marble away. Steer through them to the green cup!",
     grid: ["############","#S..B...B..#","#.....B....#","#..B.....B.#","#o...B.B..o#","#..B.....B.#",
-    "#.....B....#","#oB..B..B.o#","#....B.....#","#..B...B...#","#o.......BG#","############"] },
+    "#.....B....#","#oB..B..B.o#","#....BG....#","#..B...B...#","#o.......B.#","############"] },
   { icon: "🌀", name: "Portals", rule: "Roll into a swirl to zoom to its twin. Find the way to the green cup!",
     grid: ["############","#S...#.....#","#....#..2..#","#..1.#.....#","#....#.1...#","######..o..#",
-    "############","#..........#","#.2..o..o..#","#....o.....#","#.......o.G#","############"] },
+    "############","#..........#","#.2..o.Go..#","#....o.....#","#.......o..#","############"] },
   { icon: "⚫", name: "Black Holes", rule: "These holes pull your marble toward them. Steer wide and keep moving!", pull: true,
     grid: ["############","#S.........#","#..........#","#...o......#","#.......o..#","#..........#",
-    "#..o.......#","#......o...#","#..........#","#....o.....#","#.........G#","############"] }
+    "#..o.......#","#......o...#","#.......G..#","#....o.....#","#..........#","############"] }
 ];
 const ch = () => (mode === "challenge" ? CHALLENGES[level] : {});
 
@@ -182,7 +186,7 @@ function reach(g, from) { // steps from "from" to every square, going around wal
   }
   return d;
 }
-function makeMaze(cells, holeCount, gemCount, holesAreTargets = false) {
+function makeMaze(cells, holeCount, gemCount, holesAreTargets = false, openness = 0.22) {
   const n = cells * 2 + 1, g = Array.from({ length: n }, () => Array(n).fill("#"));
   const stack = [[0, 0]]; g[1][1] = ".";
   while (stack.length) {
@@ -194,9 +198,19 @@ function makeMaze(cells, holeCount, gemCount, holesAreTargets = false) {
   }
   const inner = []; // walls between two squares (not the posts at the corners)
   for (let r = 1; r < n - 1; r++) for (let c = 1; c < n - 1; c++) if (g[r][c] === "#" && (r + c) % 2 === 1) inner.push([r, c]);
-  shuffle(inner).slice(0, Math.round(inner.length * 0.22)).forEach(([r, c]) => { g[r][c] = "."; });
-  const S = [1, 1], G = [n - 2, n - 2];
-  g[1][1] = "S"; g[n - 2][n - 2] = "G";
+  shuffle(inner).slice(0, Math.round(inner.length * openness)).forEach(([r, c]) => { g[r][c] = "."; });
+  if (openness > 0.3) // very open boards (Color Match): also drop some corner posts, to make little rooms
+    for (let r = 2; r < n - 2; r += 2) for (let c = 2; c < n - 2; c += 2)
+      if (DIRS.every(([a, b]) => g[r + a][c + b] === ".") && Math.random() < 0.6) g[r][c] = ".";
+  const S = [1, 1]; g[1][1] = "S";
+  // the cup goes somewhere far from the start but not in a corner (a corner funnels the marble straight in)
+  let G = [n - 2, n - 2];
+  const d0 = reach(g, S), far = [];
+  for (let r = 3; r < n - 3; r += 2) for (let c = 3; c < n - 3; c += 2) if (g[r][c] === "." && d0[r][c] > 0) far.push([d0[r][c], r, c]);
+  far.sort((a, b) => b[0] - a[0]);
+  const top = far.slice(0, Math.max(1, Math.ceil(far.length / 3)));
+  if (top.length) { const t = top[rnd(top.length)]; G = [t[1], t[2]]; }
+  g[G[0]][G[1]] = "G";
   const dist = reach(g, S);
   const spots = [];
   for (let r = 1; r < n - 1; r++) for (let c = 1; c < n - 1; c++) if (g[r][c] === "." && dist[r][c] >= 3) spots.push([r, c]);
@@ -255,7 +269,7 @@ const cell = (r, c) => ({ x: c - HALF + 0.5, z: r - HALF + 0.5 });
 function buildLevel(grid) {
   curGrid = grid; N = grid.length; HALF = N / 2;
   while (board.children.length) board.remove(board.children[0]);
-  walls = []; holes = []; gems = []; bumpers = []; portals = []; spinners = []; effects.length = 0; goal = null; goalMesh = null;
+  walls = []; holes = []; gems = []; bumpers = []; portals = []; spinners = []; effects.length = 0; marbles = []; goal = null; goalMesh = null;
   const floor = new THREE.Mesh(new THREE.BoxGeometry(N, 0.4, N),
     new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.35, metalness: 0.05 }));
   floor.position.y = -0.2; floor.receiveShadow = true; board.add(floor);
@@ -290,7 +304,7 @@ function buildLevel(grid) {
   ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 40, 28),
     new THREE.MeshPhysicalMaterial({ color: "#ff6b6b", roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05 }));
   ballMesh.castShadow = true; board.add(ballMesh);
-  if (mode === "color") paintHoles();
+  if (mode === "color") { paintHoles(); placeMarbles(); }
   portals.forEach(a => { a.twin = portals.find(b => b !== a && b.id === a.id); });
   resetBall(); resize();
 }
@@ -306,6 +320,75 @@ function paintHoles() {
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.5, 40), new THREE.MeshBasicMaterial({ color: h.color.hex }));
     ring.rotation.x = -Math.PI / 2; ring.position.set(h.x, 0.008, h.z); board.add(ring);
   });
+}
+// every marble is on the board at once (one for each hole), and they all roll when you tilt
+let marbles = [];
+function placeMarbles() {
+  marbles.forEach(m => board.remove(m.mesh)); marbles = [];
+  const spots = [];
+  curGrid.forEach((row, r) => [...row].forEach((ch, c) => {
+    if ((ch === "." || ch === "S") && holes.every(h => Math.abs(h.r - r) + Math.abs(h.c - c) >= 2)) spots.push([r, c]);
+  }));
+  shuffle(spots);
+  const taken = [];
+  for (const h of shuffle(holes.slice())) {
+    const sp = spots.find(([r, c]) => taken.every(([a, b]) => Math.abs(a - r) + Math.abs(b - c) >= 2)); if (!sp) break;
+    taken.push(sp); const p = cell(sp[0], sp[1]);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 32, 22),
+      new THREE.MeshPhysicalMaterial({ color: h.color.hex, roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05 }));
+    mesh.castShadow = true; board.add(mesh);
+    marbles.push({ x: p.x, z: p.z, home: p, vx: 0, vz: 0, y: BALL_R, falling: 0, shrink: 1, color: h.color, mesh, done: false });
+  }
+  ballMesh.visible = false;
+}
+function wallBounce(b) { // keep a marble out of the walls
+  for (const w of walls) {
+    const nx = Math.max(w.x0, Math.min(b.x, w.x1)), nz = Math.max(w.z0, Math.min(b.z, w.z1));
+    const dx = b.x - nx, dz = b.z - nz, d = Math.hypot(dx, dz);
+    if (d < BALL_R && d > 0) {
+      const push = (BALL_R - d) / d; b.x += dx * push; b.z += dz * push;
+      const vn = (b.vx * dx + b.vz * dz) / d;
+      if (vn < 0) { b.vx -= 1.5 * vn * dx / d; b.vz -= 1.5 * vn * dz / d; if (vn < -1.5) sfx.bump(-vn); }
+    }
+  }
+}
+function colorStep(dt) {
+  const active = marbles.filter(m => !m.done && !(m.falling > 0));
+  for (const m of marbles) if (!m.done && m.falling > 0) { // dropping into a hole
+    m.falling -= dt;
+    const k = Math.min(1, 1 - m.falling / m.fallDur), e = 1 - (1 - k) * (1 - k);
+    m.y = BALL_R + (m.sinkTo - BALL_R) * e; m.shrink = m.good ? 1 : 1 - 0.5 * e;
+    if (m.falling <= 0) {
+      if (m.good) { m.done = true; m.hole.filled = true; m.hole.taken = false; // it stays in its cup
+        curGrid = curGrid.map((row, r) => r === m.hole.r ? row.slice(0, m.hole.c) + "." + row.slice(m.hole.c + 1) : row); }
+      else { m.x = m.home.x; m.z = m.home.z; m.y = BALL_R; m.shrink = 1; m.vx = m.vz = 0; } // back to its own spot
+      m.hole = null;
+    }
+  }
+  for (const m of active) { m.vx = (m.vx + Math.sin(tiltX) * GRAVITY * dt) * FRICTION; m.vz = (m.vz + Math.sin(tiltZ) * GRAVITY * dt) * FRICTION; }
+  for (let i = 0; i < 4; i++) {
+    for (const m of active) { m.x += m.vx * dt / 4; m.z += m.vz * dt / 4; wallBounce(m); }
+    for (let a = 0; a < active.length; a++) for (let b = a + 1; b < active.length; b++) { // marbles bump each other
+      const A = active[a], B = active[b], dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz);
+      if (d < BALL_R * 2 && d > 0) {
+        const nx = dx / d, nz = dz / d, push = (BALL_R * 2 - d) / 2;
+        A.x -= nx * push; A.z -= nz * push; B.x += nx * push; B.z += nz * push;
+        const vn = (B.vx - A.vx) * nx + (B.vz - A.vz) * nz;
+        if (vn < 0) { const j = -0.9 * vn; A.vx -= j * nx; A.vz -= j * nz; B.vx += j * nx; B.vz += j * nz; if (vn < -1.5) sfx.bump(-vn); }
+      }
+    }
+  }
+  for (const m of active) for (const h of holes) if (!h.filled && !h.taken && Math.hypot(m.x - h.x, m.z - h.z) < 0.3) {
+    const good = h.color === m.color;
+    m.x = h.x; m.z = h.z; m.vx = m.vz = 0; m.hole = h; m.good = good;
+    m.falling = m.fallDur = good ? 0.45 : 0.6; m.sinkTo = good ? CUP_Y : BALL_R - 0.6;
+    burst(h.x, h.z, good, good ? h.color.hex : null);
+    if (good) { h.taken = true; sfx.match(); }
+    else { falls++; sfx.hole(); shake = 0.3; toast(`Oops! The ${m.color.name} marble goes back to its spot.`); }
+    break;
+  }
+  if (marbles.length && marbles.every(m => m.done)) return levelDone();
+  hud();
 }
 function nextColor() { // the next marble takes the color of a hole that is still empty (a new color when it can)
   const open = [...new Set(holes.filter(h => !h.filled).map(h => h.color))];
@@ -415,13 +498,14 @@ function readTilt() {
     tx = Math.max(-1, Math.min(1, drag.dx / range)); tz = Math.max(-1, Math.min(1, drag.dy / range));
     if (drag.isStick) knob.style.transform = `translate(${tx * 34}px, ${tz * 34}px)`;
   }
+  if (!drag && !tx && !tz && tiltOn) { tx = devX; tz = devZ; } // tablet tilt (only when switched on)
   return { tx, tz };
 }
 
 // ===== Game controller (Xbox, PlayStation, Switch Pro...) =====
 // While playing, the left stick tilts the board (a little push = a little tilt) and the D-pad tilts it all the way.
 // On the menus the D-pad or stick moves between buttons, A presses, B goes back, and Start presses the big button.
-// (Phone and tablet tilting was taken out on 24 Nov 2026: testers liked the on-screen stick better.)
+// (Tilting the tablet itself is still there, but off until you switch it on: testers liked the stick better.)
 const PAD_DEAD = 0.18;     // how far the stick must move before the board starts to tilt
 const padWas = {}, padRepeat = {};
 let padSeen = false;
@@ -468,6 +552,54 @@ function moveFocus(dir) { // pick the nearest button in that direction
   if (best) { best.focus(); best.scrollIntoView({ block: "nearest" }); }
 }
 
+// ===== Tilt the tablet or phone itself (motion sensor): an extra, OFF until you switch it on =====
+// Whatever angle you hold the device at when tilt starts counts as "flat". Tap "Re-center" to reset it.
+const TILT_RANGE = 18;   // degrees of device tilt that give a full board tilt (smaller = more sensitive)
+const canTilt = "DeviceOrientationEvent" in window && matchMedia("(pointer: coarse)").matches;
+let tiltOn = false, tiltListening = false, tiltZero = null, devX = 0, devZ = 0;
+function screenAngle() {
+  const o = screen.orientation, a = o && typeof o.angle === "number" ? o.angle : (window.orientation || 0);
+  return ((a % 360) + 360) % 360;
+}
+const DEG = Math.PI / 180;
+function onOrient(e) {
+  if (!tiltOn || e.beta == null || e.gamma == null) return;
+  // Which way is "up", measured on the device itself. The raw beta/gamma numbers jump around when a tablet is
+  // held up at an angle (especially sideways); this up direction does not.
+  const b = e.beta * DEG, g = e.gamma * DEG;
+  const ux = -Math.cos(b) * Math.sin(g), uy = Math.sin(b), uz = Math.cos(b) * Math.cos(g);
+  // turn it to match the screen (portrait, sideways or upside down)
+  const a = screenAngle() * DEG, ur = ux * Math.cos(a) - uy * Math.sin(a), uu = ux * Math.sin(a) + uy * Math.cos(a);
+  const roll = Math.asin(Math.max(-1, Math.min(1, -ur))) / DEG; // right side down = more
+  const pitch = Math.atan2(uu, uz) / DEG;                        // top edge up = more
+  if (!tiltZero) tiltZero = { roll, pitch };                      // the way you hold it counts as flat
+  let dp = pitch - tiltZero.pitch; if (dp > 180) dp -= 360; if (dp < -180) dp += 360;
+  const nx = Math.max(-1, Math.min(1, (roll - tiltZero.roll) / TILT_RANGE));
+  const nz = Math.max(-1, Math.min(1, dp / TILT_RANGE));
+  devX += (nx - devX) * 0.35; devZ += (nz - devZ) * 0.35;         // smooth out sensor jitter
+}
+async function enableTilt() {
+  const btn = document.getElementById("tilt");
+  try { // iPads and iPhones ask permission first
+    if (typeof DeviceOrientationEvent.requestPermission === "function" && (await DeviceOrientationEvent.requestPermission()) !== "granted") throw 0;
+  } catch (e) { btn.textContent = "📱 Tilt not allowed"; showTiltToggle(false, true); return false; }
+  if (!tiltListening) { tiltListening = true; addEventListener("deviceorientation", onOrient); addEventListener("orientationchange", () => { tiltZero = null; });
+    if (screen.orientation) screen.orientation.addEventListener("change", () => { tiltZero = null; }); }
+  tiltOn = true; tiltZero = null; devX = devZ = 0; btn.textContent = "📱 Re-center"; showTiltToggle(true);
+  return true;
+}
+function showTiltToggle(on, refused) {
+  const t = document.getElementById("tiltToggle");
+  t.classList.toggle("on", on); t.setAttribute("aria-pressed", on);
+  t.textContent = refused ? "📱 Tilt not allowed on this device" : "📱 Tilt the tablet to steer: " + (on ? "On" : "Off");
+}
+if (canTilt) ["tilt", "tiltToggle", "tiltHint"].forEach(id => document.getElementById(id).classList.remove("hide"));
+document.getElementById("tilt").onclick = enableTilt;
+document.getElementById("tiltToggle").onclick = () => {
+  if (tiltOn) { tiltOn = false; devX = devZ = 0; document.getElementById("tilt").textContent = "📱 Tilt"; showTiltToggle(false); }
+  else enableTilt();
+};
+
 // ===== Best scores, kept on this device =====
 const REC_KEY = "marbleMaze3d.records";
 let rec = {};
@@ -494,9 +626,9 @@ const MEDAL = ["🥇", "🥈", "🥉"], MEDAL_NAME = ["Gold", "Silver", "Bronze"
 function levelGrid(n) {
   if (mode === "classic" || mode === "trial") return LEVELS[n];
   if (mode === "challenge") return CHALLENGES[n].grid;
-  if (mode === "gems") return makeMaze(n < 2 ? 5 : 6, 0, Math.min(5 + n, 9));
+  if (mode === "gems") return makeMaze(n < 2 ? 5 : 6, 0, Math.min(10 + 2 * n, 18)); // lots of gems
   if (mode === "color") { const [cells, colorCount, perColor] = COLOR_MAZES[n];
-    return makeMaze(cells, colorCount * perColor, 0, true).map(row => row.replace("G", ".")); } // no ring: fill the holes instead
+    return makeMaze(cells, colorCount * perColor, 0, true, 0.55).map(row => row.replace("G", ".")); } // open board, no cup: fill the holes instead
   const cells = n < 3 ? 5 : n < 7 ? 6 : 7;                       // Endless: the maze grows...
   return makeMaze(cells, Math.min(2 + Math.floor(n * 1.5), Math.floor(cells * cells / 2.5)), 3); // ...and gets more holes
 }
@@ -513,7 +645,7 @@ function hud() {
   $("gems").textContent = mode === "gems" ? `💎 ${got}/${gems.length}`
     : mode === "color" ? `🎯 ${holes.filter(h => h.filled).length}/${holes.length} filled` : "💎 " + gemCount;
   $("info").textContent = mode === "endless" ? "🔴 ×" + lives
-    : mode === "color" ? (ballColor ? `Find: ${ballColor.emoji} ${ballColor.name[0].toUpperCase() + ballColor.name.slice(1)}` : "")
+    : mode === "color" ? "❌ " + falls
     : mode === "trial" ? `🥇 under ${TRIAL_TIMES[level][0]}s`
     : mode === "gems" ? (goalLocked ? "🔒 Ring closed" : "🟢 Ring open!")
     : "❌ " + falls;
@@ -536,7 +668,6 @@ function startLevel(n) {
     ring.rotation.x = -Math.PI / 2; ring.position.set(h.x, 0.03, h.z); board.add(ring); spinners.push({ mesh: ring, speed: -2.5 });
   });
   windDir = 0; windTimer = 4;
-  if (mode === "color") nextColor();
   state = "play"; hud();
 }
 function showMsg(title, text, btn, next) {
@@ -643,6 +774,7 @@ function step(dt) {
   if (ch().moving) holes.forEach(h => { h.x = Math.sin(holeClock * h.sp + h.ph) * h.amp; h.mesh.position.x = h.x; });
   if (state !== "play") return;
   if (!ball.toGoal) time += dt; // the clock stops the moment the marble reaches the cup
+  if (mode === "color") return colorStep(dt);
   if (ch().timeLimit && ball.falling <= 0 && time > ch().timeLimit) return fail("⏳ Time's up!");
 
   if (ball.falling > 0) { // dropping into a hole (a good one keeps the marble; a bad one swallows it)
@@ -741,6 +873,10 @@ renderer.setAnimationLoop(now => {
     ballMesh.position.set(ball.x, ball.y, ball.z); ballMesh.scale.setScalar(ball.shrink || 1);
     if (lamp.intensity) lamp.position.set(ball.x, 1.6, ball.z);
     ballMesh.rotation.x += ball.vz * dt / BALL_R; ballMesh.rotation.z -= ball.vx * dt / BALL_R; // roll
+  }
+  for (const m of marbles) { // Color Match marbles
+    m.mesh.position.set(m.x, m.y, m.z); m.mesh.scale.setScalar(m.shrink);
+    m.mesh.rotation.x += m.vz * dt / BALL_R; m.mesh.rotation.z -= m.vx * dt / BALL_R;
   }
   for (const g of gems) g.mesh.rotation.y += dt * 2;
   if (goalMesh) goalMesh.scale.setScalar(goalLocked ? 1 : 1 + Math.sin(t * 4) * 0.08);
