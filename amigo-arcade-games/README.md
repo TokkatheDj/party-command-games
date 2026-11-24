@@ -14,7 +14,9 @@ The Arcade's games/<name>.html is a small loader that fetches the file from here
 - robo-beat-galaxy.html - Robo-Beat Galaxy, a robot-band beat maker (Amigo App Builder, 24 Nov 2026), unchanged.
 - deep-sea-dive-quiz.html - Deep Sea Dive Quiz, 10 ocean questions (Amigo App Builder, 24 Nov 2026). Blue whale fact
   corrected to about 30 m (2.5 school buses).
-- covers/ - Arcade cover art for the three games above: gameplay screenshots with Adobe contrast +15, vibrance +25, 480px WebP.
+- covers/ - Arcade cover art for the three games above and Mini Golf: gameplay screenshots with Adobe contrast +15, vibrance +25, 480px WebP.
+- On the Arcade home page since 24 Nov 2026: adobe-test/marble-maze-3d-modes.html (the Marble Maze 3D card now opens the six-mode
+  version) and adobe-test/mini-golf.html (its own Mini Golf card). Both stay on the test page too.
 - adobe-test/ - four test games made with Adobe Stock art and Adobe Fonts (23 Nov 2026), not on the
   Arcade home page yet. The Arcade's test/<name>.html loaders fetch them from here.
   - reef-rescue.html - Basic (Amigo Build rules): catch game; Adobe Stock 478346529 vectorized to SVG
