@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Mini Golf</title>
+<!-- Mini Golf (24 Nov 2026): 6 holes with water, sand, sliding blocks and windmills. Pull back and let go to putt.
+     Walls: Adobe Stock #320483183 (white gray marble), licensed 23 Nov 2026, the same texture as Marble Maze 3D.
+     Title font: Yerk by Harbor Bickmore (That That Type), served by Adobe Fonts kit pur5moc.
+     3D: three.js r160 (MIT), loaded from jsDelivr. No buzzers: water plays a soft splash. -->
+<link rel="stylesheet" href="https://use.typekit.net/pur5moc.css">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1c2133; color: #fff;
+    font-family: system-ui, "Segoe UI", sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; }
+  canvas { display: block; }
+  .title { font-family: "yerk", "Arial Black", sans-serif; font-weight: 400; }
+  #hud { position: fixed; top: 10px; left: 12px; right: 12px; display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: center;
+    font-weight: 700; font-size: clamp(14px, 3.6vw, 19px); text-shadow: 0 2px 4px #000a; pointer-events: none; }
+  #hud .title { font-size: clamp(18px, 4.6vw, 26px); color: #ffd84d; }
+  .hudbtn { pointer-events: auto; font-size: 18px; background: #ffffff22; color: #fff; border: 2px solid #fff; border-radius: 10px; padding: 2px 10px; cursor: pointer; }
+  #hudBtns { margin-left: auto; display: flex; gap: 8px; }
+  #toast { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); background: #ffd84d; color: #1c2133; font-weight: 800;
+    font-size: clamp(16px, 4vw, 22px); padding: 8px 18px; border-radius: 30px; box-shadow: 0 4px 12px #0008; pointer-events: none; }
+  #golfHint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); text-align: center;
+    font-size: 14px; font-weight: 600; line-height: 1.35; background: #000a; padding: 6px 14px; border-radius: 20px; pointer-events: none; }
+  @media (pointer: coarse) { .keysHint { display: none; } }
+  body.menu #hud, body.menu #toast, body.menu #golfHint { visibility: hidden; } /* the menu covers the game */
+  .screen { position: fixed; inset: 0; overflow-y: auto; touch-action: pan-y; padding: 22px 16px; text-align: center;
+    background: radial-gradient(circle, #23452bee, #0f1a12ee); display: flex; }
+  .inner { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 640px; width: 100%; }
+  .screen h1 { margin: 0; font-size: clamp(44px, 13vw, 92px); line-height: .95; color: #ffd84d; text-shadow: 0 6px 0 #2b8a3e; }
+  .screen p { margin: 0; max-width: 520px; font-size: clamp(15px, 4vw, 19px); line-height: 1.45; }
+  .screen p.small { font-size: 15px; color: #d3f9d8; }
+  .course { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 8px; width: 100%; }
+  .course li { background: #ffffff14; border: 2px solid #ffffff40; border-radius: 12px; padding: 8px 12px; text-align: left; font-size: 15px; }
+  .course b { color: #ffd84d; }
+  #best { font-weight: 700; color: #8ce99a; }
+  .big { font-family: "yerk", "Arial Black", sans-serif; font-size: 24px; padding: 12px 36px; border-radius: 40px; border: 4px solid #fff;
+    color: #fff; background: #ff6b6b; box-shadow: 0 6px 0 #a61e4d; cursor: pointer; }
+  .big:active { transform: translateY(4px); box-shadow: 0 2px 0 #a61e4d; }
+  .big.alt { background: #4dabf7; box-shadow: 0 6px 0 #1864ab; }
+  .big:focus-visible, .hudbtn:focus-visible { outline: 4px solid #ffd84d; outline-offset: 3px; }
+  .btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .hide { display: none !important; }
+  @media (max-width: 560px) { .screen h1 { font-size: clamp(40px, 14vw, 64px); } .inner { gap: 11px; }
+    .course { grid-template-columns: 1fr 1fr; gap: 6px; } .course li { font-size: 13px; padding: 6px 8px; } }
+</style>
+</head>
+<body class="menu">
+<div id="hud"><span class="title">Mini Golf</span><span id="lvl">Hole 1</span><span id="par">Par 2</span><span id="strokes">Strokes: 0</span><span id="total"></span>
+  <span id="hudBtns"><button id="mute" class="hudbtn" aria-label="Sound on or off">🔊</button>
+  <button id="menu" class="hudbtn" aria-label="Back to the start screen">☰</button></span></div>
+<div id="toast" class="hide"></div>
+<div id="golfHint">Pull back anywhere, then let go to putt.<span class="keysHint"> Keys: ← → aim, ↑ ↓ power, Space putts.</span></div>
+
+<div class="screen" id="start"><div class="inner">
+  <h1 class="title">Mini<br>Golf</h1>
+  <p>Pull back anywhere on the screen, aim with the arrow, and let go to putt. Get the ball in the cup in as few strokes as you can!</p>
+  <button class="big" id="play">Play</button>
+  <p id="best"></p>
+  <ul class="course" id="course"></ul>
+  <p class="small">💦 Water costs a stroke and puts your ball back. Sand slows it down. Too fast, and it rolls right over the cup.</p>
+</div></div>
+<div class="screen hide" id="msg"><div class="inner"><h1 class="title" id="msgTitle"></h1><p id="msgText"></p>
+  <div class="btns"><button class="big" id="msgBtn"></button><button class="big alt" id="msgMenu">Start screen</button></div></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.min.js"></script>
+<script>
+const BALL_R = 0.3;  // ball size (one square of the course = 1)
+
+// ===== Mini Golf: pull back and let go to putt. Fewest strokes wins. =====
+// Course map:  # wall  . grass  S tee  G cup  ~ water (+1 stroke, back to where you putted from)  : sand (slows the ball)
+// movers: slide = a block that slides back and forth (dx / dz = how far it slides each way, in squares)
+//         spin  = a windmill (len = arm length in squares, bars: 1 = two arms, 2 = four arms, speed: minus = turns the other way)
+const SHOT_MAX = 11;      // the speed of the hardest putt
+const MAX_STROKES = 8;    // after this many strokes the hole ends and you move on
+const GOLF_BOUNCE = 0.7;  // how bouncy the walls are (1 = super bouncy)
+const GOLF = [
+  { name: "Slider Alley", par: 2, tip: "Two blocks slide across the lane. Wait for a gap, then putt!", grid: ["############","####....####","####..G.####","####....####","####....####","####....####",
+    "####....####","####....####","####....####","####....####","####..S.####","############"],
+    movers: [{ type: "slide", r: 4, c: 5.5, w: 1.4, d: 0.5, dx: 0.6, speed: 1.6 }, { type: "slide", r: 7, c: 5.5, w: 1.4, d: 0.5, dx: 0.6, speed: 1.6, phase: 3.14 }] },
+  { name: "Sand Trap", par: 3, tip: "Sand slows your ball way down. Go around the sand trap, then past the sliding block.", grid: ["############","#S.....#####","#......#####","#......#####","#...:::#####","#...:::....#",
+    "#..........#","#######....#","#######....#","#######.G..#","#######....#","############"],
+    movers: [{ type: "slide", r: 7.5, c: 8.5, w: 1.2, d: 0.5, dx: 0.7, speed: 1.3 }] },
+  { name: "Windmill", par: 3, tip: "Time your putt so the ball rolls between the windmill's arms.", grid: ["############","#..........#","#....G.....#","#..........#","#..........#","####....####",
+    "####....####","#..........#","#..........#","#..........#","#....S.....#","############"],
+    movers: [{ type: "spin", r: 5.5, c: 5.5, len: 1.3, bars: 1, speed: 1.3 }] },
+  { name: "The Lake", par: 3, tip: "Cross the bridge, but watch the floating log! Falling in the water costs a stroke.", grid: ["############","#..........#","#.G........#","#..........#","#~~~~..~~~~#","#~~~~..~~~~#",
+    "#~~~~..~~~~#","#..........#","#..........#","#........S.#","#..........#","############"],
+    movers: [{ type: "slide", r: 5, c: 5.5, w: 0.9, d: 0.45, dx: 2.2, speed: 1.0, color: "#8d5a2b" }] },
+  { name: "Gates", par: 5, tip: "Two gates slide back and forth. Go when they open, and stay out of the pond.", grid: ["############","#S...:::...#","#....:::...#","#..........#","#######....#","#..........#",
+    "#..........#","#....#######","#..........#","#...~~~..G.#","#...~~~....#","############"],
+    movers: [{ type: "slide", r: 4, c: 8.5, w: 1.4, d: 0.6, dx: 0.6, speed: 1.6 }, { type: "slide", r: 7, c: 2.5, w: 1.4, d: 0.6, dx: 0.6, speed: 1.9, phase: 1 }] },
+  { name: "Spin Cycle", par: 4, tip: "Three windmills, a pond, and sand around the hole. Good luck!", grid: ["############","#S.........#","#..........#","#..........#","#..........#","#....~~....#",
+    "#....~~....#","#..........#","#..........#","#.......::.#","#.......:G.#","############"],
+    movers: [{ type: "spin", r: 3, c: 3.5, len: 1.3, bars: 1, speed: 2 }, { type: "spin", r: 3, c: 8.5, len: 1.3, bars: 2, speed: -1.5 },
+             { type: "spin", r: 8, c: 5.5, len: 1.5, bars: 2, speed: 1.2 }] }
+];
+
+// ===== three.js scene =====
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color("#1c2133");
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+scene.add(new THREE.HemisphereLight("#ffffff", "#445", 1.1));
+const sun = new THREE.DirectionalLight("#fff4e0", 2.2);
+sun.position.set(-6, 14, 8); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9 });
+scene.add(sun);
+
+// the walls use the Adobe Stock marble photo; the ground is green felt, blue water and tan sand
+const marbleTex = new THREE.TextureLoader().load("img/marble-1024.webp");
+marbleTex.colorSpace = THREE.SRGBColorSpace;
+const wallGeo = new THREE.BoxGeometry(1, 0.6, 1);
+const wallMat = new THREE.MeshStandardMaterial({ map: marbleTex, color: "#8a93b8", roughness: 0.4 });
+const tileGeo = new THREE.PlaneGeometry(1, 1);
+const waterMat = new THREE.MeshStandardMaterial({ color: "#2b8be0", roughness: 0.1, metalness: 0.2, emissive: "#0b3d7a", emissiveIntensity: 0.4 });
+const sandMat = new THREE.MeshStandardMaterial({ color: "#e8d49a", roughness: 1 });
+const feltMat = new THREE.MeshStandardMaterial({ color: "#3fa34d", roughness: 0.95 });
+
+const board = new THREE.Group(); scene.add(board);
+let walls = [], movers = [], goal, startPos, ball, ballMesh, curGrid, level = 0;
+let N = 12, HALF = N / 2;
+const cell = (r, c) => ({ x: c - HALF + 0.5, z: r - HALF + 0.5 });
+
+function buildLevel(n) {
+  level = n; curGrid = GOLF[n].grid; N = curGrid.length; HALF = N / 2;
+  while (board.children.length) board.remove(board.children[0]);
+  walls = []; movers = []; goal = null;
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(N, 0.4, N), feltMat);
+  floor.position.y = -0.2; floor.receiveShadow = true; board.add(floor);
+  curGrid.forEach((row, r) => [...row].forEach((ch, c) => {
+    const p = cell(r, c);
+    if (ch === "#") {
+      const m = new THREE.Mesh(wallGeo, wallMat);
+      m.position.set(p.x, 0.3, p.z); m.castShadow = m.receiveShadow = true; board.add(m);
+      walls.push({ x0: p.x - 0.5, x1: p.x + 0.5, z0: p.z - 0.5, z1: p.z + 0.5 });
+    } else if (ch === "~" || ch === ":") {
+      const m = new THREE.Mesh(tileGeo, ch === "~" ? waterMat : sandMat);
+      m.rotation.x = -Math.PI / 2; m.position.set(p.x, 0.004, p.z); m.receiveShadow = true; board.add(m);
+    } else if (ch === "G") { goal = p; addCup(p); }
+    else if (ch === "S") startPos = p;
+  }));
+  ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 40, 28),
+    new THREE.MeshPhysicalMaterial({ color: "#ffffff", roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1 }));
+  ballMesh.castShadow = true; board.add(ballMesh);
+  buildMovers(GOLF[n].movers || []);
+  resetBall(); resize();
+}
+function resetBall() { ball = { x: startPos.x, z: startPos.z, vx: 0, vz: 0, y: BALL_R, falling: 0 }; }
+
+// ===== Sound: soft tones only =====
+let ac = null, muted = false;
+function tone(f1, f2, dur, vol, delay = 0) {
+  if (!ac || muted) return;
+  const t0 = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
+  o.type = "sine"; o.frequency.setValueAtTime(f1, t0); o.frequency.exponentialRampToValueAtTime(f2, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.05);
+}
+const sfx = {
+  putt: () => tone(520, 380, 0.07, 0.07),
+  bump: v => tone(160, 120, 0.06, Math.min(0.05, v * 0.01)),
+  splash: () => { tone(700, 180, 0.45, 0.05); tone(1200, 400, 0.25, 0.02, 0.05); },
+  goal: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.25, 0.08, i * 0.1))
+};
+
+// ===== Keys (a game controller works too: its stick acts as the arrow keys) =====
+const keys = {};
+addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.startsWith("Arrow") && state === "play") e.preventDefault(); // on menus the arrows move between buttons
+  if (state === "play" && (e.key === " " || e.key === "Enter")) { e.preventDefault(); shoot(); }
+  if (e.key === "Escape" && state !== "start") toMenu();
+});
+addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; });
+document.getElementById("mute").onclick = e => { muted = !muted; e.currentTarget.textContent = muted ? "🔇" : "🔊"; };
+
+// ===== Best round, kept on this device =====
+const REC_KEY = "miniGolf.records";
+let rec = {};
+try { rec = JSON.parse(localStorage.getItem(REC_KEY)) || {}; } catch (e) { rec = {}; }
+function saveRec() { try { localStorage.setItem(REC_KEY, JSON.stringify(rec)); } catch (e) {} }
+
+// ===== Game flow =====
+let state = "start", time = 0, holeClock = 0, toastTimer = 0;
+const $ = id => document.getElementById(id);
+const PAR = GOLF.reduce((a, h) => a + h.par, 0);
+$("course").innerHTML = GOLF.map((h, i) => `<li><b>${i + 1}. ${h.name}</b> · par ${h.par}</li>`).join("");
+function showBest() { $("best").textContent = rec.golf ? `Your best round: ${rec.golf} strokes (par ${PAR})` : `6 holes · par ${PAR}`; }
+function hud() {
+  const sum = scores.reduce((a, b) => a + b, 0), par = GOLF.slice(0, scores.length).reduce((a, x) => a + x.par, 0);
+  $("lvl").textContent = `⛳ Hole ${level + 1}/${GOLF.length}`; $("par").textContent = `Par ${GOLF[level].par}`;
+  $("strokes").textContent = `Strokes: ${strokes}`; $("total").textContent = scores.length ? `Total: ${vsPar(sum - par)}` : "";
+}
+function toast(text) {
+  const t = $("toast"); t.textContent = text; t.classList.remove("hide");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add("hide"), 1600);
+}
+function showMsg(title, text, btn, next) {
+  state = "msg"; $("msgTitle").textContent = title; $("msgText").textContent = text; $("msgBtn").textContent = btn;
+  $("msgBtn").onclick = () => { $("msg").classList.add("hide"); next(); }; $("msg").classList.remove("hide");
+  $("msgBtn").focus();
+}
+function startGame() {
+  try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { ac = null; }
+  scores = []; $("start").classList.add("hide"); document.body.classList.remove("menu"); startLevel(0);
+}
+function startLevel(n) { // aim at the flag to start, then show the hole's card
+  time = 0; strokes = 0; buildLevel(n);
+  lastShot = { x: startPos.x, z: startPos.z }; aimPower = 0.5; aimAngle = Math.atan2(-(goal.z - startPos.z), goal.x - startPos.x);
+  const g = GOLF[n]; hud();
+  showMsg(`⛳ Hole ${n + 1}: ${g.name}`, `Par ${g.par}. ${g.tip}`, "Tee off!", () => { if (document.activeElement) document.activeElement.blur(); state = "play"; });
+}
+function toMenu() {
+  state = "start"; $("msg").classList.add("hide"); $("toast").classList.add("hide");
+  showBest(); document.body.classList.add("menu"); $("start").classList.remove("hide"); $("play").focus();
+}
+$("play").onclick = startGame;
+$("msgMenu").onclick = toMenu;
+$("menu").onclick = toMenu;
+
+// ===== Mini Golf: putting, the aim arrow, water, sand and the moving obstacles =====
+let strokes = 0, scores = [], lastShot = null, aimAngle = 0, aimPower = 0.5, aimDrag = null;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const vsPar = n => (n === 0 ? "even par" : n > 0 ? `+${n}` : `${n}`);
+const aimGeo = new THREE.BoxGeometry(1, 0.04, 0.1); aimGeo.translate(0.5, 0, 0);
+const aimMat = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+const aimMesh = new THREE.Mesh(aimGeo, aimMat); aimMesh.visible = false; scene.add(aimMesh);
+function addCup(p) { // the cup, with a flag
+  const cup = new THREE.Mesh(new THREE.CircleGeometry(0.32, 32), new THREE.MeshBasicMaterial({ color: "#0b0d12" }));
+  cup.rotation.x = -Math.PI / 2; cup.position.set(p.x, 0.006, p.z); board.add(cup);
+  const rim = new THREE.Mesh(new THREE.RingGeometry(0.32, 0.37, 32), new THREE.MeshBasicMaterial({ color: "#ffffff" }));
+  rim.rotation.x = -Math.PI / 2; rim.position.set(p.x, 0.007, p.z); board.add(rim);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.4, 8), new THREE.MeshStandardMaterial({ color: "#f1f3f5" }));
+  pole.position.set(p.x, 0.7, p.z); pole.castShadow = true; board.add(pole);
+  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.32), new THREE.MeshStandardMaterial({ color: "#ff4d4d", side: THREE.DoubleSide }));
+  flag.position.set(p.x + 0.25, 1.24, p.z); flag.castShadow = true; board.add(flag);
+}
+function buildMovers(defs) {
+  defs.forEach(d => {
+    const p = cell(d.r, d.c), m = { ...d, bx: p.x, bz: p.z, x: p.x, z: p.z, vx: 0, vz: 0, angle: 0 };
+    if (d.type === "slide") {
+      m.mesh = new THREE.Mesh(new THREE.BoxGeometry(d.w, 0.5, d.d), new THREE.MeshStandardMaterial({ color: d.color || "#ff922b", roughness: 0.5 }));
+      m.mesh.position.y = 0.25; m.mesh.castShadow = true;
+    } else {
+      m.mesh = new THREE.Group();
+      for (let k = 0; k < (d.bars || 1); k++) {
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(d.len * 2, 0.3, 0.24), new THREE.MeshStandardMaterial({ color: k ? "#f8f9fa" : "#e03131", roughness: 0.4 }));
+        bar.rotation.y = k * Math.PI / 2; bar.position.y = 0.3 + k * 0.02; bar.castShadow = true; m.mesh.add(bar);
+      }
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.7, 16), new THREE.MeshStandardMaterial({ color: "#495057" }));
+      hub.position.y = 0.35; m.mesh.add(hub);
+    }
+    m.mesh.position.x = p.x; m.mesh.position.z = p.z; board.add(m.mesh); movers.push(m);
+  });
+  updateMovers();
+}
+function updateMovers() {
+  for (const m of movers) {
+    const ph = holeClock * m.speed + (m.phase || 0);
+    if (m.type === "slide") {
+      const s = Math.sin(ph), v = Math.cos(ph) * m.speed;
+      m.x = m.bx + (m.dx || 0) * s; m.z = m.bz + (m.dz || 0) * s; m.vx = (m.dx || 0) * v; m.vz = (m.dz || 0) * v;
+      m.mesh.position.x = m.x; m.mesh.position.z = m.z;
+    } else { m.angle = ph; m.mesh.rotation.y = ph; }
+  }
+}
+function hit(px, pz, vox, voz, thick) { // bounce the ball off the point (px, pz), which may be moving
+  const dx = ball.x - px, dz = ball.z - pz, d = Math.hypot(dx, dz), R = BALL_R + thick;
+  if (d >= R || d === 0) return;
+  const nx = dx / d, nz = dz / d; ball.x = px + nx * R; ball.z = pz + nz * R;
+  const vn = (ball.vx - vox) * nx + (ball.vz - voz) * nz;
+  if (vn < 0) { ball.vx -= (1 + GOLF_BOUNCE) * vn * nx; ball.vz -= (1 + GOLF_BOUNCE) * vn * nz; if (vn < -1.5) sfx.bump(-vn); }
+}
+function collideMovers() {
+  for (const m of movers) {
+    if (m.type === "slide") {
+      const x0 = m.x - m.w / 2, x1 = m.x + m.w / 2, z0 = m.z - m.d / 2, z1 = m.z + m.d / 2;
+      if (ball.x > x0 && ball.x < x1 && ball.z > z0 && ball.z < z1) { // inside the block: push out the nearest side
+        const out = [[ball.x - x0, -1, 0], [x1 - ball.x, 1, 0], [ball.z - z0, 0, -1], [z1 - ball.z, 0, 1]].sort((a, b) => a[0] - b[0])[0];
+        ball.x += out[1] * (out[0] + 0.01); ball.z += out[2] * (out[0] + 0.01);
+      }
+      hit(clamp(ball.x, x0, x1), clamp(ball.z, z0, z1), m.vx, m.vz, 0);
+    } else {
+      hit(m.x, m.z, 0, 0, 0.2); // the hub
+      for (let k = 0; k < (m.bars || 1); k++) {
+        const a = m.angle + k * Math.PI / 2, ux = Math.cos(a), uz = -Math.sin(a);
+        const t = clamp((ball.x - m.x) * ux + (ball.z - m.z) * uz, -m.len, m.len), cx = m.x + ux * t, cz = m.z + uz * t;
+        hit(cx, cz, m.speed * (cz - m.z), -m.speed * (cx - m.x), 0.12); // a turning arm pushes the ball along with it
+      }
+    }
+  }
+}
+function tileAt(x, z) { const r = Math.floor(z + HALF), c = Math.floor(x + HALF); return (curGrid[r] || "")[c] || "#"; }
+const ballStill = () => state === "play" && ball.falling <= 0 && !ball.vx && !ball.vz;
+function shoot() {
+  if (!ballStill()) return;
+  const v = 1 + aimPower * (SHOT_MAX - 1);
+  ball.vx = Math.cos(aimAngle) * v; ball.vz = -Math.sin(aimAngle) * v;
+  strokes++; lastShot = { x: ball.x, z: ball.z }; ball.moving = true; sfx.putt(); hud();
+}
+function golfStep(dt) {
+  updateMovers();
+  aimMesh.visible = false;
+  if (state !== "play") return;
+  time += dt;
+  if (ball.falling > 0) { // dropping into the cup or the water
+    ball.falling -= dt; ball.y -= dt * 2.4;
+    if (ball.falling <= 0) {
+      if (ball.sunk) return golfHoleDone(false);
+      const p = lastShot; resetBall(); ball.x = p.x; ball.z = p.z; // back to where you putted from
+      if (strokes >= MAX_STROKES) return golfHoleDone(true);
+    }
+    hud(); return;
+  }
+  const sub = 6, h = dt / sub;
+  for (let i = 0; i < sub; i++) {
+    ball.x += ball.vx * h; ball.z += ball.vz * h;
+    for (const w of walls) hit(clamp(ball.x, w.x0, w.x1), clamp(ball.z, w.z0, w.z1), 0, 0, 0);
+    collideMovers();
+  }
+  const tile = tileAt(ball.x, ball.z);
+  if (tile === "~") { // splash: +1 stroke
+    ball.vx = ball.vz = 0; ball.falling = 0.5; strokes++; sfx.splash(); toast("💦 Splash! +1 stroke"); hud(); return;
+  }
+  const k = Math.pow(tile === ":" ? 0.95 : 0.986, dt * 60); // sand slows the ball much faster than grass
+  ball.vx *= k; ball.vz *= k;
+  let sp = Math.hypot(ball.vx, ball.vz);
+  const toCup = Math.hypot(goal.x - ball.x, goal.z - ball.z);
+  if (toCup < 0.3 && sp < 4.5) { // a slow enough ball drops in; a fast one rolls right over
+    ball.x = goal.x; ball.z = goal.z; ball.vx = ball.vz = 0; ball.falling = 0.5; ball.sunk = true; sfx.goal(); return;
+  }
+  if (toCup < 0.55 && sp < 2.5) { ball.vx += (goal.x - ball.x) * 8 * dt; ball.vz += (goal.z - ball.z) * 8 * dt; } // the cup's edge pulls a slow ball in
+  if (sp > 0) { const ns = Math.max(0, sp - 0.6 * dt); ball.vx *= ns / sp; ball.vz *= ns / sp; sp = ns; }
+  if (sp < 0.05) {
+    ball.vx = ball.vz = 0;
+    if (ball.moving) { ball.moving = false; if (strokes >= MAX_STROKES) return golfHoleDone(true); }
+  }
+  if (ballStill()) { // aim with the keys or a controller, and show the aim arrow
+    if (keys["arrowleft"] || keys["a"]) aimAngle += dt * 1.8;
+    if (keys["arrowright"] || keys["d"]) aimAngle -= dt * 1.8;
+    if (keys["arrowup"] || keys["w"]) aimPower = Math.min(1, aimPower + dt * 0.7);
+    if (keys["arrowdown"] || keys["s"]) aimPower = Math.max(0.05, aimPower - dt * 0.7);
+    aimMesh.visible = true; aimMesh.position.set(ball.x, 0.05, ball.z); aimMesh.rotation.y = aimAngle;
+    aimMesh.scale.x = 0.5 + aimPower * 2.5; aimMat.color.setHSL(0.33 - aimPower * 0.33, 0.9, 0.55); // green = soft, red = hard
+  }
+  hud();
+}
+function golfHoleDone(maxed) {
+  const g = GOLF[level], s = maxed ? MAX_STROKES : strokes; scores.push(s);
+  const names = { "-3": "Albatross!", "-2": "Eagle!", "-1": "Birdie!", "0": "Par!", "1": "Bogey", "2": "Double bogey" };
+  const title = maxed ? "On to the next hole" : s === 1 ? "⛳ Hole in one!" : names[s - g.par] || `${s} strokes`;
+  const sum = scores.reduce((a, b) => a + b, 0), par = GOLF.slice(0, scores.length).reduce((a, x) => a + x.par, 0);
+  const text = maxed ? `That's ${MAX_STROKES} strokes, the most for one hole.` : `Hole ${level + 1} in ${s} ${s === 1 ? "stroke" : "strokes"} (par ${g.par}).`;
+  if (level < GOLF.length - 1) return showMsg(title, `${text} Total so far: ${vsPar(sum - par)}.`, "Next hole", () => startLevel(level + 1));
+  const best = !rec.golf || sum < rec.golf; if (best) { rec.golf = sum; saveRec(); }
+  showMsg(title, `${text} Your card: ${scores.join(" · ")} = ${sum} strokes (par ${par}, ${vsPar(sum - par)}).${best ? " That's your best round!" : ` Your best is ${rec.golf}.`}`,
+    "Play again", startGame);
+}
+// pull back from anywhere on the screen, then let go to putt (like a slingshot)
+const ray = new THREE.Raycaster(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hitPt = new THREE.Vector3();
+function worldPoint(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
+  return ray.ray.intersectPlane(floorPlane, hitPt) ? { x: hitPt.x, z: hitPt.z } : null;
+}
+renderer.domElement.addEventListener("pointerdown", e => { if (ballStill()) { const p = worldPoint(e); if (p) aimDrag = { x: p.x, z: p.z, len: 0 }; } });
+addEventListener("pointermove", e => {
+  if (!aimDrag) return; const p = worldPoint(e); if (!p) return;
+  const dx = aimDrag.x - p.x, dz = aimDrag.z - p.z; aimDrag.len = Math.hypot(dx, dz);
+  if (aimDrag.len > 0.15) { aimAngle = Math.atan2(-dz, dx); aimPower = clamp(aimDrag.len / 3.5, 0.05, 1); }
+});
+addEventListener("pointerup", () => { if (aimDrag && aimDrag.len > 0.3) shoot(); aimDrag = null; });
+addEventListener("pointercancel", () => { aimDrag = null; });
+
+
+// ===== Render loop =====
+function resize() {
+  const w = innerWidth, h = innerHeight; renderer.setSize(w, h); camera.aspect = w / h;
+  const fit = (w < h ? 23 / (w / h) * 0.62 : 15.5) * N / 12;   // pull back on tall screens
+  camera.position.set(0, fit, fit * 0.55); camera.lookAt(0, 0, 0.6 * N / 12); camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+function step(dt) { holeClock += dt; golfStep(dt); }
+buildLevel(0); showBest();
+let last = performance.now();
+renderer.setAnimationLoop(now => {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  step(dt);
+  ballMesh.position.set(ball.x, ball.y, ball.z);
+  ballMesh.rotation.x += ball.vz * dt / BALL_R; ballMesh.rotation.z -= ball.vx * dt / BALL_R; // roll
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
