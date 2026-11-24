@@ -350,25 +350,34 @@ function readTilt() {
 const TILT_RANGE = 18;   // degrees of device tilt that give a full board tilt (smaller = more sensitive)
 const canTilt = "DeviceOrientationEvent" in window && matchMedia("(pointer: coarse)").matches;
 let tiltOn = false, tiltListening = false, tiltZero = null, devX = 0, devZ = 0;
-function screenAngle() { const a = (screen.orientation && screen.orientation.angle) ?? window.orientation ?? 0; return ((a % 360) + 360) % 360; }
+function screenAngle() {
+  const o = screen.orientation, a = o && typeof o.angle === "number" ? o.angle : (window.orientation || 0);
+  return ((a % 360) + 360) % 360;
+}
+const DEG = Math.PI / 180;
 function onOrient(e) {
   if (!tiltOn || e.beta == null || e.gamma == null) return;
-  // turn the sensor's numbers into "right" (x) and "toward me" (y) for the way the screen is turned
-  let x = e.gamma, y = e.beta;
-  const a = screenAngle();
-  if (a === 90) { x = e.beta; y = e.gamma; }
-  else if (a === 270) { x = -e.beta; y = -e.gamma; }
-  else if (a === 180) { x = -e.gamma; y = -e.beta; }
-  if (!tiltZero) tiltZero = { x, y };
-  devX = Math.max(-1, Math.min(1, (x - tiltZero.x) / TILT_RANGE));
-  devZ = Math.max(-1, Math.min(1, (y - tiltZero.y) / TILT_RANGE));
+  // Which way is "up", measured on the device itself. The raw beta/gamma numbers jump around when a tablet is
+  // held up at an angle (especially sideways); this up direction does not.
+  const b = e.beta * DEG, g = e.gamma * DEG;
+  const ux = -Math.cos(b) * Math.sin(g), uy = Math.sin(b), uz = Math.cos(b) * Math.cos(g);
+  // turn it to match the screen (portrait, sideways or upside down)
+  const a = screenAngle() * DEG, ur = ux * Math.cos(a) - uy * Math.sin(a), uu = ux * Math.sin(a) + uy * Math.cos(a);
+  const roll = Math.asin(Math.max(-1, Math.min(1, -ur))) / DEG; // right side down = more
+  const pitch = Math.atan2(uu, uz) / DEG;                        // top edge up = more
+  if (!tiltZero) tiltZero = { roll, pitch };                      // the way you hold it counts as flat
+  let dp = pitch - tiltZero.pitch; if (dp > 180) dp -= 360; if (dp < -180) dp += 360;
+  const nx = Math.max(-1, Math.min(1, (roll - tiltZero.roll) / TILT_RANGE));
+  const nz = Math.max(-1, Math.min(1, dp / TILT_RANGE));
+  devX += (nx - devX) * 0.35; devZ += (nz - devZ) * 0.35;         // smooth out sensor jitter
 }
 async function enableTilt() {
   const btn = document.getElementById("tilt");
   try { // iPads and iPhones ask permission first
     if (typeof DeviceOrientationEvent.requestPermission === "function" && (await DeviceOrientationEvent.requestPermission()) !== "granted") throw 0;
   } catch (e) { btn.textContent = "📱 Tilt not allowed"; showTiltToggle(false, true); return false; }
-  if (!tiltListening) { tiltListening = true; addEventListener("deviceorientation", onOrient); addEventListener("orientationchange", () => { tiltZero = null; }); }
+  if (!tiltListening) { tiltListening = true; addEventListener("deviceorientation", onOrient); addEventListener("orientationchange", () => { tiltZero = null; });
+    if (screen.orientation) screen.orientation.addEventListener("change", () => { tiltZero = null; }); }
   tiltOn = true; tiltZero = null; devX = devZ = 0; btn.textContent = "📱 Re-center"; showTiltToggle(true);
   return true;
 }
