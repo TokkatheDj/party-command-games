@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Marble Maze 3D</title>
-<!-- Marble Maze 3D: tilt the board, roll the marble to the green ring. Four ways to play (23 Nov 2026):
-     Classic, Time Trial, Gem Hunt and Endless. Gem Hunt and Endless build a brand-new maze every round.
+<!-- Marble Maze 3D: tilt the board, roll the marble to the green ring. Five ways to play (23 Nov 2026):
+     Classic, Time Trial, Gem Hunt, Endless and Color Match. Gem Hunt, Endless and Color Match build a brand-new maze every round.
      Board texture: Adobe Stock #320483183 (white gray marble), licensed 23 Nov 2026.
      Title font: Yerk by Harbor Bickmore (That That Type), served by Adobe Fonts kit pur5moc.
      3D: three.js r160 (MIT), loaded from jsDelivr. No buzzers: falling in a hole plays one soft tone. -->
@@ -64,12 +64,13 @@
 
 <div class="screen" id="start"><div class="inner">
   <h1 class="title">Marble<br>Maze 3D</h1>
-  <p>Tilt the board to roll your marble to the glowing green ring. Pick a way to play:</p>
+  <p>Tilt the board to roll your marble through the maze. Pick a way to play:</p>
   <div class="modes">
     <button class="mode" data-mode="classic"><b>🔴 Classic</b><span>3 mazes. Grab the gems, steer around the holes, and reach the green ring.</span><i id="best-classic"></i></button>
     <button class="mode" data-mode="trial"><b>⏱️ Time Trial</b><span>The same 3 mazes against the clock. Finish fast for gold, silver or bronze.</span><i id="best-trial"></i></button>
     <button class="mode" data-mode="gems"><b>💎 Gem Hunt</b><span>A brand-new maze every round, with no holes. Collect every gem to open the ring.</span><i id="best-gems"></i></button>
     <button class="mode" data-mode="endless"><b>♾️ Endless</b><span>New mazes that get bigger, with more holes each time. You have 3 marbles. How far can you go?</span><i id="best-endless"></i></button>
+    <button class="mode" data-mode="color"><b>🎨 Color Match</b><span>Roll each marble into the hole of the same color. Fill every hole in 3 mazes, as fast as you can.</span><i id="best-color"></i></button>
   </div>
   <button id="tiltToggle" class="hudbtn hide" aria-pressed="false">📱 Tilt the tablet to steer: Off</button>
   <p class="small">Steer with the arrow keys or WASD, drag anywhere on the screen, or use the stick in the corner.<span id="tiltHint" class="hide"> To steer by tilting this device, turn tilt on, hold the device the way you like, then pick a mode.</span></p>
@@ -90,6 +91,12 @@ const MAX_MARBLES = 5;
 // Time Trial: seconds for [gold, silver] on each Classic maze. Anything slower is bronze.
 // (A computer player that steers perfectly takes about 13, 13.5 and 9.5 seconds.)
 const TRIAL_TIMES = [[15, 24], [16, 25], [11, 17]];
+// Color Match: for each maze, [maze size, how many colors, holes of each color]
+const COLOR_MAZES = [[5, 3, 1], [6, 4, 1], [6, 4, 2]];
+const COLORS = [
+  { name: "red", emoji: "🔴", hex: "#ff4d4d" }, { name: "blue", emoji: "🔵", hex: "#339af0" },
+  { name: "yellow", emoji: "🟡", hex: "#ffd43b" }, { name: "green", emoji: "🟢", hex: "#40c057" }
+];
 
 // ===== Classic mazes: # wall  . floor  S start  G goal  o hole  * gem =====
 const LEVELS = [
@@ -104,6 +111,7 @@ const LEVELS = [
 // ===== Maze maker for Gem Hunt and Endless =====
 // Carves a random maze, knocks out some walls so there is more than one way through,
 // then adds gems and holes. A hole is only kept if the ring and every gem can still be reached.
+// With holesAreTargets (Color Match), every hole must also be reachable without crossing another hole.
 const DIRS = [[0, 1], [1, 0], [0, -1], [-1, 0]];
 const rnd = k => Math.floor(Math.random() * k);
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -116,7 +124,7 @@ function reach(g, from) { // steps from "from" to every square, going around wal
   }
   return d;
 }
-function makeMaze(cells, holeCount, gemCount) {
+function makeMaze(cells, holeCount, gemCount, holesAreTargets = false) {
   const n = cells * 2 + 1, g = Array.from({ length: n }, () => Array(n).fill("#"));
   const stack = [[0, 0]]; g[1][1] = ".";
   while (stack.length) {
@@ -137,13 +145,16 @@ function makeMaze(cells, holeCount, gemCount) {
   shuffle(spots);
   const gemSpots = spots.filter(([r, c]) => r % 2 && c % 2).slice(0, gemCount); // gems sit in the middle of a square
   gemSpots.forEach(([r, c]) => { g[r][c] = "*"; });
-  let placed = 0;
+  const holeSpots = [];
   for (const [r, c] of spots) {
-    if (placed >= holeCount) break;
+    if (holeSpots.length >= holeCount) break;
     if (g[r][c] !== ".") continue;
+    if (holesAreTargets && holeSpots.some(([a, b]) => Math.abs(a - r) + Math.abs(b - c) < 2)) continue; // keep color holes apart
     g[r][c] = "o";
     const d = reach(g, S);
-    if (d[G[0]][G[1]] < 0 || gemSpots.some(([a, b]) => d[a][b] < 0)) g[r][c] = "."; else placed++;
+    const ok = d[G[0]][G[1]] >= 0 && gemSpots.every(([a, b]) => d[a][b] >= 0) &&
+      (!holesAreTargets || [...holeSpots, [r, c]].every(([a, b]) => DIRS.some(([dr, dc]) => d[a + dr][b + dc] >= 0)));
+    if (ok) holeSpots.push([r, c]); else g[r][c] = ".";
   }
   return g.map(row => row.join(""));
 }
@@ -181,7 +192,7 @@ const cell = (r, c) => ({ x: c - HALF + 0.5, z: r - HALF + 0.5 });
 function buildLevel(grid) {
   curGrid = grid; N = grid.length; HALF = N / 2;
   while (board.children.length) board.remove(board.children[0]);
-  walls = []; holes = []; gems = [];
+  walls = []; holes = []; gems = []; goal = null; goalMesh = null;
   const floor = new THREE.Mesh(new THREE.BoxGeometry(N, 0.4, N),
     new THREE.MeshStandardMaterial({ map: marbleTex, roughness: 0.35, metalness: 0.05 }));
   floor.position.y = -0.2; floor.receiveShadow = true; board.add(floor);
@@ -193,7 +204,7 @@ function buildLevel(grid) {
       walls.push({ x0: p.x - 0.5, x1: p.x + 0.5, z0: p.z - 0.5, z1: p.z + 0.5 });
     } else if (ch === "o") {
       const m = new THREE.Mesh(holeGeo, holeMat);
-      m.rotation.x = -Math.PI / 2; m.position.set(p.x, 0.005, p.z); board.add(m); holes.push(p);
+      m.rotation.x = -Math.PI / 2; m.position.set(p.x, 0.005, p.z); board.add(m); holes.push({ ...p, r, c, mesh: m, filled: false });
     } else if (ch === "*") {
       const m = new THREE.Mesh(gemGeo, gemMat);
       m.position.set(p.x, 0.4, p.z); m.castShadow = true; board.add(m); gems.push({ ...p, mesh: m, got: false });
@@ -206,7 +217,35 @@ function buildLevel(grid) {
   ballMesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 40, 28),
     new THREE.MeshPhysicalMaterial({ color: "#ff6b6b", roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05 }));
   ballMesh.castShadow = true; board.add(ballMesh);
+  if (mode === "color") paintHoles();
   resetBall(); resize();
+}
+
+// ===== Color Match: colored holes, and a marble that changes color =====
+let ballColor = null;
+function paintHoles() {
+  const [, colorCount, perColor] = COLOR_MAZES[level];
+  const list = shuffle(COLORS.slice(0, colorCount).flatMap(col => Array(perColor).fill(col)));
+  holes.forEach((h, i) => {
+    h.color = list[i % list.length];
+    h.mesh.material = new THREE.MeshBasicMaterial({ color: new THREE.Color(h.color.hex).multiplyScalar(0.22) });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.5, 40), new THREE.MeshBasicMaterial({ color: h.color.hex }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(h.x, 0.008, h.z); board.add(ring);
+  });
+}
+function nextColor() { // the next marble takes the color of a hole that is still empty (a new color when it can)
+  const open = [...new Set(holes.filter(h => !h.filled).map(h => h.color))];
+  const other = open.filter(col => col !== ballColor);
+  ballColor = (other.length ? other : open)[rnd((other.length ? other : open).length)];
+  ballMesh.material.color.set(ballColor.hex);
+  knob.style.background = `radial-gradient(circle at 35% 35%, #fff, ${ballColor.hex} 45%, #333)`; // the stick matches the marble
+}
+function fillHole(h) { // the marble stays in the hole, so the hole is filled and safe to roll over
+  h.filled = true;
+  const m = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 32, 20),
+    new THREE.MeshPhysicalMaterial({ color: h.color.hex, roughness: 0.15, clearcoat: 1 }));
+  m.position.set(h.x, 0.02, h.z); m.castShadow = true; board.add(m);
+  curGrid = curGrid.map((row, r) => r === h.r ? row.slice(0, h.c) + "." + row.slice(h.c + 1) : row);
 }
 function resetBall() { ball = { x: startPos.x, z: startPos.z, vx: 0, vz: 0, y: BALL_R, falling: 0 }; }
 function setRing(open) { // Gem Hunt: the ring is grey and closed until every gem is collected
@@ -228,6 +267,7 @@ const sfx = {
   hole: () => tone(440, 220, 0.45, 0.06),               // soft slide-down tone
   bump: v => tone(160, 120, 0.06, Math.min(0.05, v * 0.01)),
   open: () => [784, 988, 1175].forEach((f, i) => tone(f, f, 0.22, 0.07, i * 0.08)),
+  match: () => [659, 784, 988].forEach((f, i) => tone(f, f, 0.18, 0.07, i * 0.07)),
   extra: () => [659, 880].forEach((f, i) => tone(f, f, 0.25, 0.07, i * 0.12)),
   goal: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, f, 0.25, 0.08, i * 0.1)),
   over: () => [392, 330, 262].forEach((f, i) => tone(f, f, 0.35, 0.05, i * 0.2)) // gentle "that's it" notes
@@ -311,6 +351,7 @@ function showBests() {
   const m = rec.medals || [];
   $("best-trial").textContent = m.length ? "Best medals: " + LEVELS.map((_, i) => m[i] || "▫️").join(" ") : "";
   $("best-gems").textContent = rec.gems ? `Fastest maze: ${rec.gems.toFixed(1)}s` : "";
+  $("best-color").textContent = rec.color ? `Best: all 3 in ${rec.color.toFixed(1)}s` : "";
   $("best-endless").textContent = rec.endless ? `Best: ${rec.endless} ${rec.endless === 1 ? "maze" : "mazes"} cleared` : "";
 }
 
@@ -323,16 +364,20 @@ const MEDAL = ["🥇", "🥈", "🥉"], MEDAL_NAME = ["Gold", "Silver", "Bronze"
 function levelGrid(n) {
   if (mode === "classic" || mode === "trial") return LEVELS[n];
   if (mode === "gems") return makeMaze(n < 2 ? 5 : 6, 0, Math.min(5 + n, 9));
+  if (mode === "color") { const [cells, colorCount, perColor] = COLOR_MAZES[n];
+    return makeMaze(cells, colorCount * perColor, 0, true).map(row => row.replace("G", ".")); } // no ring: fill the holes instead
   const cells = n < 3 ? 5 : n < 7 ? 6 : 7;                       // Endless: the maze grows...
   return makeMaze(cells, Math.min(2 + Math.floor(n * 1.5), Math.floor(cells * cells / 2.5)), 3); // ...and gets more holes
 }
 function hud() {
   const fixed = mode === "classic" || mode === "trial";
-  $("lvl").textContent = fixed ? `Level ${level + 1}/${LEVELS.length}` : `Maze ${level + 1}`;
+  $("lvl").textContent = fixed ? `Level ${level + 1}/${LEVELS.length}` : mode === "color" ? `Maze ${level + 1}/${COLOR_MAZES.length}` : `Maze ${level + 1}`;
   $("time").textContent = time.toFixed(1) + "s";
   const got = gems.filter(g => g.got).length;
-  $("gems").textContent = mode === "gems" ? `💎 ${got}/${gems.length}` : "💎 " + gemCount;
+  $("gems").textContent = mode === "gems" ? `💎 ${got}/${gems.length}`
+    : mode === "color" ? `🎯 ${holes.filter(h => h.filled).length}/${holes.length} filled` : "💎 " + gemCount;
   $("info").textContent = mode === "endless" ? "🔴 ×" + lives
+    : mode === "color" ? (ballColor ? `Find: ${ballColor.emoji} ${ballColor.name[0].toUpperCase() + ballColor.name.slice(1)}` : "")
     : mode === "trial" ? `🥇 under ${TRIAL_TIMES[level][0]}s`
     : mode === "gems" ? (goalLocked ? "🔒 Ring closed" : "🟢 Ring open!")
     : "🕳️ " + falls;
@@ -346,7 +391,11 @@ function startMode(m) {
   mode = m; gemCount = 0; falls = 0; totalTime = 0; lives = START_MARBLES; gemsToMarble = 0; medals = [];
   $("start").classList.add("hide"); document.body.classList.remove("menu"); startLevel(0);
 }
-function startLevel(n) { level = n; time = 0; buildLevel(levelGrid(n)); setRing(mode !== "gems"); state = "play"; hud(); }
+function startLevel(n) {
+  level = n; time = 0; ballColor = null; knob.style.background = ""; buildLevel(levelGrid(n)); setRing(mode !== "gems");
+  if (mode === "color") nextColor();
+  state = "play"; hud();
+}
 function showMsg(title, text, btn, next) {
   state = "msg"; $("msgTitle").textContent = title; $("msgText").textContent = text; $("msgBtn").textContent = btn;
   $("msgBtn").onclick = () => { $("msg").classList.add("hide"); next(); }; $("msg").classList.remove("hide");
@@ -381,6 +430,13 @@ function levelDone() {
     return showMsg(`${MEDAL[m]} ${MEDAL_NAME[m]}!`, `${text} Your medals: ${medals.join(" ")}. Total time ${totalTime.toFixed(1)}s.`,
       "Try again", () => startMode("trial"));
   }
+  if (mode === "color") {
+    if (level < COLOR_MAZES.length - 1)
+      return showMsg("Maze clear!", `Every hole filled in ${t} seconds. Ready for maze ${level + 2}?`, "Next maze", () => startLevel(level + 1));
+    const best = !rec.color || totalTime < rec.color; if (best) { rec.color = totalTime; saveRec(); }
+    return showMsg("All matched!", `All ${COLOR_MAZES.length} mazes in ${totalTime.toFixed(1)} seconds, with ${falls} wrong ${falls === 1 ? "hole" : "holes"}.${best ? " That's your best time!" : ` Your best is ${rec.color.toFixed(1)}s.`}`,
+      "Play again", () => startMode("color"));
+  }
   if (mode === "gems") {
     const best = !rec.gems || time < rec.gems; if (best) { rec.gems = time; saveRec(); }
     return showMsg("All gems found!", `Maze ${level + 1} done in ${t} seconds.${best ? " That's your fastest maze!" : ` Fastest: ${rec.gems.toFixed(1)}s.`}`,
@@ -408,7 +464,11 @@ function step(dt) {
 
   if (ball.falling > 0) { // dropping into a hole
     ball.falling -= dt; ball.y -= dt * 3;
-    if (ball.falling <= 0) { if (mode === "endless" && lives <= 0) return outOfMarbles(); resetBall(); }
+    if (ball.falling <= 0) {
+      if (mode === "endless" && lives <= 0) return outOfMarbles();
+      if (ball.into) { fillHole(ball.into); if (holes.every(h => h.filled)) return levelDone(); nextColor(); }
+      resetBall();
+    }
     hud(); return;
   }
   ball.vx = (ball.vx + Math.sin(tiltX) * GRAVITY * dt) * FRICTION;
@@ -427,8 +487,11 @@ function step(dt) {
       }
     }
   }
-  for (const h of holes) if (Math.hypot(ball.x - h.x, ball.z - h.z) < 0.3) {
-    ball.x = h.x; ball.z = h.z; ball.vx = ball.vz = 0; ball.falling = 0.6; falls++; sfx.hole();
+  for (const h of holes) if (!h.filled && Math.hypot(ball.x - h.x, ball.z - h.z) < 0.3) {
+    ball.x = h.x; ball.z = h.z; ball.vx = ball.vz = 0; ball.falling = 0.6;
+    if (mode === "color" && h.color === ballColor) { ball.into = h; sfx.match(); hud(); return; } // a match!
+    falls++; sfx.hole();
+    if (mode === "color") toast(`Oops, that hole is ${h.color.name}. Find ${ballColor.emoji} ${ballColor.name}!`);
     if (mode === "endless") lives--;
     hud(); return;
   }
@@ -439,7 +502,7 @@ function step(dt) {
       gemsToMarble = 0; if (lives < MAX_MARBLES) { lives++; sfx.extra(); toast("🔴 Extra marble!"); }
     }
   }
-  if (!goalLocked && Math.hypot(ball.x - goal.x, ball.z - goal.z) < 0.35) return levelDone();
+  if (goal && !goalLocked && Math.hypot(ball.x - goal.x, ball.z - goal.z) < 0.35) return levelDone();
   hud();
 }
 
