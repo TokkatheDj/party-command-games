@@ -1,0 +1,711 @@
+<!-- CONCEPT: HEAD-TO-HEAD TRIVIA (chicken-out clue ladder duels) - "Clue Ladder": two duelists face a secret answer hidden behind 5 clues that run from fiendish to giveaway; on your move you either GUESS out loud (worth 5 points on rung 1, falling to 1 on rung 5) or PASS, which reveals the next, easier clue to your rival - wait too long and they grab it cheaply, guess too early and a wrong answer hands them the next clue and a free shot at it. A rotating Referee holds the answer (peek button) and taps right/wrong; bouts are 3 cards (sudden death on a tie), the winner keeps the crown (+2 bonus) and the loser joins the back of the challenger queue so 3-10 players rotate through; Twist cards (Golden Card x2, Slippery Rungs -2 for a miss, Quick Clock 8s per move, Blind Category), double-points final duel, 94 cards in 8 categories remembered across games, keyboard keys, scoreboard and awards | Players: 3-10 | ~15-25 min [style: Neon Arcade / sound: Chiptune] -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Clue Ladder</title>
+<style>
+:root{
+  --bg:#0b0b1a; --panel:#16162e; --panel2:#20203d; --text:#f0f0ff; --muted:#a9a3c0;
+  --accent:#00e5ff; --accent-ink:#0b0b1a; --pink:#ff4fd8; --gold:#ffd166; --ok:#2ec27e; --bad:#ff5c7a;
+  --dark-on:#6b2fb3; --line:#3a3550;
+  --head:"Press Start 2P","Courier New",monospace;
+  --body:"VT323","Courier New",monospace;
+  --gap:clamp(8px,2.2vw,14px);
+}
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text);
+  font-family:var(--body);font-size:clamp(19px,4.6vw,26px);line-height:1.25;
+  touch-action:manipulation;user-select:none;-webkit-user-select:none}
+input{user-select:text;-webkit-user-select:text}
+#app{height:100%;display:flex;flex-direction:column;max-width:960px;margin:0 auto}
+.top{flex:none;display:flex;align-items:center;gap:8px;padding:8px var(--gap);border-bottom:3px solid var(--line)}
+.logo{font-family:var(--head);font-size:clamp(11px,2.8vw,15px);color:var(--accent);letter-spacing:1px;flex:1;margin:0;font-weight:700}
+main{flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--gap);-webkit-overflow-scrolling:touch}
+.screen[hidden]{display:none}
+h1,h2,h3{font-family:var(--head);font-weight:700;margin:0 0 10px}
+h1{font-size:clamp(24px,7vw,46px);color:var(--accent);text-shadow:0 0 12px rgba(0,229,255,.55);line-height:1.2}
+h2{font-size:clamp(15px,4vw,24px);color:var(--accent);line-height:1.3}
+h3{font-size:clamp(12px,3vw,16px);color:var(--gold);line-height:1.4}
+p{margin:0 0 10px}
+.muted{color:var(--muted)}
+.panel{background:var(--panel);border:3px solid var(--line);padding:var(--gap);margin-bottom:var(--gap)}
+button{font-family:var(--body);font-size:clamp(20px,4.8vw,27px);min-height:48px;padding:8px 14px;cursor:pointer;
+  border:3px solid var(--text);border-radius:0;background:var(--panel2);color:var(--text);line-height:1.1}
+button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button:active{transform:translate(2px,2px)}
+button:disabled{cursor:not-allowed;background:var(--panel);color:var(--muted);border-color:var(--line)}
+.btn-main{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);box-shadow:0 0 12px rgba(0,229,255,.6);font-weight:700}
+.btn-pink{background:var(--pink);color:var(--accent-ink);border-color:var(--pink);box-shadow:0 0 12px rgba(255,79,216,.5);font-weight:700}
+.btn-ok{background:var(--ok);color:var(--accent-ink);border-color:var(--ok);font-weight:700}
+.btn-bad{background:var(--bad);color:var(--accent-ink);border-color:var(--bad);font-weight:700}
+.btn-small{font-size:clamp(17px,4vw,21px);min-height:44px;padding:4px 10px}
+button[aria-pressed="true"]{background:var(--dark-on);color:#ffffff;border-color:var(--accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.grow{flex:1}
+.big-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);margin:var(--gap) 0}
+.big-row button{min-height:72px;font-size:clamp(22px,5.4vw,32px)}
+.big-row .sub{display:block;font-size:.72em;margin-top:4px}
+/* setup */
+.intro-meta{font-family:var(--head);font-size:clamp(10px,2.6vw,13px);color:var(--gold);line-height:1.7;margin-bottom:12px}
+.rules{margin:0;padding-left:1.1em}
+.rules li{margin-bottom:6px}
+.plist{display:grid;gap:8px;margin-bottom:10px}
+.prow{display:flex;gap:8px}
+.prow input{flex:1;min-width:0;font-family:var(--body);font-size:clamp(20px,4.8vw,26px);min-height:48px;padding:6px 10px;
+  background:var(--bg);color:var(--text);border:3px solid var(--line);border-radius:0}
+.prow button{width:52px;padding:0}
+/* duel bar */
+.duelbar{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;margin-bottom:var(--gap)}
+.fighter{background:var(--panel);border:3px solid var(--line);padding:4px 8px;text-align:center;min-width:0}
+.fighter .nm{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fighter .sc{font-family:var(--head);font-size:clamp(16px,4.6vw,26px);display:block;margin-top:4px}
+.fighter.c0{border-color:var(--accent)} .fighter.c0 .sc{color:var(--accent)}
+.fighter.c1{border-color:var(--pink)} .fighter.c1 .sc{color:var(--pink)}
+.fighter.on{box-shadow:0 0 12px currentColor}
+.fighter.c0.on{color:var(--accent)} .fighter.c1.on{color:var(--pink)}
+.fighter.on .nm{color:var(--text)}
+.vs{font-family:var(--head);font-size:clamp(11px,3vw,15px);color:var(--gold);text-align:center}
+.cardinfo{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.tag{display:inline-block;font-family:var(--head);font-size:clamp(9px,2.4vw,12px);padding:6px 8px;line-height:1.4;
+  background:var(--panel2);color:var(--text);border:2px solid var(--line)}
+.tag.gold{background:var(--gold);color:var(--accent-ink);border-color:var(--gold)}
+.twist{background:var(--panel);border:3px dashed var(--gold);padding:8px 10px;margin-bottom:var(--gap)}
+.twist b{color:var(--gold)}
+/* ladder */
+.ladder{list-style:none;margin:0 0 var(--gap);padding:0;display:grid;gap:6px}
+.rung{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;background:var(--panel);
+  border:3px solid var(--line);padding:5px 8px;min-height:44px;line-height:1.15}
+.rung.locked{min-height:34px;padding:2px 8px}
+.rung.locked .val{padding:3px 2px}
+.rung .val{font-family:var(--head);font-size:clamp(11px,2.8vw,14px);width:4.2em;text-align:center;padding:6px 2px;
+  background:var(--panel2);color:var(--muted);border:2px solid var(--line);line-height:1.3}
+.rung.open .val{background:var(--gold);color:var(--accent-ink);border-color:var(--gold)}
+.rung.locked .clue{color:var(--muted)}
+.rung.cur{border-color:var(--accent);box-shadow:0 0 12px rgba(0,229,255,.55)}
+.rung.new .clue{animation:typein .45s steps(6) both}
+@keyframes typein{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+.turn{font-family:var(--head);font-size:clamp(13px,3.6vw,20px);text-align:center;padding:10px;line-height:1.5;
+  border:3px solid var(--line);background:var(--panel)}
+.turn.c0{color:var(--accent);border-color:var(--accent)}
+.turn.c1{color:var(--pink);border-color:var(--pink)}
+.turn small{display:block;font-family:var(--body);font-size:clamp(18px,4.2vw,23px);color:var(--text);margin-top:6px}
+.timer{height:14px;background:var(--panel);border:2px solid var(--line);margin-top:8px}
+.timer i{display:block;height:100%;background:var(--gold);width:100%}
+.refbox{background:var(--panel);border:3px solid var(--gold);padding:var(--gap);margin-top:var(--gap)}
+.answer{font-family:var(--head);font-size:clamp(16px,5vw,30px);color:var(--gold);margin:8px 0;line-height:1.35;word-break:break-word}
+.result{text-align:center}
+.result .answer{font-size:clamp(18px,6vw,36px)}
+/* scores */
+.scores{display:flex;flex-wrap:wrap;gap:6px;margin-top:var(--gap)}
+.chip{background:var(--panel);border:2px solid var(--line);padding:4px 8px;font-size:clamp(18px,4.2vw,22px)}
+.chip b{color:var(--gold);font-weight:400}
+.chip.champ{border-color:var(--gold)}
+.podium{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.podium li{display:flex;justify-content:space-between;gap:10px;background:var(--panel);border:3px solid var(--line);padding:8px 12px}
+.podium li:first-child{border-color:var(--gold);box-shadow:0 0 12px rgba(255,209,102,.5)}
+.podium .pts{font-family:var(--head);color:var(--gold);font-size:clamp(12px,3.2vw,17px)}
+.awards{margin:0;padding-left:1.1em}
+.awards li{margin-bottom:6px}
+.keys{font-size:clamp(16px,3.8vw,20px)}
+.center{text-align:center}
+.mt{margin-top:var(--gap)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (min-width:760px){
+  .big-row button{min-height:96px}
+}
+@media (prefers-reduced-motion:reduce){
+  .rung.new .clue{animation:none}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <p class="logo">CLUE LADDER</p>
+    <button id="muteBtn" class="btn-small" aria-pressed="false">🔊 Sound</button>
+    <button id="quitBtn" class="btn-small" hidden>Quit</button>
+  </header>
+  <main id="main">
+
+    <section id="sSetup" class="screen">
+      <h1>CLUE LADDER</h1>
+      <p>Trivia duels where every clue is easier than the last, and worth less. Guess early for big points, or wait and risk your rival grabbing it first.</p>
+      <p class="intro-meta">3–10 PLAYERS · ~15–25 MIN · ONE SHARED SCREEN</p>
+      <div class="panel">
+        <h3>HOW TO PLAY</h3>
+        <ul class="rules">
+          <li>Two players duel. A secret answer hides behind <b>5 clues</b>, hardest first.</li>
+          <li>On your move: <b>GUESS</b> out loud (5 pts on rung 1, down to 1 on rung 5) or <b>PASS</b>, which shows the next clue to your rival.</li>
+          <li>Guess wrong and your rival gets the next clue and one free shot.</li>
+          <li>A <b>Referee</b> (someone not duelling) peeks at the answer and taps right or wrong.</li>
+          <li>Win a 3-card bout to keep the 👑 crown (+2). The loser goes to the back of the line. Highest total at the end wins.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>PLAYERS</h3>
+        <div id="plist" class="plist"></div>
+        <div class="row">
+          <button id="addP" class="btn-small">+ Add player</button>
+          <span id="pcount" class="muted"></span>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>GAME LENGTH</h3>
+        <div class="row">
+          <button id="lenQuick" class="btn-small" aria-pressed="true">Quick: one lap</button>
+          <button id="lenFull" class="btn-small" aria-pressed="false">Full: two laps</button>
+        </div>
+        <p class="muted mt">A lap means every player gets one turn as a challenger. The last duel is worth double.</p>
+        <div class="row mt">
+          <button id="twistBtn" class="btn-small" aria-pressed="true">Twist cards: ON</button>
+        </div>
+      </div>
+      <button id="startBtn" class="btn-main" style="width:100%">START THE DUELS ▸</button>
+      <p class="muted keys mt">Keyboard: G = guess · P = pass · Y / N = referee right / wrong · Enter = next</p>
+    </section>
+
+    <section id="sIntro" class="screen" hidden></section>
+    <section id="sPlay" class="screen" hidden></section>
+    <section id="sBout" class="screen" hidden></section>
+    <section id="sOver" class="screen" hidden></section>
+
+  </main>
+</div>
+<script>
+// [category, answer, also-accept, [5 clues: hardest -> giveaway]]
+const CARDS = [
+["Animals","Octopus","",["I have three hearts and blue blood.","I can taste things with the suckers on my arms.","I squirt ink to escape from danger.","I have no bones, so I can squeeze through tiny gaps.","I live in the sea and have eight arms."]],
+["Animals","Giraffe","",["My tongue is dark blue-black and about half a metre long.","My neck has seven bones, the same number as yours.","I sleep only a few minutes at a time, often standing up.","My coat is a patchwork of brown patches.","I'm the tallest animal on Earth."]],
+["Animals","Penguin","",["Some of my kind give a pebble as a gift to a partner.","My black-and-white colouring is called countershading.","I 'fly' underwater but never in the air.","The Emperor is the biggest of my kind.","I'm a waddling bird from the Southern Hemisphere that can't fly."]],
+["Animals","Owl","",["A group of us is called a parliament.","I can't move my eyes in their sockets.","My fringed feathers let me fly almost silently.","I can turn my head about 270 degrees.","I'm a night bird famous for saying 'hoo'."]],
+["Animals","Kangaroo","",["My babies are born about the size of a jellybean.","I can't easily walk backwards.","I use my strong tail like a fifth leg.","My baby is called a joey.","I'm Australia's famous hopping animal with a pouch."]],
+["Animals","Elephant","",["My closest living relatives include the manatee.","I talk with rumbles too low for humans to hear.","One part of my body has about 40,000 muscles.","My tusks are actually giant teeth.","I'm the largest land animal, with a long trunk."]],
+["Animals","Bee","Honeybee",["I give directions to friends with a 'waggle dance'.","I have five eyes.","Only the females of my kind have a stinger.","I live in a hive ruled by a queen.","I buzz from flower to flower and make honey."]],
+["Animals","Sloth","",["Algae grows in my fur and gives it a green tint.","I can hold my breath for up to 40 minutes.","I climb down from my tree about once a week to go to the toilet.","I spend most of my life hanging upside down.","I'm famous for being the slowest mammal on Earth."]],
+["Animals","Shark","",["My skin feels like sandpaper because it's covered in tiny tooth-like scales.","My skeleton is made of cartilage, not bone.","Some of my kind must keep swimming to breathe.","I can lose and regrow thousands of teeth in my life.","I'm a fish famous for the triangle fin poking out of the water."]],
+["Animals","Flamingo","",["I eat with my head upside down.","I'm born grey or white.","What looks like my backwards knee is really my ankle.","My pink colour comes from the food I eat.","I'm a pink bird famous for standing on one leg."]],
+["Animals","Chameleon","",["My tongue shoots out faster than a sports car accelerates.","My toes are joined in groups, like a pair of tongs.","Each of my eyes can look in a different direction.","I can change the colour of my skin.","I'm a lizard famous for blending into the background."]],
+["Animals","Hedgehog","",["Sometimes I smear frothy spit all over my spines.","I can resist some snake venom.","I roll into a ball when I'm scared.","I have about 5,000 spines.","I'm a small prickly animal that snuffles round gardens at night."]],
+["Animals","Dolphin","",["I sleep with only half of my brain at a time.","I find food by making clicks and listening for echoes.","My kind give each other signature whistles, like names.","I breathe through a blowhole on top of my head.","I'm a clever, playful sea mammal that leaps out of the waves."]],
+["Animals","Panda","Giant panda",["I have a 'pseudo-thumb' made from a wrist bone.","My body is built like a meat-eater's, but I eat almost only plants.","I eat for up to 14 hours a day.","My main food is bamboo.","I'm a black-and-white bear from China."]],
+["Animals","Camel","",["My red blood cells are oval, not round.","I can drink about 100 litres of water in ten minutes.","I have three eyelids and two rows of eyelashes to keep out sand.","My hump stores fat, not water.","I'm called the 'ship of the desert'."]],
+["Animals","Butterfly","",["I taste with my feet.","My wings are covered in tiny scales.","I drink through a curly tube called a proboscis.","I start life as a caterpillar.","I'm a colourful insect that comes out of a chrysalis."]],
+["Animals","Crocodile","",["I can't stick out my tongue.","I swallow stones to help me digest and dive.","The temperature of my nest decides if my babies are boys or girls.","My kind have been around since the dinosaurs.","I'm a big toothy river reptile, cousin of the alligator."]],
+["Animals","Zebra","",["Flies avoid landing on me; scientists think my pattern confuses them.","Under my coat, my skin is black.","No two of us have exactly the same pattern.","I'm part of the horse family.","I'm a horse-like animal with black and white stripes."]],
+["Food & Drink","Pizza","",["A classic version of me is named after an Italian queen, Margherita.","My dough is sometimes stretched by tossing it in the air.","Pepperoni is my most famous topping in America.","I'm often cut into triangles from a circle.","I'm a flat bread with tomato sauce and melted cheese."]],
+["Food & Drink","Chocolate","Cocoa",["The Aztecs used my beans as money.","I'm made from seeds that grow in pods on a tree.","I can be dark, milk or white.","I melt in your hand on a hot day.","I'm a sweet brown treat made into bars and Easter eggs."]],
+["Food & Drink","Popcorn","",["Each piece of me holds a tiny drop of water that turns to steam.","The pieces of me that never open are called 'old maids'.","I'm a whole-grain snack.","I make a 'pop' when I'm heated.","I'm the classic snack at the cinema."]],
+["Food & Drink","Banana","",["I'm very slightly radioactive because I'm full of potassium.","Botanists say I'm a berry.","My plant is actually a giant herb, not a tree.","I grow in bunches called 'hands'.","I'm a curved yellow fruit you peel."]],
+["Food & Drink","Honey","",["Pots of me were found in Egyptian tombs, still edible after 3,000 years.","A worker makes only about a twelfth of a teaspoon of me in its life.","I almost never go bad.","I'm sticky, golden and sweet.","Bees make me from flower nectar."]],
+["Food & Drink","Pancake","Pancakes, crepe",["In some English towns people race while flipping me.","Shrove Tuesday is nicknamed after me.","A crêpe is a thin French version of me.","I'm often stacked up and covered in maple syrup.","I'm a flat round breakfast you flip in a frying pan."]],
+["Food & Drink","Ice cream","Gelato",["Rocky road and neapolitan are kinds of me.","I can give you a 'brain freeze' headache.","I'm served in a cone or a bowl.","I melt fast in the summer sun.","I'm a frozen sweet dessert made with cream."]],
+["Food & Drink","Carrot","",["The first ones of me weren't orange; they were purple and yellow.","Eat loads of me and your skin can turn a little orange.","You eat my root.","Cartoon rabbits are always munching me.","I'm an orange vegetable that snowmen use as a nose."]],
+["Food & Drink","Bread","Toast, loaf",["Sourdough versions of me use wild yeast.","A 'baker's dozen' of me is 13.","I rise because yeast makes bubbles of gas.","Toast is me, heated up.","I'm a baked loaf you slice for sandwiches."]],
+["Food & Drink","Sushi","",["My rice is seasoned with vinegar.","Wasabi and pickled ginger are served next to me.","Some of me is rolled in seaweed called nori.","I'm often eaten with chopsticks.","I'm a Japanese dish of rice, often with raw fish."]],
+["Food & Drink","Pineapple","",["I contain an enzyme that breaks down protein, so I can make your mouth tingle.","My plant takes about two years to grow one fruit.","My English name joins two other plants, but I'm neither.","I wear a spiky crown of leaves.","I'm a tropical fruit with rough, spiky skin and sweet yellow flesh."]],
+["Food & Drink","Spaghetti","Pasta",["My name means 'little strings' in Italian.","People twirl me round a fork against a spoon.","Bolognese sauce is often poured on me.","I'm a long, thin dried pasta.","I'm the long noodle served with meatballs."]],
+["Food & Drink","Peanut","Peanuts",["I'm not a true nut; I'm a legume, like peas.","I grow underground.","George Washington Carver found hundreds of uses for me.","I'm squashed into a famous butter.","I'm a small nut in a crinkly shell that elephants are said to love."]],
+["Food & Drink","Lemon","",["Sailors ate me to fight scurvy.","My juice can be used as invisible ink.","Push copper and zinc into me and I make a tiny battery.","I taste very sour.","I'm a bright yellow citrus fruit."]],
+["Places","Egypt","",["Most of my people live along one river valley.","There's a golden eagle on my flag.","The Sphinx guards a plateau in me.","Cairo is my capital.","I'm the country of the pyramids and the pharaohs."]],
+["Places","Australia","",["My capital is Canberra, not my biggest city.","I'm home to the Great Barrier Reef.","Sydney is my most famous city.","I'm a country and a continent at once.","Kangaroos and koalas come from me."]],
+["Places","Antarctica","",["Scientists count me as the largest desert in the world.","No country owns me; a treaty protects me.","About 70% of the world's fresh water is frozen on me.","The South Pole is on me.","I'm the icy continent where penguins live."]],
+["Places","Venice","",["I'm built on more than 100 small islands.","My buildings stand on wooden posts driven into mud.","There are no cars on my old streets.","Gondolas carry people along my canals.","I'm the Italian city of canals."]],
+["Places","Mount Everest","Everest",["Local people call me Chomolungma.","I sit on the border of Nepal and China.","Sherpas guide climbers up me.","Hillary and Tenzing first reached my top in 1953.","I'm the highest mountain on Earth."]],
+["Places","Japan","",["My name means 'origin of the sun'.","I'm made of thousands of islands.","Mount Fuji is my tallest mountain.","Tokyo is my capital.","I'm the island country of sushi and bullet trains."]],
+["Places","Sahara","Sahara Desert",["About 6,000 years ago parts of me were green, with lakes.","I'm roughly the size of the United States.","The Nile flows along my eastern side.","I'm the largest hot desert in the world.","I'm the huge sandy desert across North Africa."]],
+["Places","Paris","",["My nickname is the City of Light.","The Louvre museum is in me.","The River Seine flows through me.","I'm the capital of France.","The Eiffel Tower is my famous landmark."]],
+["Places","Amazon River","Amazon",["I carry more water than the next seven biggest rivers put together.","No bridge crosses my main channel.","Pink river dolphins swim in me.","I flow through the world's largest rainforest.","I'm South America's giant river."]],
+["Places","Iceland","",["I have no mosquitoes at all.","My parliament is one of the oldest in the world.","Geysers are named after one of mine, Geysir.","Despite my name, I'm green in summer.","I'm a Nordic island nation of volcanoes, with 'ice' in my name."]],
+["Places","London","",["My underground railway is the oldest in the world.","Black cabs and red double-decker buses fill my streets.","The River Thames runs through me.","Big Ben's bell rings in me.","I'm the capital of England."]],
+["Places","Great Wall of China","Great Wall",["It's a myth that you can easily see me from space.","Some of my builders mixed sticky rice into the mortar.","Many dynasties built me over many centuries.","I stretch for thousands of kilometres.","I'm the giant ancient wall in China."]],
+["Everyday Things","Umbrella","Brolly",["Early versions of me were for shade, not rain.","My name comes from a Latin word for 'shade'.","My frame has ribs and a canopy.","I can blow inside out in the wind.","You open me when it rains."]],
+["Everyday Things","Mirror","",["Legend says breaking me brings seven years of bad luck.","Ancient versions of me were polished bronze.","I swap left and right, but not up and down.","Dentists use a tiny one of me.","I'm the glass you look in to see yourself."]],
+["Everyday Things","Toothbrush","",["Early versions of me used hog hair.","Experts say you should replace me every three months.","Astronauts use me with toothpaste they swallow.","I have bristles.","You use me twice a day to clean your teeth."]],
+["Everyday Things","Candle","",["People once marked hours on my side and used me as a clock.","I have a wick and I'm made of wax.","I'm stuck into birthday cakes.","People blow me out and make a wish.","I'm a stick of wax with a little flame on top."]],
+["Everyday Things","Scissors","",["I'm really two levers joined at a pivot.","Left-handed versions of me exist.","You should walk with me pointing down.","I beat paper but lose to rock.","I have two blades and cut paper."]],
+["Everyday Things","Piano","Keyboard",["I'm both a string instrument and a percussion instrument.","Inside me, felt hammers hit strings.","My name comes from Italian words for 'soft-loud'.","I usually have 88 black and white keys.","I'm the big keyboard instrument in concert halls."]],
+["Everyday Things","Clock","Watch",["My hands turn the way they do because of sundial shadows.","Some of me cuckoo.","Town squares often have one of me in a tower.","My hands point at numbers 1 to 12.","I tell you what time it is."]],
+["Everyday Things","Balloon","",["The first ones of me were made from animal bladders.","Rub me on your hair and I'll stick to a wall.","Helium makes me float.","I pop if you poke me with a pin.","You blow me up for parties."]],
+["Everyday Things","Pencil","",["My 'lead' is really graphite mixed with clay.","One of me can draw a line about 56 kilometres long.","Most of my kind in the USA are painted yellow.","I often have an eraser on the end.","You sharpen me to write and draw."]],
+["Everyday Things","Bicycle","Bike",["My earliest version had no pedals; you pushed with your feet.","The 'penny-farthing' was me with a giant front wheel.","I have a chain, gears and a saddle.","Training wheels help kids learn to ride me.","I'm a two-wheeler you pedal."]],
+["Everyday Things","Kite","",["Benjamin Franklin is said to have flown one of me in a thunderstorm.","Ancient China used me to send military signals.","My tail keeps me steady.","I need wind to fly.","I'm a paper or fabric toy you fly on a long string."]],
+["Everyday Things","Lighthouse","",["One of the Seven Wonders of the Ancient World was one of me, at Alexandria.","Each of me flashes its own pattern so sailors can tell us apart.","Keepers used to live inside me.","I'm a tall tower on the coast.","My light warns ships away from rocks."]],
+["Everyday Things","Telescope","",["Galileo pointed me at Jupiter and found four moons.","One of me called Hubble orbits the Earth.","Some of me use mirrors, some use lenses.","I make far-away things look closer.","Astronomers use me to look at the stars."]],
+["Jobs","Firefighter","Fireman, firewoman",["The long back brim of my helmet keeps water off my neck.","My station often has a pole to slide down.","A Dalmatian is my traditional mascot.","I wear a heavy suit and an air tank.","I put out fires."]],
+["Jobs","Astronaut","Cosmonaut, spaceman",["I train underwater because it feels like being weightless.","I can grow a little taller at work as my spine stretches.","I often eat my food out of pouches.","I wear a spacesuit.","I travel into space."]],
+["Jobs","Dentist","",["An Egyptian named Hesy-Re is the first known person with my job.","I use a tiny mirror on a stick.","I say 'open wide'.","I fill cavities.","I look after your teeth."]],
+["Jobs","Chef","Cook",["Legend says the 100 pleats in my hat show 100 ways to cook an egg.","My tall white hat is called a toque.","My team answers me with 'Yes, chef!'","I run a restaurant kitchen.","I'm a professional cook."]],
+["Jobs","Pilot","",["I say 'roger' to air traffic control.","I sit in a cockpit.","I wear wings on my uniform.","Captain and first officer both do my job.","I fly planes."]],
+["Jobs","Librarian","",["The Dewey Decimal System helps me.","I check things in and out and stamp due dates.","I might whisper 'shhh!'","I look after thousands of books.","I'm in charge of a library."]],
+["Jobs","Farmer","",["I rotate my crops to keep the soil healthy.","I'm up at dawn for the milking.","I drive a tractor.","I grow crops and raise animals.","Old MacDonald had my job."]],
+["Jobs","Detective","Police detective, investigator",["I might work 'undercover' or in 'plain clothes'.","I check people's alibis.","My classic tool is a magnifying glass.","Sherlock Holmes is a famous one.","I solve mysteries and crimes."]],
+["Jobs","Lifeguard","",["I scan my zone of water every few seconds.","I often sit in a tall chair.","I carry a red float tube.","I blow a whistle at the pool.","I keep swimmers safe at the beach."]],
+["Jobs","Vet","Veterinarian",["One day my patient weighs a tonne, the next a few grams.","I use a stethoscope on furry chests.","My patients can't tell me where it hurts.","I give puppies their vaccinations.","I'm an animal doctor."]],
+["Sports & Games","Chess","",["The 'en passant' rule surprises beginners at me.","A pawn can turn into a queen in me.","Grandmasters play me.","Checkmate ends me.","I'm a board game with kings, queens, knights and rooks."]],
+["Sports & Games","Basketball","",["A Canadian teacher invented me in 1891 using peach baskets.","A 'triple-double' is a big stat in me.","Players dribble the ball.","My hoop is 10 feet high.","I'm the sport of shooting a ball through a hoop."]],
+["Sports & Games","Tennis","",["In me, 'love' means zero.","Wimbledon is my oldest tournament.","My scores go 15, 30, 40.","Players use a racket.","I'm the sport of hitting a fuzzy yellow ball over a net."]],
+["Sports & Games","Football","Soccer",["Scoring three goals in me is a 'hat-trick'.","My World Cup is one of the most watched events on Earth.","Only the goalkeeper may use their hands.","Players kick a ball.","I'm the world's most popular sport; Americans call me soccer."]],
+["Sports & Games","Golf","",["An astronaut once played me on the Moon.","An 'albatross' is three under par in me.","A 'birdie' is one under par.","You use clubs and tees.","You try to get a little ball in a hole in as few shots as possible."]],
+["Sports & Games","Bowling","Ten-pin bowling",["Three strikes in a row is called a 'turkey'.","A perfect game of me scores 300.","A 'spare' means two balls to knock them all down.","There are ten pins.","You roll a heavy ball down a lane."]],
+["Sports & Games","Hide and seek","Hide-and-seek",["In France I'm called 'cache-cache'.","One player counts with their eyes closed.","'Ready or not, here I come!'","You need a really good spot.","One person counts and everyone else hides."]],
+["Sports & Games","Skateboarding","Skateboard",["An 'ollie' is a jump in me.","I joined the Olympics at Tokyo 2020.","A 'kickflip' is one of my tricks.","Halfpipes and skateparks are made for me.","You ride a board with four little wheels."]],
+["Sports & Games","Swimming","",["The 'butterfly' is one of my strokes.","Michael Phelps won a record number of gold medals in me.","You wear goggles and a cap.","I happen in a pool.","You move through water with your arms and legs."]],
+["Sports & Games","Hopscotch","",["Roman soldiers may have played a long version of me for training.","You throw a small stone or marker.","You hop on one foot.","My court is numbered squares chalked on the ground.","I'm the playground game of hopping through chalk squares."]],
+["Nature & Space","Moon","The Moon",["I drift about 4 centimetres further from Earth every year.","I always show the same face to Earth.","I pull on the oceans and cause the tides.","Twelve people have walked on me.","I'm Earth's natural satellite, shining at night."]],
+["Nature & Space","Volcano","",["My name comes from the Roman god of fire.","The islands of Hawaii were built by my kind.","Pompeii was buried by one of me.","I spit out lava and ash.","I'm a mountain that can erupt."]],
+["Nature & Space","Rainbow","",["You can never reach my end, because I move as you move.","When there are two of me, the second has its colours reversed.","I appear when sunlight bends through water droplets.","Red, orange, yellow, green, blue, indigo, violet.","I'm the colourful arc in the sky after rain."]],
+["Nature & Space","Saturn","",["I'm less dense than water; I'd float in a giant bathtub.","My biggest moon, Titan, has lakes of methane.","I'm the sixth planet from the Sun.","My rings are made of ice and rock.","I'm the planet famous for its rings."]],
+["Nature & Space","Lightning","",["I'm about five times hotter than the surface of the Sun.","When I hit sand, I can make tubes of glass.","Count the seconds after me to tell how far away a storm is.","Thunder is the sound I make.","I'm the bright zigzag flash in a storm."]],
+["Nature & Space","Snowflake","Snow",["Wilson Bentley photographed thousands of me.","Most of my kind have six arms.","People say no two of me are alike.","I form in clouds when water vapour freezes.","I'm a little ice crystal that falls in winter."]],
+["Nature & Space","Sun","The Sun",["My light takes about 8 minutes to reach you.","I'm mostly hydrogen and helium.","About 1.3 million Earths could fit inside me.","I'm a star.","I'm the bright star at the centre of our solar system."]],
+["Nature & Space","Tornado","Twister",["The Fujita scale measures my strength.","'Tornado Alley' in the USA gets lots of me.","Storm chasers drive toward me.","I'm a spinning funnel of wind.","I'm a twisting column of air that touches the ground."]],
+["Nature & Space","Coral reef","Coral, reef",["Tiny animals called polyps build me.","The largest one of me is off Australia.","Clownfish hide in my anemones.","Warming seas can 'bleach' me.","I'm a colourful underwater structure full of fish."]],
+["Nature & Space","Mars","",["My two little moons are Phobos and Deimos.","Olympus Mons, the tallest volcano known, is on me.","Rovers called Curiosity and Perseverance explore me.","I'm the fourth planet from the Sun.","I'm the Red Planet."]],
+["Inventions","Telephone","Phone",["My inventor's first words through me were 'Mr. Watson, come here'.","Alexander Graham Bell patented me in 1876.","Old versions of me had a rotary dial.","You dial a number on me.","I let you talk to someone far away."]],
+["Inventions","Light bulb","Lightbulb, bulb",["Thomas Edison's team tested thousands of filaments for me.","Old versions of me had a glowing tungsten wire inside.","LED versions of me save energy.","Cartoons draw me over someone's head when they get an idea.","I screw into a lamp and light up a room."]],
+["Inventions","Wheel","",["My oldest known example, found in Slovenia, is about 5,000 years old.","The Inca built huge roads but didn't use me for transport.","I turn on an axle.","A car has four of me.","I'm round, I roll, and I'm called one of the greatest inventions."]],
+["Inventions","Television","TV",["John Logie Baird showed an early mechanical version of me in the 1920s.","Colour versions of me arrived in the 1950s and 60s.","My remote control often gets lost in the sofa.","You can binge-watch on me.","I'm the screen in the living room for watching shows."]],
+["Inventions","Printing press","Press",["Johannes Gutenberg built a famous one of me around 1440.","My first famous book was a Bible.","I use movable type.","I spread books and newspapers fast.","I'm the machine that presses ink onto paper to make books."]],
+["Inventions","Aeroplane","Airplane, plane",["My first powered flight lasted only 12 seconds, in 1903.","The Wright brothers built me.","My wings create lift.","I take off from a runway.","I'm a flying machine that carries passengers."]],
+["Inventions","Internet","The internet, the web",["My early version was called ARPANET.","Tim Berners-Lee built the World Wide Web on top of me.","Wi-Fi connects you to me.","You browse websites on me.","I'm the worldwide network linking computers."]],
+["Inventions","Camera","",["The 'camera obscura', a dark room with a pinhole, was my ancestor.","Early versions of me needed people to sit still for minutes.","I have a lens and a shutter.","You say 'cheese' in front of me.","I take photos."]],
+["Inventions","Compass","",["Early Chinese versions of me used a magnetic spoon on a plate.","I work because the Earth is a giant magnet.","My needle is magnetised.","I help hikers and sailors find their way.","My needle always points north."]]
+];
+const TWISTS = {
+  golden:{name:"GOLDEN CARD",text:"Every rung is worth double."},
+  slippery:{name:"SLIPPERY RUNGS",text:"A wrong guess costs 2 points."},
+  quick:{name:"QUICK CLOCK",text:"8 seconds per move, or you're forced to pass."},
+  blind:{name:"BLIND CATEGORY",text:"The category stays secret until the card ends."}
+};
+/* ---------- helpers ---------- */
+const load = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+const K = 'cowork-clueladder-';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+/* ---------- SOUND: Chiptune kit (square + 25% pulse, fast arps, noise snare) ---------- */
+let AC = null, master = null, pulseWave = null;
+let muted = !!load(K + 'mute', false);
+function audio() {
+  if (!AC) {
+    try {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+      const comp = AC.createDynamicsCompressor();
+      comp.threshold.value = -14; comp.ratio.value = 4;
+      master = AC.createGain(); master.gain.value = muted ? 0 : 0.5;
+      master.connect(comp); comp.connect(AC.destination);
+      const n = 32, re = new Float32Array(n), im = new Float32Array(n);
+      for (let k = 1; k < n; k++) re[k] = (2 / (k * Math.PI)) * Math.sin(k * Math.PI * 0.25);
+      pulseWave = AC.createPeriodicWave(re, im);
+    } catch (e) { AC = null; }
+  }
+  if (AC && AC.state === 'suspended') AC.resume();
+  return AC;
+}
+function tone(f, t, d, type = 'square', v = 0.15) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  if (type === 'pulse') o.setPeriodicWave(pulseWave); else o.type = type;
+  o.frequency.setValueAtTime(f, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(v, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t + d + 0.03);
+}
+function noise(t, d, hp = 1800, v = 0.22) {
+  const len = Math.max(1, Math.ceil(AC.sampleRate * d));
+  const buf = AC.createBuffer(1, len, AC.sampleRate), ch = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+  const s = AC.createBufferSource(); s.buffer = buf;
+  const f = AC.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + d + 0.03);
+}
+const N = m => 440 * Math.pow(2, (m - 69) / 12);
+function sfx(name) {
+  if (muted || !audio()) return;
+  const t = AC.currentTime + 0.01;
+  switch (name) {
+    case 'tap': tone(N(84), t, 0.05, 'pulse', 0.1); tone(N(91), t + 0.02, 0.04, 'pulse', 0.07); break;
+    case 'climb': [72, 76, 79].forEach((m, i) => tone(N(m), t + i * 0.02, 0.1, 'pulse', 0.12)); break;
+    case 'guess': tone(N(76), t, 0.08, 'square', 0.12); tone(N(76), t + 0.12, 0.12, 'square', 0.12); break;
+    case 'right':
+      [72, 76, 79, 84].forEach((m, i) => tone(N(m), t + i * 0.07, 0.16, 'square', 0.13));
+      [76, 79, 84, 88].forEach((m, i) => tone(N(m), t + i * 0.07, 0.12, 'pulse', 0.06));
+      noise(t + 0.28, 0.12, 1500, 0.2); break;
+    case 'wrong': tone(N(64), t, 0.14, 'square', 0.14); tone(N(58), t + 0.15, 0.34, 'square', 0.14); noise(t, 0.08, 700, 0.16); break;
+    case 'tick': noise(t, 0.03, 3000, 0.1); break;
+    case 'dead': tone(N(60), t, 0.2, 'pulse', 0.12); tone(N(55), t + 0.2, 0.32, 'pulse', 0.12); break;
+    case 'motif': [67, 72, 76, 79].forEach((m, i) => tone(N(m), t + i * 0.11, i === 3 ? 0.42 : 0.12, 'pulse', 0.14)); noise(t + 0.33, 0.12, 1500, 0.18); break;
+    case 'crown': [67, 72, 76, 79, 76, 79, 84].forEach((m, i) => tone(N(m), t + i * 0.09, i === 6 ? 0.5 : 0.1, 'square', 0.12)); noise(t + 0.54, 0.15, 1500, 0.2); break;
+  }
+}
+function renderMute() {
+  const b = $('muteBtn');
+  b.textContent = muted ? '🔇 Sound off' : '🔊 Sound on';
+  b.setAttribute('aria-pressed', muted ? 'true' : 'false');
+}
+$('muteBtn').addEventListener('click', () => {
+  muted = !muted; save(K + 'mute', muted);
+  if (master) master.gain.value = muted ? 0 : 0.5;
+  renderMute(); sfx('tap');
+});
+
+/* ---------- SETUP ---------- */
+let names = load(K + 'players', null);
+if (!Array.isArray(names) || names.length < 3) names = ['', '', '', ''];
+names = names.slice(0, 10).map(x => String(x == null ? '' : x).slice(0, 16));
+let gameLen = load(K + 'len', 'quick') === 'full' ? 'full' : 'quick';
+let twistsOn = load(K + 'twists', true) !== false;
+
+function renderSetup() {
+  $('plist').innerHTML = names.map((n, i) =>
+    `<div class="prow"><input id="pname${i}" data-i="${i}" maxlength="16" value="${esc(n)}" placeholder="Player ${i + 1}" aria-label="Player ${i + 1} name" autocomplete="off">` +
+    `<button data-rm="${i}" ${names.length <= 3 ? 'disabled' : ''}><span aria-hidden="true">✕</span><span class="sr">Remove player ${i + 1}</span></button></div>`).join('');
+  $('pcount').textContent = names.length + ' players' + (names.length >= 10 ? ' (max)' : names.length <= 3 ? ' (min 3)' : '');
+  $('addP').disabled = names.length >= 10;
+  $('lenQuick').setAttribute('aria-pressed', gameLen === 'quick');
+  $('lenFull').setAttribute('aria-pressed', gameLen === 'full');
+  $('twistBtn').setAttribute('aria-pressed', twistsOn);
+  $('twistBtn').textContent = 'Twist cards: ' + (twistsOn ? 'ON' : 'OFF');
+}
+$('plist').addEventListener('input', e => {
+  if (e.target.dataset.i == null) return;
+  names[+e.target.dataset.i] = e.target.value.slice(0, 16); save(K + 'players', names);
+});
+$('plist').addEventListener('click', e => {
+  const b = e.target.closest('[data-rm]'); if (!b || b.disabled) return;
+  names.splice(+b.dataset.rm, 1); save(K + 'players', names); sfx('tap'); renderSetup();
+});
+$('addP').addEventListener('click', () => {
+  if (names.length >= 10) return;
+  names.push(''); save(K + 'players', names); sfx('tap'); renderSetup();
+  const inp = $('pname' + (names.length - 1)); if (inp) inp.focus();
+});
+$('lenQuick').addEventListener('click', () => { gameLen = 'quick'; save(K + 'len', gameLen); sfx('tap'); renderSetup(); });
+$('lenFull').addEventListener('click', () => { gameLen = 'full'; save(K + 'len', gameLen); sfx('tap'); renderSetup(); });
+$('twistBtn').addEventListener('click', () => { twistsOn = !twistsOn; save(K + 'twists', twistsOn); sfx('tap'); renderSetup(); });
+$('startBtn').addEventListener('click', () => startGame());
+
+/* ---------- GAME STATE ---------- */
+let G = null, timerId = null, peekId = null, quitArmed = 0;
+
+function show(id) {
+  ['sSetup', 'sIntro', 'sPlay', 'sBout', 'sOver'].forEach(s => { $(s).hidden = s !== id; });
+  $('quitBtn').hidden = id === 'sSetup';
+  $('main').scrollTop = 0;
+}
+function startGame(sameNames) {
+  const ps = sameNames || names.map((n, i) => n.trim() || `Player ${i + 1}`);
+  // make duplicate names distinguishable
+  const seen = {};
+  const finalNames = ps.map(n => { seen[n] = (seen[n] || 0) + 1; return seen[n] > 1 ? `${n} ${seen[n]}` : n; });
+  G = {
+    p: finalNames.map(n => ({ name: n, total: 0, hits: 0, early: 0, steals: 0, wins: 0, miss: 0 })),
+    duel: 0, totalDuels: (gameLen === 'full' ? 2 : 1) * (finalNames.length - 1),
+    seen: [], card: null, bout: null, lastNames: finalNames
+  };
+  const order = shuffle(finalNames.map((_, i) => i));
+  G.champ = order[0]; G.chall = order[1]; G.queue = order.slice(2);
+  audio(); sfx('motif');
+  startDuel();
+}
+function drawCard() {
+  let used = load(K + 'used', []); if (!Array.isArray(used)) used = [];
+  const all = CARDS.map((_, i) => i);
+  let pool = all.filter(i => !used.includes(i) && !G.seen.includes(i));
+  if (!pool.length) { used = []; pool = all.filter(i => !G.seen.includes(i)); }
+  if (!pool.length) { G.seen = []; pool = all; }
+  const id = pool[Math.floor(Math.random() * pool.length)];
+  used.push(id); G.seen.push(id); save(K + 'used', used);
+  return id;
+}
+const duo = () => [G.champ, G.chall];
+const pName = i => G.p[duo()[i]].name;
+const val = r => (6 - r) * G.card.mult;
+
+function startDuel() {
+  G.duel++;
+  G.final = G.duel === G.totalDuels;
+  G.ref = G.queue[0];
+  G.bout = { s: [0, 0], played: 0, sudden: 0, starter: Math.random() < 0.5 ? 0 : 1 };
+  const ref = G.p[G.ref];
+  $('sIntro').innerHTML = `
+    <h2>DUEL ${G.duel} OF ${G.totalDuels}</h2>
+    ${G.final ? '<p><span class="tag gold">FINAL DUEL · DOUBLE POINTS</span></p>' : ''}
+    <div class="duelbar">
+      <div class="fighter c0"><span class="nm">👑 ${esc(G.p[G.champ].name)}</span><span class="sc">CHAMP</span></div>
+      <div class="vs">VS</div>
+      <div class="fighter c1"><span class="nm">⚔️ ${esc(G.p[G.chall].name)}</span><span class="sc">CHALLENGER</span></div>
+    </div>
+    <div class="panel">
+      <h3>REFEREE: ${esc(ref.name).toUpperCase()}</h3>
+      <p>When a duelist guesses, the other duelist covers their eyes while you press <b>PEEK</b> to check the answer, then tap <b>RIGHT</b> or <b>WRONG</b>. Close enough counts. You make the call.</p>
+      <p class="muted">Best of 3 cards. A tie goes to sudden death. The winner keeps the crown and gets +${2 * (G.final ? 2 : 1)} bonus points.</p>
+    </div>
+    <button class="btn-main" data-act="fight" data-key="enter" style="width:100%">FIGHT! ▸</button>
+    ${scoresHTML()}`;
+  show('sIntro');
+}
+function nextCard() {
+  const b = G.bout;
+  let twist = null;
+  if (twistsOn && Math.random() < 0.35) twist = shuffle(Object.keys(TWISTS))[0];
+  G.card = {
+    id: drawCard(), rung: 1, turn: (b.starter + b.played) % 2, phase: 'decide', locked: -1,
+    twist, mult: (G.final ? 2 : 1) * (twist === 'golden' ? 2 : 1), peek: false, winner: -1, pts: 0, note: ''
+  };
+  sfx('climb');
+  show('sPlay');
+  renderPlay(true);
+}
+
+/* ---------- RENDER PLAY ---------- */
+function duelbarHTML(active) {
+  const b = G.bout;
+  return `<div class="duelbar">
+    <div class="fighter c0 ${active === 0 ? 'on' : ''}"><span class="nm">${G.champ === duo()[0] ? '👑 ' : ''}${esc(pName(0))}</span><span class="sc">${b.s[0]}</span></div>
+    <div class="vs">VS</div>
+    <div class="fighter c1 ${active === 1 ? 'on' : ''}"><span class="nm">${esc(pName(1))}</span><span class="sc">${b.s[1]}</span></div>
+  </div>`;
+}
+function scoresHTML() {
+  return `<div class="scores" aria-label="Game scores">` + G.p.map((p, i) =>
+    `<span class="chip ${i === G.champ ? 'champ' : ''}">${i === G.champ ? '👑 ' : ''}${esc(p.name)} <b>${p.total}</b></span>`).join('') + `</div>`;
+}
+function renderPlay(isNew) {
+  const c = G.card, b = G.bout, d = CARDS[c.id];
+  const other = 1 - c.turn, steal = c.locked >= 0;
+  const blind = c.twist === 'blind' && c.phase !== 'done';
+  let h = duelbarHTML(c.phase === 'done' ? -1 : c.turn);
+  h += `<div class="cardinfo"><span class="tag">${b.played >= 3 ? 'SUDDEN DEATH' : 'CARD ' + (b.played + 1) + ' OF 3'}</span>` +
+       `<span class="tag">${blind ? 'CATEGORY: ???' : esc(d[0]).toUpperCase()}</span>` +
+       `${G.final ? '<span class="tag gold">FINAL ×2</span>' : ''}</div>`;
+  if (c.twist) h += `<div class="twist"><b>${TWISTS[c.twist].name}</b>: ${TWISTS[c.twist].text}</div>`;
+  h += '<ol class="ladder" aria-label="Clue ladder">';
+  for (let r = 1; r <= 5; r++) {
+    const open = r <= c.rung || c.phase === 'done';
+    const cur = r === c.rung && c.phase !== 'done';
+    const v = val(r);
+    h += `<li class="rung ${open ? 'open' : 'locked'} ${cur ? 'cur' : ''} ${isNew && cur ? 'new' : ''}">` +
+         `<span class="val">${v} PT${v === 1 ? '' : 'S'}</span>` +
+         `<span class="clue">${open ? esc(d[3][r - 1]) : 'Rung ' + r + ' · locked'}</span></li>`;
+  }
+  h += '</ol>';
+
+  if (c.phase === 'decide') {
+    const v = val(c.rung);
+    const canPass = !steal && c.rung < 5;
+    h += `<div class="turn c${c.turn}">${esc(pName(c.turn)).toUpperCase()}'S MOVE` +
+         `<small>${steal ? `STEAL! One shot for ${v} pt${v === 1 ? '' : 's'}. Guess or give up.` :
+           canPass ? `Guess now for ${v} pt${v === 1 ? '' : 's'}, or pass the next clue to ${esc(pName(other))}.` :
+           `Last clue! Guess for ${v} pt${v === 1 ? '' : 's'}, or give up and ${esc(pName(other))} gets one shot.`}</small>` +
+         `${c.twist === 'quick' ? '<div class="timer" aria-hidden="true"><i id="tbar"></i></div>' : ''}</div>`;
+    h += `<div class="big-row">
+      <button class="${c.turn === 0 ? 'btn-main' : 'btn-pink'}" data-act="guess" data-key="g">GUESS<span class="sub">for ${v} pt${v === 1 ? '' : 's'}</span></button>
+      ${canPass ? `<button data-act="pass" data-key="p">PASS<span class="sub">next clue to ${esc(pName(other))}</span></button>`
+                : `<button data-act="giveup" data-key="p">GIVE UP<span class="sub">${steal ? 'nobody scores' : esc(pName(other)) + ' gets a shot'}</span></button>`}
+    </div>`;
+  } else if (c.phase === 'judge') {
+    const ref = G.p[G.ref].name;
+    h += `<div class="turn c${c.turn}">${esc(pName(c.turn)).toUpperCase()}: SAY YOUR ANSWER!` +
+         `<small>${esc(pName(other))}, cover your eyes 🙈 · Referee ${esc(ref)}: peek, then judge.</small></div>`;
+    h += `<div class="refbox">
+      <button class="btn-small" data-act="peek" aria-pressed="${c.peek}">${c.peek ? 'Hide answer' : '👁 PEEK at answer (Referee only)'}</button>
+      ${c.peek ? `<p class="answer">${esc(d[1]).toUpperCase()}</p>${d[2] ? `<p class="muted">Also accept: ${esc(d[2])}</p>` : ''}` : ''}
+      <div class="big-row">
+        <button class="btn-ok" data-act="right" data-key="y">✓ RIGHT<span class="sub">+${val(c.rung)} pt${val(c.rung) === 1 ? '' : 's'}</span></button>
+        <button class="btn-bad" data-act="wrong" data-key="n">✗ WRONG<span class="sub">${c.twist === 'slippery' ? '−2 pts, ' : ''}${steal ? 'card over' : esc(pName(other)) + ' steals'}</span></button>
+      </div>
+    </div>`;
+  } else {
+    const last = b.played >= 3 && b.s[0] !== b.s[1];
+    h += `<div class="panel result">
+      <h3>THE ANSWER WAS</h3>
+      <p class="answer">${esc(d[1]).toUpperCase()}</p>
+      <p>${c.winner >= 0 ? `<b>${esc(pName(c.winner))}</b> scores <b>${c.pts}</b> pt${c.pts === 1 ? '' : 's'}${c.note ? ' ' + c.note : ''}!` : 'Nobody climbed this one.' + (c.note ? ' ' + c.note : '')}</p>
+      <button class="btn-main" data-act="next" data-key="enter" style="width:100%">${last ? 'END BOUT ▸' : 'NEXT CARD ▸'}</button>
+    </div>`;
+  }
+  h += scoresHTML();
+  $('sPlay').innerHTML = h;
+  // keep the action buttons on screen on short phones (no text inputs here, so this never yanks typing)
+  const m = $('main'), actRow = $('sPlay').querySelector('.big-row, .result');
+  if (actRow && !$('sPlay').hidden) {
+    const over = actRow.getBoundingClientRect().bottom - m.getBoundingClientRect().bottom + 8;
+    if (over > 0) m.scrollTop += over;
+  }
+  startTimer();
+}
+
+/* ---------- QUICK CLOCK ---------- */
+function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
+function startTimer() {
+  stopTimer();
+  const c = G && G.card;
+  if (!c || c.twist !== 'quick' || c.phase !== 'decide') return;
+  const end = performance.now() + 8000; let lastSec = 9;
+  timerId = setInterval(() => {
+    const left = Math.max(0, end - performance.now());
+    const bar = $('tbar'); if (bar) bar.style.width = (left / 80) + '%';
+    const sec = Math.ceil(left / 1000);
+    if (sec !== lastSec && sec <= 3 && sec > 0) sfx('tick');
+    lastSec = sec;
+    if (left <= 0) {
+      stopTimer();
+      if (c.locked < 0 && c.rung < 5) act('pass'); else act('giveup');
+    }
+  }, 100);
+}
+
+/* ---------- ACTIONS ---------- */
+function act(a) {
+  const c = G && G.card;
+  switch (a) {
+    case 'fight': nextCard(); return;
+    case 'guess':
+      if (c.phase !== 'decide') return;
+      stopTimer(); c.phase = 'judge'; c.peek = false; sfx('guess'); renderPlay(); return;
+    case 'pass':
+      if (c.phase !== 'decide' || c.locked >= 0 || c.rung >= 5) return;
+      stopTimer(); c.rung++; c.turn = 1 - c.turn; sfx('climb'); renderPlay(true); return;
+    case 'giveup':
+      if (c.phase !== 'decide') return;
+      stopTimer();
+      if (c.locked < 0) { c.locked = c.turn; c.turn = 1 - c.turn; sfx('tap'); renderPlay(); }
+      else endCard(-1, 0);
+      return;
+    case 'peek':
+      if (c.phase !== 'judge') return;
+      c.peek = !c.peek; clearTimeout(peekId);
+      if (c.peek) peekId = setTimeout(() => { if (G.card === c && c.phase === 'judge' && c.peek) { c.peek = false; renderPlay(); } }, 5000);
+      sfx('tap'); renderPlay(); return;
+    case 'right': {
+      if (c.phase !== 'judge') return;
+      const pi = duo()[c.turn], p = G.p[pi], pts = val(c.rung);
+      G.bout.s[c.turn] += pts; p.total += pts; p.hits++;
+      if (c.rung <= 2) p.early++;
+      let note = '';
+      if (c.locked >= 0) { p.steals++; note = 'with a steal'; }
+      else if (c.rung === 1) note = 'on the very first clue';
+      endCard(c.turn, pts, note); return;
+    }
+    case 'wrong': {
+      if (c.phase !== 'judge') return;
+      const p = G.p[duo()[c.turn]]; p.miss++;
+      if (c.twist === 'slippery') { G.bout.s[c.turn] -= 2; p.total = Math.max(0, p.total - 2); }
+      sfx('wrong');
+      if (c.locked < 0) {
+        c.locked = c.turn; c.turn = 1 - c.turn; c.peek = false;
+        if (c.rung < 5) c.rung++;
+        c.phase = 'decide'; renderPlay(true);
+      } else endCard(-1, 0, '');
+      return;
+    }
+    case 'next': afterCard(); return;
+    case 'nextduel': startDuel(); return;
+    case 'results': gameOver(); return;
+    case 'again': startGame(G.lastNames); return;
+    case 'setup': G = null; renderSetup(); show('sSetup'); return;
+  }
+}
+function endCard(winner, pts, note) {
+  const c = G.card; stopTimer(); clearTimeout(peekId);
+  c.phase = 'done'; c.winner = winner; c.pts = pts; c.note = note || ''; c.peek = false;
+  G.bout.played++;
+  if (winner >= 0) sfx('right'); else sfx('dead');
+  renderPlay();
+}
+function afterCard() {
+  const b = G.bout;
+  if (b.played >= 3 && (b.s[0] !== b.s[1] || b.sudden >= 3)) { endBout(); return; }
+  if (b.played >= 3) b.sudden++;
+  nextCard();
+}
+function endBout() {
+  const b = G.bout, d2 = duo();
+  const tie = b.s[0] === b.s[1];
+  const w = b.s[1] > b.s[0] ? 1 : 0;   // champion keeps the crown on an unbreakable tie
+  const winner = d2[w], loser = d2[1 - w];
+  const bonus = 2 * (G.final ? 2 : 1);
+  G.p[winner].wins++; G.p[winner].total += bonus;
+  const newChamp = winner !== G.champ;
+  G.champ = winner; G.queue.push(loser);
+  const done = G.duel >= G.totalDuels;
+  if (!done) G.chall = G.queue.shift();
+  sfx('crown');
+  $('sBout').innerHTML = `
+    <h2>${esc(G.p[winner].name).toUpperCase()} ${newChamp ? 'TAKES' : 'KEEPS'} THE CROWN 👑</h2>
+    <div class="panel center">
+      <p class="answer">${b.s[w]} – ${b.s[1 - w]}</p>
+      <p>${tie ? 'Still tied after sudden death, so the champion keeps the crown. ' : ''}+${bonus} crown bonus for ${esc(G.p[winner].name)}.</p>
+      <p class="muted">${esc(G.p[loser].name)} heads to the back of the line.</p>
+    </div>
+    ${done ? `<button class="btn-main" data-act="results" data-key="enter" style="width:100%">FINAL RESULTS ▸</button>` :
+      `<div class="panel"><h3>NEXT DUEL</h3><p>👑 ${esc(G.p[G.champ].name)} vs ⚔️ ${esc(G.p[G.chall].name)}${G.duel + 1 === G.totalDuels ? ' · <b>FINAL, double points</b>' : ''}</p><p class="muted">Referee: ${esc(G.p[G.queue[0]].name)}</p></div>
+       <button class="btn-main" data-act="nextduel" data-key="enter" style="width:100%">NEXT DUEL ▸</button>`}
+    ${scoresHTML()}`;
+  show('sBout');
+}
+function gameOver() {
+  const ranked = G.p.map((p, i) => ({ ...p, i })).sort((a, b) => b.total - a.total || b.wins - a.wins);
+  const best = (key, min = 1) => {
+    const m = Math.max(...G.p.map(p => p[key]));
+    if (m < min) return null;
+    return { names: G.p.filter(p => p[key] === m).map(p => esc(p.name)).join(' & '), m };
+  };
+  const aw = [];
+  let x;
+  if ((x = best('wins'))) aw.push(`👑 <b>King of the Hill</b>: ${x.names} (${x.m} bout${x.m === 1 ? '' : 's'} won)`);
+  if ((x = best('early'))) aw.push(`⚡ <b>Quick Draw</b>: ${x.names} (${x.m} correct on rung 1 or 2)`);
+  if ((x = best('steals'))) aw.push(`🦝 <b>Cat Burglar</b>: ${x.names} (${x.m} steal${x.m === 1 ? '' : 's'})`);
+  if ((x = best('hits'))) aw.push(`🎯 <b>Sharpshooter</b>: ${x.names} (${x.m} right answer${x.m === 1 ? '' : 's'})`);
+  if ((x = best('miss'))) aw.push(`🙈 <b>Fearless Guesser</b>: ${x.names} (${x.m} brave miss${x.m === 1 ? '' : 'es'})`);
+  const topScore = ranked[0].total;
+  const champs = ranked.filter(p => p.total === topScore).map(p => esc(p.name)).join(' & ');
+  $('sOver').innerHTML = `
+    <h1>GAME OVER</h1>
+    <h2>🏆 ${champs.toUpperCase()} WIN${ranked.filter(p => p.total === topScore).length > 1 ? '' : 'S'}!</h2>
+    <ol class="podium">${ranked.map((p, k) => `<li><span>${k + 1}. ${esc(p.name)}${p.i === G.champ ? ' 👑' : ''}</span><span class="pts">${p.total} PTS</span></li>`).join('')}</ol>
+    <div class="panel mt"><h3>AWARDS</h3><ul class="awards">${aw.map(a => `<li>${a}</li>`).join('') || '<li>Everyone played it safe!</li>'}</ul></div>
+    <div class="row">
+      <button class="btn-main grow" data-act="again" data-key="enter">PLAY AGAIN ▸</button>
+      <button class="grow" data-act="setup">CHANGE PLAYERS</button>
+    </div>`;
+  show('sOver');
+  setTimeout(() => sfx('motif'), 250);
+}
+
+/* ---------- INPUT ---------- */
+$('main').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b || b.disabled || !G) return;
+  audio(); act(b.dataset.act);
+});
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  let k = e.key.toLowerCase();
+  if (k === 'enter') { if (document.activeElement && document.activeElement.tagName === 'BUTTON') return; }
+  const scr = ['sIntro', 'sPlay', 'sBout', 'sOver'].map($).find(s => !s.hidden);
+  if (!scr) return;
+  const b = scr.querySelector(`[data-key="${k}"]`);
+  if (b && !b.disabled) { e.preventDefault(); b.click(); }
+});
+$('quitBtn').addEventListener('click', () => {
+  const b = $('quitBtn');
+  if (Date.now() - quitArmed < 3000) {
+    stopTimer(); quitArmed = 0; b.textContent = 'Quit'; act('setup'); return;
+  }
+  quitArmed = Date.now(); b.textContent = 'Tap again to quit';
+  setTimeout(() => { if (Date.now() - quitArmed >= 2900) b.textContent = 'Quit'; }, 3000);
+});
+
+renderMute();
+renderSetup();
+</script>
+</body>
+</html>
