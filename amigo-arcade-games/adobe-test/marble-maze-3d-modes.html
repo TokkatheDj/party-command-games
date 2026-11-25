@@ -73,7 +73,7 @@
     <button class="mode" data-mode="trial"><b>⏱️ Time Trial</b><span>The same 6 mazes against the clock. Finish fast for gold, silver or bronze.</span><i id="best-trial"></i></button>
     <button class="mode" data-mode="gems"><b>💎 Gem Hunt</b><span>A brand-new maze every round, with no holes. Collect every gem to open the green cup.</span><i id="best-gems"></i></button>
     <button class="mode" data-mode="endless"><b>♾️ Endless</b><span>New mazes that get bigger, with more holes each time. You have 3 marbles. How far can you go?</span><i id="best-endless"></i></button>
-    <button class="mode" data-mode="color"><b>🎨 Color Match</b><span>All the marbles roll at once! Tilt to drop each one into the hole of its color. 3 boards, as fast as you can.</span><i id="best-color"></i></button>
+    <button class="mode" data-mode="color"><b>🎨 Color Match</b><span>All the marbles roll at once! Tilt to drop each one into the hole of its color. 12 boards, with more colors and more marbles as you go.</span><i id="best-color"></i></button>
     <button class="mode" data-mode="challenge"><b>🏆 Challenges</b><span>12 challenges with a twist: ice, lights out, wind, bumpers, portals, black holes and more. Miss one and your marble just goes back to the start.</span><i id="best-challenge"></i></button>
   </div>
   <button id="tiltToggle" class="hudbtn hide" aria-pressed="false">📱 Tilt the tablet to steer: Off</button>
@@ -110,11 +110,14 @@ const MAX_MARBLES = 5;
 const TRIAL_TIMES = [[18, 29], [17, 27], [15, 24], [14, 23], [17, 27], [10, 16]];
 const WIND = 4;            // Windy Day: how hard the wind pushes
 const PULL = 5;            // Black Holes: how hard a hole pulls when the marble is close
-// Color Match: for each maze, [maze size, how many colors, holes of each color]
-const COLOR_MAZES = [[5, 3, 1], [6, 4, 1], [6, 4, 2]];
+// Color Match: for each board, [maze size, how many colors, holes of each color]. Mostly 4 colors with 2-4 marbles
+// of each (testers loved that); purple joins on board 9 and orange on board 11.
+const COLOR_MAZES = [[5, 3, 1], [6, 4, 1], [6, 4, 2], [6, 4, 2], [6, 3, 3], [7, 4, 2],
+                     [6, 4, 3], [7, 4, 3], [7, 5, 2], [7, 4, 4], [7, 6, 2], [7, 5, 3]];
 const COLORS = [
   { name: "red", emoji: "🔴", hex: "#ff4d4d" }, { name: "blue", emoji: "🔵", hex: "#339af0" },
-  { name: "yellow", emoji: "🟡", hex: "#ffd43b" }, { name: "green", emoji: "🟢", hex: "#40c057" }
+  { name: "yellow", emoji: "🟡", hex: "#ffd43b" }, { name: "green", emoji: "🟢", hex: "#40c057" },
+  { name: "purple", emoji: "🟣", hex: "#9775fa" }, { name: "orange", emoji: "🟠", hex: "#ff922b" }
 ];
 
 // ===== Classic mazes: # wall  . floor  S start  G goal  o hole  * gem =====
@@ -612,13 +615,15 @@ document.getElementById("tiltToggle").onclick = () => {
 const REC_KEY = "marbleMaze3d.records";
 let rec = {};
 try { rec = JSON.parse(localStorage.getItem(REC_KEY)) || {}; } catch (e) { rec = {}; }
+if (rec.color && !rec.colorReached) rec.colorReached = 2; // finished the old 3-board Color Match: start them at board 3
 function saveRec() { try { localStorage.setItem(REC_KEY, JSON.stringify(rec)); } catch (e) {} }
 function showBests() {
   $("best-classic").textContent = rec.classic ? `Best: all ${LEVELS.length} in ${rec.classic.toFixed(1)}s` : "";
   const m = rec.medals || [];
   $("best-trial").textContent = m.length ? "Best medals: " + LEVELS.map((_, i) => m[i] || "▫️").join(" ") : "";
   $("best-gems").textContent = rec.gems ? `Fastest maze: ${rec.gems.toFixed(1)}s` : "";
-  $("best-color").textContent = rec.color ? `Best: all ${COLOR_MAZES.length} in ${rec.color.toFixed(1)}s` : "";
+  $("best-color").textContent = rec.colorReached ? `Reached board ${rec.colorReached + 1}/${COLOR_MAZES.length}` +
+    (rec.colorRun ? ` · Best full run ${rec.colorRun.toFixed(1)}s` : "") : "";
   const done = (rec.ch || []).filter(Boolean).length;
   $("best-challenge").textContent = done ? `${done} of ${CHALLENGES.length} challenges done` : "";
   $("best-endless").textContent = rec.endless ? `Best: ${rec.endless} ${rec.endless === 1 ? "maze" : "mazes"} cleared` : "";
@@ -627,7 +632,7 @@ function showBests() {
 // ===== Game flow =====
 let mode = "classic", level = 0, state = "start", time = 0, totalTime = 0, gemCount = 0, falls = 0;
 let lives = START_MARBLES, gemsToMarble = 0, goalLocked = false, medals = [], toastTimer = 0, attempts = 1, holeClock = 0;
-let windDir = 0, windTimer = 0;   // Windy Day: 0 right, 1 down, 2 left, 3 up
+let windDir = 0, windTimer = 0, colorFrom = 0;   // Windy Day: 0 right, 1 down, 2 left, 3 up
 const $ = id => document.getElementById(id);
 const MEDAL = ["🥇", "🥈", "🥉"], MEDAL_NAME = ["Gold", "Silver", "Bronze"];
 
@@ -649,7 +654,7 @@ function hud() {
     $("gems").textContent = c.needGems ? `💎 ${gems.filter(g => g.got).length}/${gems.length}` : c.wind ? `🌬️ Wind ${"→↓←↑"[windDir]}` : "";
     $("info").textContent = `Try ${attempts}`; return; }
   const fixed = mode === "classic" || mode === "trial";
-  $("lvl").textContent = fixed ? `Level ${level + 1}/${LEVELS.length}` : mode === "color" ? `Maze ${level + 1}/${COLOR_MAZES.length}` : `Maze ${level + 1}`;
+  $("lvl").textContent = fixed ? `Level ${level + 1}/${LEVELS.length}` : mode === "color" ? `Board ${level + 1}/${COLOR_MAZES.length}` : `Maze ${level + 1}`;
   $("time").textContent = time.toFixed(1) + "s";
   const got = gems.filter(g => g.got).length;
   $("gems").textContent = mode === "gems" ? `💎 ${got}/${gems.length}`
@@ -667,7 +672,14 @@ function toast(text) {
 function startMode(m) {
   try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { ac = null; }
   mode = m; gemCount = 0; falls = 0; totalTime = 0; lives = START_MARBLES; gemsToMarble = 0; medals = [];
-  $("start").classList.add("hide"); document.body.classList.remove("menu"); startLevel(0);
+  $("start").classList.add("hide"); document.body.classList.remove("menu"); colorFrom = 0;
+  const reached = m === "color" ? Math.min(rec.colorReached || 0, COLOR_MAZES.length - 1) : 0;
+  if (!reached) return startLevel(0);
+  startLevel(reached); // Color Match: pick up from the furthest board, or start again at board 1
+  const [, cc, pc] = COLOR_MAZES[reached];
+  showMsg("🎨 Color Match", `You've reached board ${reached + 1} of ${COLOR_MAZES.length} (${cc} colors, ${cc * pc} marbles). Keep going from there, or start again at board 1?`,
+    `Board ${reached + 1}`, () => { colorFrom = reached; state = "play"; time = 0; },
+    { label: "Board 1", fn: () => { colorFrom = 0; startLevel(0); } });
 }
 function startLevel(n) {
   level = n; time = 0; attempts = 1; ballColor = null; knob.style.background = ""; buildLevel(levelGrid(n));
@@ -680,8 +692,9 @@ function startLevel(n) {
   windDir = 0; windTimer = 4;
   state = "play"; hud();
 }
-function showMsg(title, text, btn, next) {
-  $("msgModes").textContent = mode === "challenge" ? "Challenges" : mode === "mini" ? "Mini-Games" : "Modes";
+function showMsg(title, text, btn, next, alt) { // alt: an optional second choice in place of the Modes button
+  $("msgModes").textContent = alt ? alt.label : mode === "challenge" ? "Challenges" : mode === "mini" ? "Mini-Games" : "Modes";
+  $("msgModes").onclick = alt ? () => { $("msg").classList.add("hide"); alt.fn(); } : back;
   state = "msg"; $("msgTitle").textContent = title; $("msgText").textContent = text; $("msgBtn").textContent = btn;
   $("msgBtn").onclick = () => { $("msg").classList.add("hide"); next(); }; $("msg").classList.remove("hide");
   $("msgBtn").focus();
@@ -697,7 +710,6 @@ function back() {
   else if (mode === "mini" && (state !== "start" || window.MINI_ONLY)) toMinis();
   else toMenu();
 }
-$("msgModes").onclick = back;
 $("menu").onclick = back;
 
 // the list of challenges, with a check mark and best time for each one done
@@ -756,10 +768,18 @@ function levelDone(quiet) {
       lastCh ? "All challenges" : "Next challenge", () => lastCh ? toChallenges() : startChallenge(level + 1));
   }
   if (mode === "color") {
-    if (level < COLOR_MAZES.length - 1)
-      return showMsg("Maze clear!", `Every hole filled in ${t} seconds. Ready for maze ${level + 2}?`, "Next maze", () => startLevel(level + 1));
-    const best = !rec.color || totalTime < rec.color; if (best) { rec.color = totalTime; saveRec(); }
-    return showMsg("All matched!", `All ${COLOR_MAZES.length} mazes in ${totalTime.toFixed(1)} seconds, with ${falls} wrong ${falls === 1 ? "hole" : "holes"}.${best ? " That's your best time!" : ` Your best is ${rec.color.toFixed(1)}s.`}`,
+    rec.colorBest = rec.colorBest || []; const prevB = rec.colorBest[level], newB = !prevB || time < prevB; if (newB) rec.colorBest[level] = time;
+    rec.colorReached = Math.max(rec.colorReached || 0, Math.min(level + 1, COLOR_MAZES.length - 1)); saveRec();
+    const bestTxt = newB && prevB ? " New best for this board!" : prevB ? ` Your best here is ${prevB.toFixed(1)}s.` : "";
+    if (level < COLOR_MAZES.length - 1) {
+      const [, cc, pc] = COLOR_MAZES[level + 1], newColor = cc > Math.max(...COLOR_MAZES.slice(0, level + 1).map(x => x[1]));
+      return showMsg("Board clear!", `Every hole filled in ${t} seconds.${bestTxt} Board ${level + 2} has ${cc} colors and ${cc * pc} marbles${newColor ? `, with a new color: ${COLORS[cc - 1].emoji} ${COLORS[cc - 1].name}` : ""}!`,
+        "Next board", () => startLevel(level + 1));
+    }
+    const full = colorFrom === 0, best = full && (!rec.colorRun || totalTime < rec.colorRun); if (best) { rec.colorRun = totalTime; saveRec(); }
+    return showMsg("All matched!", full
+      ? `All ${COLOR_MAZES.length} boards in ${totalTime.toFixed(1)} seconds, with ${falls} wrong ${falls === 1 ? "hole" : "holes"}.${best ? " That's your best full run!" : ` Your best full run is ${rec.colorRun.toFixed(1)}s.`}`
+      : `You finished all ${COLOR_MAZES.length} boards! Start at board 1 and play them all in a row to set a full-run time.`,
       "Play again", () => startMode("color"));
   }
   if (mode === "gems") {
