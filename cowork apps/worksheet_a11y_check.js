@@ -35,7 +35,7 @@ async function scan(page) {
 }
 
 (async () => {
-  const b = await chromium.launch();
+  const b = await chromium.launch({ args: ["--mute-audio"] });   // never play through the speakers (25 Nov 2026: the weekly run played every Arcade game aloud)
   const pages = [];
   for (const p of PAGES) {
     const url = toUrl(p), issues = new Set(), errors = [];

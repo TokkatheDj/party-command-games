@@ -195,7 +195,7 @@ async function layoutCheck(page, modId) {
 }
 
 (async () => {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: ["--mute-audio"] });   // never play through the speakers (25 Nov 2026: the weekly run played every Arcade game aloud)
   const url = toUrl(PAGE);
   const report = { url, topics: 0, problems: 0, failures: [], dialogs: [], errors: [] };
   for (const width of [390, 1440]) {

@@ -284,7 +284,7 @@ async function main() {
     console.log(`   Started local test server on port ${PORT}\n`);
   }
 
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless: true, args: ["--mute-audio"] });   // never play through the speakers (25 Nov 2026: the weekly run played every Arcade game aloud)
   const startTime = Date.now();
   const allResults = [];
 

@@ -92,7 +92,7 @@ async function playTile(p, vp, id, errs) {
 
 (async () => {
   const server = await serve();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: ["--mute-audio"] });   // never play through the speakers (25 Nov 2026: the weekly run played every Arcade game aloud)
   const tiles = {};
   for (const vp of VIEWPORTS) {
     const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, isMobile: vp.mobile, hasTouch: true });

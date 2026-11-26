@@ -138,7 +138,7 @@ async function run(rel, ctx) {
   let apps = discover();
   console.log("apps: " + apps.length);
   const server = await serve();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ args: ["--mute-audio"] });   // never play through the speakers (25 Nov 2026: the weekly run played every Arcade game aloud)
   const results = [];
   let i = 0;
   await Promise.all(Array.from({ length: WORKERS }, async () => {
