@@ -56,14 +56,36 @@ function jsParses(file) {
   return false;
 }
 
+// HOW TO RUN THE NETLIFY COMMAND (25 Nov 2026). Plain `netlify` is tried first; on Windows the copy npm
+// installs (%APPDATA%\\npm\\netlify.cmd) is tried next, by its full path. Why: the weekly run on the
+// desktop reported all 11 folders UNKNOWN for a week. One folder in that PC's system PATH had a stray
+// quotation mark, and cmd.exe treats everything after an unclosed quote as one name - so every folder
+// listed after it, npm's included, could not be found, though `where netlify` and a signed-in CLI both
+// looked fine. Returns the command to use, or null when there is none to be found.
+let _netlify;
+function netlifyCommand() {
+  if (_netlify !== undefined) return _netlify;
+  const tries = ["netlify"];
+  if (process.platform === "win32" && process.env.APPDATA) tries.push(`"${path.join(process.env.APPDATA, "npm", "netlify.cmd")}"`);
+  for (const cmd of tries) {
+    try { execSync(`${cmd} --version`, { stdio: ["ignore", "pipe", "pipe"] }); return (_netlify = cmd); } catch (e) { /* next */ }
+  }
+  return (_netlify = null);
+}
+
 function liveSite(folder) {
   const st = path.join(folder, ".netlify", "state.json");
   if (!fs.existsSync(st)) return { err: "no .netlify/state.json - this folder isn't linked to a Netlify site" };
   const id = JSON.parse(fs.readFileSync(st, "utf8")).siteId;
+  const netlify = netlifyCommand();
+  if (!netlify) return { id, err: "couldn't ask Netlify about the site: the netlify command was not found on this PC (not installed, or its folder is missing from PATH)" };
   try {
-    const j = JSON.parse(execSync(`netlify api getSite --data "{\\"site_id\\":\\"${id}\\"}"`, { stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" }));
+    const j = JSON.parse(execSync(`${netlify} api getSite --data "{\\"site_id\\":\\"${id}\\"}"`, { stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" }));
     return { id, url: (j.ssl_url || j.url).replace(/\/?$/, "/"), deployedAt: j.published_deploy && j.published_deploy.published_at };
-  } catch (e) { return { id, err: "couldn't ask Netlify about the site (is the netlify CLI installed and logged in?)" }; }
+  } catch (e) {
+    const said = String((e && e.stderr) || "").trim().split(/\r?\n/).filter(Boolean)[0] || "";
+    return { id, err: "couldn't ask Netlify about the site (signed out? run `netlify status`)" + (said ? " - it said: " + said.slice(0, 120) : "") };
+  }
 }
 
 async function checkFolder(folder) {
