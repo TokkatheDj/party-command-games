@@ -29,6 +29,19 @@ const OVER = /\b(game over|you lose|you lost|you died|time'?s up|out of lives|no
 const START = /^\W*(start|play|let'?s|begin|go\b|tap to (start|play)|new (game|word|item)|ready|spin|roll|deal|flip|shuffle|pick|next|truth)/i;
 const SKIP = /sound|mute|music|volume|settings|help|how to|rules|about|back|quit|menu|reset|all games/i;
 const JUNK = /(^|[\s:(=])(null|undefined|NaN)(?=[\s.,!?)]|$)/;
+// "UNDEFINED" IS ALSO A MATHS WORD (25 Nov 2026). The Algebra tile says "Vertical line: slope is undefined." - correct,
+// and it was reported as a value leaking onto the page. The word is let through only when a maths term sits within
+// 60 characters of it; "Score: undefined" and "Hello undefined" are still caught, and so are null and NaN anywhere.
+const MATHS_NEAR = /\b(slope|gradient|divid\w*|division|by zero|denominator|fraction|tangent|limit|logarithm|square root|expression|vertical line|asymptote)\b/i;
+function junkIn(t) {   // -> the first [match, index] that is a leaked value, or null
+  const re = new RegExp(JUNK.source, "g"); let m;
+  while ((m = re.exec(t))) {
+    const at = m.index + m[1].length;
+    if (m[2] === "undefined" && MATHS_NEAR.test(t.slice(Math.max(0, at - 60), at + 60 + m[2].length))) continue;
+    return [m, m.index];
+  }
+  return null;
+}
 // Errors that come from the TEST browser, not the app (13 Oct 2026): headless Chromium has no
 // speech voices (speechSynthesis errors) and no microphone, so a recording is empty and
 // playing its blob: URL fails with ERR_REQUEST_RANGE_NOT_SATISFIABLE. Real devices have both.
@@ -84,10 +97,25 @@ async function playTile(p, vp, id, errs) {
   if (errs.length) add(`errors after pressing "${pressed || "(no Start button - taps only)"}": ` + flush());
   const t2 = await text();
   for (const [w, t] of [["on open", t0], ["while playing", t2]]) {
-    const j = t.match(JUNK);
+    const hit = junkIn(t), j = hit && hit[0];
     if (j) { add(`the word "${j[2]}" is showing ${w}: …${t.slice(Math.max(0, j.index - 30), j.index + 30).replace(/\s+/g, " ")}…`); break; }
   }
   return probs;
+}
+
+if (process.argv.includes("--self-test")) {
+  const cases = [
+    ["a leaked value is caught", "Score: undefined", true],
+    ["a greeting with a leaked name is caught", "Hello undefined, ready to play?", true],
+    ["null and NaN are caught even beside maths words", "The slope is NaN", true],
+    ["the maths sense is let through", "m = 0. Vertical line: slope is undefined. Positive slope rises", false],
+    ["dividing by zero is let through", "You cannot divide by zero: the answer is undefined.", false],
+    ["a leak AFTER a maths sentence is still caught", "The slope is undefined for a vertical line. " + "x".repeat(80) + " Your score: undefined", true],
+    ["ordinary text is quiet", "Tap a card to flip it", false],
+  ];
+  let bad = 0;
+  for (const [name, text, want] of cases) { const got = !!junkIn(text); console.log((got === want ? "ok   " : "FAIL ") + name); if (got !== want) bad++; }
+  process.exit(bad ? 1 : 0);
 }
 
 (async () => {
