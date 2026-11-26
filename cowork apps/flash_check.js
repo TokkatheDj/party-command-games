@@ -14,6 +14,14 @@
  *   - the app FAILS if any 1-second window holds more than 3 flashes.
  * Simplified on purpose (no red-flash rule, cells not pixels): it is a screen, not a certificate.
  *
+ * SCROLLING IS NOT FLASHING (25 Nov 2026). Genetic Drift Lab was failed at 4 a second and does not flash at
+ * all: it is a long page (1,900 px of scroll), the check's Space and arrow keys paged it down, and its pale
+ * cards sliding past dark bands swung the grid both ways on every frame. Each scroll event's time is now
+ * recorded in the page, and a frame drawn within SCROLL_QUIET seconds after one is not counted - the person
+ * scrolling moved the picture, the app did not change it. A strobe that only runs WHILE the page scrolls
+ * would be missed; one that keeps going afterwards is still caught.
+ *   node flash_check.js --self-test     proves both halves on made-up frames
+ *
  *   node flash_check.js kids_apps/a.html party_apps/b.html     ->  JSON {apps:[{app, ok, maxPerSec, ...}]}
  *   node flash_check.js --seconds 10 --port 8768 FILES...
  */
@@ -61,9 +69,13 @@ async function makeDecoder(browser) {
   }, [b64, GRID]);
 }
 
-function analyse(frames) {   // frames: [{t (s), L: [cells]}]
+const SCROLL_QUIET = 0.25;   // seconds after a scroll event during which a frame's change is the scroll's, not the app's
+function analyse(frames, scrolls) {   // frames: [{t (s), L: [cells]}]; scrolls: [t (s)] when the page scrolled, sorted
   const trans = [];          // {t, dir: +1 brighten / -1 darken}
+  scrolls = scrolls || []; let si = 0;
   for (let i = 1; i < frames.length; i++) {
+    while (si < scrolls.length && scrolls[si] < frames[i].t - SCROLL_QUIET) si++;
+    if (si < scrolls.length && scrolls[si] <= frames[i].t) continue;      // the page was being scrolled
     const a = frames[i - 1].L, b = frames[i].L; let up = 0, down = 0;
     for (let k = 0; k < a.length; k++) {
       const d = b[k] - a[k];
@@ -93,6 +105,15 @@ async function checkOne(browser, decode, rel) {
   cdp.on("Page.screencastFrame", f => { raw.push({ t: f.metadata.timestamp, data: f.data }); cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => {}); });
   const url = `http://127.0.0.1:${PORT}/${rel.split("/").map(encodeURIComponent).join("/")}`;
   try { await page.goto(url, { waitUntil: "load", timeout: 20000 }); } catch (e) { errs.push("LOAD " + e.message.slice(0, 80)); }
+  await page.evaluate(() => { window.__scrolls = []; addEventListener("scroll", () => window.__scrolls.push(Date.now() / 1000), true); }).catch(() => {});
+  // ... and the check's own Space / arrow presses must not PAGE the document: on a long page they scrolled it on
+  // nearly every frame, which would leave almost nothing to measure. Added last, so the app's own handlers run
+  // first; keys aimed at a button, slider, text box or a canvas the app listens on are left alone.
+  await page.evaluate(() => addEventListener("keydown", e => {
+    const t = e.target, tag = (t && t.tagName) || "";
+    if (!e.defaultPrevented && /^(BODY|HTML|MAIN|SECTION|ARTICLE|DIV|P|H[1-6]|UL|LI|SPAN)$/.test(tag) && !(t && t.isContentEditable) &&
+        [" ", "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.key)) e.preventDefault();
+  })).catch(() => {});
   await cdp.send("Page.startScreencast", { format: "jpeg", quality: 40, maxWidth: 128, maxHeight: 96, everyNthFrame: 1 });
   await page.waitForTimeout(400);
   // press the most Start-like visible button
@@ -124,14 +145,33 @@ async function checkOne(browser, decode, rel) {
     k++; await page.waitForTimeout(150);
   }
   await cdp.send("Page.stopScreencast").catch(() => {});
+  const scrolls = await page.evaluate(() => window.__scrolls || []).catch(() => []);
   const frames = [];
   for (const f of raw) { try { frames.push({ t: f.t, L: await decode(f.data) }); } catch (e) {} }
   await ctx.close();
-  const a = analyse(frames);
-  return { app: rel, ok: a.maxPerSec <= LIMIT, maxPerSec: a.maxPerSec, flashes: a.flashes, frames: frames.length, errors: errs.slice(0, 2) };
+  const a = analyse(frames, scrolls);
+  return { app: rel, ok: a.maxPerSec <= LIMIT, maxPerSec: a.maxPerSec, flashes: a.flashes, frames: frames.length, scrolled: scrolls.length, errors: errs.slice(0, 2) };
 }
 
-if (require.main === module) {
+function selfTest() {
+  // a whole-screen strobe at 10 changes a second for 2 seconds: light, dark, light, dark ...
+  const n = GRID * GRID, frame = (t, v) => ({ t, L: new Array(n).fill(v) });
+  const strobe = []; for (let i = 0; i <= 20; i++) strobe.push(frame(i / 10, i % 2 ? 0.9 : 0.1));
+  const every = strobe.map(f => f.t);                                   // ... and the page scrolling on every frame
+  const firstHalf = every.filter(t => t <= 1);                           // ... or only during the first second
+  const cases = [
+    ["a strobe with no scrolling FAILS", analyse(strobe).maxPerSec > LIMIT],
+    ["the same frames while the page scrolls throughout PASS", analyse(strobe, every).maxPerSec === 0],
+    ["a strobe that carries on after the scrolling stops still FAILS", analyse(strobe, firstHalf).maxPerSec > LIMIT],
+    ["a scroll long before the strobe changes nothing", analyse(strobe.map(f => ({ t: f.t + 5, L: f.L })), [0, 1, 2]).maxPerSec > LIMIT],
+  ];
+  let bad = 0;
+  for (const [name, ok] of cases) { console.log((ok ? "ok   " : "FAIL ") + name); if (!ok) bad++; }
+  process.exit(bad ? 1 : 0);
+}
+
+if (require.main === module && args.includes("--self-test")) selfTest();
+else if (require.main === module) {
   (async () => {
     const server = await serve();
     const browser = await chromium.launch({ args: ["--mute-audio"] });
