@@ -365,7 +365,12 @@ function makeRound() {
 }
 
 /* ---------- SCREENS ---------- */
+let navLock = 0;   // 26 Nov 2026: a double-tap used to skip the standings, or start a new game over the final results
+document.addEventListener('click', e => {
+  if (performance.now() < navLock && e.target.closest && e.target.closest('button') && !e.target.closest('#sPlay') && !e.target.closest('#btnMute')) { e.stopPropagation(); e.preventDefault(); }
+}, true);
 function show(id) {
+  if (!$(id).classList.contains('on')) navLock = performance.now() + 400;
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
   const s = $(id); s.scrollTop = 0;
   const f = s.querySelector('.cta'); if (f && id !== 'sPlay') setTimeout(() => { try { f.focus({ preventScroll: true }); } catch (e) {} }, 30);
@@ -405,7 +410,7 @@ $('twOn').addEventListener('click', () => { twistsOn = true; save(KEY + 'twists'
 $('twOff').addEventListener('click', () => { twistsOn = false; save(KEY + 'twists', false); renderSetup(); });
 $('startBtn').addEventListener('click', () => {
   names = names.map((n, i) => (n || '').trim() || 'Player ' + (i + 1));
-  const seen = {}; names = names.map(n => { const k = n.toLowerCase(); seen[k] = (seen[k] || 0) + 1; return seen[k] > 1 ? n + ' ' + seen[k] : n; });
+  const used = new Set(); names = names.map(n => { let m = n, k = 2; while (used.has(m.toLowerCase())) m = n + ' ' + (k++); used.add(m.toLowerCase()); return m; });   // A, A, "A 2" used to make two "A 2"s
   save(KEY + 'names', names);
   ac(); SND.motif(); newGame(); nextRound();
 });
@@ -642,7 +647,8 @@ function showFinal() {
   const ps = G.players.slice().sort((a, b) => b.score - a.score || b.bulls - a.bulls);
   const best = ps[0].score, winners = ps.filter(p => p.score === best && p.bulls === ps[0].bulls);
   $('fWinner').textContent = (winners.length > 1 ? winners.map(w => w.name).join(' & ') + ' tie!' : winners[0].name + ' wins!') + ` ${best} pts`;
-  $('fBody').innerHTML = ps.map((p, i) => `<tr><td>${i + 1}</td><td><b>${esc(p.name)}</b></td><td class="r">${p.bulls}</td><td class="r pts">${p.score}</td></tr>`).join('');
+  let fRank = 0, fS = null, fB = null;   // tied players share a place, as on the standings screen
+  $('fBody').innerHTML = ps.map((p, i) => { if (p.score !== fS || p.bulls !== fB) { fRank = i + 1; fS = p.score; fB = p.bulls; } return `<tr><td>${fRank}</td><td><b>${esc(p.name)}</b></td><td class="r">${p.bulls}</td><td class="r pts">${p.score}</td></tr>`; }).join('');
   const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
   const aw = [];
   const byB = G.players.slice().sort((a, b) => b.bulls - a.bulls);
