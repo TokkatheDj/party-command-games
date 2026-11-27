@@ -15,8 +15,8 @@
  * touches 90 ms apart on the same spot. Every click the browser delivers is logged before any page code
  * runs, and again after it has passed through the page, so a click the page's own guard swallowed is seen
  * as swallowed. It FAILS a page when
- *   - the second tap was delivered to a DIFFERENT button, the first button had left the screen, and the
- *     page let that click through; or
+ *   - the second tap was delivered to a DIFFERENT button (different label), the first button had left the
+ *     screen, and the page let that click through; or
  *   - the second tap landed on the SAME button after its label changed to a "tap again / are you sure"
  *     confirmation, and the button did not stay on that label (a confirm needs a pause, or a double-tap
  *     confirms itself).
@@ -39,6 +39,7 @@ const MAX_PRESSES = 18, GAP_MS = 90, SETTLE_MS = 650;
 const START = /^\W*(start|play|let'?s|begin|go\b|tap to (start|play)|new (game|word|item)|ready|next|continue|deal|reveal|done|ok\b|got it|pass|show|open)/i;
 const SKIP = /sound|mute|music|volume|settings|help|how to|rules|about|back|quit|exit|menu|home|reset|clear|delete|remove|start over|all games|share|print|full ?screen|install|^\W*[x×✕✖]\W*$/i;
 const CONFIRM = /again|sure|confirm|really|tap to (clear|quit|delete|reset)/i;
+const stem = t => t.toLowerCase().replace(/\d+/g, "").replace(/\b(on|off|yes|no)\b/g, "").replace(/[^a-z]+/g, " ").trim();
 const ADD = /^\W*(\+|add\b)/i;   // "Add player": pressed up to 4 times, a name typed before each, so a 3-player setup can be passed
 
 // Runs in the page before any of its code: log every click as the browser delivers it (window, capture)
@@ -126,7 +127,10 @@ async function doubleTapProblems(browser, address, opts = {}) {
       if (log.length < 2) continue;                                   // the second tap hit no button at all
       const [a, b] = log;
       if (a.rapid || b.rapid || !b.through) continue;                 // a fast-tap area, or the page swallowed it
-      if (b.id !== a.id && b.prevShown === false)
+      // Same label on a new element = the page redrew the button in place (a chip, a stepper, a tab): the
+      // second tap is just a second press of it, as on a button that stays put. So is a label that differs
+      // only in a count or an on/off word ("1c penny x5" -> "x4", "Twists ON" -> "Twists OFF").
+      if (b.id !== a.id && b.prevShown === false && stem(b.label) !== stem(a.label))
         problems.push(`a double-tap on "${a.label}" also pressed "${b.label}" on the next screen`);
       else if (b.id === a.id && b.label !== a.label && CONFIRM.test(b.label)) {
         // The click reaches the page either way; what matters is whether the page ACTED on it. A confirm
@@ -158,6 +162,8 @@ const confirm = pause => `<!doctype html><title>t</title>${css}<button id="r">Ne
 <script>let armed = 0; r.onclick = () => { if (!armed) { armed = performance.now(); r.textContent = "Tap again to confirm"; return; } if (performance.now() - armed < ${pause}) return; document.title = "wiped"; r.textContent = "Done"; };</script>`;
 const rapid = `<!doctype html><title>t</title>${css}<div data-rapid><button id="s">Start</button></div><div id="b" hidden data-rapid><button id="q">Pop</button></div>
 <script>s.onclick = () => { s.parentNode.hidden = true; b.hidden = false; }; q.onclick = () => {};</script>`;
+const redraw = `<!doctype html><title>t</title>${css}<div id="w"></div><script>let n = 0; const draw = () => { w.innerHTML = '<button>2 teams</button>'; w.firstChild.onclick = () => { n++; draw(); }; }; draw();</script>`;
+const toggle = `<!doctype html><title>t</title>${css}<div id="w"></div><script>let on = true, n = 5; const draw = () => { w.innerHTML = '<button>Twist rounds ' + (on ? 'ON' : 'OFF') + ' x' + n + '</button>'; w.firstChild.onclick = () => { on = !on; n--; draw(); }; }; draw();</script>`;
 const oneScreen = `<!doctype html><title>t</title>${css}<button id="s">Play</button><script>let n = 0; s.onclick = () => { s.textContent = "Play (" + (++n) + ")"; };</script>`;
 
 module.exports = { doubleTapProblems };
@@ -173,7 +179,9 @@ if (require.main === module) (async () => {
       ["a two-tap confirm with no pause FAILS", confirm(0), true],
       ["a two-tap confirm that waits 700 ms PASSES", confirm(700), false],
       ["a fast-tap area marked data-rapid PASSES", rapid, false],
-      ["a button that stays put and is tapped twice PASSES", oneScreen, false]];
+      ["a button that stays put and is tapped twice PASSES", oneScreen, false],
+      ["a button redrawn in place with the same label PASSES", redraw, false],
+      ["a toggle or counter redrawn with a new state in its label PASSES", toggle, false]];
     for (const [name, html, shouldFail] of cases) {
       const p = await doubleTapProblems(browser, "data:text/html;charset=utf-8," + encodeURIComponent(html));
       const failed = p.length > 0, ok = failed === shouldFail && !p.some(x => /could not walk/.test(x));
