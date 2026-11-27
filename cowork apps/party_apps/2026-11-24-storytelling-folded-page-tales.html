@@ -45,7 +45,7 @@ button[aria-pressed="true"].opt{background:var(--btnDark);color:#fff;outline:3px
 .row>*{flex:1 1 auto}
 .stack>*+*{margin-top:10px}
 label{font-weight:700}
-input[type=text],textarea{width:100%;font-family:var(--font);font-size:max(16px,1em);color:var(--text);background:#fff;border:2px solid var(--ink);border-radius:var(--radius);padding:10px 12px}
+input[type=text],textarea{width:100%;font-family:var(--font);font-size:max(16px,1em);color:var(--text);background:#fff;border:2px solid var(--ink);border-radius:var(--radius);padding:10px 12px;min-height:44px}
 textarea{resize:none;min-height:96px;line-height:1.45}
 input:focus,textarea:focus,button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .names{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
@@ -336,8 +336,9 @@ function newGame(names) {
   const stories = opIdx.map((oi, s) => {
     const count = linesFor(n);
     const writers = []; for (let j = 0; j < count; j++) writers.push((ptr + j) % n);
-    const reader = (ptr + count) % n;
-    ptr = (ptr + count) % n;
+    const whole = count % n === 0;   // 3-8 players: everyone writes the same number of lines
+    const reader = whole ? (ptr + 1) % n : (ptr + count) % n;   // then the Reader is neither the first nor the last writer
+    ptr = whole ? (ptr + 1) % n : (ptr + count) % n;             // and the next story starts with the next player
     const beats = shuffle(BEATS_MID);
     const lineBeats = []; for (let j = 0; j < count; j++) lineBeats.push(j === count - 1 ? BEAT_END : (j === count - 2 && count >= 5) ? BEAT_NEAR_END : beats[j % beats.length]);
     const twist = s === 0 ? null : twists[(s - 1) % twists.length];
@@ -387,8 +388,9 @@ function screenSetup() {
     const filled = [];
     raw.forEach((v, i) => { if (v) filled.push(v); });
     if (filled.length < 3) { err.textContent = 'You need at least 3 players - type 3 or more names.'; SFX.fail(); return; }
-    const seen = {};
-    const names = filled.map(v => { const k = v.toLowerCase(); seen[k] = (seen[k] || 0) + 1; return seen[k] > 1 ? v + ' ' + seen[k] : v; });
+    // 27 Nov 2026: Sam, Sam, "Sam 2" used to make two "Sam 2"s: keep each name as first typed, renumber only the repeats
+    const low = filled.map(v => v.toLowerCase()), used = new Set(low);
+    const names = filled.map((v, i) => { if (low.indexOf(low[i]) === i) return v; let k = 2, m; do { m = v + ' ' + (k++); } while (used.has(m.toLowerCase())); used.add(m.toLowerCase()); return m; });
     savedNames = filled; save(KEY + 'names', filled); save(KEY + 'settings', settings);
     newGame(names); SFX.motif(); screenStoryIntro();
   }}});
@@ -586,10 +588,13 @@ function screenReveal(i) {
     ),
     h('div', {cls: 'meter', 'aria-hidden': 'true'}, h('div', {style: 'width:' + ((i + 1) / pages.length * 100) + '%'}))
   );
-  if (readAloud) setTimeout(() => speak(pages[i]), 250);
+  const tok = ++revealTok;   // a fast page turn used to speak the page that had just been left
+  if (readAloud) setTimeout(() => { if (tok === revealTok) speak(pages[i]); }, 250);
 }
+let revealTok = 0;
 
 function screenJudge() {
+  revealTok++;
   const st = cur();
   let quill = null, stitch = null;
   const go = h('button', {cls: 'big', text: 'Reveal the writers', disabled: true});
@@ -709,6 +714,13 @@ function screenFinal() {
   );
 }
 
+/* 27 Nov 2026: a double-tap must not press whatever button the next screen puts under the finger.
+   A tap on a button is ignored if it lands within 400 ms and a fingertip's width of a tap on another button that has since left the screen. */
+(function () { let t0 = 0, el = null, x0 = 0, y0 = 0;
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return;
+    const now = performance.now(), gone = el && !(el.isConnected && el.getClientRects().length);
+    if (now - t0 < 400 && b !== el && gone && Math.hypot(e.clientX - x0, e.clientY - y0) < 56) { e.stopPropagation(); e.preventDefault(); return; }
+    t0 = now; el = b; x0 = e.clientX; y0 = e.clientY; }, true); })();
 screenSetup();
 </script>
 </body>
