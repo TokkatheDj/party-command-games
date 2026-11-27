@@ -65,7 +65,7 @@ hr.rule{border:0;height:2px;background:var(--line);margin:10px 0}
 #opts button.struck{text-decoration:line-through;border-color:var(--line);color:var(--muted)}
 #opts button.right{background:#1e7a45;color:#fff;border-color:#1e7a45}
 #pads{display:flex;gap:6px}
-#pads button{flex:1;color:#fff;font-size:clamp(14px,3.8vw,19px);min-height:62px;padding:4px;line-height:1.15;border-bottom:5px solid rgba(0,0,0,.35)}
+#pads button{flex:1;min-width:0;overflow-wrap:anywhere;color:#fff;font-size:clamp(14px,3.8vw,19px);min-height:62px;padding:4px;line-height:1.15;border-bottom:5px solid rgba(0,0,0,.35)}
 #pads button:active:not(:disabled){transform:translateY(3px);border-bottom-width:2px}
 #pads button .sc{display:block;font-size:clamp(18px,5vw,26px)}
 #pads button.locked{background:#e6e0d6 !important;color:var(--text);border-bottom-color:#c9c0b2}
@@ -284,8 +284,12 @@ function newGame() {
   }
   used = used.concat(picks.map(p => p.id)); save(KEY + 'used', used);
   const teams = [];
-  for (let i = 0; i < cfg.teams; i++) teams.push({ name: cfg.names[i], c: TEAM_DEF[i].c, score: 0, wrong: 0, right: 0, best: 0, early: 0 });
+  // 27 Nov 2026: two teams with the same name used to read "It's a tie: Sam & Sam!": keep names as typed, renumber only the repeats
+  const raw = cfg.names.slice(0, cfg.teams), low = raw.map(n => n.toLowerCase()), used = new Set(low);
+  const nm = raw.map((n, i) => { if (low.indexOf(low[i]) === i) return n; let k = 2, m; do { m = n + ' ' + (k++); } while (used.has(m.toLowerCase())); used.add(m.toLowerCase()); return m; });
+  for (let i = 0; i < cfg.teams; i++) teams.push({ name: nm[i], c: TEAM_DEF[i].c, score: 0, wrong: 0, right: 0, best: 0, early: 0 });
   G = { teams, pics: picks, idx: -1, state: 'ready', paused: false };
+  $('btnPause').setAttribute('aria-pressed', 'false'); $('btnPause').textContent = 'Pause';   // a game ended while paused left the next game's button reading Resume
   show('sGame'); buildPads(); SND.motif(); nextPic();
 }
 function nextPic() {
@@ -464,7 +468,7 @@ function reveal(winner) {
   $('anEmoji').textContent = p.e; $('anName').textContent = p.name;
   if (winner >= 0) {
     SND.right();
-    $('anMsg').textContent = `${G.teams[winner].name} spotted it for ${G.val} points!`;
+    $('anMsg').textContent = `${G.teams[winner].name} spotted it for ${G.val} point${G.val === 1 ? '' : 's'}!`;
     $('status').textContent = `+${G.val} to ${G.teams[winner].name}`;
   } else {
     SND.none();
@@ -482,11 +486,11 @@ function endGame() {
   const ranked = G.teams.slice().sort((a, b) => b.score - a.score);
   const top = ranked[0].score, winners = ranked.filter(t => t.score === top);
   $('winTitle').textContent = winners.length > 1 ? `It's a tie: ${winners.map(t => t.name).join(' & ')}!` : `${winners[0].name} win!`;
-  $('finalBoard').innerHTML = ranked.map((t, i) => `<div class="bline" style="background:${t.c}"><span>${i + 1}.</span><span>${esc(t.name)}</span><span class="s">${t.score}</span></div>`).join('');
+  $('finalBoard').innerHTML = ranked.map(t => `<div class="bline" style="background:${t.c}"><span>${ranked.findIndex(q => q.score === t.score) + 1}.</span><span>${esc(t.name)}</span><span class="s">${t.score}</span></div>`).join('');
   const aw = [];
   const by = (f, min = 1) => { const s = G.teams.slice().sort((a, b) => f(b) - f(a)); return f(s[0]) >= min ? s[0] : null; };
   let a;
-  if ((a = by(t => t.best))) aw.push(['Eagle Eye', `${a.name} — the boldest single catch, worth ${a.best} points.`]);
+  if ((a = by(t => t.best))) aw.push(['Eagle Eye', `${a.name} — the boldest single catch, worth ${a.best} point${a.best === 1 ? '' : 's'}.`]);
   if ((a = by(t => t.early))) aw.push(['Blur Whisperer', `${a.name} — ${a.early} picture${a.early > 1 ? 's' : ''} named while still a smudge.`]);
   if ((a = by(t => t.wrong))) aw.push(['Trigger Happy', `${a.name} — ${a.wrong} wrong buzz${a.wrong > 1 ? 'es' : ''}. Brave!`]);
   if ((a = by(t => t.right))) aw.push(['Sharp Shooter', `${a.name} — ${a.right} picture${a.right > 1 ? 's' : ''} named in total.`]);
@@ -517,6 +521,13 @@ document.addEventListener('keydown', e => {
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= 4 && G && n <= G.teams.length) { e.preventDefault(); buzz(n - 1); }
 });
+/* 27 Nov 2026: a double-tap must not press whatever button the next screen puts under the finger.
+   A tap on a button is ignored if it lands within 400 ms and a fingertip's width of a tap on another button that has since left the screen. */
+(function () { let t0 = 0, el = null, x0 = 0, y0 = 0;
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return;
+    const now = performance.now(), gone = el && !(el.isConnected && el.getClientRects().length);
+    if (now - t0 < 400 && b !== el && gone && Math.hypot(e.clientX - x0, e.clientY - y0) < 56) { e.stopPropagation(); e.preventDefault(); return; }
+    t0 = now; el = b; x0 = e.clientX; y0 = e.clientY; }, true); })();
 paintMute(); renderSetup(); fit();
 </script>
 </body>
