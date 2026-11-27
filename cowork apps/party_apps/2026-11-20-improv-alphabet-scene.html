@@ -126,7 +126,7 @@ footer.note{text-align:center;color:var(--muted);font-size:14px;padding:12px 0 4
       <div class="card tilt-l">
         <h2 id="hSetup">Act it out, A to Z!</h2>
         <p>Two players act out a silly scene where <b>every line must start with the next letter of the alphabet</b>. The room referees. Get as far as you can before 3 fumbles or the clock runs out.</p>
-        <div class="meta"><span class="chip">3–10 players</span><span class="chip y">~15–25 min</span><span class="chip p">One screen, room referees</span></div>
+        <div class="meta"><span class="chip">3–12 players</span><span class="chip y">~15–25 min</span><span class="chip p">One screen, room referees</span></div>
       </div>
 
       <div class="card tilt-r">
@@ -430,7 +430,7 @@ function renderPlayers(){
 function addPlayer(){
   const inp = $('#nameIn'); let v = inp.value.trim().replace(/\s+/g,' ');
   if (!v || players.length >= 12) return;
-  if (players.some(p => p.toLowerCase() === v.toLowerCase())) v += ' ' + (players.length+1);
+  for (let base = v, k = 2; players.some(p => p.toLowerCase() === v.toLowerCase()); k++) v = base + ' ' + k;   // 27 Nov 2026: Sam, "Sam 3", Sam used to make two "Sam 3"s sharing one score
   players.push(v); store.set('players', players); inp.value = ''; inp.focus(); renderPlayers(); SFX.tap();
 }
 $('#addBtn').addEventListener('click', addPlayer);
@@ -449,7 +449,7 @@ function newGame(){
   audio();
   G = {
     players: players.slice(),
-    score: {}, stats: {},
+    score: Object.create(null), stats: Object.create(null),   // plain maps: a player named __proto__ used to 'win with [object Object] points'
     lap: 1, laps: opts.laps,
     queue: [], sceneNo: 0, totalScenes: 0, log: [], pairHist: {}
   };
@@ -627,6 +627,7 @@ function advance(skip){
   maybeEvents();
 }
 function strike(reason){
+  if (!S || S.over || S.strikes >= 3) return;   // a double-tapped BUZZ used to make 4 of 3
   if (S.over) return;
   S.strikes++; SFX.strike();
   S.lineT0 = performance.now();
@@ -636,7 +637,7 @@ function strike(reason){
   $('#letterInfo').textContent = reason === 'stall' ? 'Stalled! Strike — same letter, keep going.' : 'Buzzed! Strike — same letter, try again.';
   document.querySelectorAll('#strikes .strike').forEach((e,i) => e.classList.toggle('hit', i < S.strikes));
   $('#strikes').setAttribute('aria-label', `Strikes: ${S.strikes} of 3`);
-  if (S.strikes >= 3) setTimeout(() => endScene('strikes'), 500);
+  if (S.strikes >= 3) { const mine = S; setTimeout(() => { if (S === mine) endScene('strikes'); }, 500); }   // the old timer could end the NEXT scene
 }
 function loop(now){
   if (!S || S.over) return;
@@ -654,9 +655,9 @@ function loop(now){
   if (left <= 0) return endScene('clock');
   if (frac <= 0 && S.strikes < 3) strike('stall');
 }
-$('#nextBtn').addEventListener('click', () => advance(false));
+$('#nextBtn').addEventListener('click', () => { if (S && S.strikes < 3) advance(false); });
 $('#buzzBtn').addEventListener('click', () => strike('buzz'));
-$('#freeBtn').addEventListener('click', () => { if (S.freebie && !S.over){ S.freebie = false; advance(true); } });
+$('#freeBtn').addEventListener('click', () => { if (S.freebie && !S.over && S.strikes < 3){ S.freebie = false; advance(true); } });
 $('#endBtn').addEventListener('click', () => endScene('manual'));
 document.addEventListener('keydown', e => {
   if (!$('#sPlay').classList.contains('on') || !S || S.over) return;
@@ -675,21 +676,24 @@ function endScene(why){
   S.fullBonus = S.full ? 5 : 0;
   S.why = why;
   why === 'full' ? SFX.win() : SFX.wrap();
-  const reasons = {full:'ALL 26 LETTERS! Standing ovation!', strikes:'Three strikes — curtain down.', clock:'The clock ran out.', manual:'The scene was ended early.'};
+  const reasons = {full: S.skipped.length ? 'The whole alphabet, with one freebie! Standing ovation!' : 'ALL 26 LETTERS! Standing ovation!', strikes:'Three strikes — curtain down.', clock:'The clock ran out.', manual:'The scene was ended early.'};
   $('#resWhy').textContent = reasons[why];
   const mult = isFinalLap() ? 2 : 1;
   const base = S.pts + S.fullBonus;
-  $('#resPts').textContent = base * mult + (mult > 1 ? ' pts' : ' pts');
+  $('#resPts').textContent = base * mult + (base * mult === 1 ? ' pt' : ' pts');
   const first = letterAt(S,0), last = S.cleared.length ? letterAt(S, Math.max(...S.cleared, ...S.skipped)) : first;
   $('#resDetail').innerHTML = `${S.cleared.length} letter${S.cleared.length===1?'':'s'} cleared (${esc(first)} to ${esc(last)})` +
      (S.fullBonus ? ' · +5 full alphabet' : '') + (mult > 1 ? ' · <b>doubled in the final lap</b>' : '') + '<br>Plus the applause bonus below.';
   buildTrack($('#resTrack'), false);
   applause = 0; syncAp();
+  resultAt = performance.now();
   show('sResult');
 }
+let resultAt = 0;
 function syncAp(){ $('#apSeg').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === applause))); }
 $('#apSeg').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { applause = Number(b.dataset.v); syncAp(); applause ? mar(523.3 + applause*130, 0, 0.3, 0.3) : SFX.tap(); }));
 $('#bankBtn').addEventListener('click', () => {
+  if (performance.now() - resultAt < 600) return;   // a tap aimed at NEXT as the clock ran out used to bank the scene unseen
   const mult = isFinalLap() ? 2 : 1;
   const total = (S.pts + S.fullBonus + applause) * mult;
   const who = S.pair.guest ? [S.pair.a] : [S.pair.a, S.pair.b];
@@ -711,12 +715,12 @@ function sortedPlayers(){ return G.players.slice().sort((a,b) => G.score[b] - G.
 function boardHTML(){
   const sp = sortedPlayers(), top = G.score[sp[0]];
   return '<tr><th>#</th><th>Player</th><th class="n">Best run</th><th class="n">Score</th></tr>' +
-    sp.map((p,i) => `<tr class="${G.score[p]===top && top>0 ? 'lead':''}"><td>${i+1}</td><td>${esc(p)}</td><td class="n">${G.stats[p].best}</td><td class="n">${G.score[p]}</td></tr>`).join('');
+    sp.map((p,i) => `<tr class="${G.score[p]===top && top>0 ? 'lead':''}"><td>${sp.findIndex(q => G.score[q] === G.score[p]) + 1}</td><td>${esc(p)}</td><td class="n">${G.stats[p].best}</td><td class="n">${G.score[p]}</td></tr>`).join('');
 }
 function renderBoard(msg){
   $('#boardTbl').innerHTML = boardHTML();
   const nextIsFinal = !G.queue.length ? (G.lap + 1 === G.laps && G.laps > 1) : isFinalLap();
-  $('#boardCtx').innerHTML = msg + (nextIsFinal ? ' <b>Final lap coming: double points!</b>' : '');
+  $('#boardCtx').innerHTML = msg + (nextIsFinal ? (G.queue.length && isFinalLap() ? ' <b>Final lap: double points!</b>' : ' <b>Final lap coming: double points!</b>') : '');
   show('sBoard');
 }
 $('#contBtn').addEventListener('click', () => { SFX.tap(); nextScene(); });
@@ -726,12 +730,12 @@ function finish(){
   const sp = sortedPlayers(), top = G.score[sp[0]];
   const winners = sp.filter(p => G.score[p] === top);
   $('#winName').textContent = '🏆 ' + winners.join(' & ');
-  $('#winLine').textContent = winners.length > 1 ? `A tie at ${top} points — share the bow!` : `wins with ${top} points!`;
+  $('#winLine').textContent = winners.length > 1 ? `A tie at ${top} point${top===1?'':'s'} — share the bow!` : `wins with ${top} point${top===1?'':'s'}!`;
   $('#finalTbl').innerHTML = boardHTML();
   const st = G.stats, P = G.players;
   const maxBy = (f, filt) => { let best = null, bv = -Infinity; P.forEach(p => { const v = f(p); if ((filt ? filt(p) : true) && v > bv){ bv = v; best = p; } }); return [best, bv]; };
   const aw = [];
-  let [p1,v1] = maxBy(p => st[p].best); aw.push(['📏 Longest Run', p1, `${v1} letters in one scene`]);
+  let [p1,v1] = maxBy(p => st[p].best); if (v1 > 0) aw.push(['📏 Longest Run', p1, `${v1} letter${v1===1?'':'s'} in one scene`]);
   let [p2,v2] = maxBy(p => st[p].hard); if (v2 > 0) aw.push(['💎 Tricky Letter Tamer', p2, `${v2} of J K Q V X Z conquered`]);
   let [p3,v3] = maxBy(p => -st[p].strikes / Math.max(1, st[p].scenes), p => st[p].scenes > 0); aw.push(['🧈 Smooth Talker', p3, `fewest fumbles (${st[p3].strikes} strike${st[p3].strikes===1?'':'s'})`]);
   let [p4,v4] = maxBy(p => st[p].applause); if (v4 > 0) aw.push(['👏 Crowd Favourite', p4, `${v4} applause points`]);
@@ -749,6 +753,13 @@ $('#startBtn').addEventListener('click', () => { if (players.length >= 3) newGam
 /* ---------- INIT ---------- */
 setMute(muted);
 renderPlayers();
+/* 27 Nov 2026: a double-tap must not press whatever button the next screen puts under the finger.
+   A tap on a button is ignored if it comes within 400 ms of a tap on another button that has since left the screen. */
+(function () { let t0 = 0, el = null;
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return;
+    const now = performance.now(), gone = el && !(el.isConnected && el.getClientRects().length);
+    if (now - t0 < 400 && b !== el && gone) { e.stopPropagation(); e.preventDefault(); return; }
+    t0 = now; el = b; }, true); })();
 window.__alphabetScene = { get G(){ return G; }, get S(){ return S; }, letterAt: (k) => letterAt(S,k), counts: {WHO:WHO.length, WHERE:WHERE.length, TWISTS:TWISTS.length, EMOTIONS:EMOTIONS.length} };
 })();
 </script>

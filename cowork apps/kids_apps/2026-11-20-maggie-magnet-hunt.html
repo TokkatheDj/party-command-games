@@ -64,6 +64,9 @@ h2{font-family:var(--head);font-weight:900;font-size:clamp(22px,6vw,32px);margin
 .stage.zip .thing .nm{visibility:hidden}
 .pow{position:absolute;left:50%;top:80%;z-index:2;transform:translate(-50%,-50%) scale(0);font-family:var(--head);font-weight:900;font-size:clamp(30px,9vw,52px);color:var(--ink);background:var(--yel);border:4px solid var(--ink);padding:4px 16px;border-radius:8px;letter-spacing:2px;pointer-events:none;transition:transform .25s cubic-bezier(.4,2,.6,1)}
 .pow.show{transform:translate(-50%,-50%) scale(1) rotate(-6deg)}
+.pow.nope{top:44%}
+/* a phone held sideways: let the Workbench scroll so its buttons can be reached */
+@media (max-height:480px){ #bench{overflow-y:auto} #bench .stage{flex:none;min-height:170px} }
 .say{min-height:3.2em}
 .guess{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap)}
 .guess[hidden],button[hidden]{display:none}
@@ -237,7 +240,7 @@ const THINGS = {
   balloon:{e:'🎈',n:'Balloon',m:false,f:'Balloons are rubber - they float away from magnets!'}
 };
 const BENCH = [
-  {name:'Bench 1', items:['clip','pencil','bolt','duck','pin','leaf']},
+  {name:'Bench 1', items:['clip','pencil','bolt','duck','pin','leaf','balloon']},
   {name:'Bench 2', items:['scis','crayon','can','sock','driver','apple','hammer','wood']},
   {name:'Bench 3 (Tricky!)', items:['ring','key','ball','magnet','bell','chain','coin','mirror']}
 ];
@@ -393,11 +396,15 @@ function benchGuess(g){
   if(B.busy) return; B.busy=true;
   $('gYes').disabled=true; $('gNo').disabled=true; SND.tap();
   const k=B.items[B.idx], t=THINGS[k], ok=(g===t.m);
+  const mine=B, at=B.idx, here=()=>B===mine&&B.idx===at&&screen==='bench';   // 27 Nov 2026: Home or another bench inside the 1.15 s reveal used to drop this item's result onto the next one
   const st=$('stage'); st.classList.add('test');
   setTimeout(()=>{
+    if(!here()) return;
+    $('pow').classList.toggle('nope',!t.m);
     if(t.m){ st.classList.add('zip'); $('pow').textContent='CLINK!'; $('pow').classList.add('show'); SND.clink(); }
     else { $('magHead').classList.add('wobble'); $('pow').textContent='NOPE!'; $('pow').classList.add('show'); SND.nope(); }
     setTimeout(()=>{
+      if(!here()) return;
       if(ok){ B.right++; SND.right(); }
       else SND.oops();
       const lead = ok ? (t.m?'Yes! It sticks! ':'Right! It won\'t stick. ') : (t.m?'Surprise - it sticks! ':'Surprise - it won\'t stick! ');
@@ -500,8 +507,9 @@ function checkItems(){
       if(it.m){ it.stuck=true; it.fly=1; it.seen=true; S.book[it.k]=1; save(); SND.clink();
         digMsg(`CLINK! ${t.n}! ${t.f}`); say(`${t.n}! Clink!`); renderFound();
         if(D.items.filter(i=>i.m&&!i.stuck).length===0 && !D.done){ D.done=true;
-          setTimeout(()=>{ const st=D.hints===0?3:D.hints<=2?2:1; finish('dig',D.lvl,st,`You dug up all ${D.items.filter(i=>i.m).length} metal things!`+(D.hints?'':' No hints needed!')); },1100); }
-      } else if(!it.seen){ it.seen=true; S.book[it.k]=1; save(); SND.nope(); digMsg(`A ${t.n.toLowerCase()} - ${t.f}`); }
+          const mine=D;   // Home, another pit or New sand inside the 1.1 s pause used to give that screen this pit's win and stars
+          setTimeout(()=>{ if(D!==mine||screen!=='dig') return; const st=D.hints===0?3:D.hints<=2?2:1; finish('dig',D.lvl,st,`You dug up all ${D.items.filter(i=>i.m).length} things that stick!`+(D.hints?'':' No hints needed!')); },1100); }
+      } else if(!it.seen){ it.seen=true; S.book[it.k]=1; save(); SND.nope(); digMsg(`${/^[aeiou]/i.test(t.n)?'An':'A'} ${t.n.toLowerCase()} - ${t.f}`); }
     }
   });
 }
@@ -570,6 +578,13 @@ function loop(t){
   }catch(err){ /* keep the loop alive */ }
 }
 
+/* 27 Nov 2026: a double-tap must not press whatever button the next screen puts under the finger.
+   A tap on a button is ignored if it comes within 400 ms of a tap on another button that has since left the screen. */
+(function () { let t0 = 0, el = null;
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return;
+    const now = performance.now(), gone = el && !(el.isConnected && el.getClientRects().length);
+    if (now - t0 < 400 && b !== el && gone) { e.stopPropagation(); e.preventDefault(); return; }
+    t0 = now; el = b; }, true); })();
 renderHome();
 document.addEventListener('pointerdown',()=>audio(),{once:true});
 </script>

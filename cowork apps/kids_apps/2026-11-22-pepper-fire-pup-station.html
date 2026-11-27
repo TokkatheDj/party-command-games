@@ -369,7 +369,8 @@ function renderTitle() {
 
 /* ---------- game flow ---------- */
 const G = { s: 0, call: 0, cfg: null, target: null, houses: [], friend: null, job: '' };
-function startShift(s) { G.s = s; G.cfg = SHIFTS[s]; G.call = 0; startCall(); }
+let runId = 0;   // 27 Nov 2026: bumped by Home and by every new shift, so a delayed step from the old screen can't land later
+function startShift(s) { runId++; G.s = s; G.cfg = SHIFTS[s]; G.call = 0; startCall(); }
 function startCall() {
   const cfg = G.cfg;
   G.friend = FRIENDS[G.s * 4 + G.call];
@@ -438,7 +439,7 @@ function startGear() {
       SFX.good();
       const pep = $('gearPepper').firstElementChild; if (pep) pep.classList.add('bounce');
       $('gearGrid').querySelectorAll('button').forEach(x => x.disabled = true);
-      setTimeout(startTown, 1100);
+      const rid = runId; setTimeout(() => { if (rid === runId) startTown(); }, 1100);
     }
   });
   show('sGear');
@@ -468,7 +469,7 @@ function tapHouse(b, h) {
     const road = b.parentElement.nextElementSibling;
     const tr = $('truck'); void tr.offsetWidth;
     tr.style.transition = 'left 1.1s ease-in'; tr.style.left = (road.clientWidth + 10) + 'px';
-    setTimeout(startJob, 1200);
+    const rid = runId; setTimeout(() => { if (rid === runId) startJob(); }, 1200);
     return;
   }
   G.misses++;
@@ -811,6 +812,7 @@ function finishCall() {
   const [e, n] = G.friend, idx = G.s * 4 + G.call;
   const isNew = !prog.badges.includes(idx);
   if (isNew) prog.badges.push(idx);
+  if (G.call === 3) prog.done[G.s] = true;   // save the shift's star with its last badge: a reload on the thank-you screen used to lose it
   saveProg();
   SFX.win(); confettiBurst(90);
   const last = G.call === 3;
@@ -828,11 +830,11 @@ function finishShift() {
   const btns = [{ t: '🏠 Station', cls: 'grey', fn: renderTitle }];
   if (next) btns.push({ t: `Shift ${G.s + 2} ▶`, cls: 'green', fn: () => startShift(G.s + 1) });
   else btns.push({ t: '📒 Badges', cls: 'yellow', fn: renderBook });
-  overlay(`<div class="big" aria-hidden="true">${next ? '⭐' : '🏆'}</div><h2 id="ovTitle">${next ? `Shift ${G.s + 1} done!` : 'Fire Chief Pepper!'}</h2><p class="desc">${next ? 'Four friends helped. Super fire pup!' : 'Every shift done. The whole town says thank you!'}</p>`, btns);
+  overlay(`<div class="big" aria-hidden="true">${next ? '⭐' : '🏆'}</div><h2 id="ovTitle">${next ? `Shift ${G.s + 1} done!` : 'Fire Chief Pepper!'}</h2><p class="desc">${next ? 'Four friends helped. Super fire pup!' : (prog.done.every(Boolean) ? 'Every shift done. ' : 'The hardest shift is done. ') + 'The whole town says thank you!'}</p>`, btns);
 }
 
 /* ---------- badge book ---------- */
-let resetArm = false;
+let resetArm = false, resetArmAt = 0;
 function renderBook() {
   $('book').innerHTML = FRIENDS.map((f, i) => prog.badges.includes(i)
     ? `<div class="slot"><span class="e" aria-hidden="true">${f[0]}</span>${f[1]}</div>`
@@ -844,10 +846,11 @@ function renderBook() {
 $('bookBtn').onclick = () => { ensureAudio(); SFX.tap(); renderBook(); };
 $('bookBack').onclick = () => { SFX.tap(); renderTitle(); };
 $('resetBtn').onclick = () => {
-  if (!resetArm) { resetArm = true; $('resetBtn').textContent = 'Tap again to clear'; return; }
+  if (!resetArm) { resetArm = true; resetArmAt = performance.now(); $('resetBtn').textContent = 'Tap again to clear'; return; }
+  if (performance.now() - resetArmAt < 700) return;   // a double-tap used to wipe every badge and star
   prog = { done: [false, false, false, false], badges: [] }; saveProg(); renderBook();
 };
-$('homeBtn').onclick = () => { ensureAudio(); SFX.tap(); $('ov').hidden = true; J.phase = ''; renderTitle(); try { speechSynthesis.cancel(); } catch (e) {} };
+$('homeBtn').onclick = () => { runId++; ensureAudio(); SFX.tap(); $('ov').hidden = true; J.phase = ''; renderTitle(); try { speechSynthesis.cancel(); } catch (e) {} };
 function setMuteUI() { $('muteBtn').textContent = muted ? '🔇' : '🔊'; $('muteBtn').setAttribute('aria-pressed', String(!muted)); }
 $('muteBtn').onclick = () => {
   muted = !muted; save(KEY + 'muted', muted); ensureAudio();
@@ -855,6 +858,13 @@ $('muteBtn').onclick = () => {
   if (muted) { try { speechSynthesis.cancel(); } catch (e) {} } else SFX.tap();
   setMuteUI();
 };
+/* 27 Nov 2026: a double-tap must not press whatever button the next screen puts under the finger.
+   A tap on a button is ignored if it comes within 400 ms of a tap on another button that has since left the screen. */
+(function () { let t0 = 0, el = null;
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b) return;
+    const now = performance.now(), gone = el && !(el.isConnected && el.getClientRects().length);
+    if (now - t0 < 400 && b !== el && gone) { e.stopPropagation(); e.preventDefault(); return; }
+    t0 = now; el = b; }, true); })();
 setMuteUI();
 renderTitle();
 </script>
