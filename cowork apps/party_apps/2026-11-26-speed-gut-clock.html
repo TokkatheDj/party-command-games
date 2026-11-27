@@ -90,6 +90,7 @@ main{flex:1 1 auto;min-height:0;position:relative}
 .tl .tk{position:absolute;bottom:-22px;font-size:12px;color:var(--muted);font-weight:700;transform:translateX(-50%)}
 table{border-collapse:collapse;width:100%;font-size:clamp(15px,3.4vw,19px)}
 th,td{text-align:left;padding:8px 6px;border-bottom:2px solid var(--ink)}
+td b{overflow-wrap:anywhere}
 th{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 td.r,th.r{text-align:right}
 .pts{font-weight:900;font-size:1.2em}
@@ -131,7 +132,7 @@ td.r,th.r{text-align:right}
           <hr class="rule">
           <h2>Round types</h2>
           <ul class="types">
-            <li><b>Blind Clock</b> clock shows 3 s, then goes dark.</li>
+            <li><b>Blind Clock</b> clock shows a few seconds, then goes dark.</li>
             <li><b>Lying Clock</b> a clock runs at a secret wrong speed — ignore it.</li>
             <li><b>Echo</b> watch the red block for a secret time, then copy it.</li>
             <li><b>Tick Tock</b> 4 ticks at a secret tempo — tap on tick #N.</li>
@@ -244,7 +245,7 @@ const TICK = [['Grandfather Clock','Keep counting the ticks.'],['Metronome','The
  ['Skipping Rope','Count the jumps.'],['Ping Pong Rally','Keep the rally going.'],['Tap Dancer','Tap along silently.']];
 
 const TYPES = {
-  BLIND:{label:'Blind Clock', rule:c=>`Tap at exactly <b>${fmt(c.t)} seconds</b>. The clock shows the first 3 seconds, then goes dark.`},
+  BLIND:{label:'Blind Clock', rule:c=>`Tap at exactly <b>${fmt(c.t)} seconds</b>. The clock shows the first few seconds, then goes dark.`},
   FAKE:{label:'Lying Clock', rule:c=>`Tap at <b>${fmt(c.t)} REAL seconds</b>. The clock on screen runs at a secret wrong speed — every heat gets a different liar.`},
   ECHO:{label:'Echo', rule:()=>`A red block lights up for a secret time. When it switches off, tap when <b>the same time</b> has passed again. Every heat gets a new secret.`},
   TICK:{label:'Tick Tock', rule:c=>`You hear and see 4 ticks at a secret tempo, then silence. Keep counting and tap on <b>tick #${c.n}</b>.`},
@@ -481,11 +482,18 @@ function begin() {
   } else {
     H.phase = 'run'; H.start = now;
     $('pStatus').textContent = c.twist && c.twist.name === 'Eyes Closed' ? 'GO! Eyes closed…' : 'GO!';
+    const heat = H;   // a tick left over from a heat that ended early must not light up the next one
     if (c.type === 'TICK') for (let k = 1; k <= 4; k++) setTimeout(() => {
-      if (H && H.phase === 'run') { SND.tick(); const d = $('pDots').children[k - 1]; if (d) d.classList.add('lit'); $('pClock').textContent = k; }
+      if (H === heat && H.phase === 'run') { SND.tick(); const d = $('pDots').children[k - 1]; if (d) d.classList.add('lit'); $('pClock').textContent = k; }
     }, k * H.beat * 1000);
   }
+  allOutCheck();
   cancelAnimationFrame(rafId); rafId = requestAnimationFrame(frame);
+}
+function allOutCheck() {   // everyone tapped too soon: nobody can tap now, so end the heat instead of waiting out the clock
+  if (!H || H.phase !== 'run' || !H.foul.every(Boolean)) return;
+  const heat = H; $('pStatus').textContent = 'Everyone tapped too soon!';
+  setTimeout(() => { if (H === heat && H.phase === 'run') endHeat(); }, 1200);
 }
 function frame() {
   if (!H) return;
@@ -497,6 +505,7 @@ function frame() {
         H.phase = 'run'; H.start = H.watchStart + H.target * 1000;
         $('pWatch').classList.remove('lit'); $('pWatch').textContent = 'COPY IT';
         $('pStatus').textContent = 'Now! Tap when the same time has passed.'; SND.tick();
+        allOutCheck();
       }
       return;
     }
@@ -592,7 +601,8 @@ function renderReveal(rows) {
     const p = G.players[r.pi];
     const tap = r.taps.length ? r.taps.map(fmt2).join(' / ') + ' s' : '—';
     let off = esc(r.label);
-    if (r.err != null) off = (r.signed < 0 ? '−' : '+') + fmt2(Math.abs(r.signed)) + ' s ' + (Math.abs(r.signed) < 0.005 ? '' : r.signed < 0 ? 'early' : 'late');
+    if (r.err != null && r.taps.length === 2) off = fmt2(r.err) + ' s avg';   // two taps: show the average miss that was scored, not early and late cancelling out
+    else if (r.err != null) off = (r.signed < 0 ? '−' : '+') + fmt2(Math.abs(r.signed)) + ' s ' + (Math.abs(r.signed) < 0.005 ? '' : r.signed < 0 ? 'early' : 'late');
     const isB = r.pts / c.mult === 5;
     return `<tr><td><span class="tagn" aria-hidden="true">${r.tag}</span><b>${esc(p.name)}</b>${isB ? ' <span class="bull">BULLSEYE</span>' : ''}</td><td>${tap}</td><td>${off}</td><td class="r pts">${r.pts}</td></tr>`;
   }).join('');
