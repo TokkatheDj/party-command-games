@@ -612,7 +612,7 @@ function maybeEvents(){
   if (S.twist.id === 'back' && S.k === 0) showBanner(`↩️ Backwards! Z, Y, X… from ${letterAt(S,0)}`);
 }
 function advance(skip){
-  if (S.over) return;
+  if (S.over || S.strikes >= 3) return;   // nothing counts after the third strike, by tap or by key
   const k = S.k;
   if (skip){ S.skipped.push(k); SFX.skip(); }
   else {
@@ -655,16 +655,16 @@ function loop(now){
   if (left <= 0) return endScene('clock');
   if (frac <= 0 && S.strikes < 3) strike('stall');
 }
-$('#nextBtn').addEventListener('click', () => { if (S && S.strikes < 3) advance(false); });
+$('#nextBtn').addEventListener('click', () => advance(false));
 $('#buzzBtn').addEventListener('click', () => strike('buzz'));
-$('#freeBtn').addEventListener('click', () => { if (S.freebie && !S.over && S.strikes < 3){ S.freebie = false; advance(true); } });
+$('#freeBtn').addEventListener('click', () => { if (S.freebie && !S.over && S.strikes < 3){   /* keeps the freebie unspent */ S.freebie = false; advance(true); } });
 $('#endBtn').addEventListener('click', () => endScene('manual'));
 document.addEventListener('keydown', e => {
   if (!$('#sPlay').classList.contains('on') || !S || S.over) return;
   if (e.target && e.target.tagName === 'INPUT') return;
   if (e.code === 'Space'){ e.preventDefault(); if (document.activeElement && document.activeElement.tagName === 'BUTTON') document.activeElement.blur(); advance(false); }
   else if (e.key === 'b' || e.key === 'B'){ strike('buzz'); }
-  else if ((e.key === 'f' || e.key === 'F') && S.freebie){ S.freebie = false; advance(true); }
+  else if ((e.key === 'f' || e.key === 'F') && S.freebie && S.strikes < 3){ S.freebie = false; advance(true); }
 });
 
 /* ---------- RESULT ---------- */
@@ -756,7 +756,7 @@ renderPlayers();
 /* 27 Nov 2026: a double-tap must not press whatever button the next screen puts under the finger.
    A tap on a button is ignored if it lands within 400 ms and a fingertip's width of a tap on another button that has since left the screen. */
 (function () { let t0 = 0, el = null, x0 = 0, y0 = 0;
-  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b || !e.detail) return;   // keyboard presses and scripted clicks have no position: leave them alone
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button'); if (!b || (!e.detail && !e.clientX && !e.clientY)) return;   // keyboard presses and scripted clicks have no position: leave them alone
     const now = performance.now(), gone = el && !(el.isConnected && el.getClientRects().length);
     if (now - t0 < 400 && b !== el && gone && Math.hypot(e.clientX - x0, e.clientY - y0) < 56) { e.stopPropagation(); e.preventDefault(); return; }
     t0 = now; el = b; x0 = e.clientX; y0 = e.clientY; }, true); })();
