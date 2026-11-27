@@ -17,6 +17,8 @@
  *      below the screen where nothing scrolls to it (phone_fit_check.js).
  *   6. opens it where the browser refuses saved data, and flags a page that stops there
  *      (storage_block_check.js).
+ *   7. walks it with real double-taps, and flags a second tap that presses a button on the
+ *      next screen or confirms a "tap again" by itself (double_tap_check.js).
  *
  *   node smoke_new_apps.js kids_apps/2026-10-11-foo.html party_apps/bar.html
  * Prints one JSON object: { checked_at, apps: [{ app, title, ok, problems: [...], a11y: [...] }] }
@@ -58,6 +60,12 @@ const fit = require("./phone_fit_check");
 // (Human Remote, Rule Pile, Common Ground), all found by hand. storage_block_check.js opens the page where
 // the browser really refuses it; an app that throws there fails "does it play".
 const blocked = require("./storage_block_check");
+// Double-taps (27 Nov 2026): when a button changes the screen, the second tap of a double-tap presses
+// whatever the new screen puts under the finger. All ten factory games played end to end that week did it
+// somewhere (skipped a writer's hand-over, showed the referee's answer, wiped the final scores), all found
+// by hand. double_tap_check.js walks the page with real double-taps; an app that lets one through fails
+// "does it play". The fix is the guard in the prompts' PLAYS RIGHT block.
+const dtap = require("./double_tap_check");
 // AXE_CORE overrides the path on a machine without the canopy-hr checkout (the Surface).
 // axe-core is a dev dependency of cowork apps since 29 Oct; the canopy-hr path is the desktop's old copy
 const AXE = process.env.AXE_CORE || [path.join(__dirname, "node_modules/axe-core/axe.min.js"),
@@ -197,6 +205,7 @@ async function checkOne(browser, rel, vp) {
     const url = `http://127.0.0.1:${PORT}/${rel.split("/").map(encodeURIComponent).join("/")}`;
     problems.push(...(await fit.fitProblems(browser, url)).map(w => "doesn't fit a phone screen - " + w));
     problems.push(...(await blocked.storageProblems(browser, path.join(ROOT, rel))));
+    problems.push(...(await dtap.doubleTapProblems(browser, url)));
     out.apps.push({ app: rel, title, ok: problems.length === 0, problems, a11y: await a11yScan(browser, rel) });
   }
   await browser.close(); server.close();
