@@ -695,8 +695,9 @@ $('#phome').addEventListener('click', showMenu);
 $('#home').addEventListener('click', showMenu);
 $('#reset').addEventListener('click', e => {
   const b = e.currentTarget;
+  if (b.dataset.armed && performance.now() - (+b.dataset.armedAt || 0) < 700) return;   // 27 Nov 2026: a double-tap used to confirm by itself and clear every sticker
   if (b.dataset.armed) { prog = { done: LEVELS.map(() => false), partied: false }; saveProg(); delete b.dataset.armed; showMenu(); sfx.pop(); return; }
-  b.dataset.armed = '1'; b.textContent = 'Tap again to clear the stickers';
+  b.dataset.armed = '1'; b.dataset.armedAt = String(performance.now()); b.textContent = 'Tap again to clear the stickers';
   setTimeout(() => { delete b.dataset.armed; b.textContent = 'Start the week again'; }, 3000);
 });
 $('#snd').addEventListener('click', () => {
@@ -846,6 +847,15 @@ showMenu();
 resize();
 requestAnimationFrame(frame);
 window.__toby = { S, LEVELS, ITEMS, prog: () => prog, startLevel, startFree, tapItem, tapWorn, tapCase, startFun, funTap, showMenu };
+/* 27 Nov 2026: a double-tap must not press whatever button the next screen puts under the finger.
+   A tap on a button is ignored if it lands within 400 ms and a fingertip's width of a tap on another button that has since left the screen.
+   Buttons inside an element marked data-rapid are left alone (fast-tap play areas). */
+(function () { let t0 = 0, el = null, x0 = 0, y0 = 0;
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('button');
+    if (!b || b.closest('[data-rapid]') || (!e.detail && !e.clientX && !e.clientY)) return;
+    const now = performance.now(), gone = el && !(el.isConnected && el.getClientRects().length);
+    if (now - t0 < 400 && b !== el && gone && Math.hypot(e.clientX - x0, e.clientY - y0) < 56) { e.stopPropagation(); e.preventDefault(); return; }
+    t0 = now; el = b; x0 = e.clientX; y0 = e.clientY; }, true); })();
 </script>
 </body>
 </html>
